@@ -944,7 +944,7 @@ const styles = StyleSheet.create({
   volBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
   volBars: { flexDirection: "row", gap: 4, alignItems: "center", marginHorizontal: 4 },
   volSeg: { width: 12, height: 16, borderRadius: 3 },
-  musicFab: { position: "absolute", top: 60, right: 20, flexDirection: "row", alignItems: "center", gap: 7, height: 46, paddingHorizontal: 16, borderRadius: 23, borderWidth: 1.5, zIndex: 20, ...shadow.glow },
+  musicFab: { position: "absolute", bottom: 24, left: 20, flexDirection: "row", alignItems: "center", gap: 7, height: 46, paddingHorizontal: 16, borderRadius: 23, borderWidth: 1.5, zIndex: 20, ...shadow.glow },
   musicFabOn: { backgroundColor: colors.yellow, borderColor: colors.yellow },
   musicFabOff: { backgroundColor: colors.card, borderColor: colors.border },
   musicFabLabel: { fontSize: 14, fontWeight: "800", letterSpacing: 0.3 },
