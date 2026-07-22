@@ -21,13 +21,33 @@ import {
 } from "@/src/components/workout";
 import { useWorkoutAudio } from "@/src/hooks/useWorkoutAudio";
 
-const CUES = [
-  "Hold steady at 251 watts.",
-  "Bring cadence toward 90 rpm.",
-  "The gradient rises ahead.",
-  "Three minutes remain in this block.",
-  "Your heart rate is stable.",
-];
+// Alberto's cues are generated live from the rider's real telemetry so the
+// coaching reflects what's actually happening on the bike.
+const POWER_TARGET = 251;   // watts (matches the on-screen power target)
+const CAD_LOW = 90;         // rpm cadence window
+const CAD_HIGH = 100;
+
+function buildCue(t: { power: number; hr: number; cadence: number; speed: number; elapsed: number }, idx: number): string {
+  const cat = idx % 4;
+  if (cat === 0) {
+    const d = t.power - POWER_TARGET;
+    if (d < -12) return `You're at ${t.power} watts — lift it toward ${POWER_TARGET}.`;
+    if (d > 12) return `Ease off a touch, you're ${Math.round(d)} watts over target.`;
+    return `Nicely done — holding ${t.power} watts right on target.`;
+  }
+  if (cat === 1) {
+    if (t.cadence < CAD_LOW) return `Spin it up — bring your cadence toward ${CAD_LOW} rpm.`;
+    if (t.cadence > CAD_HIGH) return `Cadence is high at ${t.cadence} — settle back near ${CAD_HIGH}.`;
+    return `Great rhythm at ${t.cadence} rpm — keep it smooth.`;
+  }
+  if (cat === 2) {
+    if (t.hr > 170) return `Heart rate is climbing at ${t.hr} — breathe and stay controlled.`;
+    if (t.hr < 130) return `You have room to give — heart rate is ${t.hr}.`;
+    return `Heart rate steady at ${t.hr} beats — good work.`;
+  }
+  const m = Math.floor(t.elapsed / 60);
+  return `${m} minutes in at ${t.speed} kilometres per hour — strong and steady.`;
+}
 const CONTROLS = [
   { key: "skip", label: "Skip Interval", icon: "play-skip-forward" as const },
   { key: "extend", label: "Extend Recovery", icon: "time" as const },
@@ -158,16 +178,24 @@ export default function LiveWorkout() {
     }
   }, [telemetry]);
 
-  const { musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, speak, voiceOptions, voiceId, selectVoice, pitch, setPitch } = useWorkoutAudio();
+  const { musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, speak, voiceOptions, voiceId, selectVoice } = useWorkoutAudio();
+
+  // Keep the latest telemetry in a ref so cues read live values without the
+  // 5-second speak interval re-firing every telemetry tick.
+  const telemetryRef = React.useRef(telemetry);
+  React.useEffect(() => { telemetryRef.current = telemetry; }, [telemetry]);
+
+  // Live coaching line, rebuilt from current telemetry (also shown on screen).
+  const liveCue = paused ? "Workout paused — take a breath." : buildCue(telemetry, cueIdx);
 
   React.useEffect(() => {
-    const id = setInterval(() => setCueIdx((c) => (c + 1) % CUES.length), 5000);
+    const id = setInterval(() => setCueIdx((c) => (c + 1) % 4), 5000);
     return () => clearInterval(id);
   }, []);
 
-  // Speak each in-workout instruction aloud as it appears (Alberto, mild French accent).
+  // Speak each live cue aloud as it rotates (built from real-time stats).
   React.useEffect(() => {
-    if (!paused) speak(CUES[cueIdx]);
+    if (!paused) speak(buildCue(telemetryRef.current, cueIdx));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cueIdx]);
 
@@ -267,7 +295,7 @@ export default function LiveWorkout() {
           />
         </ScrollView>
 
-        <AlbertoLiveCue message={paused ? "Workout paused — take a breath." : CUES[cueIdx]} />
+        <AlbertoLiveCue message={liveCue} />
 
         <MusicButton musicOn={musicOn} onPress={() => setShowMusic(true)} />
 
@@ -330,7 +358,7 @@ export default function LiveWorkout() {
                 connectionState={connectionState}
                 stale={stale}
                 paused={paused}
-                cue={CUES[cueIdx]}
+                cue={liveCue}
                 trainerConnected={settings.hasTrainer}
                 wearableConnected={settings.hasWearable}
                 onPause={onPauseToggle}
@@ -381,8 +409,6 @@ export default function LiveWorkout() {
           voiceOptions={voiceOptions}
           voiceId={voiceId}
           selectVoice={selectVoice}
-          pitch={pitch}
-          setPitch={setPitch}
           onClose={() => setShowMusic(false)}
         />
       )}
