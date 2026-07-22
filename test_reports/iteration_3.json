@@ -1,0 +1,37 @@
+{
+  "summary": "Responsive layout verification for ROUJAUNE landscape cycling dashboard at TWO viewports: (1) tablet 1194x834 (compact=false) and (2) phone landscape 844x390 (compact=true, breakpoint height<560). ALL required behaviors pass. Tablet: hero-route height measured 432px, brand descriptor bottom y=166.5, alberto-coach-card top y=193 -> clean 26.5px vertical gap (no overlap). All 8 primary nav items (home, training, routes, workouts, calendar, progress, community, wellness) + Settings/Help render; start-ride-button fires toast 'Starting today's ride…'; nav-training fires toast 'Training Plan'; metric-summary-strip, training-plan-card, featured-route-card, calendar-card, progress-card, community-card, wellness-card, achievement-card all visible. Phone landscape: hero height = 367px (94% of 390, matches compact formula Math.round(height*0.94)); brand-header bottom y=136.8, alberto-coach-card top y=171 -> 34.17px clean vertical gap, descriptor 'Personalised cycling training with Alberto.' NOT covered. Sidebar is vertically scrollable: adjacent nav-item bounding boxes contain ZERO overlaps (nav_boxes_sorted verified) and nav-home, nav-training, nav-workouts, nav-settings, nav-help are all reachable after scrollIntoView; nav-settings tap fires 'Settings' toast, confirming active state + toast. Main dashboard-scroll reveals metric-summary-strip and all four bottom cards (progress, community, wellness, achievement) below the hero without layout breakage. Only pre-existing (non-blocking) console deprecations from iteration_1/2 remain (shadow*/textShadow*/pointerEvents prop/useNativeDriver on web).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "theme/shadow", "issue": "Console warning: '\"shadow*\" style props are deprecated. Use \"boxShadow\".' (pre-existing from iteration_1/2). Reference: /app/frontend/src/theme.ts shadow.card/shadow.glow."},
+      {"component": "BrandHeader / HeroRoute text", "issue": "Console warning: '\"textShadow*\" style props are deprecated. Use \"textShadow\".' (pre-existing). Reference: /app/frontend/src/components/BrandHeader.tsx:71-80 and /app/frontend/src/components/HeroRoute.tsx:140-142."},
+      {"component": "AlbertoCoachCard portrait overlay / Toast", "issue": "Console warning: 'props.pointerEvents is deprecated. Use style.pointerEvents' (pre-existing). Reference: /app/frontend/src/components/AlbertoCoachCard.tsx:27 and /app/frontend/app/index.tsx:32."},
+      {"component": "Animated (Toast / Touchable)", "issue": "Console warning on web: 'useNativeDriver is not supported on web ... Falling back to JS-based animation' (pre-existing). Reference: /app/frontend/app/index.tsx:22,24. Gate with Platform.OS !== 'web'."}
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_3.json",
+    "/app/test_reports/screens/iter3_tablet.png",
+    "/app/test_reports/screens/iter3_phone_hero.png",
+    "/app/test_reports/screens/iter3_phone_scrolled.png"
+  ],
+  "action_items": [
+    "(carried over, non-blocking) Migrate deprecated shadow*/textShadow*/pointerEvents-prop usages; gate useNativeDriver behind Platform.OS !== 'web'."
+  ],
+  "critical_code_review_comments": [
+    "index.tsx: compact = height < 560 correctly triggers at 390 phone-landscape height; navWidth compact range 72-88, hero height Math.max(320, round(height*0.94)) measured to 367 as expected.",
+    "SideNavigation.tsx: <ScrollView> around items+footer with contentContainerStyle flexGrow:1/justifyContent:space-between makes the sidebar scrollable while keeping settings/help pinned to bottom when space allows. Verified sidebar scrolls in compact mode; no adjacent NavRow overlaps at 390h.",
+    "BrandHeader.tsx: compact scale 0.72 on Wordmark3D + reduced tagline (24) & descriptor (13) fit within compact hero without pushing over the coach card (measured 34.17px gap at 844x390).",
+    "HeroRoute.tsx: signature/weather areas re-anchored via `compact && { top: '26%' }` and `top: '50%'` respectively — Alberto signature and 18°C/Alpe d'Huez both visible and not colliding with the coach card at 844x390.",
+    "AlbertoCoachCard.tsx: compact reduces portrait width (108) and text sizes; card width uses Math.min(380, width*0.56) in compact — measured 380px at 844 viewport (56% of mainWidth≈678 => 380 clamp), fits inside hero without horizontal overflow."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "100%"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Two viewports required: tablet 1194x834 and phone landscape 844x390. Compact breakpoint height<560. For phone-landscape sidebar tests, items above nav-calendar sit at negative y before scrolling; use element.scroll_into_view_if_needed() before clicking. Measured non-overlap gaps: tablet 26.5px, phone 34.17px between brand-header bottom and alberto-coach-card top."
+}

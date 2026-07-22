@@ -14,9 +14,13 @@ const STEP_Y = 1.5;
 const STEP_X = 0.7;
 
 /** Faux-3D extruded wordmark: stacked dark copies behind + full-colour top + gloss highlight. */
-function Wordmark3D() {
+function Wordmark3D({ scale = 1 }: { scale?: number }) {
+  const w = W * scale;
+  const h = H * scale;
+  const sy = STEP_Y * scale;
+  const sx = STEP_X * scale;
   return (
-    <View style={{ width: W + DEPTH * STEP_X, height: H + DEPTH * STEP_Y }} testID="brand-wordmark">
+    <View style={{ width: w + DEPTH * sx, height: h + DEPTH * sy }} testID="brand-wordmark">
       {Array.from({ length: DEPTH }).map((_, i) => {
         const d = DEPTH - i; // deepest (largest offset) drawn first
         // shade fades from dark maroon (far) to mid (near) for a lit-edge look
@@ -30,7 +34,7 @@ function Wordmark3D() {
             source={wordmark}
             tintColor={`rgb(${r},${g},${b})`}
             contentFit="contain"
-            style={{ position: "absolute", left: d * STEP_X, top: d * STEP_Y, width: W, height: H }}
+            style={{ position: "absolute", left: d * sx, top: d * sy, width: w, height: h }}
           />
         );
       })}
@@ -39,20 +43,20 @@ function Wordmark3D() {
         source={wordmark}
         tintColor="rgb(255,236,180)"
         contentFit="contain"
-        style={{ position: "absolute", left: -1.2, top: -1.4, width: W, height: H }}
+        style={{ position: "absolute", left: -1.2, top: -1.4, width: w, height: h }}
       />
       {/* full-colour face on top */}
-      <Image source={wordmark} contentFit="contain" style={{ position: "absolute", left: 0, top: 0, width: W, height: H }} accessibilityLabel="ROUJAUNE" />
+      <Image source={wordmark} contentFit="contain" style={{ position: "absolute", left: 0, top: 0, width: w, height: h }} accessibilityLabel="ROUJAUNE" />
     </View>
   );
 }
 
-export function BrandHeader() {
+export function BrandHeader({ compact = false }: { compact?: boolean }) {
   return (
     <View testID="brand-header">
-      <Wordmark3D />
-      <Text style={styles.tagline}>{brand.tagline}</Text>
-      <Text style={styles.descriptor}>{brand.descriptor}</Text>
+      <Wordmark3D scale={compact ? 0.72 : 1} />
+      <Text style={[styles.tagline, compact && { fontSize: 24, marginTop: 6 }]}>{brand.tagline}</Text>
+      <Text style={[styles.descriptor, compact && { fontSize: 13 }]}>{brand.descriptor}</Text>
     </View>
   );
 }

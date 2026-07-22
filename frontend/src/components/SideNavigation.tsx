@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -52,28 +52,36 @@ export function SideNavigation({
   active,
   onSelect,
   width,
+  compact = false,
 }: {
   active: string;
   onSelect: (key: string) => void;
   width: number;
+  compact?: boolean;
 }) {
   return (
     <View style={[styles.nav, { width }]} testID="side-navigation">
-      <View style={styles.logoWrap}>
-        <Image source={logoIcon} style={styles.logo} contentFit="contain" />
+      <View style={[styles.logoWrap, compact && { width: 42, height: 42, marginBottom: spacing.sm }]}>
+        <Image source={logoIcon} style={compact ? { width: 38, height: 38 } : styles.logo} contentFit="contain" />
       </View>
 
-      <View style={styles.items}>
-        {navItems.map((item) => (
-          <NavRow key={item.key} item={item} active={active === item.key} onPress={() => onSelect(item.key)} />
-        ))}
-      </View>
+      <ScrollView
+        style={{ width: "100%" }}
+        contentContainerStyle={styles.scrollBody}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.items}>
+          {navItems.map((item) => (
+            <NavRow key={item.key} item={item} active={active === item.key} onPress={() => onSelect(item.key)} />
+          ))}
+        </View>
 
-      <View style={styles.footer}>
-        {navFooter.map((item) => (
-          <NavRow key={item.key} item={item} active={active === item.key} onPress={() => onSelect(item.key)} />
-        ))}
-      </View>
+        <View style={styles.footer}>
+          {navFooter.map((item) => (
+            <NavRow key={item.key} item={item} active={active === item.key} onPress={() => onSelect(item.key)} />
+          ))}
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -94,8 +102,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   logo: { width: 46, height: 46 },
-  items: { flex: 1, width: "100%", gap: 4, paddingHorizontal: 8 },
-  footer: { width: "100%", gap: 4, paddingHorizontal: 8, paddingTop: spacing.sm },
+  scrollBody: { width: "100%", flexGrow: 1, justifyContent: "space-between", paddingBottom: spacing.sm },
+  items: { width: "100%", gap: 4, paddingHorizontal: 8 },
+  footer: { width: "100%", gap: 4, paddingHorizontal: 8, paddingTop: spacing.md },
   rowWrap: { width: "100%" },
   row: {
     alignItems: "center",

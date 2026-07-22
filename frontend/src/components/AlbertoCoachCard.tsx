@@ -8,16 +8,17 @@ import { PrimaryButton } from "./ui";
 
 const albertoPortrait = require("../../assets/images/coach_alberto_b2.jpg");
 
-export function AlbertoCoachCard({ width, onStart }: { width: number; onStart: () => void }) {
+export function AlbertoCoachCard({ width, onStart, compact = false }: { width: number; onStart: () => void; compact?: boolean }) {
+  const portraitW = compact ? 108 : 150;
   return (
     <LinearGradient
       testID="alberto-coach-card"
       colors={["rgba(23,20,18,0.92)", "rgba(10,9,8,0.92)"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={[styles.card, { width }]}
+      style={[styles.card, { width }, compact && { minHeight: 150 }]}
     >
-      <View style={styles.portraitWrap}>
+      <View style={[styles.portraitWrap, { width: portraitW }, compact && { minHeight: 150 }]}>
         <Image source={albertoPortrait} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition="top center" accessibilityLabel="Coach Alberto" />
         <LinearGradient
           colors={["transparent", "rgba(10,9,8,0.9)"]}
@@ -28,17 +29,17 @@ export function AlbertoCoachCard({ width, onStart }: { width: number; onStart: (
         />
       </View>
 
-      <View style={styles.body}>
+      <View style={[styles.body, compact && { padding: spacing.sm }]}>
         <View style={styles.headRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.name}>{coach.name}</Text>
+            <Text style={[styles.name, compact && { fontSize: 15 }]}>{coach.name}</Text>
             <Text style={styles.role}>{coach.role}</Text>
           </View>
-          <Text style={styles.quoteMark}>&#8220;</Text>
+          <Text style={[styles.quoteMark, compact && { fontSize: 34, lineHeight: 34 }]}>&#8220;</Text>
         </View>
 
-        <Text style={styles.quote}>{coach.quote}</Text>
-        <Text style={styles.support}>{coach.support}</Text>
+        <Text style={[styles.quote, compact && { fontSize: 18, lineHeight: 21 }]}>{coach.quote}</Text>
+        <Text style={[styles.support, compact && { fontSize: 11, lineHeight: 15, marginTop: 5 }]}>{coach.support}</Text>
 
         <PrimaryButton
           testID="start-ride-button"

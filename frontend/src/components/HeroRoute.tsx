@@ -38,11 +38,13 @@ export function HeroRoute({
   height,
   onStart,
   onToast,
+  compact = false,
 }: {
   width: number;
   height: number;
   onStart: () => void;
   onToast: (m: string) => void;
+  compact?: boolean;
 }) {
   return (
     <View style={[styles.wrap, { height }]} testID="hero-route">
@@ -68,25 +70,25 @@ export function HeroRoute({
 
       {/* top-left brand */}
       <View style={styles.brandArea}>
-        <BrandHeader />
+        <BrandHeader compact={compact} />
       </View>
 
       {/* top-right status */}
       <StatusBar onPress={onToast} />
 
       {/* right: Alberto signature + coach */}
-      <View style={styles.signatureArea}>
-        <Text style={styles.signature}>Alberto</Text>
+      <View style={[styles.signatureArea, compact && { top: "26%" }]}>
+        <Text style={[styles.signature, compact && { fontSize: 26 }]}>Alberto</Text>
         <Text style={styles.signatureSub}>Your Coach</Text>
       </View>
 
       {/* right-lower weather */}
-      <View style={styles.weatherArea}>
+      <View style={[styles.weatherArea, compact && { top: "50%" }]}>
         <View style={styles.weatherTop}>
-          <Ionicons name="sunny" size={18} color={colors.yellow} />
-          <Text style={styles.temp}>{heroRoute.temp}</Text>
+          <Ionicons name="sunny" size={compact ? 15 : 18} color={colors.yellow} />
+          <Text style={[styles.temp, compact && { fontSize: 18 }]}>{heroRoute.temp}</Text>
         </View>
-        <Text style={styles.place}>{heroRoute.place}</Text>
+        <Text style={[styles.place, compact && { fontSize: 14 }]}>{heroRoute.place}</Text>
         <Text style={styles.routeMeta}>
           {heroRoute.distance}  <Text style={{ color: colors.textFaint }}>•</Text>  {heroRoute.elevation}
         </Text>
@@ -94,7 +96,11 @@ export function HeroRoute({
 
       {/* bottom-left coaching card */}
       <View style={styles.coachArea}>
-        <AlbertoCoachCard width={Math.min(460, width * 0.44)} onStart={onStart} />
+        <AlbertoCoachCard
+          width={compact ? Math.min(380, width * 0.56) : Math.min(460, width * 0.44)}
+          onStart={onStart}
+          compact={compact}
+        />
       </View>
     </View>
   );

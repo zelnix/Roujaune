@@ -44,11 +44,14 @@ function Toast({ message }: { message: { id: number; text: string } | null }) {
 }
 
 export default function Dashboard() {
-  const { width } = useWindowDimensions();
-  const navWidth = Math.max(84, Math.min(104, width * 0.085));
+  const { width, height } = useWindowDimensions();
+  const compact = height < 560;
+  const navWidth = compact
+    ? Math.max(72, Math.min(88, width * 0.09))
+    : Math.max(84, Math.min(104, width * 0.085));
   const contentWidth = width - navWidth;
   const mainWidth = contentWidth - spacing.lg * 2;
-  const heroHeight = 432;
+  const heroHeight = compact ? Math.max(320, Math.round(height * 0.94)) : 432;
 
   const [active, setActive] = React.useState("home");
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
@@ -70,11 +73,11 @@ export default function Dashboard() {
       <StatusBar hidden />
       <SafeAreaView style={styles.container} edges={["top", "bottom", "left"]}>
         <View style={styles.row}>
-          <SideNavigation active={active} onSelect={onSelectNav} width={navWidth} />
+          <SideNavigation active={active} onSelect={onSelectNav} width={navWidth} compact={compact} />
 
           <ScrollView
             style={{ flex: 1 }}
-            contentContainerStyle={styles.content}
+            contentContainerStyle={[styles.content, compact && { gap: spacing.sm, paddingHorizontal: spacing.md }]}
             showsVerticalScrollIndicator={false}
             testID="dashboard-scroll"
           >
@@ -83,11 +86,12 @@ export default function Dashboard() {
               height={heroHeight}
               onStart={() => showToast("Starting today's ride…")}
               onToast={showToast}
+              compact={compact}
             />
 
             <MetricSummaryStrip />
 
-            <View style={styles.midRow}>
+            <View style={[styles.midRow, compact && { minHeight: 210 }]}>
               <View style={styles.midCol}>
                 <TrainingPlanCard onPress={() => showToast("Opening training plan")} />
               </View>
