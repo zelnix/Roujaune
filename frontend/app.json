@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "Roujaune",
+    "slug": "roujaune",
     "version": "1.0.0",
     "orientation": "landscape",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
+    "scheme": "roujaune",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
