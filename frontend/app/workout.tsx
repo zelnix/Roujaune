@@ -9,6 +9,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing, shadow } from "@/src/theme";
 import { useTelemetry } from "@/src/hooks/useTelemetry";
 import { rideRecorder } from "@/src/lib/ride";
+import { getLastRouteId, setLastRouteId } from "@/src/lib/prefs";
 import { routeVideos, nextInterval, currentWorkout } from "@/src/data";
 import { RouteVideo } from "@/src/components/RouteVideo";
 import {
@@ -88,6 +89,7 @@ export default function LiveWorkout() {
   const [expanded, setExpanded] = React.useState(false);
   const [routeIdx, setRouteIdx] = React.useState(autoRouteIndex);
   const [routeAuto, setRouteAuto] = React.useState(true);
+  const [lastRouteId, setLastRouteIdState] = React.useState<string | null>(null);
   const [showRoutes, setShowRoutes] = React.useState(false);
   const [showControls, setShowControls] = React.useState(false);
   const [showMenu, setShowMenu] = React.useState(false);
@@ -102,6 +104,21 @@ export default function LiveWorkout() {
   React.useEffect(() => {
     rideRecorder.reset({ workout: "Threshold Climb", route: "Alpe d'Huez" });
   }, []);
+
+  // Restore the rider's last route across sessions (falls back to auto-match).
+  React.useEffect(() => {
+    (async () => {
+      const id = await getLastRouteId();
+      if (!id) return;
+      const i = routeVideos.findIndex((r) => r.id === id);
+      if (i >= 0) {
+        setRouteIdx(i);
+        setRouteAuto(false);
+        setLastRouteIdState(id);
+        showToast(`Resuming your last route: ${routeVideos[i].title}`);
+      }
+    })();
+  }, [showToast]);
 
   // Record live telemetry so the summary screen can compute real aggregates.
   React.useEffect(() => {
@@ -142,16 +159,22 @@ export default function LiveWorkout() {
   };
 
   const activeRoute = routeVideos[routeIdx];
-  const onSelectRoute = (i: number) => { setRouteIdx(i); setRouteAuto(false); setShowRoutes(false); showToast(`Route: ${routeVideos[i].title}`); };
+  const onSelectRoute = (i: number) => {
+    setRouteIdx(i); setRouteAuto(false); setShowRoutes(false);
+    setLastRouteIdState(routeVideos[i].id); setLastRouteId(routeVideos[i].id);
+    showToast(`Route: ${routeVideos[i].title}`);
+  };
   const onAutoRoute = () => {
     const i = autoRouteIndex();
     setRouteIdx(i); setRouteAuto(true); setShowRoutes(false);
+    setLastRouteIdState(null); setLastRouteId(null);
     showToast(`Auto-matched to your ${currentWorkout.type.toLowerCase()}: ${routeVideos[i].title}`);
   };
   const onShuffleRoute = () => {
     let i = routeIdx;
     if (routeVideos.length > 1) { while (i === routeIdx) i = Math.floor(Math.random() * routeVideos.length); }
     setRouteIdx(i); setRouteAuto(false); setShowRoutes(false);
+    setLastRouteIdState(routeVideos[i].id); setLastRouteId(routeVideos[i].id);
     showToast(`Surprise route: ${routeVideos[i].title}`);
   };
 
@@ -175,7 +198,7 @@ export default function LiveWorkout() {
                   {expanded ? (
                     <VideoPlaceholder width={centerW} onRestore={() => setExpanded(false)} />
                   ) : (
-                    <RouteVideo source={activeRoute.url} title={routeAuto ? `${activeRoute.title} · Auto-matched` : activeRoute.title} playing={!paused} muted width={centerW} onToggleExpand={() => setExpanded(true)} expanded={false}>
+                    <RouteVideo source={activeRoute.url} title={`${activeRoute.title}${routeAuto ? " · Auto-matched" : activeRoute.id === lastRouteId ? " · Last ride" : ""}`} playing={!paused} muted width={centerW} onToggleExpand={() => setExpanded(true)} expanded={false}>
                       <View style={styles.inlineRoutes} pointerEvents="box-none">
                         <RoutesButton onPress={() => setShowRoutes(true)} testID="inline-routes" />
                       </View>
@@ -281,6 +304,7 @@ export default function LiveWorkout() {
           activeIndex={routeIdx}
           recommendedTag={currentWorkout.recommendedTag}
           auto={routeAuto}
+          lastRouteId={lastRouteId}
           onSelect={onSelectRoute}
           onAuto={onAutoRoute}
           onShuffle={onShuffleRoute}

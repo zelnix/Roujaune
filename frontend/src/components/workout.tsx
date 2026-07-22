@@ -572,8 +572,8 @@ export function RoutesButton({ onPress, testID = "routes-button" }: { onPress: (
   );
 }
 
-export function RoutePicker({ routes, activeIndex, recommendedTag, auto, onSelect, onAuto, onShuffle, onClose }: {
-  routes: RouteOption[]; activeIndex: number; recommendedTag?: string; auto?: boolean;
+export function RoutePicker({ routes, activeIndex, recommendedTag, auto, lastRouteId, onSelect, onAuto, onShuffle, onClose }: {
+  routes: RouteOption[]; activeIndex: number; recommendedTag?: string; auto?: boolean; lastRouteId?: string | null;
   onSelect: (i: number) => void; onAuto: () => void; onShuffle: () => void; onClose: () => void;
 }) {
   return (
@@ -602,6 +602,7 @@ export function RoutePicker({ routes, activeIndex, recommendedTag, auto, onSelec
           {routes.map((r, i) => {
             const active = i === activeIndex;
             const reco = !!recommendedTag && r.tag === recommendedTag;
+            const isLast = !!lastRouteId && r.id === lastRouteId;
             return (
               <Pressable key={r.id} testID={`route-option-${i}`} style={[styles.rpCard, active && styles.rpCardActive]} onPress={() => onSelect(i)} accessibilityRole="button" accessibilityLabel={`Select route ${r.title}`}>
                 <View style={styles.rpThumb}>
@@ -616,9 +617,11 @@ export function RoutePicker({ routes, activeIndex, recommendedTag, auto, onSelec
                   <View style={styles.rpStat}><MaterialCommunityIcons name="map-marker-distance" size={12} color={colors.textDim} /><Text style={styles.rpStatText}>{r.distance}</Text></View>
                   <View style={styles.rpStat}><MaterialCommunityIcons name="terrain" size={12} color={colors.textDim} /><Text style={styles.rpStatText}>{r.elevation}</Text></View>
                 </View>
-                {reco && (
+                {isLast ? (
+                  <View style={[styles.rpReco, styles.rpLast]}><Ionicons name="time" size={10} color="#8FD3FF" /><Text style={[styles.rpRecoText, { color: "#8FD3FF" }]}>Your last ride</Text></View>
+                ) : reco ? (
                   <View style={styles.rpReco}><Ionicons name="star" size={10} color={colors.yellow} /><Text style={styles.rpRecoText}>Great for your workout</Text></View>
-                )}
+                ) : null}
               </Pressable>
             );
           })}
@@ -788,6 +791,7 @@ const styles = StyleSheet.create({
   rpActionText: { color: colors.white, fontSize: 12.5, fontWeight: "700" },
   rpReco: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8, backgroundColor: "rgba(245,179,1,0.12)", borderRadius: radius.sm, paddingHorizontal: 8, paddingVertical: 4, alignSelf: "flex-start" },
   rpRecoText: { color: colors.yellow, fontSize: 10.5, fontWeight: "700" },
+  rpLast: { backgroundColor: "rgba(143,211,255,0.12)" },
   rpGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
   rpCard: { width: 224, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 10, gap: 2 },
   rpCardActive: { borderColor: colors.yellow, borderWidth: 2 },
