@@ -4,18 +4,12 @@ import { Image } from "expo-image";
 import { colors } from "../theme";
 import { brand } from "../data";
 
-const logoIcon = require("../../assets/images/logo_glyph_t.png");
+const wordmark = require("../../assets/images/wordmark_t.png");
 
 export function BrandHeader() {
   return (
     <View testID="brand-header">
-      <View style={styles.row}>
-        <Image source={logoIcon} style={styles.icon} contentFit="contain" accessibilityLabel="ROUJAUNE cyclist logo" />
-        <Text style={styles.wordmark} accessibilityLabel="ROUJAUNE">
-          <Text style={{ color: colors.red }}>ROU</Text>
-          <Text style={{ color: colors.yellow }}>JAUNE</Text>
-        </Text>
-      </View>
+      <Image source={wordmark} style={styles.wordmark} contentFit="contain" accessibilityLabel="ROUJAUNE" />
       <Text style={styles.tagline}>{brand.tagline}</Text>
       <Text style={styles.descriptor}>{brand.descriptor}</Text>
     </View>
@@ -23,21 +17,13 @@ export function BrandHeader() {
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", gap: 10 },
-  icon: { width: 58, height: 58 },
-  wordmark: {
-    fontSize: 44,
-    fontWeight: "900",
-    fontStyle: "italic",
-    letterSpacing: 1,
-    textShadowColor: "rgba(0,0,0,0.5)",
-    textShadowRadius: 8,
-  },
+  // 1819x222 source -> ~8.19:1 aspect
+  wordmark: { width: 385, height: 47 },
   tagline: {
     color: colors.white,
     fontSize: 32,
     fontWeight: "800",
-    marginTop: 6,
+    marginTop: 10,
     letterSpacing: -0.5,
     textShadowColor: "rgba(0,0,0,0.6)",
     textShadowRadius: 8,
