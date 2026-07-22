@@ -26,8 +26,11 @@ const FEMALE_NAMES = ["monica", "mónica", "paulina", "marisol", "esperanza", "m
 const MALE_NAMES = ["jorge", "diego", "carlos", "enrique", "miguel", "pablo", "juan", "hombre", "gonzalo", "daniel", "arthur", "oliver", "aaron", "fred", "reed", "rishi"];
 function genderOf(v: Speech.Voice): "male" | "female" | "neutral" {
   const s = `${v.name ?? ""} ${v.identifier ?? ""}`.toLowerCase();
-  if (s.includes("female") || FEMALE_NAMES.some((n) => s.includes(n))) return "female";
-  if (/ male|#male/.test(s) || MALE_NAMES.some((n) => s.includes(n))) return "male";
+  const isFemale = s.includes("female") || FEMALE_NAMES.some((n) => s.includes(n));
+  if (isFemale) return "female";
+  // Strip "female" so the substring "male" inside it can't cause a false match.
+  const sm = s.replace(/female/g, "");
+  if (sm.includes("male") || MALE_NAMES.some((n) => s.includes(n))) return "male";
   return "neutral";
 }
 
@@ -72,22 +75,25 @@ export function useWorkoutAudio() {
         const voices = await Speech.getAvailableVoicesAsync();
         const relevant = voices.filter((v) => {
           const l = (v.language ?? "").toLowerCase();
-          return l.startsWith("es") || l.startsWith("en");
+          return v.identifier && (l.startsWith("es") || l.startsWith("en"));
         });
-        // De-duplicate by accent + gender so the list stays clean.
-        const seen = new Set<string>();
+        // Keep EVERY voice (deduped by identifier only) so a male voice is
+        // always reachable even when the OS doesn't expose gender metadata.
+        const seenId = new Set<string>();
         const opts: VoiceOption[] = [];
+        const labelCount: Record<string, number> = {};
         for (const v of relevant) {
-          if (!v.identifier) continue;
+          if (seenId.has(v.identifier)) continue;
+          seenId.add(v.identifier);
           const gender = genderOf(v);
           const accent = accentOf(v.language ?? "");
-          const key = `${accent}|${gender}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          const label = `${accent} ${gender === "female" ? "(female)" : gender === "male" ? "(male)" : ""}`.trim();
+          const gTag = gender === "female" ? " (female)" : gender === "male" ? " (male)" : "";
+          let label = `${accent}${gTag}`;
+          const n = (labelCount[label] = (labelCount[label] ?? 0) + 1);
+          if (n > 1) label = `${label} ${n}`;
           opts.push({ id: v.identifier, label, accent, gender, lang: v.language ?? "es-ES" });
         }
-        // Sort: Spanish male first (Alberto's default), then other males, then females.
+        // Sort: Spanish male first (Alberto's default), then other males, neutral, female.
         const rank = (o: VoiceOption) =>
           (o.accent === "Spanish" && o.gender === "male" ? 0 : o.gender === "male" ? 1 : o.gender === "neutral" ? 2 : 3);
         opts.sort((a, b) => rank(a) - rank(b) || a.label.localeCompare(b.label));
