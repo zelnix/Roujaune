@@ -1,7 +1,7 @@
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import * as Speech from "expo-speech";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getVoiceId, setVoiceId } from "../lib/prefs";
+import { getVoiceId, setVoiceId, getVoicePitch, setVoicePitch } from "../lib/prefs";
 
 // Royalty-free instrumental track used as upbeat cycling music (admin-replaceable).
 const MUSIC_SOURCE = { uri: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3" };
@@ -74,6 +74,8 @@ export function useWorkoutAudio() {
   const voiceReady = useRef(false);
   const [voiceOptions, setVoiceOptions] = useState<VoiceOption[]>([]);
   const [voiceId, setVoiceIdState] = useState<string | undefined>(undefined);
+  const [pitch, setPitchState] = useState(0.8); // <1 = deeper/masculine, >1 = higher
+  const pitchRef = useRef(0.8);
 
   // Build a curated, de-duplicated list of Spanish/English voices for the
   // selector, and choose Alberto's default (a Spanish male) or the rider's
@@ -112,6 +114,8 @@ export function useWorkoutAudio() {
           voice.current = { id: chosen.id, lang: chosen.lang };
           setVoiceIdState(chosen.id);
         }
+        const savedPitch = await getVoicePitch();
+        if (savedPitch != null) { pitchRef.current = savedPitch; setPitchState(savedPitch); }
       } catch {
         /* keep default es-ES */
       } finally {
@@ -159,14 +163,30 @@ export function useWorkoutAudio() {
     Speech.stop();
     duck(true);
     Speech.speak(numbersToWords(text), {
-      voice: voice.current.id,        // male Spanish voice → mild Spanish accent
+      voice: voice.current.id,
       language: voice.current.lang,
-      pitch: 0.9,
+      pitch: pitchRef.current,        // rider-controlled tone (deep = masculine)
       rate: 0.92,                     // clear, well-paced English
       onDone: () => duck(false),
       onStopped: () => duck(false),
       onError: () => duck(false),
     });
+  }, [voiceOn, duck]);
+
+  /** Adjust the voice tone/pitch (lower = deeper/masculine), persist it, preview. */
+  const setPitch = useCallback((p: number) => {
+    const clamped = Math.max(0.5, Math.min(1.5, Math.round(p * 100) / 100));
+    pitchRef.current = clamped;
+    setPitchState(clamped);
+    setVoicePitch(clamped);
+    Speech.stop();
+    if (voiceOn) {
+      duck(true);
+      Speech.speak(PREVIEW, {
+        voice: voice.current.id, language: voice.current.lang, pitch: clamped, rate: 0.92,
+        onDone: () => duck(false), onStopped: () => duck(false), onError: () => duck(false),
+      });
+    }
   }, [voiceOn, duck]);
 
   /** Change Alberto's voice, persist it, and speak a short preview. */
@@ -180,11 +200,11 @@ export function useWorkoutAudio() {
     if (voiceOn) {
       duck(true);
       Speech.speak(PREVIEW, {
-        voice: opt.id, language: opt.lang, pitch: 0.9, rate: 0.92,
+        voice: opt.id, language: opt.lang, pitch: pitchRef.current, rate: 0.92,
         onDone: () => duck(false), onStopped: () => duck(false), onError: () => duck(false),
       });
     }
   }, [voiceOptions, voiceOn, duck]);
 
-  return { musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, speak, voiceOptions, voiceId, selectVoice };
+  return { musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, speak, voiceOptions, voiceId, selectVoice, pitch, setPitch };
 }

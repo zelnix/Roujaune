@@ -2,6 +2,25 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const LAST_ROUTE_KEY = "roujaune:lastRouteId";
 const VOICE_KEY = "roujaune:voiceId";
+const PITCH_KEY = "roujaune:voicePitch";
+
+/** Persisted voice pitch (voice tone). */
+export async function getVoicePitch(): Promise<number | null> {
+  try {
+    const v = await AsyncStorage.getItem(PITCH_KEY);
+    return v ? parseFloat(v) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function setVoicePitch(p: number): Promise<void> {
+  try {
+    await AsyncStorage.setItem(PITCH_KEY, String(p));
+  } catch {
+    /* noop */
+  }
+}
 
 /** Persisted identifier of Alberto's chosen TTS voice (across sessions). */
 export async function getVoiceId(): Promise<string | null> {

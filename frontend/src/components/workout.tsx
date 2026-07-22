@@ -705,11 +705,14 @@ export function SettingsPanel({ settings, setSetting, onClose }: {
   );
 }
 
-export function MusicPanel({ musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, voiceOptions, voiceId, selectVoice, onClose }: {
+export function MusicPanel({ musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, voiceOptions, voiceId, selectVoice, pitch, setPitch, onClose }: {
   musicOn: boolean; toggleMusic: () => void; volume: number; setVolume: (v: number) => void; voiceOn: boolean; toggleVoice: () => void;
-  voiceOptions: { id: string; label: string; sublabel: string; accent: string; gender: "male" | "female" | "neutral" }[]; voiceId?: string; selectVoice: (id: string) => void; onClose: () => void;
+  voiceOptions: { id: string; label: string; sublabel: string; accent: string; gender: "male" | "female" | "neutral" }[]; voiceId?: string; selectVoice: (id: string) => void;
+  pitch: number; setPitch: (p: number) => void; onClose: () => void;
 }) {
   const level = Math.round(volume * 5);
+  // Map pitch 0.5–1.5 to a 5-segment "deep ↔ high" tone meter.
+  const toneLevel = Math.max(1, Math.min(5, Math.round(((pitch - 0.5) / 1.0) * 4) + 1));
   return (
     <Pressable style={styles.rpOverlay} onPress={onClose} testID="music-panel">
       <Pressable style={styles.spPanel} onPress={() => { /* swallow */ }}>
@@ -740,6 +743,18 @@ export function MusicPanel({ musicOn, toggleMusic, volume, setVolume, voiceOn, t
           <View style={styles.spIcon}><Ionicons name="mic" size={18} color={colors.yellow} /></View>
           <View style={{ flex: 1 }}><Text style={styles.spLabel}>Alberto&apos;s voice</Text><Text style={styles.spSub}>Spoken cues · softens music</Text></View>
           <Switch testID="toggle-voice" value={voiceOn} onValueChange={toggleVoice} trackColor={{ true: colors.red, false: "rgba(255,255,255,0.2)" }} thumbColor="#fff" />
+        </View>
+
+        <View style={[styles.spRow, !voiceOn && { opacity: 0.4 }]} pointerEvents={voiceOn ? "auto" : "none"}>
+          <View style={styles.spIcon}><Ionicons name="options" size={18} color={colors.yellow} /></View>
+          <View style={{ flex: 1 }}><Text style={styles.spLabel}>Voice tone</Text><Text style={styles.spSub}>Deep (masculine) ↔ high</Text></View>
+          <Pressable testID="tone-down" onPress={() => setPitch(pitch - 0.1)} style={styles.volBtn} hitSlop={8}><Ionicons name="remove" size={18} color="#fff" /></Pressable>
+          <View style={styles.volBars}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <View key={i} style={[styles.volSeg, { backgroundColor: i < toneLevel ? colors.yellow : "rgba(255,255,255,0.15)" }]} />
+            ))}
+          </View>
+          <Pressable testID="tone-up" onPress={() => setPitch(pitch + 0.1)} style={styles.volBtn} hitSlop={8}><Ionicons name="add" size={18} color="#fff" /></Pressable>
         </View>
 
         <View style={[styles.voiceBlock, !voiceOn && { opacity: 0.4 }]} pointerEvents={voiceOn ? "auto" : "none"}>
