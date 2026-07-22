@@ -51,12 +51,12 @@ function Wordmark3D({ scale = 1 }: { scale?: number }) {
   );
 }
 
-export function BrandHeader({ compact = false }: { compact?: boolean }) {
+export function BrandHeader({ compact = false, showDescriptor = true }: { compact?: boolean; showDescriptor?: boolean }) {
   return (
     <View testID="brand-header">
       <Wordmark3D scale={compact ? 0.72 : 1} />
       <Text style={[styles.tagline, compact && { fontSize: 24, marginTop: 6 }]}>{brand.tagline}</Text>
-      <Text style={[styles.descriptor, compact && { fontSize: 13 }]}>{brand.descriptor}</Text>
+      {showDescriptor && <Text style={[styles.descriptor, compact && { fontSize: 13 }]}>{brand.descriptor}</Text>}
     </View>
   );
 }

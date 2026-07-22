@@ -1,0 +1,54 @@
+{
+  "summary": "Frontend-only UI test of the new landscape-tablet '/training' (Today's Training) screen at 1194x834. All 5 navigation & rendering flows verified: (1) Home '/' -> Training via start-ride-button navigates to /training and renders 'Today's Training' heading; (2) Home sidebar nav-workouts navigates to /training; (3) Training sidebar nav-home navigates back to '/' and shows hero tagline 'Your strongest ride is your own.'; (4) Training screen renders every required section with the exact mock data (BrandHeader wordmark, page title, date 'Wednesday, 12 May 2025', alberto-coach-card, main-workout-card with Threshold Climb / 1h 00m / 251 W / Z4 / 92 TSS / 1,050 m and Structured Workout/Climbing/ERG Mode tags, route-weather-card Alpe d'Huez 16.0 km / 1,090 m / 18°C Sunny / Wind 8 km/h / Humidity 48% / Feels Like 18°C, readiness-card 82% Good to go, training-load-card Moderate 366 TSS, what-to-expect-card Warm Up 15 min / Threshold Blocks 3 x 12 min / Cool Down 15 min, equipment-card Smart Trainer/Heart Rate Monitor/Power Meter/Cadence Sensor connected + Fan attention, before-you-ride-card Fuel/Hydrate, fb50-card Pre-Ride Activation 10 min, mpc-card Calm Start 5 min); (5) Toasts fire correctly for view-details-button ('Opening workout details'), preview-route-button ('Previewing Alpe d'Huez'), start-workout-button ('Starting Threshold Climb…'), route-image ('Opening route map'), alberto-coach-card ('Message from Alberto'), fb50-card ('Starting Pre-Ride Activation'), mpc-card ('Starting Calm Start'), and top pills flame-pill ('12 day streak 🔥'), bell-pill ('You have 3 notifications'), profile-pill ('Profile'). Regression on '/' passes — dashboard still renders side-navigation, hero-route, metric-summary-strip, training-plan-card, featured-route-card, calendar-card, bottom cards, no errors. BUG FOUND: equipment rows (equip-fan and other equip-*) do NOT fire a toast although the review spec requires it — their onPress in EquipmentCard is a no-op ('onPress={() => {}}'). Deprecated Expo/RN web style props detected (shadow*, textShadow*, pointerEvents, ScrollView.scrollTo signature) — console warnings only, non-blocking.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "EquipmentCard rows",
+        "issue": "Tapping equip-fan (and equip-smart-trainer, equip-heart-rate-monitor, equip-power-meter, equip-cadence-sensor) does not fire the required toast. The Touchable's onPress is hard-coded to '() => {}' in /app/frontend/src/components/training.tsx around line 280. Per the review request, equipment rows must fire a toast (testID toast). Fix: pass an onPress that calls showToast with a per-item message (e.g. `Fan needs attention` / `Smart Trainer connected`) and wire it via a prop from training.tsx.",
+        "testID": "equip-fan",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "/training",
+        "issues": [
+          "Visually matches the reference — landscape tablet layout, near-black premium theme with red/yellow accents, correct card ordering, all icons/tags render. No spacing/contrast issues observed."
+        ]
+      }
+    ],
+    "react_native_issues": [
+      {
+        "component": "Deprecated shadow* / textShadow* / pointerEvents style props",
+        "issue": "React-Native-Web console warns: '\"shadow*\" style props are deprecated. Use \"boxShadow\".' and '\"textShadow*\" style props are deprecated. Use \"textShadow\".' and 'props.pointerEvents is deprecated. Use style.pointerEvents'. Non-blocking but should be migrated. Reference: /app/frontend/src/theme.ts (shadow.card / shadow.glow) and BrandHeader textShadow* styles; pointerEvents=\"none\" on Toast Animated.View in /app/frontend/app/training.tsx:41 and /app/frontend/app/index.tsx:33."
+      },
+      {
+        "component": "ScrollView.scrollTo deprecated signature",
+        "issue": "Console warning: '`scrollTo(y, x, animated)` is deprecated. Use `scrollTo({x: 5, y: 5, animated: true})` instead.' Emitted from within ScrollView / Animated internals; source is a library call, not our code, so likely resolves on next RN-web bump. Non-blocking."
+      },
+      {
+        "component": "useNativeDriver on web",
+        "issue": "Console warning: 'Animated: `useNativeDriver` is not supported because the native animated module is missing. Falling back to JS-based animation.' Occurs for the Toast spring/timing animations in training.tsx & index.tsx and Touchable scale animations in src/components/ui.tsx. On web this is harmless (JS driver used) but on native mobile it works. No action strictly required."
+      }
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_4.json"],
+  "action_items": [
+    "Fix EquipmentCard so each equip-* row fires a toast (spec requirement). Simplest: accept an onItemPress prop in EquipmentCard and forward the label, then in /app/frontend/app/training.tsx pass onItemPress={(label, ok) => showToast(ok ? `${label} connected` : `${label} needs attention`)}."
+  ],
+  "critical_code_review_comments": [
+    "EquipmentCard rows use onPress={() => {}} which contradicts the review spec ('equipment rows (e.g. equip-fan) fire a toast'). Wire real toasts.",
+    "Both index.tsx and training.tsx duplicate a Toast component (identical implementation ~15 lines) — consider extracting to /app/frontend/src/components/ui.tsx as a shared <Toast/> to satisfy DRY.",
+    "SideNavigation on /training is hard-coded to active=\"home\" — this matches the reference intent but is unusual UX; a comment is present in code. Fine as-is.",
+    "Because expo-router web keeps '/' mounted behind '/training' when using router.push, testIDs (nav-home, flame-pill, bell-pill, profile-pill, alberto-coach-card) resolve to 2 elements in Playwright. Functionally fine for users, but future tests should filter with ':visible'. If ever needed, switching Home->Training to router.replace would eliminate duplicates (currently start-ride-button and nav-workouts both use push)."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "N/A (frontend-only test)", "frontend": "95% (all 5 flows pass; 1 spec deviation on equipment toasts)" },
+  "seed_data_creation": "None (no backend).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Landscape tablet viewport 1194x834. Two routes: '/' and '/training'. Because expo-router pushes keep both screens in the web DOM, always use `page.locator('[data-testid=\"...\"]:visible').first` when clicking shared testIDs (nav-home, nav-workouts, flame-pill, bell-pill, profile-pill, alberto-coach-card). Toast testID is 'toast' and auto-dismisses in ~1.9s. Content on /training is inside a ScrollView testID='training-scroll'; scroll it via `document.querySelector('[data-testid=\"training-scroll\"]').scrollTo({x:0,y:2000})` to reach EquipmentCard. All required mock data verified visually via screenshots (some get_by_text 'NOT VIS' hits in first pass were false-negatives caused by the 3D-wordmark tinted image layers stacking above text — screenshots confirm all text is present).",
+  "rca_of_issue": "Equipment toast bug — root cause: EquipmentCard in /app/frontend/src/components/training.tsx defines items inline and wires `onPress={() => {}}` on the Touchable (line ~280). No callback prop is exposed, so TodaysTraining cannot inject a toast handler. Repro: open /training, tap any equipment row (Fan, Smart Trainer, etc.) — no toast appears. Mitigation: add `onItemPress?: (label: string, ok: boolean) => void` prop to EquipmentCard, call it from Touchable.onPress, then in training.tsx pass `<EquipmentCard onItemPress={(label, ok) => showToast(ok ? `${label} connected` : `${label} needs attention`)} />`."
+}

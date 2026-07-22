@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, ScrollView, Animated, useWindowDimensions } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { useRouter } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -53,6 +54,7 @@ export default function Dashboard() {
   const mainWidth = contentWidth - spacing.lg * 2;
   const heroHeight = compact ? Math.max(320, Math.round(height * 0.94)) : 432;
 
+  const router = useRouter();
   const [active, setActive] = React.useState("home");
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
 
@@ -61,6 +63,10 @@ export default function Dashboard() {
   }, []);
 
   const onSelectNav = (key: string) => {
+    if (key === "workouts" || key === "training") {
+      router.push("/training");
+      return;
+    }
     setActive(key);
     if (key !== "home") {
       const item = [...navItems, ...navFooter].find((n) => n.key === key);
@@ -84,7 +90,7 @@ export default function Dashboard() {
             <HeroRoute
               width={mainWidth}
               height={heroHeight}
-              onStart={() => showToast("Starting today's ride…")}
+              onStart={() => router.push("/training")}
               onToast={showToast}
               compact={compact}
             />
