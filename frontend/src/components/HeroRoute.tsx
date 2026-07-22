@@ -9,7 +9,7 @@ import { BrandHeader } from "./BrandHeader";
 import { AlbertoCoachCard } from "./AlbertoCoachCard";
 import { GlassPill } from "./ui";
 
-const heroImg = require("../../assets/images/hero_cyclist.png");
+const heroImg = require("../../assets/images/hero_cyclist_b.jpg");
 
 function StatusBar({ onPress }: { onPress: (m: string) => void }) {
   return (
@@ -54,13 +54,13 @@ export function HeroRoute({
         accessibilityLabel="Cyclist climbing a mountain road at sunset"
       />
       <LinearGradient
-        colors={["rgba(5,5,5,0.96)", "rgba(5,5,5,0.55)", "rgba(5,5,5,0.12)", "rgba(5,5,5,0.35)"]}
+        colors={["rgba(5,5,5,0.9)", "rgba(5,5,5,0.4)", "rgba(5,5,5,0.05)", "rgba(5,5,5,0.25)"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={StyleSheet.absoluteFill}
       />
       <LinearGradient
-        colors={["rgba(5,5,5,0.65)", "transparent"]}
+        colors={["rgba(5,5,5,0.5)", "transparent"]}
         start={{ x: 0, y: 1 }}
         end={{ x: 0, y: 0.4 }}
         style={StyleSheet.absoluteFill}
