@@ -737,7 +737,7 @@ export function MusicPanel({ musicOn, toggleMusic, volume, setVolume, voiceOn, t
 
         <View style={styles.spRow}>
           <View style={styles.spIcon}><Ionicons name="mic" size={18} color={colors.yellow} /></View>
-          <View style={{ flex: 1 }}><Text style={styles.spLabel}>Alberto&apos;s voice</Text><Text style={styles.spSub}>Spoken cues · mild French accent · softens music</Text></View>
+          <View style={{ flex: 1 }}><Text style={styles.spLabel}>Alberto&apos;s voice</Text><Text style={styles.spSub}>Spoken cues · mild Spanish accent · softens music</Text></View>
           <Switch testID="toggle-voice" value={voiceOn} onValueChange={toggleVoice} trackColor={{ true: colors.red, false: "rgba(255,255,255,0.2)" }} thumbColor="#fff" />
         </View>
       </Pressable>
@@ -747,8 +747,9 @@ export function MusicPanel({ musicOn, toggleMusic, volume, setVolume, voiceOn, t
 
 export function MusicButton({ musicOn, onPress }: { musicOn: boolean; onPress: () => void }) {
   return (
-    <Pressable style={styles.musicFab} onPress={onPress} testID="music-button" hitSlop={8} accessibilityRole="button" accessibilityLabel="Music and audio settings">
-      <Ionicons name={musicOn ? "musical-notes" : "volume-mute"} size={18} color={musicOn ? colors.yellow : colors.textDim} />
+    <Pressable style={[styles.musicFab, musicOn ? styles.musicFabOn : styles.musicFabOff]} onPress={onPress} testID="music-button" hitSlop={8} accessibilityRole="button" accessibilityLabel="Music and audio settings">
+      <Ionicons name={musicOn ? "volume-high" : "volume-mute"} size={24} color={musicOn ? colors.bg : colors.textDim} />
+      <Text style={[styles.musicFabLabel, { color: musicOn ? colors.bg : colors.textDim }]}>Audio</Text>
     </Pressable>
   );
 }
@@ -943,5 +944,8 @@ const styles = StyleSheet.create({
   volBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
   volBars: { flexDirection: "row", gap: 4, alignItems: "center", marginHorizontal: 4 },
   volSeg: { width: 12, height: 16, borderRadius: 3 },
-  musicFab: { position: "absolute", top: 64, right: 20, width: 42, height: 42, borderRadius: 21, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center", zIndex: 20, ...shadow.card },
+  musicFab: { position: "absolute", top: 60, right: 20, flexDirection: "row", alignItems: "center", gap: 7, height: 46, paddingHorizontal: 16, borderRadius: 23, borderWidth: 1.5, zIndex: 20, ...shadow.glow },
+  musicFabOn: { backgroundColor: colors.yellow, borderColor: colors.yellow },
+  musicFabOff: { backgroundColor: colors.card, borderColor: colors.border },
+  musicFabLabel: { fontSize: 14, fontWeight: "800", letterSpacing: 0.3 },
 });
