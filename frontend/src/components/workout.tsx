@@ -794,9 +794,64 @@ export function MusicPanel({ musicOn, toggleMusic, volume, setVolume, voiceOn, t
 
 export function MusicButton({ musicOn, onPress }: { musicOn: boolean; onPress: () => void }) {
   return (
-    <Pressable style={[styles.musicFab, musicOn ? styles.musicFabOn : styles.musicFabOff]} onPress={onPress} testID="music-button" hitSlop={8} accessibilityRole="button" accessibilityLabel="Music and audio settings">
-      <Ionicons name={musicOn ? "volume-high" : "volume-mute"} size={24} color={musicOn ? colors.bg : colors.textDim} />
-      <Text style={[styles.musicFabLabel, { color: musicOn ? colors.bg : colors.textDim }]}>Audio</Text>
+    <Pressable style={[styles.mediaPill, musicOn ? styles.mediaPillOn : styles.mediaPillOff]} onPress={onPress} testID="music-button" hitSlop={8} accessibilityRole="button" accessibilityLabel="Music and audio settings">
+      <Ionicons name={musicOn ? "volume-high" : "volume-mute"} size={22} color={musicOn ? colors.bg : colors.textDim} />
+      <Text style={[styles.mediaPillLabel, { color: musicOn ? colors.bg : colors.textDim }]}>Audio</Text>
+    </Pressable>
+  );
+}
+
+export function CastButton({ casting, onPress }: { casting: boolean; onPress: () => void }) {
+  return (
+    <Pressable style={[styles.mediaPill, casting ? styles.mediaPillOn : styles.mediaPillOff]} onPress={onPress} testID="cast-button" hitSlop={8} accessibilityRole="button" accessibilityLabel="Cast to TV">
+      <Ionicons name="tv-outline" size={22} color={casting ? colors.bg : colors.white} />
+      <Text style={[styles.mediaPillLabel, { color: casting ? colors.bg : colors.white }]}>Cast</Text>
+    </Pressable>
+  );
+}
+
+const CAST_DEVICES = [
+  { id: "living", name: "Living Room TV", kind: "tv" as const },
+  { id: "studio", name: "Studio Display", kind: "monitor" as const },
+  { id: "chromecast", name: "Chromecast", kind: "cast" as const },
+];
+
+/** Cast-to-TV sheet. NOTE: device discovery/streaming is MOCKED — real casting
+ * (Google Cast / AirPlay) needs a native build and won't work in Expo Go. */
+export function CastPanel({ castingTo, onCast, onStop, onClose }: { castingTo: string | null; onCast: (name: string) => void; onStop: () => void; onClose: () => void }) {
+  const icon = (k: string) => (k === "tv" ? "tv" : k === "monitor" ? "desktop-outline" : "wifi");
+  return (
+    <Pressable style={styles.rpOverlay} onPress={onClose} testID="cast-panel">
+      <Pressable style={styles.spPanel} onPress={() => { /* swallow */ }}>
+        <View style={styles.rpHead}>
+          <View style={{ flex: 1 }}><Text style={styles.rpTitle}>Cast to TV</Text><Text style={styles.rpSub}>Mirror your ride to a nearby screen</Text></View>
+          <Pressable onPress={onClose} testID="cast-close" hitSlop={10}><Ionicons name="close" size={22} color={colors.white} /></Pressable>
+        </View>
+
+        {castingTo && (
+          <View style={styles.castActive}>
+            <Ionicons name="tv" size={18} color={colors.bg} />
+            <Text style={styles.castActiveText}>Casting to {castingTo}</Text>
+            <Pressable onPress={onStop} testID="cast-stop" style={styles.castStop} hitSlop={8}><Text style={styles.castStopText}>Stop</Text></Pressable>
+          </View>
+        )}
+
+        <Text style={styles.voiceHint}>Available devices</Text>
+        {CAST_DEVICES.map((d) => {
+          const active = d.name === castingTo;
+          return (
+            <Pressable key={d.id} testID={`cast-${d.id}`} onPress={() => onCast(d.name)} style={[styles.voiceRow, active && styles.voiceRowActive]}>
+              <Ionicons name={icon(d.kind) as never} size={18} color={active ? colors.yellow : colors.textDim} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.voiceLabel, active && { color: colors.white }]}>{d.name}</Text>
+                <Text style={styles.voiceSub}>{active ? "Connected" : "Available"}</Text>
+              </View>
+              <Ionicons name={active ? "checkmark-circle" : "chevron-forward"} size={18} color={active ? colors.yellow : colors.textDim} />
+            </Pressable>
+          );
+        })}
+        <Text style={styles.castNote}>Real casting requires a device build — discovery is simulated in preview / Expo Go.</Text>
+      </Pressable>
     </Pressable>
   );
 }
@@ -998,8 +1053,13 @@ const styles = StyleSheet.create({
   voiceRowActive: { borderColor: colors.yellow, backgroundColor: "rgba(245,197,24,0.10)" },
   voiceLabel: { flex: 1, color: colors.textDim, fontSize: 13.5, fontWeight: "700" },
   voiceSub: { color: colors.textDim, fontSize: 11, marginTop: 1, opacity: 0.8 },
-  musicFab: { position: "absolute", bottom: 24, left: 20, flexDirection: "row", alignItems: "center", gap: 7, height: 46, paddingHorizontal: 16, borderRadius: 23, borderWidth: 1.5, zIndex: 20, ...shadow.glow },
-  musicFabOn: { backgroundColor: colors.yellow, borderColor: colors.yellow },
-  musicFabOff: { backgroundColor: colors.card, borderColor: colors.border },
-  musicFabLabel: { fontSize: 14, fontWeight: "800", letterSpacing: 0.3 },
+  mediaPill: { flexDirection: "row", alignItems: "center", gap: 7, height: 46, paddingHorizontal: 16, borderRadius: 23, borderWidth: 1.5, ...shadow.glow },
+  mediaPillOn: { backgroundColor: colors.yellow, borderColor: colors.yellow },
+  mediaPillOff: { backgroundColor: colors.card, borderColor: colors.border },
+  mediaPillLabel: { fontSize: 14, fontWeight: "800", letterSpacing: 0.3 },
+  castActive: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.yellow, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12 },
+  castActiveText: { flex: 1, color: colors.bg, fontWeight: "800", fontSize: 13.5 },
+  castStop: { backgroundColor: "rgba(0,0,0,0.18)", borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 5 },
+  castStopText: { color: colors.bg, fontWeight: "800", fontSize: 12.5 },
+  castNote: { color: colors.textDim, fontSize: 11, marginTop: 10, lineHeight: 15 },
 });

@@ -17,7 +17,7 @@ import {
   WorkoutTopBar, PowerCard, HeartRateCard, CadenceCard, WorkoutTimelineCard,
   ClimbCard, RouteMapCard, WearableDataCard, RideSummaryStrip,
   TrainerControlBar, AlbertoLiveCue, NextUpStrip, SafetyNote, ImmersiveHud, VideoPlaceholder,
-  RoutesButton, RoutePicker, SettingsPanel, MusicPanel, MusicButton,
+  RoutesButton, RoutePicker, SettingsPanel, MusicPanel, MusicButton, CastButton, CastPanel,
 } from "@/src/components/workout";
 import { useWorkoutAudio } from "@/src/hooks/useWorkoutAudio";
 
@@ -48,6 +48,10 @@ function buildCue(t: { power: number; hr: number; cadence: number; speed: number
   const m = Math.floor(t.elapsed / 60);
   return `${m} minutes in at ${t.speed} kilometres per hour — strong and steady.`;
 }
+// Fixed design width for the tablet/TV layout; the whole screen is scaled from
+// this so it fits (and fills) any large display.
+const DESIGN_W = 1024;
+
 const CONTROLS = [
   { key: "skip", label: "Skip Interval", icon: "play-skip-forward" as const },
   { key: "extend", label: "Extend Recovery", icon: "time" as const },
@@ -109,6 +113,7 @@ export default function LiveWorkout() {
 
   const [centerW, setCenterW] = React.useState(560);
   const [availH, setAvailH] = React.useState(0);
+  const [availW, setAvailW] = React.useState(0);
   const [contentH, setContentH] = React.useState(0);
   const [paused, setPaused] = React.useState(false);
   const [expanded, setExpanded] = React.useState(false);
@@ -120,6 +125,8 @@ export default function LiveWorkout() {
   const [showMenu, setShowMenu] = React.useState(false);
   const [showSettings, setShowSettings] = React.useState(false);
   const [showMusic, setShowMusic] = React.useState(false);
+  const [showCast, setShowCast] = React.useState(false);
+  const [castingTo, setCastingTo] = React.useState<string | null>(null);
   const [hudVisible, setHudVisible] = React.useState(true);
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
   const [cueIdx, setCueIdx] = React.useState(0);
@@ -246,10 +253,13 @@ export default function LiveWorkout() {
     showToast(`Surprise route: ${routeVideos[i].title}`);
   };
 
-  // Tablet (landscape): scale the whole workout to fit the screen so every
-  // panel is visible without scrolling. Phones keep the scroll view.
+  // Tablet/TV (landscape): render at a fixed design width and scale it to fit
+  // the screen — scales DOWN on small tablets and UP on large TVs so every
+  // panel is always visible and fills the display. Phones keep scrolling.
   const tablet = !compact;
-  const fitScale = tablet && availH > 0 && contentH > 0 ? Math.min(1, availH / contentH) : 1;
+  const fitScale = tablet && contentH > 0 && availW > 0
+    ? Math.min(2, availW / DESIGN_W, availH / contentH)
+    : 1;
 
   const body = (
     <>
@@ -305,7 +315,7 @@ export default function LiveWorkout() {
       <StatusBar hidden />
       <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
         {tablet ? (
-          <View style={styles.fitOuter} onLayout={(e) => setAvailH(e.nativeEvent.layout.height)} testID="workout-fit">
+          <View style={styles.fitOuter} onLayout={(e) => { setAvailH(e.nativeEvent.layout.height); setAvailW(e.nativeEvent.layout.width); }} testID="workout-fit">
             <View
               style={[styles.content, styles.fitInner, { transform: [{ scale: fitScale }] }]}
               onLayout={(e) => setContentH(e.nativeEvent.layout.height)}
@@ -321,7 +331,10 @@ export default function LiveWorkout() {
 
         <AlbertoLiveCue message={liveCue} />
 
-        <MusicButton musicOn={musicOn} onPress={() => setShowMusic(true)} />
+        <View style={styles.mediaBar} pointerEvents="box-none">
+          <MusicButton musicOn={musicOn} onPress={() => setShowMusic(true)} />
+          <CastButton casting={!!castingTo} onPress={() => setShowCast(true)} />
+        </View>
 
         {showControls && (
           <Pressable style={styles.overlay} testID="controls-overlay" onPress={() => setShowControls(false)}>
@@ -437,6 +450,15 @@ export default function LiveWorkout() {
         />
       )}
 
+      {showCast && (
+        <CastPanel
+          castingTo={castingTo}
+          onCast={(name) => { setCastingTo(name); setShowCast(false); showToast(`Casting to ${name}`); }}
+          onStop={() => { setCastingTo(null); showToast("Casting stopped"); }}
+          onClose={() => setShowCast(false)}
+        />
+      )}
+
       <Toast message={toast} />
     </GestureHandlerRootView>
   );
@@ -445,8 +467,9 @@ export default function LiveWorkout() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.md, gap: spacing.md },
-  fitOuter: { flex: 1, justifyContent: "center" },
-  fitInner: { width: "100%" },
+  fitOuter: { flex: 1, alignItems: "center", justifyContent: "center" },
+  fitInner: { width: DESIGN_W },
+  mediaBar: { position: "absolute", bottom: 24, left: 20, flexDirection: "row", gap: 10, zIndex: 20 },
   immersive: { ...StyleSheet.absoluteFillObject, backgroundColor: "#000", zIndex: 50 },
   hudEye: { position: "absolute", top: 12, left: 12, width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center", zIndex: 5 },
   inlineRoutes: { position: "absolute", left: 10, bottom: 10 },
