@@ -6,7 +6,7 @@ import { colors, radius, spacing } from "../theme";
 import { coach } from "../data";
 import { PrimaryButton } from "./ui";
 
-const albertoPortrait = require("../../assets/images/coach_alberto_b.jpg");
+const albertoPortrait = require("../../assets/images/coach_alberto_b2.jpg");
 
 export function AlbertoCoachCard({ width, onStart }: { width: number; onStart: () => void }) {
   return (

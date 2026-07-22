@@ -9,7 +9,7 @@ import { BrandHeader } from "./BrandHeader";
 import { AlbertoCoachCard } from "./AlbertoCoachCard";
 import { GlassPill } from "./ui";
 
-const heroImg = require("../../assets/images/hero_cyclist_b.jpg");
+const heroImg = require("../../assets/images/hero_cyclist_b2.jpg");
 
 function StatusBar({ onPress }: { onPress: (m: string) => void }) {
   return (
