@@ -21,6 +21,7 @@ import {
 } from "@/src/components/workout";
 import { useWorkoutAudio } from "@/src/hooks/useWorkoutAudio";
 import { useCast } from "@/src/hooks/useCast";
+import { fetchCoachCue } from "@/src/lib/coach";
 
 // Alberto's cues are generated live from the rider's real telemetry so the
 // coaching reflects what's actually happening on the bike.
@@ -130,7 +131,7 @@ export default function LiveWorkout() {
   const [castingTo, setCastingTo] = React.useState<string | null>(null);
   const [hudVisible, setHudVisible] = React.useState(true);
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
-  const [cueIdx, setCueIdx] = React.useState(0);
+  const [cueIdx] = React.useState(0);
 
   const { telemetry, connectionState, stale, sendErg, pause, resume, simulateDropout } = useTelemetry();
   const { settings, setSetting, loaded } = useSettings();
@@ -191,24 +192,10 @@ export default function LiveWorkout() {
   const { musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, speak, voiceOptions, voiceId, selectVoice } = useWorkoutAudio();
   const { castSupported, castDeviceName, showCastDialog } = useCast();
 
-  // Keep the latest telemetry in a ref so cues read live values without the
-  // 5-second speak interval re-firing every telemetry tick.
+  // Keep the latest telemetry in a ref so cue timers read live values without
+  // re-firing on every telemetry tick.
   const telemetryRef = React.useRef(telemetry);
   React.useEffect(() => { telemetryRef.current = telemetry; }, [telemetry]);
-
-  // Live coaching line, rebuilt from current telemetry (also shown on screen).
-  const liveCue = paused ? "Workout paused — take a breath." : buildCue(telemetry, cueIdx);
-
-  React.useEffect(() => {
-    const id = setInterval(() => setCueIdx((c) => (c + 1) % 4), 30000);
-    return () => clearInterval(id);
-  }, []);
-
-  // Speak each live cue aloud as it rotates (built from real-time stats).
-  React.useEffect(() => {
-    if (!paused) speak(buildCue(telemetryRef.current, cueIdx));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cueIdx]);
 
   const onCenterLayout = (e: LayoutChangeEvent) => setCenterW(e.nativeEvent.layout.width);
 
@@ -236,6 +223,63 @@ export default function LiveWorkout() {
   };
 
   const activeRoute = routeVideos[routeIdx];
+
+  // ---- Alberto's live AI coaching cues ----
+  // Prefers the AI-generated cue; falls back to the local rule-based line while
+  // a call is pending or fails.
+  const [coachCue, setCoachCue] = React.useState<string | null>(null);
+  const liveCue = paused ? "Workout paused — take a breath." : (coachCue ?? buildCue(telemetry, cueIdx));
+
+  const coachCtx = React.useMemo(() => ({
+    power_target: POWER_TARGET,
+    cadence_low: CAD_LOW,
+    cadence_high: CAD_HIGH,
+    workout: currentWorkout.title,
+    route: activeRoute.title,
+  }), [activeRoute.title]);
+
+  const cueBusy = React.useRef(false);
+  const lastCueAt = React.useRef(0);
+
+  const generateCue = React.useCallback(async () => {
+    if (paused || cueBusy.current) return;
+    cueBusy.current = true;
+    lastCueAt.current = Date.now();
+    const t = telemetryRef.current;
+    try {
+      const cue = await fetchCoachCue(t, coachCtx);
+      setCoachCue(cue);
+      speak(cue);
+    } catch {
+      const fallback = buildCue(t, Math.floor(Date.now() / 1000) % 4);
+      setCoachCue(fallback);
+      speak(fallback);
+    } finally {
+      cueBusy.current = false;
+    }
+  }, [paused, coachCtx, speak]);
+
+  // A cue at least every 60 seconds.
+  React.useEffect(() => {
+    const id = setInterval(() => generateCue(), 60000);
+    return () => clearInterval(id);
+  }, [generateCue]);
+
+  // An extra cue when the rider drifts meaningfully off target (debounced ~25s).
+  React.useEffect(() => {
+    if (paused) return;
+    const offPower = Math.abs(telemetry.power - POWER_TARGET) > 35;
+    const offCadence = telemetry.cadence < CAD_LOW - 8 || telemetry.cadence > CAD_HIGH + 8;
+    if ((offPower || offCadence) && Date.now() - lastCueAt.current > 25000) generateCue();
+  }, [telemetry.power, telemetry.cadence, paused, generateCue]);
+
+  // First cue shortly after the ride opens.
+  React.useEffect(() => {
+    const id = setTimeout(() => generateCue(), 2500);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const onSelectRoute = (i: number) => {
     setRouteIdx(i); setRouteAuto(false); setShowRoutes(false);
     setLastRouteIdState(routeVideos[i].id); setLastRouteId(routeVideos[i].id);

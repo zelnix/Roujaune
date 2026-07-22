@@ -327,6 +327,66 @@ async def ride_history(limit: int = 20):
     return docs
 
 
+# ----------------------- Alberto: AI coaching cue -----------------------
+ALBERTO_SYSTEM = (
+    "You are Alberto, a former professional cyclist who won multiple Grand Tours. "
+    "Today you are a professor of cycling coaching, a sports team director, and a "
+    "sports psychologist. You are coaching a rider through an indoor workout in real time.\n"
+    "Speak in first person, warm but authoritative, like a mentor who has been in the "
+    "hardest moments of a race. Blend physiology, tactics and psychology.\n"
+    "Rules: reply with ONE short spoken sentence (max 16 words). No emojis, no lists, "
+    "no quotation marks. Be specific to the numbers you are given. Vary your wording. "
+    "It must sound natural read aloud."
+)
+
+
+class CoachCueRequest(BaseModel):
+    power: int = 0
+    hr: int = 0
+    cadence: int = 0
+    speed: float = 0
+    elapsed: int = 0
+    power_target: int = 251
+    cadence_low: int = 90
+    cadence_high: int = 100
+    workout: str = "Threshold Climb"
+    route: Optional[str] = None
+
+
+@api_router.post("/coach/cue")
+async def coach_cue(req: CoachCueRequest):
+    """Generate a live, in-persona coaching cue from the rider's telemetry."""
+    key = os.environ.get("EMERGENT_LLM_KEY")
+    if not key:
+        raise HTTPException(status_code=503, detail="Coaching model not configured")
+
+    minutes = req.elapsed // 60
+    prompt = (
+        f"Workout: {req.workout}. Route: {req.route or 'indoor'}. "
+        f"Elapsed: {minutes} minutes.\n"
+        f"Live: power {req.power} W (target {req.power_target} W), "
+        f"cadence {req.cadence} rpm (aim {req.cadence_low}-{req.cadence_high}), "
+        f"heart rate {req.hr} bpm, speed {req.speed} km/h.\n"
+        "Give the rider one short coaching cue right now."
+    )
+
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(
+            api_key=key,
+            session_id="alberto-live-coach",
+            system_message=ALBERTO_SYSTEM,
+        ).with_model("anthropic", "claude-sonnet-4-6")
+        reply = await chat.send_message(UserMessage(text=prompt))
+        cue = (reply or "").strip().strip('"').split("\n")[0]
+        if not cue:
+            raise ValueError("empty cue")
+        return {"cue": cue}
+    except Exception as e:
+        logging.exception("coach_cue failed")
+        raise HTTPException(status_code=502, detail=f"Coaching generation failed: {e}")
+
+
 # ----------------------- Trainer telemetry (BLE bridge stand-in) -----------------------
 class TrainerSim:
     """Server-side smart-trainer/wearable simulator.
