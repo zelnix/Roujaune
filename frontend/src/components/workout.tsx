@@ -572,29 +572,43 @@ export function RoutesButton({ onPress, testID = "routes-button" }: { onPress: (
   );
 }
 
-export function RoutePicker({ routes, activeIndex, onSelect, onClose }: {
-  routes: RouteOption[]; activeIndex: number; onSelect: (i: number) => void; onClose: () => void;
+export function RoutePicker({ routes, activeIndex, recommendedTag, auto, onSelect, onAuto, onShuffle, onClose }: {
+  routes: RouteOption[]; activeIndex: number; recommendedTag?: string; auto?: boolean;
+  onSelect: (i: number) => void; onAuto: () => void; onShuffle: () => void; onClose: () => void;
 }) {
   return (
     <Pressable style={styles.rpOverlay} onPress={onClose} testID="route-picker">
       <Pressable style={styles.rpPanel} onPress={() => { /* swallow */ }}>
         <View style={styles.rpHead}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.rpTitle}>Choose your route</Text>
             <Text style={styles.rpSub}>Immersive first-person scenery — swap any time</Text>
           </View>
           <Pressable onPress={onClose} testID="route-picker-close" hitSlop={10}><Ionicons name="close" size={22} color={colors.white} /></Pressable>
         </View>
+
+        <View style={styles.rpActions}>
+          <Pressable style={[styles.rpActionBtn, auto && styles.rpActionBtnOn]} onPress={onAuto} testID="route-auto" accessibilityRole="button" accessibilityLabel="Auto-match route to workout">
+            <Ionicons name="sparkles" size={14} color={auto ? "#1a1300" : colors.yellow} />
+            <Text style={[styles.rpActionText, auto && { color: "#1a1300" }]}>Auto-match to workout</Text>
+          </Pressable>
+          <Pressable style={styles.rpActionBtn} onPress={onShuffle} testID="route-shuffle" accessibilityRole="button" accessibilityLabel="Surprise me with a random route">
+            <Ionicons name="shuffle" size={14} color="#fff" />
+            <Text style={styles.rpActionText}>Surprise me</Text>
+          </Pressable>
+        </View>
+
         <ScrollView contentContainerStyle={styles.rpGrid} showsVerticalScrollIndicator={false}>
           {routes.map((r, i) => {
             const active = i === activeIndex;
+            const reco = !!recommendedTag && r.tag === recommendedTag;
             return (
               <Pressable key={r.id} testID={`route-option-${i}`} style={[styles.rpCard, active && styles.rpCardActive]} onPress={() => onSelect(i)} accessibilityRole="button" accessibilityLabel={`Select route ${r.title}`}>
                 <View style={styles.rpThumb}>
                   <Image source={{ uri: posterFor(r.id) }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
                   <View style={styles.rpThumbScrim} />
                   <View style={[styles.rpTag, { backgroundColor: r.tagColor }]}><Text style={styles.rpTagText}>{r.tag}</Text></View>
-                  {active && <View style={styles.rpActiveBadge}><Ionicons name="checkmark" size={13} color="#1a1300" /></View>}
+                  {active && <View style={styles.rpActiveBadge}><Ionicons name={auto ? "sparkles" : "checkmark"} size={12} color="#1a1300" /></View>}
                 </View>
                 <Text style={styles.rpName} numberOfLines={1}>{r.title}</Text>
                 <Text style={styles.rpPlace}>{r.place}</Text>
@@ -602,6 +616,9 @@ export function RoutePicker({ routes, activeIndex, onSelect, onClose }: {
                   <View style={styles.rpStat}><MaterialCommunityIcons name="map-marker-distance" size={12} color={colors.textDim} /><Text style={styles.rpStatText}>{r.distance}</Text></View>
                   <View style={styles.rpStat}><MaterialCommunityIcons name="terrain" size={12} color={colors.textDim} /><Text style={styles.rpStatText}>{r.elevation}</Text></View>
                 </View>
+                {reco && (
+                  <View style={styles.rpReco}><Ionicons name="star" size={10} color={colors.yellow} /><Text style={styles.rpRecoText}>Great for your workout</Text></View>
+                )}
               </Pressable>
             );
           })}
@@ -762,9 +779,15 @@ const styles = StyleSheet.create({
   hudRoutes: { position: "absolute", top: 12, right: 58 },
   rpOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.72)", alignItems: "center", justifyContent: "center", zIndex: 60 },
   rpPanel: { width: 760, maxWidth: "92%", maxHeight: "88%", backgroundColor: colors.cardElevated, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, ...shadow.card },
-  rpHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: spacing.md },
+  rpHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: spacing.sm },
   rpTitle: { color: colors.white, fontSize: 22, fontWeight: "800" },
   rpSub: { color: colors.textDim, fontSize: 12.5, marginTop: 3 },
+  rpActions: { flexDirection: "row", gap: 10, marginBottom: spacing.md },
+  rpActionBtn: { flexDirection: "row", alignItems: "center", gap: 7, height: 38, paddingHorizontal: 14, borderRadius: radius.pill, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: colors.border },
+  rpActionBtnOn: { backgroundColor: colors.yellow, borderColor: colors.yellow },
+  rpActionText: { color: colors.white, fontSize: 12.5, fontWeight: "700" },
+  rpReco: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8, backgroundColor: "rgba(245,179,1,0.12)", borderRadius: radius.sm, paddingHorizontal: 8, paddingVertical: 4, alignSelf: "flex-start" },
+  rpRecoText: { color: colors.yellow, fontSize: 10.5, fontWeight: "700" },
   rpGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
   rpCard: { width: 224, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 10, gap: 2 },
   rpCardActive: { borderColor: colors.yellow, borderWidth: 2 },

@@ -151,3 +151,11 @@ export const nextInterval = {
   target: "150 W",
   rpe: "RPE 4",
 };
+
+// The active workout — used to auto-match a scenic route to the session type.
+// recommendedTag maps to a RouteOption.tag (e.g. a Climb → "Mountain").
+export const currentWorkout = {
+  title: "Threshold Climb",
+  type: "Climb",
+  recommendedTag: "Mountain",
+};

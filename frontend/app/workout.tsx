@@ -9,7 +9,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing, shadow } from "@/src/theme";
 import { useTelemetry } from "@/src/hooks/useTelemetry";
 import { rideRecorder } from "@/src/lib/ride";
-import { routeVideos, nextInterval } from "@/src/data";
+import { routeVideos, nextInterval, currentWorkout } from "@/src/data";
 import { RouteVideo } from "@/src/components/RouteVideo";
 import {
   WorkoutTopBar, PowerCard, HeartRateCard, CadenceCard, WorkoutTimelineCard,
@@ -53,6 +53,12 @@ function fmt(sec: number) {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+// Pick the route that best matches the current workout type (falls back to first).
+function autoRouteIndex() {
+  const i = routeVideos.findIndex((r) => r.tag === currentWorkout.recommendedTag);
+  return i >= 0 ? i : 0;
+}
+
 function Toast({ message }: { message: { id: number; text: string } | null }) {
   const anim = React.useRef(new Animated.Value(0)).current;
   React.useEffect(() => {
@@ -80,7 +86,8 @@ export default function LiveWorkout() {
   const [centerW, setCenterW] = React.useState(560);
   const [paused, setPaused] = React.useState(false);
   const [expanded, setExpanded] = React.useState(false);
-  const [routeIdx, setRouteIdx] = React.useState(0);
+  const [routeIdx, setRouteIdx] = React.useState(autoRouteIndex);
+  const [routeAuto, setRouteAuto] = React.useState(true);
   const [showRoutes, setShowRoutes] = React.useState(false);
   const [showControls, setShowControls] = React.useState(false);
   const [showMenu, setShowMenu] = React.useState(false);
@@ -135,7 +142,18 @@ export default function LiveWorkout() {
   };
 
   const activeRoute = routeVideos[routeIdx];
-  const onSelectRoute = (i: number) => { setRouteIdx(i); setShowRoutes(false); showToast(`Route: ${routeVideos[i].title}`); };
+  const onSelectRoute = (i: number) => { setRouteIdx(i); setRouteAuto(false); setShowRoutes(false); showToast(`Route: ${routeVideos[i].title}`); };
+  const onAutoRoute = () => {
+    const i = autoRouteIndex();
+    setRouteIdx(i); setRouteAuto(true); setShowRoutes(false);
+    showToast(`Auto-matched to your ${currentWorkout.type.toLowerCase()}: ${routeVideos[i].title}`);
+  };
+  const onShuffleRoute = () => {
+    let i = routeIdx;
+    if (routeVideos.length > 1) { while (i === routeIdx) i = Math.floor(Math.random() * routeVideos.length); }
+    setRouteIdx(i); setRouteAuto(false); setShowRoutes(false);
+    showToast(`Surprise route: ${routeVideos[i].title}`);
+  };
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -157,7 +175,7 @@ export default function LiveWorkout() {
                   {expanded ? (
                     <VideoPlaceholder width={centerW} onRestore={() => setExpanded(false)} />
                   ) : (
-                    <RouteVideo source={activeRoute.url} title={activeRoute.title} playing={!paused} muted width={centerW} onToggleExpand={() => setExpanded(true)} expanded={false}>
+                    <RouteVideo source={activeRoute.url} title={routeAuto ? `${activeRoute.title} · Auto-matched` : activeRoute.title} playing={!paused} muted width={centerW} onToggleExpand={() => setExpanded(true)} expanded={false}>
                       <View style={styles.inlineRoutes} pointerEvents="box-none">
                         <RoutesButton onPress={() => setShowRoutes(true)} testID="inline-routes" />
                       </View>
@@ -258,7 +276,16 @@ export default function LiveWorkout() {
       )}
 
       {showRoutes && (
-        <RoutePicker routes={routeVideos} activeIndex={routeIdx} onSelect={onSelectRoute} onClose={() => setShowRoutes(false)} />
+        <RoutePicker
+          routes={routeVideos}
+          activeIndex={routeIdx}
+          recommendedTag={currentWorkout.recommendedTag}
+          auto={routeAuto}
+          onSelect={onSelectRoute}
+          onAuto={onAutoRoute}
+          onShuffle={onShuffleRoute}
+          onClose={() => setShowRoutes(false)}
+        />
       )}
 
       <Toast message={toast} />
