@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, Animated, useWindowDimensions, LayoutChangeEvent, Pressable, Platform, Switch } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Animated, useWindowDimensions, LayoutChangeEvent, Pressable, Platform } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -246,9 +246,10 @@ export default function LiveWorkout() {
     showToast(`Surprise route: ${routeVideos[i].title}`);
   };
 
-  // On tablets, scale the whole workout down to fit the screen (no scrolling);
-  // phones (short landscape height) keep the scroll view.
-  const fitScale = !compact && availH > 0 && contentH > availH ? availH / contentH : 1;
+  // Tablet (landscape): scale the whole workout to fit the screen so every
+  // panel is visible without scrolling. Phones keep the scroll view.
+  const tablet = !compact;
+  const fitScale = tablet && availH > 0 && contentH > 0 ? Math.min(1, availH / contentH) : 1;
 
   const body = (
     <>
@@ -303,16 +304,19 @@ export default function LiveWorkout() {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
       <StatusBar hidden />
       <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
-        {compact ? (
-          <ScrollView contentContainerStyle={[styles.content, { padding: spacing.sm, gap: spacing.sm }]} showsVerticalScrollIndicator={false} testID="workout-scroll">
-            {body}
-          </ScrollView>
-        ) : (
+        {tablet ? (
           <View style={styles.fitOuter} onLayout={(e) => setAvailH(e.nativeEvent.layout.height)} testID="workout-fit">
-            <View style={[styles.content, styles.fitInner, { transform: [{ scale: fitScale }] }]} onLayout={(e) => setContentH(e.nativeEvent.layout.height)}>
+            <View
+              style={[styles.content, styles.fitInner, { transform: [{ scale: fitScale }] }]}
+              onLayout={(e) => setContentH(e.nativeEvent.layout.height)}
+            >
               {body}
             </View>
           </View>
+        ) : (
+          <ScrollView contentContainerStyle={[styles.content, { padding: spacing.sm, gap: spacing.sm }]} showsVerticalScrollIndicator={false} testID="workout-scroll">
+            {body}
+          </ScrollView>
         )}
 
         <AlbertoLiveCue message={liveCue} />

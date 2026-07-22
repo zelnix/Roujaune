@@ -381,14 +381,7 @@ function SumMetric({ icon, iconColor, value, unit, label, sub }: { icon: React.R
   );
 }
 
-export function RideSummaryStrip({ speed, trainerConnected = true }: { speed: string; trainerConnected?: boolean }) {
-  const zones = [
-    { z: "Z1", t: "02:15", c: ZONE.z1, w: 0.3 },
-    { z: "Z2", t: "05:30", c: ZONE.z2, w: 0.65 },
-    { z: "Z3", t: "08:45", c: ZONE.z3, w: 1 },
-    { z: "Z4", t: "06:20", c: ZONE.z4, w: 0.75 },
-    { z: "Z5", t: "01:45", c: ZONE.z5, w: 0.25 },
-  ];
+export function RideSummaryStrip({ speed, trainerConnected = true, withZones = true }: { speed: string; trainerConnected?: boolean; withZones?: boolean }) {
   return (
     <View style={styles.summaryStrip} testID="ride-summary-strip">
       <SumMetric icon={<Ionicons name="speedometer-outline" size={14} color={colors.yellow} />} iconColor={colors.yellow} value={trainerConnected ? speed : "—"} unit="km/h" label="SPEED" sub={trainerConnected ? "Avg 24.6" : "Not connected"} />
@@ -402,18 +395,48 @@ export function RideSummaryStrip({ speed, trainerConnected = true }: { speed: st
       <SumMetric icon={<Ionicons name="flame" size={14} color={colors.red} />} iconColor={colors.red} value="512" unit="kcal" label="CALORIES" sub="622 kcal (Total)" />
       <View style={styles.sumDiv} />
       <SumMetric icon={<Ionicons name="thermometer-outline" size={14} color={colors.yellow} />} iconColor={colors.yellow} value="18" unit="°C" label="TEMP" sub="Feels like 18°C" />
-      <View style={styles.sumDiv} />
-      <View style={styles.zoneCell}>
-        <SectionLabel color={colors.textDim}>TIME IN ZONES</SectionLabel>
-        <View style={{ marginTop: 4, gap: 3 }}>
-          {zones.map((z) => (
-            <View key={z.z} style={styles.zoneLine}>
-              <Text style={styles.zoneLbl}>{z.z}</Text>
-              <View style={styles.zoneBarTrack}><View style={{ height: 5, borderRadius: 3, backgroundColor: z.c, width: `${z.w * 100}%` }} /></View>
-              <Text style={styles.zoneTime}>{z.t}</Text>
+      {withZones && (
+        <>
+          <View style={styles.sumDiv} />
+          <View style={styles.zoneCell}>
+            <SectionLabel color={colors.textDim}>TIME IN ZONES</SectionLabel>
+            <View style={{ marginTop: 4, gap: 3 }}>
+              {ZONE_TIMES.map((z) => (
+                <View key={z.z} style={styles.zoneLine}>
+                  <Text style={styles.zoneLbl}>{z.z}</Text>
+                  <View style={styles.zoneBarTrack}><View style={{ height: 5, borderRadius: 3, backgroundColor: z.c, width: `${z.w * 100}%` }} /></View>
+                  <Text style={styles.zoneTime}>{z.t}</Text>
+                </View>
+              ))}
             </View>
-          ))}
-        </View>
+          </View>
+        </>
+      )}
+    </View>
+  );
+}
+
+const ZONE_TIMES = [
+  { z: "Z1", t: "02:15", c: ZONE.z1, w: 0.3 },
+  { z: "Z2", t: "05:30", c: ZONE.z2, w: 0.65 },
+  { z: "Z3", t: "08:45", c: ZONE.z3, w: 1 },
+  { z: "Z4", t: "06:20", c: ZONE.z4, w: 0.75 },
+  { z: "Z5", t: "01:45", c: ZONE.z5, w: 0.25 },
+];
+
+/** Time-in-zones as a standalone card (used in the side column on tablet). */
+export function TimeInZonesCard() {
+  return (
+    <View style={styles.metricCard} testID="time-in-zones-card">
+      <SectionLabel color={colors.textDim}>TIME IN ZONES</SectionLabel>
+      <View style={{ marginTop: 8, gap: 6 }}>
+        {ZONE_TIMES.map((z) => (
+          <View key={z.z} style={styles.zoneLine}>
+            <Text style={styles.zoneLbl}>{z.z}</Text>
+            <View style={styles.zoneBarTrack}><View style={{ height: 6, borderRadius: 3, backgroundColor: z.c, width: `${z.w * 100}%` }} /></View>
+            <Text style={styles.zoneTime}>{z.t}</Text>
+          </View>
+        ))}
       </View>
     </View>
   );
