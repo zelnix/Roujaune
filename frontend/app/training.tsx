@@ -151,7 +151,9 @@ export default function TodaysTraining() {
                 <MainWorkoutCard chartWidth={chartWidth} onDetails={() => showToast("Opening workout details")} />
                 <RouteWeatherCard onPreview={() => showToast("Previewing Alpe d'Huez")} onImagePress={() => showToast("Opening route map")} />
                 <View style={styles.bottomRow}>
-                  <PreRideCard />
+                  <View style={styles.bottomSlot}>
+                    <PreRideCard />
+                  </View>
                   <FB50RecommendationCard onPress={() => showToast("Starting Pre-Ride Activation")} />
                   <MPCRecommendationCard onPress={() => showToast("Starting Calm Start")} />
                 </View>
@@ -201,6 +203,7 @@ const styles = StyleSheet.create({
   leftCol: { flex: 1, gap: spacing.md },
   rightCol: { gap: spacing.md },
   bottomRow: { flexDirection: "row", gap: spacing.md },
+  bottomSlot: { flex: 1, flexBasis: 0, minWidth: 0 },
 
   toast: { position: "absolute", top: 24, alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(20,18,16,0.96)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 18, paddingVertical: 11 },
   toastText: { color: colors.white, fontWeight: "700", fontSize: 14 },

@@ -1,41 +1,38 @@
-# ROUJAUNE — Cycling Coaching Tablet Dashboard
+# ROUJAUNE — Cycling Coaching Tablet App
 
-## Original Problem Statement
-Native mobile app for ROUJAUNE (part of Harmony Wellness Group), optimized for tablets in landscape.
-Recreate the attached high-fidelity Home dashboard in React Native: deep charcoal/black background,
-glass-effect cards, red/yellow accents, fixed left sidebar, prominent gradient "Coach Alberto" card,
-cinematic hero, Featured Route card, calendar/today's-plan widget, metric strip and bottom card row.
+## Problem Statement
+Premium, tablet-first (landscape) React Native/Expo app for ROUJAUNE (Harmony Wellness Group):
+deep charcoal/near-black theme, glass cards, red/yellow accents, French/Italian cycling heritage.
+Recreate supplied high-fidelity references as real, reusable, data-driven components (not screenshots).
 
 ## Architecture
-- **Frontend:** Expo Router (React Native, SDK 54), landscape-locked (`app.json` orientation: landscape).
-- **State:** Local React state only. **No backend, no auth, no integrations** — mock data driven.
-- **Libraries:** expo-image, expo-linear-gradient, expo-blur (glass), react-native-svg (rings/charts/backdrops),
-  @expo/vector-icons, dayjs (calendar), expo-haptics.
-- **Data source:** `src/data.ts` (all reference values). Theme tokens: `src/theme.ts`.
-- **Brand assets:** `assets/images/` — `logo_glyph_t.png` (cyclist glyph, white bg knocked out),
-  `hero_cyclist.png`, `coach_alberto.png`. Wordmark rendered as styled text (ROU red / JAUNE yellow).
+- **Frontend:** Expo Router (SDK 54). Landscape-locked via `app.json` + runtime `expo-screen-orientation`.
+- **State:** Local React state; mock data. **No backend/auth yet.** Live workout uses a simulated telemetry loop (setInterval) designed to be swapped for a WebSocket/sensor stream.
+- **Libs:** expo-image, expo-linear-gradient, expo-blur, react-native-svg, @expo/vector-icons, dayjs, expo-haptics, expo-screen-orientation.
+- **Theme/tokens:** `src/theme.ts`. Shared UI primitives: `src/components/ui.tsx` (Touchable w/ containerStyle, Card/GlassCard, PrimaryButton, SecondaryButton, YellowButton, CircularProgress, ClimbBars, LineChart, ReadinessScale, GlassPill, SectionLabel).
+- **Assets:** `assets/images/` — `logo_glyph_t.png` (bg-removed), `hero_cyclist_b2.jpg` (brightened rider), `coach_alberto_b2.jpg`. Wordmark rendered as 3D-extruded text/image in `BrandHeader`.
 
-## Reusable Components (`src/components/`)
-SideNavigation, BrandHeader, HeroRoute, AlbertoCoachCard, MetricSummaryStrip, TrainingPlanCard,
-FeaturedRouteCard, CalendarCard (+ Today's Plan), BottomCards (Progress/Community/Wellness/Achievement),
-and `ui.tsx` primitives (Card, GlassCard, PrimaryButton, YellowButton, SecondaryButton, CircularProgress,
-ClimbBars, LineChart, ReadinessScale, ActivityDots, GlassPill, Touchable, SectionLabel).
+## Screens / Routes
+- `/` **Home dashboard** — sidebar, hero (3D wordmark + Alberto card + weather), metric strip, Training Plan / Featured Route / Calendar+Today, bottom cards (Progress/Community/Wellness/Achievements). Responsive tablet + phone-landscape (compact).
+- `/training` **Today's Training** — reuses sidebar; header (brand/title/date), Alberto coach card, Main Workout (interval profile + metrics), Route/Weather, right sidebar (Readiness/TrainingLoad/WhatToExpect+Start/Equipment), bottom row (Before You Ride/FB50/MPC). Responsive compact layout.
+- `/workout` **Live Workout** — full-screen (no sidebar): top bar (live elapsed, route progress, finish, flame), left live cards (Power/HeartRate/Cadence w/ zone visuals), workout timeline (active-interval highlight), rider route viewport (image placeholder for future 3D avatar) + elevation profile overlay, right column (Climb/RouteMap/Wearable), ride summary strip + time-in-zones, control bar (ERG mode, ERG intensity ±, Controls panel, Pause/Resume, End Workout), Alberto live cue. Simulated live telemetry.
+
+## Navigation
+Home Alberto "Start Today's Ride" & sidebar Workouts → `/training`. Training "Start Workout" → `/workout`. Workout "End Workout"/menu → `/training`. Sidebar Home → `/`.
 
 ## Implemented (2026-06-22)
-- Full Home dashboard matching the reference: sidebar (8 items + Settings/Help), cinematic hero with
-  brand header/status pills/Alberto signature/weather, gradient Coach Alberto card with CTA, 4-metric
-  summary strip with readiness scale, middle row (Training Plan / Featured Route / Calendar+Today), and
-  bottom row (Progress line chart / Community avatars / Wellness sunset / Achievements progress).
-- Interactivity: active sidebar state, functional buttons (toasts), month navigation, day selection,
-  today's-plan row selection, press/hover micro-animations, haptics on native.
-- Verified by testing agent: 100% pass on all flows; no runtime errors.
+- All three screens built and verified by testing agent (100% functional pass each).
+- Landscape lock (native), phone-landscape responsive variants for `/` and `/training`.
+- Brand images corrected + brightened; 3D wordmark; scrollable sidebar (no label overlap).
+- Bug fixes: coach portrait height-collapse on web; Alberto-card/descriptor overlap; bottom-row equal-width (now 0px diff).
 
 ## Backlog
-- **P1:** Build out the other sidebar routes (Training Plan, Workouts, Calendar, etc.) as real screens.
-- **P1:** Real data layer (FastAPI + MongoDB) for stats, plans, calendar, community.
-- **P2:** Provide dedicated photo assets for Featured Route & Wellness (currently stylised SVG backdrops).
-- **P2:** Custom gold script font for the "Alberto" signature (currently system italic).
+- **P1:** Real backend (FastAPI + MongoDB) + WebSocket/BLE telemetry for live workout (power/cadence/HR, ERG control, trainer dropout/reconnect states); replace simulated loop.
+- **P1:** Build remaining sidebar routes (Virtual Routes, Progress, Community, Wellness, Calendar, Settings).
+- **P2:** Real 3D rider avatar (R3F/Three) in the route viewport bound to live physics.
+- **P2:** Clean up RN-web deprecation warnings (shadow*/textShadow*/pointerEvents/useNativeDriver); extract shared Toast into ui.tsx; wire workout menu-button to a real menu overlay.
+- **P2:** Dedicated photos for Featured Route & Wellness (currently SVG backdrops); gold script font for signatures.
 
 ## Next Tasks
-1. Confirm scope: expand to multi-screen app or keep single dashboard.
-2. If data-driven: design backend models and wire endpoints.
+1. Decide on backend + live telemetry integration scope.
+2. Flesh out the remaining navigation destinations as real screens.
