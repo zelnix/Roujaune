@@ -48,7 +48,7 @@ export default function Dashboard() {
   const navWidth = Math.max(84, Math.min(104, width * 0.085));
   const contentWidth = width - navWidth;
   const mainWidth = contentWidth - spacing.lg * 2;
-  const heroHeight = 400;
+  const heroHeight = 432;
 
   const [active, setActive] = React.useState("home");
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);

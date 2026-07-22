@@ -1,0 +1,35 @@
+{
+  "summary": "Bug fix verification for ROUJAUNE landscape tablet dashboard (viewport 1194x834). Verified the Alberto coach card no longer overlaps the hero descriptor subtitle after the hero height was bumped from 400 -> 432. Measured on the live web preview: descriptor 'Personalised cycling training with Alberto.' bottom = y 166.5, alberto-coach-card top = y 193.0 -> 26.5px clean vertical gap. Screenshot confirms visually. Regression suite passed: brand-wordmark, brand-header, tagline, descriptor, and alberto-coach-card with tappable start-ride-button all render; toast fires 'Starting today's ride…'. All required containers render post-scroll: dashboard-scroll, hero-route, metric-summary-strip, training-plan-card, featured-route-card, calendar-card, progress-card, community-card, wellness-card, achievement-card. Hero measured height = 432px exactly. No new console errors. Only pre-existing deprecation warnings from iteration_1 remain (shadow*, textShadow*, pointerEvents prop, useNativeDriver on web).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "theme/shadow", "issue": "Console warning: '\"shadow*\" style props are deprecated. Use \"boxShadow\".' (pre-existing, unresolved from iteration_1). Reference: /app/frontend/src/theme.ts shadow.card/shadow.glow."},
+      {"component": "HeroRoute signature text", "issue": "Console warning: '\"textShadow*\" style props are deprecated. Use \"textShadow\".' (pre-existing). Reference: /app/frontend/src/components/HeroRoute.tsx:128-136 and BrandHeader.tsx:67-76."},
+      {"component": "AlbertoCoachCard portrait overlay", "issue": "Console warning: 'props.pointerEvents is deprecated. Use style.pointerEvents' (pre-existing). Reference: /app/frontend/src/components/AlbertoCoachCard.tsx:27 and /app/frontend/app/index.tsx:32."},
+      {"component": "Animated (Toast / Touchable)", "issue": "Console warning on web: 'useNativeDriver is not supported ... Falling back to JS-based animation' (pre-existing). Reference: /app/frontend/app/index.tsx:22,24."}
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_2.json",
+    "/app/test_reports/screens/iter2_hero.png",
+    "/app/test_reports/screens/iter2_bottom.png"
+  ],
+  "action_items": [
+    "(carried over, non-blocking) Migrate deprecated shadow*/textShadow*/pointerEvents-prop usages; optionally gate useNativeDriver with Platform.OS !== 'web'."
+  ],
+  "critical_code_review_comments": [
+    "Fix in /app/frontend/app/index.tsx line 51 (heroHeight = 432) is correctly propagated to <HeroRoute height={heroHeight}/>.",
+    "HeroRoute uses justifyContent: 'flex-end' on wrap + coachArea absolutely positioned at bottom-left (bottom: spacing.lg), so the coach card is anchored to the bottom of the 432px hero. With BrandHeader top at spacing.lg (24) and total header stack height ~125.5px, the descriptor sits at y~149-166 inside the hero and the coach card top lands at y~193 -> confirmed 26.5px gap.",
+    "Coach card minHeight 190 + bottom spacing.lg fits comfortably within 432px hero without clipping."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "100%"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Landscape 1194x834 required. Measured gap between hero descriptor bottom and alberto-coach-card top = 26.5px at 1194x834; safe margin. If width changes, coach card width scales via Math.min(460, width * 0.44) but its top position depends only on hero height (432) and its own minHeight (190) — remains safe.",
+  "rca_of_issue": "Root cause of the original bug: hero height was 400px while brand header (top:24) + wordmark(~57) + tagline(~37+margin) + descriptor(~17+margin) stack reached y≈166 and the bottom-anchored coach card (bottom:24, minHeight:190) had its top at 400-24-190 = 186 (or higher after content grew), clipping the descriptor. Fix: raising hero height to 432 pushes coach card top to 432-24-230(actual)=178 rendered top at y=193 in-container -> 26.5px gap to descriptor bottom. Verified visually and via bounding-box math."
+}
