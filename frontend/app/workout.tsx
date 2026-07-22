@@ -189,7 +189,7 @@ export default function LiveWorkout() {
   const liveCue = paused ? "Workout paused — take a breath." : buildCue(telemetry, cueIdx);
 
   React.useEffect(() => {
-    const id = setInterval(() => setCueIdx((c) => (c + 1) % 4), 5000);
+    const id = setInterval(() => setCueIdx((c) => (c + 1) % 4), 30000);
     return () => clearInterval(id);
   }, []);
 
