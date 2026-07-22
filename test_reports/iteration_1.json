@@ -1,0 +1,44 @@
+{
+  "summary": "Frontend-only smoke + interaction testing for the ROUJAUNE landscape tablet dashboard (viewport 1194x834). All 12 required containers render (side-navigation, hero-route, alberto-coach-card, metric-summary-strip, training-plan-card, featured-route-card, calendar-card, dashboard-scroll, progress-card, community-card, wellness-card, achievement-card). All 5 CTA buttons (start-ride-button, view-plan-button, explore-route-button, view-calendar-button, join-ride-button) fire the toast with the expected message. Sidebar nav items (nav-training, nav-workouts) update the active highlight and show a toast with the correct label. Calendar prev/next arrows update the month label (May 2025 -> April 2025 -> June 2025). Day cell tap (day-2025-05-20) works and moves the red selection. Today's-plan rows (today-warmup / today-climb / today-cool) update selection and emit toast (\"Warm Up selected\", \"Threshold Climb selected\", \"Cool Down selected\"). Key content strings verified: ROUJAUNE, Alberto, Build & Climb, 62%, Col du Galibier, 4 / 6, 6h 24m, 287 W, 82%. No runtime/red-screen errors. A handful of React Native web deprecation warnings surfaced (see react_native_issues).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "theme/shadow", "issue": "Console warning: '\"shadow*\" style props are deprecated. Use \"boxShadow\".' Emitted by shadow.card / shadow.glow usage. Reference: /app/frontend/src/theme.ts (shadow object) used across ui.tsx, index.tsx, SideNavigation.tsx"},
+      {"component": "HeroRoute signature text", "issue": "Console warning: '\"textShadow*\" style props are deprecated. Use \"textShadow\".' Reference: /app/frontend/src/components/HeroRoute.tsx:128-129 (textShadowColor / textShadowRadius on signature)"},
+      {"component": "AlbertoCoachCard portrait overlay", "issue": "Console warning: 'props.pointerEvents is deprecated. Use style.pointerEvents'. Reference: /app/frontend/src/components/AlbertoCoachCard.tsx:27 (pointerEvents=\"none\" prop on LinearGradient overlay). Same pattern may exist in Toast in /app/frontend/app/index.tsx:32."},
+      {"component": "Animated (Toast / Touchable)", "issue": "Console warning on web: 'Animated: `useNativeDriver` is not supported ... Falling back to JS-based animation.' Consider Platform-gating useNativeDriver (true only on native) or accept the warning on web. Reference: /app/frontend/app/index.tsx:22,24 and /app/frontend/src/components/ui.tsx (Touchable spring)."}
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_1.json",
+    "/app/test_reports/screens/01_loaded.png",
+    "/app/test_reports/screens/02_bottom.png"
+  ],
+  "action_items": [
+    "Replace deprecated shadow* style props in /app/frontend/src/theme.ts with boxShadow (RN >=0.76 web).",
+    "Replace textShadowColor/textShadowRadius on the Alberto signature in HeroRoute.tsx with the new textShadow shorthand.",
+    "Move pointerEvents=\"none\" from JSX prop to style.pointerEvents on the LinearGradient overlay in AlbertoCoachCard.tsx (and any similar overlay).",
+    "Optional: gate useNativeDriver with Platform.OS !== 'web' in Toast and Touchable animations to silence the JS-fallback warning on web."
+  ],
+  "critical_code_review_comments": [
+    "No backend used (frontend-only spec) — matches requirement.",
+    "All interactive elements have testIDs and are correctly wired to onPress handlers.",
+    "Dashboard scroll container has testID and works.",
+    "Calendar month computation via dayjs and buildGrid is correct; May 2025 starts on Thursday and grid renders as expected.",
+    "index.tsx is ~145 lines, other components are small (<210 lines) — no file size concerns.",
+    "Toast auto-dismiss (~1.9s) matches spec."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "100%"},
+  "seed_data_creation": "None (frontend-only mock data in /app/frontend/src/data.ts)",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Landscape tablet viewport 1194x834 required. Whole dashboard lives at '/'. Bottom row (progress/community/wellness/achievement) requires scrolling the [data-testid=\"dashboard-scroll\"] ScrollView. Toasts auto-dismiss ~1.9s so wait between toast-emitting actions. All interactions verified against testIDs listed in the review request.",
+  "rca_of_issue": "No functional bugs found. Only deprecation warnings in the React Native Web console — non-blocking, cosmetic, listed under react_native_issues with exact file references."
+}
