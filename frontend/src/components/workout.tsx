@@ -707,7 +707,7 @@ export function SettingsPanel({ settings, setSetting, onClose }: {
 
 export function MusicPanel({ musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, voiceOptions, voiceId, selectVoice, onClose }: {
   musicOn: boolean; toggleMusic: () => void; volume: number; setVolume: (v: number) => void; voiceOn: boolean; toggleVoice: () => void;
-  voiceOptions: { id: string; label: string; accent: string; gender: "male" | "female" | "neutral" }[]; voiceId?: string; selectVoice: (id: string) => void; onClose: () => void;
+  voiceOptions: { id: string; label: string; sublabel: string; accent: string; gender: "male" | "female" | "neutral" }[]; voiceId?: string; selectVoice: (id: string) => void; onClose: () => void;
 }) {
   const level = Math.round(volume * 5);
   return (
@@ -743,7 +743,7 @@ export function MusicPanel({ musicOn, toggleMusic, volume, setVolume, voiceOn, t
         </View>
 
         <View style={[styles.voiceBlock, !voiceOn && { opacity: 0.4 }]} pointerEvents={voiceOn ? "auto" : "none"}>
-          <Text style={styles.voiceHint}>Voice & accent · tap to preview</Text>
+          <Text style={styles.voiceHint}>Voice & accent · tap any to hear it, then pick your favourite</Text>
           {voiceOptions.length === 0 ? (
             <Text style={styles.spSub}>Loading device voices…</Text>
           ) : (
@@ -753,8 +753,11 @@ export function MusicPanel({ musicOn, toggleMusic, volume, setVolume, voiceOn, t
                 return (
                   <Pressable key={v.id} testID={`voice-${v.id}`} onPress={() => selectVoice(v.id)} style={[styles.voiceRow, active && styles.voiceRowActive]}>
                     <Ionicons name={v.gender === "female" ? "woman" : v.gender === "male" ? "man" : "person"} size={16} color={active ? colors.yellow : colors.textDim} />
-                    <Text style={[styles.voiceLabel, active && { color: colors.white }]} numberOfLines={1}>{v.label}</Text>
-                    <Ionicons name={active ? "checkmark-circle" : "play-circle-outline"} size={18} color={active ? colors.yellow : colors.textDim} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.voiceLabel, active && { color: colors.white }]} numberOfLines={1}>{v.label}</Text>
+                      <Text style={styles.voiceSub} numberOfLines={1}>{v.sublabel}</Text>
+                    </View>
+                    <Ionicons name={active ? "checkmark-circle" : "play-circle-outline"} size={20} color={active ? colors.yellow : colors.textDim} />
                   </Pressable>
                 );
               })}
@@ -971,6 +974,7 @@ const styles = StyleSheet.create({
   voiceRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, paddingHorizontal: 12, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: "rgba(255,255,255,0.03)", marginBottom: 6 },
   voiceRowActive: { borderColor: colors.yellow, backgroundColor: "rgba(245,197,24,0.10)" },
   voiceLabel: { flex: 1, color: colors.textDim, fontSize: 13.5, fontWeight: "700" },
+  voiceSub: { color: colors.textDim, fontSize: 11, marginTop: 1, opacity: 0.8 },
   musicFab: { position: "absolute", bottom: 24, left: 20, flexDirection: "row", alignItems: "center", gap: 7, height: 46, paddingHorizontal: 16, borderRadius: 23, borderWidth: 1.5, zIndex: 20, ...shadow.glow },
   musicFabOn: { backgroundColor: colors.yellow, borderColor: colors.yellow },
   musicFabOff: { backgroundColor: colors.card, borderColor: colors.border },

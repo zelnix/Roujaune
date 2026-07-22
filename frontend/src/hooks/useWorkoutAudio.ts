@@ -1,4 +1,4 @@
-import { useAudioPlayer } from "expo-audio";
+import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import * as Speech from "expo-speech";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getVoiceId, setVoiceId } from "../lib/prefs";
@@ -9,7 +9,16 @@ const MUSIC_SOURCE = { uri: "https://www.soundhelix.com/examples/mp3/SoundHelix-
 const DUCK = 0.22; // music volume multiplier while Alberto is speaking
 const PREVIEW = "Alright, let's ride. Hold steady and breathe.";
 
-export type VoiceOption = { id: string; label: string; accent: string; gender: "male" | "female" | "neutral"; lang: string };
+export type VoiceOption = { id: string; label: string; sublabel: string; accent: string; gender: "male" | "female" | "neutral"; lang: string };
+
+// A human-readable name for a device voice (falls back to the identifier tail).
+function readableName(v: Speech.Voice): string {
+  const name = (v.name ?? "").trim();
+  if (name && !name.startsWith("com.") && !/^[a-z]{2}([-_][a-z0-9]+)+$/i.test(name)) return name;
+  const id = v.identifier ?? "";
+  const tail = id.split(/[._-]/).filter(Boolean).pop() ?? id;
+  return tail ? tail.charAt(0).toUpperCase() + tail.slice(1) : "Voice";
+}
 
 // Friendly accent label from a BCP-47 language tag.
 const ACCENTS: Record<string, string> = {
@@ -77,25 +86,25 @@ export function useWorkoutAudio() {
           const l = (v.language ?? "").toLowerCase();
           return v.identifier && (l.startsWith("es") || l.startsWith("en"));
         });
-        // Keep EVERY voice (deduped by identifier only) so a male voice is
-        // always reachable even when the OS doesn't expose gender metadata.
+        // Keep EVERY voice (deduped by identifier only) so any voice — male or
+        // female — is reachable. Devices often expose no name/gender metadata,
+        // so we number them per accent and let the rider preview by ear.
         const seenId = new Set<string>();
         const opts: VoiceOption[] = [];
-        const labelCount: Record<string, number> = {};
+        const perAccent: Record<string, number> = {};
         for (const v of relevant) {
           if (seenId.has(v.identifier)) continue;
           seenId.add(v.identifier);
           const gender = genderOf(v);
           const accent = accentOf(v.language ?? "");
-          const gTag = gender === "female" ? " (female)" : gender === "male" ? " (male)" : "";
-          let label = `${accent}${gTag}`;
-          const n = (labelCount[label] = (labelCount[label] ?? 0) + 1);
-          if (n > 1) label = `${label} ${n}`;
-          opts.push({ id: v.identifier, label, accent, gender, lang: v.language ?? "es-ES" });
+          const n = (perAccent[accent] = (perAccent[accent] ?? 0) + 1);
+          const gTag = gender === "female" ? " · female" : gender === "male" ? " · male" : "";
+          const label = `${accent} voice ${n}`;
+          const sublabel = `${readableName(v)}${gTag}`;
+          opts.push({ id: v.identifier, label, sublabel, accent, gender, lang: v.language ?? "es-ES" });
         }
-        // Sort: Spanish male first (Alberto's default), then other males, neutral, female.
-        const rank = (o: VoiceOption) =>
-          (o.accent === "Spanish" && o.gender === "male" ? 0 : o.gender === "male" ? 1 : o.gender === "neutral" ? 2 : 3);
+        // Sort: detected males first (Alberto's preference), then neutral, then female.
+        const rank = (o: VoiceOption) => (o.gender === "male" ? 0 : o.gender === "neutral" ? 1 : 2);
         opts.sort((a, b) => rank(a) - rank(b) || a.label.localeCompare(b.label));
         setVoiceOptions(opts);
 
@@ -123,11 +132,15 @@ export function useWorkoutAudio() {
     }
   }, [player, musicOn, volume]);
 
+  const status = useAudioPlayerStatus(player);
+
   useEffect(() => {
     try { player.loop = true; } catch { /* noop */ }
   }, [player]);
 
-  useEffect(() => { apply(); }, [apply]);
+  // Start / update playback as soon as the track is loaded (fixes music not
+  // playing until the volume was nudged).
+  useEffect(() => { if (status?.isLoaded) apply(); }, [status?.isLoaded, apply]);
 
   useEffect(() => {
     return () => { try { Speech.stop(); player.pause(); } catch { /* noop */ } };
