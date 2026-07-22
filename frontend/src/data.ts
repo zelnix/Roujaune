@@ -134,14 +134,28 @@ export type RouteOption = {
   elevation: string;
   tag: string;
   tagColor: string;
+  level: "Race" | "Casual";
 };
 
 export const routeVideos: RouteOption[] = [
-  { id: "XlwjMjyU410", url: "https://youtu.be/XlwjMjyU410", title: "Alpe d'Huez", place: "France", distance: "16.0 km", elevation: "1,090 m", tag: "Mountain", tagColor: colors.red },
-  { id: "Pyfy8trRybA", url: "https://youtu.be/Pyfy8trRybA", title: "Lake Garda", place: "Italy", distance: "24.0 km", elevation: "420 m", tag: "Rolling", tagColor: colors.yellow },
-  { id: "U94MF1ZF81o", url: "https://youtu.be/U94MF1ZF81o", title: "Alpine Descent", place: "The Alps", distance: "18.0 km", elevation: "−980 m", tag: "Descent", tagColor: colors.green },
-  { id: "AX8sC_kR46M", url: "https://youtu.be/AX8sC_kR46M", title: "Bavaria Autumn", place: "Germany", distance: "30.0 km", elevation: "260 m", tag: "Forest", tagColor: "#E8631C" },
-  { id: "_vdX8QZyWeI", url: "https://youtu.be/_vdX8QZyWeI", title: "Countryside Roads", place: "Open Country", distance: "28.0 km", elevation: "180 m", tag: "Flat", tagColor: colors.green },
+  // ---- Legendary race climbs & stages ----
+  { id: "XlwjMjyU410", url: "https://youtu.be/XlwjMjyU410", title: "Alpe d'Huez", place: "France", distance: "13.8 km", elevation: "1,120 m", tag: "Climb", tagColor: colors.red, level: "Race" },
+  { id: "eSV5wxZ4Mdc", url: "https://youtu.be/eSV5wxZ4Mdc", title: "Mont Ventoux", place: "France", distance: "21.5 km", elevation: "1,610 m", tag: "Climb", tagColor: colors.red, level: "Race" },
+  { id: "0aLc9bGiUr0", url: "https://youtu.be/0aLc9bGiUr0", title: "Passo dello Stelvio", place: "Italy", distance: "24.3 km", elevation: "1,808 m", tag: "Climb", tagColor: colors.red, level: "Race" },
+  { id: "hHnyiYjVTHA", url: "https://youtu.be/hHnyiYjVTHA", title: "Dolomites Passes", place: "Italy", distance: "35.0 km", elevation: "1,200 m", tag: "Mountain", tagColor: "#E8631C", level: "Race" },
+  { id: "kaoeXjaGdNI", url: "https://youtu.be/kaoeXjaGdNI", title: "Alpine Ascent", place: "The Alps", distance: "22.0 km", elevation: "980 m", tag: "Mountain", tagColor: "#E8631C", level: "Race" },
+  { id: "z9Vn06I8hOM", url: "https://youtu.be/z9Vn06I8hOM", title: "Legendary Climbs", place: "World Tour", distance: "42.0 km", elevation: "2,300 m", tag: "Epic", tagColor: "#B983FF", level: "Race" },
+  { id: "Pyfy8trRybA", url: "https://youtu.be/Pyfy8trRybA", title: "Lake Garda", place: "Italy", distance: "24.0 km", elevation: "420 m", tag: "Rolling", tagColor: colors.yellow, level: "Race" },
+  { id: "U94MF1ZF81o", url: "https://youtu.be/U94MF1ZF81o", title: "Alpine Descent", place: "The Alps", distance: "18.0 km", elevation: "−980 m", tag: "Descent", tagColor: "#0AA0DE", level: "Race" },
+
+  // ---- Easy & scenic rides for casual / beginner riders ----
+  { id: "SbCfkpjNsuo", url: "https://youtu.be/SbCfkpjNsuo", title: "Mincio Riverside", place: "Italy", distance: "20.0 km", elevation: "60 m", tag: "Easy", tagColor: colors.green, level: "Casual" },
+  { id: "Pzx9hk1UT1Y", url: "https://youtu.be/Pzx9hk1UT1Y", title: "Lake Achensee", place: "Austria", distance: "18.0 km", elevation: "120 m", tag: "Scenic", tagColor: colors.green, level: "Casual" },
+  { id: "8tWsrbyFVE8", url: "https://youtu.be/8tWsrbyFVE8", title: "Ocean Shores Coast", place: "USA", distance: "15.0 km", elevation: "20 m", tag: "Coastal", tagColor: "#0AA0DE", level: "Casual" },
+  { id: "R-J9bp3IACE", url: "https://youtu.be/R-J9bp3IACE", title: "Spreewald Waterways", place: "Germany", distance: "22.0 km", elevation: "40 m", tag: "Easy", tagColor: colors.green, level: "Casual" },
+  { id: "d6ib9yH3cTE", url: "https://youtu.be/d6ib9yH3cTE", title: "German Countryside", place: "Germany", distance: "30.0 km", elevation: "180 m", tag: "Flat", tagColor: colors.green, level: "Casual" },
+  { id: "AX8sC_kR46M", url: "https://youtu.be/AX8sC_kR46M", title: "Bavaria Autumn", place: "Germany", distance: "30.0 km", elevation: "260 m", tag: "Forest", tagColor: "#E8631C", level: "Casual" },
+  { id: "_vdX8QZyWeI", url: "https://youtu.be/_vdX8QZyWeI", title: "Countryside Roads", place: "Open Country", distance: "28.0 km", elevation: "180 m", tag: "Flat", tagColor: colors.green, level: "Casual" },
 ];
 
 // Preview of the interval coming up next (includes RPE + power target).
@@ -157,5 +171,5 @@ export const nextInterval = {
 export const currentWorkout = {
   title: "Threshold Climb",
   type: "Climb",
-  recommendedTag: "Mountain",
+  recommendedTag: "Climb",
 };

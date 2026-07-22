@@ -157,7 +157,7 @@ function MetricCell({ icon, label, value, unit, last, compact }: Cell & { last?:
   );
 }
 
-export function MetricsGrid({ stats, compact = false }: { stats: SummaryStats; compact?: boolean }) {
+export function MetricsGrid({ stats, compact = false, routeName }: { stats: SummaryStats; compact?: boolean; routeName?: string }) {
   const y = colors.yellow, r = colors.red, w = colors.white;
   const row1: Cell[] = [
     { icon: <Ionicons name="time-outline" size={14} color={w} />, label: "DURATION", value: fmtDuration(stats.duration_sec) },
@@ -171,7 +171,7 @@ export function MetricsGrid({ stats, compact = false }: { stats: SummaryStats; c
     { icon: <Ionicons name="heart" size={14} color={r} />, label: "AVG HEART RATE", value: String(stats.avg_hr), unit: "bpm" },
     { icon: <Ionicons name="flame" size={14} color={r} />, label: "CALORIES", value: stats.calories.toLocaleString(), unit: "kcal" },
     { icon: <MaterialCommunityIcons name="speedometer" size={14} color={r} />, label: "TSS TRAINING LOAD", value: String(stats.tss), unit: "TSS" },
-    { icon: <Ionicons name="location" size={14} color={y} />, label: "ROUTE", value: C.route.name },
+    { icon: <Ionicons name="location" size={14} color={y} />, label: "ROUTE", value: routeName ?? C.route.name },
   ];
   return (
     <View style={styles.metricsCard} testID="metrics-grid">
@@ -417,12 +417,15 @@ export function SyncExportRow({ onToast, compact = false }: { onToast: (m: strin
 }
 
 /* ======================= RIGHT COLUMN ======================= */
-export function RouteSummaryCard() {
+export function RouteSummaryCard({ route }: { route?: { name: string; place: string; distance: string; elevation: string; tag: string } }) {
+  const name = route?.name ?? C.route.name;
+  const stat = route ? `${route.distance}  •  ${route.elevation} climb` : C.route.stat;
+  const place = route?.place;
   return (
     <View style={styles.rightCard} testID="route-summary-card">
       <View style={styles.mHead}><MaterialCommunityIcons name="terrain" size={14} color={colors.yellow} /><Text style={styles.rightHeadLabel}>ROUTE SUMMARY</Text></View>
-      <Text style={styles.routeName}>{C.route.name}</Text>
-      <Text style={styles.routeStat}>{C.route.stat}</Text>
+      <Text style={styles.routeName}>{name}</Text>
+      <Text style={styles.routeStat}>{place ? `${place}  ·  ${stat}` : stat}</Text>
       <View style={styles.routeCompleted}>
         <Ionicons name="checkmark-circle" size={14} color={colors.green} />
         <Text style={styles.routeCompletedText}>{C.route.status}</Text>

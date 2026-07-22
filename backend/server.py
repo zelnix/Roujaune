@@ -9,7 +9,7 @@ import random
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone
 
@@ -132,7 +132,7 @@ class TelemetrySample(BaseModel):
 
 class SummarizeRequest(BaseModel):
     workout: str = "Threshold Climb"
-    route: str = "Alpe d'Huez"
+    route: Optional[Dict[str, Any]] = None   # {id,name,place,distance,elevation,tag}
     elapsed: int = 0          # seconds of the ride
     ftp: int = 287            # rider FTP (watts)
     weight: float = 78        # kg
@@ -216,6 +216,7 @@ async def summarize_workout(body: SummarizeRequest):
     low to be meaningful (e.g. a quick demo tap-through)."""
     powers = [s.power for s in body.samples if s.power is not None]
     if len(body.samples) < 30 or not powers:
+        await _save_ride_history(body, REFERENCE_SUMMARY)
         return REFERENCE_SUMMARY
 
     hrs = [s.hr for s in body.samples if s.hr]
@@ -267,7 +268,7 @@ async def summarize_workout(body: SummarizeRequest):
     cadence_compliance = round(cad_in / len(cads) * 100) if cads else 0
     overall = round((power_compliance + cadence_compliance) / 2)
 
-    return {
+    result = {
         "computed": True,
         "duration_sec": dur,
         "distance_km": distance,
@@ -294,6 +295,36 @@ async def summarize_workout(body: SummarizeRequest):
             "completed": 100,
         },
     }
+    await _save_ride_history(body, result)
+    return result
+
+
+async def _save_ride_history(body: SummarizeRequest, result: dict):
+    """Persist a lightweight ride-history record (route + key metrics)."""
+    try:
+        doc = {
+            "id": str(uuid.uuid4()),
+            "created_at": now_iso(),
+            "workout": body.workout,
+            "route": body.route,
+            "duration_sec": result.get("duration_sec"),
+            "distance_km": result.get("distance_km"),
+            "elevation_m": result.get("elevation_m"),
+            "avg_power": result.get("avg_power"),
+            "tss": result.get("tss"),
+            "computed": result.get("computed", False),
+        }
+        await db.ride_history.insert_one(doc)
+    except Exception as e:  # never block the summary on history write
+        logger.warning(f"ride_history insert failed: {e}")
+
+
+@api_router.get("/rides/history")
+async def ride_history(limit: int = 20):
+    docs = await db.ride_history.find().sort("created_at", -1).to_list(length=limit)
+    for d in docs:
+        d.pop("_id", None)
+    return docs
 
 
 # ----------------------- Trainer telemetry (BLE bridge stand-in) -----------------------

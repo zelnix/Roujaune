@@ -39,7 +39,7 @@ export default function WorkoutComplete() {
   const rightW = compact ? 300 : 344;
   const pad = phone ? spacing.sm : compact ? spacing.md : spacing.lg;
 
-  const { stats } = useSummary();
+  const { stats, route } = useSummary();
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
   const [mainW, setMainW] = React.useState(600);
   const showToast = React.useCallback((text: string) => setToast({ id: Date.now(), text }), []);
@@ -74,16 +74,16 @@ export default function WorkoutComplete() {
             <View style={[styles.contentRow, phone && styles.contentCol]}>
               <View style={styles.mainCol} onLayout={onMainLayout}>
                 <HeroSummaryCard compact={phone} />
-                <MetricsGrid stats={stats} compact={compact} />
+                <MetricsGrid stats={stats} compact={compact} routeName={route.name} />
                 <ComplianceCard stats={stats} compact={phone} />
                 <ChartsRow stats={stats} width={mainW} vertical={phone} />
-                {phone && <RightColumn score={78} phone />}
+                {phone && <RightColumn score={78} phone route={route} />}
                 <SyncExportRow onToast={showToast} compact={phone} />
               </View>
 
               {!phone && (
                 <View style={[styles.rightCol, { width: rightW }]}>
-                  <RouteSummaryCard />
+                  <RouteSummaryCard route={route} />
                   <AchievementsCard />
                   <RecoveryCard score={78} />
                 </View>
@@ -109,10 +109,10 @@ export default function WorkoutComplete() {
 }
 
 // On phone landscape the right-hand cards flow below the main content in a wrap row.
-function RightColumn({ score, phone }: { score: number; phone: boolean }) {
+function RightColumn({ score, phone, route }: { score: number; phone: boolean; route?: React.ComponentProps<typeof RouteSummaryCard>["route"] }) {
   return (
     <View style={phone ? styles.rightWrap : undefined}>
-      <View style={phone && styles.rightWrapItemWide}><RouteSummaryCard /></View>
+      <View style={phone && styles.rightWrapItemWide}><RouteSummaryCard route={route} /></View>
       <View style={phone && styles.rightWrapItem}><AchievementsCard /></View>
       <View style={phone && styles.rightWrapItem}><RecoveryCard score={score} /></View>
     </View>

@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView, Switch } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -8,6 +8,7 @@ import { colors, radius, spacing, shadow } from "../theme";
 import { Touchable, SectionLabel } from "./ui";
 import { posterFor } from "../lib/youtube";
 import type { RouteOption } from "../data";
+import type { Settings } from "../lib/settings";
 
 const glyph = require("../../assets/images/logo_glyph_t.png");
 const riderImg = require("../../assets/images/hero_cyclist_b2.jpg");
@@ -87,71 +88,93 @@ function ZoneBlocks({ active }: { active: number }) {
   );
 }
 
-export function PowerCard({ power, wkg }: { power: number; wkg: string }) {
+function NotConnectedBody({ kind }: { kind: "trainer" | "wearable" }) {
   return (
-    <View style={styles.metricCard} testID="power-card">
-      <View style={styles.metricHead}><Ionicons name="flash" size={15} color={colors.yellow} /><SectionLabel color={colors.yellow}>POWER</SectionLabel></View>
-      <View style={styles.metricValRow}>
-        <Text style={styles.metricBig}>{power}</Text>
-        <Text style={styles.metricUnit}>W</Text>
-        <View style={{ flex: 1 }} />
-        <Text style={styles.metricSecondary}>{wkg} <Text style={styles.microLabel}>W/kg</Text></Text>
-      </View>
-      <View style={styles.metricDivider} />
-      <View style={styles.tgtRow}>
-        <Text style={styles.microLabel}>TARGET</Text>
-        <Text style={styles.tgtVal}>251 W</Text>
-      </View>
-      <View style={styles.tgtRow}>
-        <Text style={styles.microLabel}>ZONE</Text>
-        <ZoneBlocks active={3} />
-        <Text style={styles.zoneTag}>Z4</Text>
-      </View>
+    <View style={styles.ncBody} testID={`nc-${kind}`}>
+      <Ionicons name={kind === "trainer" ? "bluetooth" : "watch-outline"} size={20} color={colors.textDim} />
+      <Text style={styles.ncTitle}>Not connected</Text>
+      <Text style={styles.ncSub}>{kind === "trainer" ? "Connect a smart trainer" : "Connect a wearable"}</Text>
     </View>
   );
 }
 
-export function HeartRateCard({ hr }: { hr: number }) {
+export function PowerCard({ power, wkg, connected = true }: { power: number; wkg: string; connected?: boolean }) {
+  return (
+    <View style={styles.metricCard} testID="power-card">
+      <View style={styles.metricHead}><Ionicons name="flash" size={15} color={colors.yellow} /><SectionLabel color={colors.yellow}>POWER</SectionLabel></View>
+      {connected ? (
+        <>
+          <View style={styles.metricValRow}>
+            <Text style={styles.metricBig}>{power}</Text>
+            <Text style={styles.metricUnit}>W</Text>
+            <View style={{ flex: 1 }} />
+            <Text style={styles.metricSecondary}>{wkg} <Text style={styles.microLabel}>W/kg</Text></Text>
+          </View>
+          <View style={styles.metricDivider} />
+          <View style={styles.tgtRow}>
+            <Text style={styles.microLabel}>TARGET</Text>
+            <Text style={styles.tgtVal}>251 W</Text>
+          </View>
+          <View style={styles.tgtRow}>
+            <Text style={styles.microLabel}>ZONE</Text>
+            <ZoneBlocks active={3} />
+            <Text style={styles.zoneTag}>Z4</Text>
+          </View>
+        </>
+      ) : <NotConnectedBody kind="trainer" />}
+    </View>
+  );
+}
+
+export function HeartRateCard({ hr, connected = true }: { hr: number; connected?: boolean }) {
   const pct = Math.min(1, Math.max(0, (hr - 90) / (178 - 90)));
   return (
     <View style={styles.metricCard} testID="heart-rate-card">
       <View style={styles.metricHead}><Ionicons name="heart" size={15} color={colors.red} /><SectionLabel color={colors.red}>HEART RATE</SectionLabel></View>
-      <View style={styles.metricValRow}>
-        <Text style={styles.metricBig}>{hr}</Text>
-        <Text style={styles.metricUnit}>bpm</Text>
-        <View style={{ flex: 1 }} />
-        <View style={{ alignItems: "flex-end" }}><Text style={styles.microLabel}>ZONE</Text><Text style={styles.zoneTag}>Z4</Text></View>
-      </View>
-      <View style={styles.hrBarWrap}>
-        <LinearGradient colors={[ZONE.z1, ZONE.z2, ZONE.z3, ZONE.z4, ZONE.z5]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.hrBar} />
-        <View style={[styles.hrMarker, { left: `${pct * 100}%` }]} />
-      </View>
-      <View style={styles.tgtRow}>
-        <Text style={styles.microLabel}>Max 178 bpm</Text>
-        <View style={{ flex: 1 }} />
-        <Text style={styles.microLabel}>Avg 148 bpm</Text>
-      </View>
+      {connected ? (
+        <>
+          <View style={styles.metricValRow}>
+            <Text style={styles.metricBig}>{hr}</Text>
+            <Text style={styles.metricUnit}>bpm</Text>
+            <View style={{ flex: 1 }} />
+            <View style={{ alignItems: "flex-end" }}><Text style={styles.microLabel}>ZONE</Text><Text style={styles.zoneTag}>Z4</Text></View>
+          </View>
+          <View style={styles.hrBarWrap}>
+            <LinearGradient colors={[ZONE.z1, ZONE.z2, ZONE.z3, ZONE.z4, ZONE.z5]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.hrBar} />
+            <View style={[styles.hrMarker, { left: `${pct * 100}%` }]} />
+          </View>
+          <View style={styles.tgtRow}>
+            <Text style={styles.microLabel}>Max 178 bpm</Text>
+            <View style={{ flex: 1 }} />
+            <Text style={styles.microLabel}>Avg 148 bpm</Text>
+          </View>
+        </>
+      ) : <NotConnectedBody kind="wearable" />}
     </View>
   );
 }
 
-export function CadenceCard({ cadence }: { cadence: number }) {
+export function CadenceCard({ cadence, connected = true }: { cadence: number; connected?: boolean }) {
   const bars = Array.from({ length: 22 }, (_, i) => 0.3 + Math.abs(Math.sin(i * 0.7)) * 0.7);
   const activeIdx = Math.round((cadence / 120) * bars.length);
   return (
     <View style={styles.metricCard} testID="cadence-card">
       <View style={styles.metricHead}><Ionicons name="sync" size={15} color={colors.yellow} /><SectionLabel color={colors.yellow}>CADENCE</SectionLabel></View>
-      <View style={styles.metricValRow}>
-        <Text style={styles.metricBig}>{cadence}</Text>
-        <Text style={styles.metricUnit}>rpm</Text>
-        <View style={{ flex: 1 }} />
-        <View style={{ alignItems: "flex-end" }}><Text style={styles.microLabel}>TARGET</Text><Text style={styles.tgtVal}>90–100</Text></View>
-      </View>
-      <View style={styles.cadenceBars}>
-        {bars.map((h, i) => (
-          <View key={i} style={{ width: 5, height: 6 + h * 26, borderRadius: 2, backgroundColor: i === activeIdx ? colors.yellow : "rgba(255,255,255,0.18)" }} />
-        ))}
-      </View>
+      {connected ? (
+        <>
+          <View style={styles.metricValRow}>
+            <Text style={styles.metricBig}>{cadence}</Text>
+            <Text style={styles.metricUnit}>rpm</Text>
+            <View style={{ flex: 1 }} />
+            <View style={{ alignItems: "flex-end" }}><Text style={styles.microLabel}>TARGET</Text><Text style={styles.tgtVal}>90–100</Text></View>
+          </View>
+          <View style={styles.cadenceBars}>
+            {bars.map((h, i) => (
+              <View key={i} style={{ width: 5, height: 6 + h * 26, borderRadius: 2, backgroundColor: i === activeIdx ? colors.yellow : "rgba(255,255,255,0.18)" }} />
+            ))}
+          </View>
+        </>
+      ) : <NotConnectedBody kind="trainer" />}
     </View>
   );
 }
@@ -324,21 +347,25 @@ function WGrid({ label, value, sub, subColor }: { label: string; value: string; 
   );
 }
 
-export function WearableDataCard() {
+export function WearableDataCard({ connected = true }: { connected?: boolean }) {
   return (
     <View style={styles.sideCard} testID="wearable-card">
       <View style={styles.metricHead}><MaterialCommunityIcons name="watch-variant" size={15} color={colors.white} /><SectionLabel color={colors.white}>FROM YOUR WEARABLE</SectionLabel></View>
-      <View style={styles.wGridRow}>
-        <WGrid label="HRV" value="42" sub="Good" subColor={colors.greenText} />
-        <WGrid label="STRESS" value="36" sub="Low" subColor={colors.greenText} />
-        <WGrid label="RESPIRATION" value="14" sub="brpm" />
-      </View>
-      <View style={styles.wDivider} />
-      <View style={styles.wGridRow}>
-        <WGrid label="BODY TEMP" value="36.7" sub="°C" />
-        <WGrid label="BATTERY" value="92" sub="%" />
-        <WGrid label="VO2 MAX" value="52" sub="ml/kg/min" />
-      </View>
+      {connected ? (
+        <>
+          <View style={styles.wGridRow}>
+            <WGrid label="HRV" value="42" sub="Good" subColor={colors.greenText} />
+            <WGrid label="STRESS" value="36" sub="Low" subColor={colors.greenText} />
+            <WGrid label="RESPIRATION" value="14" sub="brpm" />
+          </View>
+          <View style={styles.wDivider} />
+          <View style={styles.wGridRow}>
+            <WGrid label="BODY TEMP" value="36.7" sub="°C" />
+            <WGrid label="BATTERY" value="92" sub="%" />
+            <WGrid label="VO2 MAX" value="52" sub="ml/kg/min" />
+          </View>
+        </>
+      ) : <NotConnectedBody kind="wearable" />}
     </View>
   );
 }
@@ -354,7 +381,7 @@ function SumMetric({ icon, iconColor, value, unit, label, sub }: { icon: React.R
   );
 }
 
-export function RideSummaryStrip({ speed }: { speed: string }) {
+export function RideSummaryStrip({ speed, trainerConnected = true }: { speed: string; trainerConnected?: boolean }) {
   const zones = [
     { z: "Z1", t: "02:15", c: ZONE.z1, w: 0.3 },
     { z: "Z2", t: "05:30", c: ZONE.z2, w: 0.65 },
@@ -364,7 +391,7 @@ export function RideSummaryStrip({ speed }: { speed: string }) {
   ];
   return (
     <View style={styles.summaryStrip} testID="ride-summary-strip">
-      <SumMetric icon={<Ionicons name="speedometer-outline" size={14} color={colors.yellow} />} iconColor={colors.yellow} value={speed} unit="km/h" label="SPEED" sub="Avg 24.6" />
+      <SumMetric icon={<Ionicons name="speedometer-outline" size={14} color={colors.yellow} />} iconColor={colors.yellow} value={trainerConnected ? speed : "—"} unit="km/h" label="SPEED" sub={trainerConnected ? "Avg 24.6" : "Not connected"} />
       <View style={styles.sumDiv} />
       <SumMetric icon={<MaterialCommunityIcons name="map-marker-distance" size={14} color={colors.yellow} />} iconColor={colors.yellow} value="23.7" unit="km" label="DISTANCE" sub="16.0 km to go" />
       <View style={styles.sumDiv} />
@@ -493,11 +520,14 @@ function HudChip({ icon, color, label, value, unit }: { icon: React.ReactNode; c
 
 export function ImmersiveHud({
   elapsed, power, wkg, hr, cadence, speed, progress, connectionState, stale, paused, cue, onPause, onEnd, onOpenRoutes,
+  trainerConnected = true, wearableConnected = true,
 }: {
   elapsed: string; power: number; wkg: string; hr: number; cadence: number; speed: string | number; progress: string;
   connectionState: string; stale: boolean; paused: boolean; cue: string; onPause: () => void; onEnd: () => void; onOpenRoutes: () => void;
+  trainerConnected?: boolean; wearableConnected?: boolean;
 }) {
   const conn = connMeta(connectionState, stale);
+  const NC = "—";
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none" testID="immersive-hud">
       {/* top scrim + status */}
@@ -529,10 +559,10 @@ export function ImmersiveHud({
       <LinearGradient colors={["transparent", "rgba(0,0,0,0.82)"]} style={styles.hudBotScrim} pointerEvents="none" />
       <View style={styles.hudBottom} pointerEvents="box-none">
         <View style={styles.hudChips} pointerEvents="none">
-          <HudChip icon={<Ionicons name="flash" size={13} color={colors.yellow} />} color={colors.yellow} label="POWER" value={power} unit={`W · ${wkg} W/kg`} />
-          <HudChip icon={<Ionicons name="heart" size={13} color={colors.red} />} color={colors.red} label="HEART RATE" value={hr} unit="bpm" />
-          <HudChip icon={<Ionicons name="sync" size={13} color={colors.yellow} />} color={colors.yellow} label="CADENCE" value={cadence} unit="rpm" />
-          <HudChip icon={<Ionicons name="speedometer-outline" size={13} color="#fff" />} color="#fff" label="SPEED" value={speed} unit="km/h" />
+          <HudChip icon={<Ionicons name="flash" size={13} color={colors.yellow} />} color={colors.yellow} label="POWER" value={trainerConnected ? power : NC} unit={trainerConnected ? `W · ${wkg} W/kg` : "not connected"} />
+          <HudChip icon={<Ionicons name="heart" size={13} color={colors.red} />} color={colors.red} label="HEART RATE" value={wearableConnected ? hr : NC} unit={wearableConnected ? "bpm" : "not connected"} />
+          <HudChip icon={<Ionicons name="sync" size={13} color={colors.yellow} />} color={colors.yellow} label="CADENCE" value={trainerConnected ? cadence : NC} unit={trainerConnected ? "rpm" : "not connected"} />
+          <HudChip icon={<Ionicons name="speedometer-outline" size={13} color="#fff" />} color="#fff" label="SPEED" value={trainerConnected ? speed : NC} unit={trainerConnected ? "km/h" : "not connected"} />
         </View>
         <View style={styles.hudControls}>
           <Pressable onPress={onPause} style={[styles.hudBtn, styles.hudPause]} testID="hud-pause" accessibilityRole="button" accessibilityLabel={paused ? "Resume workout" : "Pause workout"}>
@@ -598,31 +628,45 @@ export function RoutePicker({ routes, activeIndex, recommendedTag, auto, lastRou
           </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={styles.rpGrid} showsVerticalScrollIndicator={false}>
-          {routes.map((r, i) => {
-            const active = i === activeIndex;
-            const reco = !!recommendedTag && r.tag === recommendedTag;
-            const isLast = !!lastRouteId && r.id === lastRouteId;
+        <ScrollView contentContainerStyle={styles.rpScroll} showsVerticalScrollIndicator={false}>
+          {(["Race", "Casual"] as const).map((lvl) => {
+            const items = routes.map((r, i) => ({ r, i })).filter((x) => x.r.level === lvl);
+            if (items.length === 0) return null;
             return (
-              <Pressable key={r.id} testID={`route-option-${i}`} style={[styles.rpCard, active && styles.rpCardActive]} onPress={() => onSelect(i)} accessibilityRole="button" accessibilityLabel={`Select route ${r.title}`}>
-                <View style={styles.rpThumb}>
-                  <Image source={{ uri: posterFor(r.id) }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
-                  <View style={styles.rpThumbScrim} />
-                  <View style={[styles.rpTag, { backgroundColor: r.tagColor }]}><Text style={styles.rpTagText}>{r.tag}</Text></View>
-                  {active && <View style={styles.rpActiveBadge}><Ionicons name={auto ? "sparkles" : "checkmark"} size={12} color="#1a1300" /></View>}
+              <View key={lvl} style={{ width: "100%" }}>
+                <View style={styles.rpSection}>
+                  <Ionicons name={lvl === "Race" ? "trophy" : "leaf"} size={13} color={lvl === "Race" ? colors.red : colors.green} />
+                  <Text style={styles.rpSectionText}>{lvl === "Race" ? "Legendary race climbs & stages" : "Easy & scenic — casual riders"}</Text>
                 </View>
-                <Text style={styles.rpName} numberOfLines={1}>{r.title}</Text>
-                <Text style={styles.rpPlace}>{r.place}</Text>
-                <View style={styles.rpStats}>
-                  <View style={styles.rpStat}><MaterialCommunityIcons name="map-marker-distance" size={12} color={colors.textDim} /><Text style={styles.rpStatText}>{r.distance}</Text></View>
-                  <View style={styles.rpStat}><MaterialCommunityIcons name="terrain" size={12} color={colors.textDim} /><Text style={styles.rpStatText}>{r.elevation}</Text></View>
+                <View style={styles.rpGrid}>
+                  {items.map(({ r, i }) => {
+                    const active = i === activeIndex;
+                    const reco = !!recommendedTag && r.tag === recommendedTag;
+                    const isLast = !!lastRouteId && r.id === lastRouteId;
+                    return (
+                      <Pressable key={r.id} testID={`route-option-${i}`} style={[styles.rpCard, active && styles.rpCardActive]} onPress={() => onSelect(i)} accessibilityRole="button" accessibilityLabel={`Select route ${r.title}`}>
+                        <View style={styles.rpThumb}>
+                          <Image source={{ uri: posterFor(r.id) }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+                          <View style={styles.rpThumbScrim} />
+                          <View style={[styles.rpTag, { backgroundColor: r.tagColor }]}><Text style={styles.rpTagText}>{r.tag}</Text></View>
+                          {active && <View style={styles.rpActiveBadge}><Ionicons name={auto ? "sparkles" : "checkmark"} size={12} color="#1a1300" /></View>}
+                        </View>
+                        <Text style={styles.rpName} numberOfLines={1}>{r.title}</Text>
+                        <Text style={styles.rpPlace}>{r.place}</Text>
+                        <View style={styles.rpStats}>
+                          <View style={styles.rpStat}><MaterialCommunityIcons name="map-marker-distance" size={12} color={colors.textDim} /><Text style={styles.rpStatText}>{r.distance}</Text></View>
+                          <View style={styles.rpStat}><MaterialCommunityIcons name="terrain" size={12} color={colors.textDim} /><Text style={styles.rpStatText}>{r.elevation}</Text></View>
+                        </View>
+                        {isLast ? (
+                          <View style={[styles.rpReco, styles.rpLast]}><Ionicons name="time" size={10} color="#8FD3FF" /><Text style={[styles.rpRecoText, { color: "#8FD3FF" }]}>Your last ride</Text></View>
+                        ) : reco ? (
+                          <View style={styles.rpReco}><Ionicons name="star" size={10} color={colors.yellow} /><Text style={styles.rpRecoText}>Great for your workout</Text></View>
+                        ) : null}
+                      </Pressable>
+                    );
+                  })}
                 </View>
-                {isLast ? (
-                  <View style={[styles.rpReco, styles.rpLast]}><Ionicons name="time" size={10} color="#8FD3FF" /><Text style={[styles.rpRecoText, { color: "#8FD3FF" }]}>Your last ride</Text></View>
-                ) : reco ? (
-                  <View style={styles.rpReco}><Ionicons name="star" size={10} color={colors.yellow} /><Text style={styles.rpRecoText}>Great for your workout</Text></View>
-                ) : null}
-              </Pressable>
+              </View>
             );
           })}
         </ScrollView>
@@ -632,6 +676,82 @@ export function RoutePicker({ routes, activeIndex, recommendedTag, auto, lastRou
 }
 
 const mh = { flexDirection: "row" as const, alignItems: "center" as const, gap: 6 };
+
+/* ============================ SETTINGS & AUDIO PANELS ============================ */
+export function SettingsPanel({ settings, setSetting, onClose }: {
+  settings: Settings; setSetting: <K extends keyof Settings>(k: K, v: Settings[K]) => void; onClose: () => void;
+}) {
+  const rows: { key: keyof Settings; icon: keyof typeof Ionicons.glyphMap; label: string; sub: string }[] = [
+    { key: "hasTrainer", icon: "bluetooth", label: "Smart trainer connected", sub: "Power, cadence & speed" },
+    { key: "hasWearable", icon: "watch-outline", label: "Wearable connected", sub: "Heart rate & wellness" },
+    { key: "hudEnabled", icon: "eye", label: "Show on-screen HUD", sub: "Live-data overlay in full screen" },
+  ];
+  return (
+    <Pressable style={styles.rpOverlay} onPress={onClose} testID="settings-panel">
+      <Pressable style={styles.spPanel} onPress={() => { /* swallow */ }}>
+        <View style={styles.rpHead}>
+          <View style={{ flex: 1 }}><Text style={styles.rpTitle}>Workout settings</Text><Text style={styles.rpSub}>Devices & display</Text></View>
+          <Pressable onPress={onClose} testID="settings-close" hitSlop={10}><Ionicons name="close" size={22} color={colors.white} /></Pressable>
+        </View>
+        {rows.map((r) => (
+          <View key={r.key} style={styles.spRow}>
+            <View style={styles.spIcon}><Ionicons name={r.icon} size={18} color={colors.yellow} /></View>
+            <View style={{ flex: 1 }}><Text style={styles.spLabel}>{r.label}</Text><Text style={styles.spSub}>{r.sub}</Text></View>
+            <Switch testID={`toggle-${r.key}`} value={settings[r.key]} onValueChange={(v) => setSetting(r.key, v)} trackColor={{ true: colors.red, false: "rgba(255,255,255,0.2)" }} thumbColor="#fff" />
+          </View>
+        ))}
+      </Pressable>
+    </Pressable>
+  );
+}
+
+export function MusicPanel({ musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, onClose }: {
+  musicOn: boolean; toggleMusic: () => void; volume: number; setVolume: (v: number) => void; voiceOn: boolean; toggleVoice: () => void; onClose: () => void;
+}) {
+  const level = Math.round(volume * 5);
+  return (
+    <Pressable style={styles.rpOverlay} onPress={onClose} testID="music-panel">
+      <Pressable style={styles.spPanel} onPress={() => { /* swallow */ }}>
+        <View style={styles.rpHead}>
+          <View style={{ flex: 1 }}><Text style={styles.rpTitle}>Music & audio</Text><Text style={styles.rpSub}>Ride soundtrack & Alberto&apos;s voice</Text></View>
+          <Pressable onPress={onClose} testID="music-close" hitSlop={10}><Ionicons name="close" size={22} color={colors.white} /></Pressable>
+        </View>
+
+        <View style={styles.spRow}>
+          <View style={styles.spIcon}><Ionicons name="musical-notes" size={18} color={colors.yellow} /></View>
+          <View style={{ flex: 1 }}><Text style={styles.spLabel}>Cycling music</Text><Text style={styles.spSub}>Upbeat instrumental loop</Text></View>
+          <Switch testID="toggle-music" value={musicOn} onValueChange={toggleMusic} trackColor={{ true: colors.red, false: "rgba(255,255,255,0.2)" }} thumbColor="#fff" />
+        </View>
+
+        <View style={[styles.spRow, !musicOn && { opacity: 0.4 }]}>
+          <View style={styles.spIcon}><Ionicons name="volume-high" size={18} color={colors.yellow} /></View>
+          <Text style={[styles.spLabel, { flex: 1 }]}>Volume</Text>
+          <Pressable testID="volume-down" onPress={() => setVolume(volume - 0.2)} disabled={!musicOn} style={styles.volBtn} hitSlop={8}><Ionicons name="remove" size={18} color="#fff" /></Pressable>
+          <View style={styles.volBars}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <View key={i} style={[styles.volSeg, { backgroundColor: i < level ? colors.yellow : "rgba(255,255,255,0.15)" }]} />
+            ))}
+          </View>
+          <Pressable testID="volume-up" onPress={() => setVolume(volume + 0.2)} disabled={!musicOn} style={styles.volBtn} hitSlop={8}><Ionicons name="add" size={18} color="#fff" /></Pressable>
+        </View>
+
+        <View style={styles.spRow}>
+          <View style={styles.spIcon}><Ionicons name="mic" size={18} color={colors.yellow} /></View>
+          <View style={{ flex: 1 }}><Text style={styles.spLabel}>Alberto&apos;s voice</Text><Text style={styles.spSub}>Spoken cues · mild French accent · softens music</Text></View>
+          <Switch testID="toggle-voice" value={voiceOn} onValueChange={toggleVoice} trackColor={{ true: colors.red, false: "rgba(255,255,255,0.2)" }} thumbColor="#fff" />
+        </View>
+      </Pressable>
+    </Pressable>
+  );
+}
+
+export function MusicButton({ musicOn, onPress }: { musicOn: boolean; onPress: () => void }) {
+  return (
+    <Pressable style={styles.musicFab} onPress={onPress} testID="music-button" hitSlop={8} accessibilityRole="button" accessibilityLabel="Music and audio settings">
+      <Ionicons name={musicOn ? "musical-notes" : "volume-mute"} size={18} color={musicOn ? colors.yellow : colors.textDim} />
+    </Pressable>
+  );
+}
 const styles = StyleSheet.create({
   /* top bar */
   topBar: { flexDirection: "row", alignItems: "center", gap: spacing.lg, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.lg, paddingVertical: 10, ...shadow.card },
@@ -744,9 +864,14 @@ const styles = StyleSheet.create({
   safety: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 4, paddingTop: 2 },
   safetyText: { color: colors.textFaint, fontSize: 11, flex: 1, lineHeight: 15 },
 
+  /* not-connected metric body */
+  ncBody: { minHeight: 92, alignItems: "center", justifyContent: "center", gap: 3, paddingVertical: 10 },
+  ncTitle: { color: colors.textDim, fontSize: 13, fontWeight: "800", letterSpacing: 0.3 },
+  ncSub: { color: colors.textFaint, fontSize: 11 },
+
   /* immersive HUD */
   hudTopScrim: { position: "absolute", top: 0, left: 0, right: 0, height: 110 },
-  hudTopLeft: { position: "absolute", top: 16, left: 18 },
+  hudTopLeft: { position: "absolute", top: 16, left: 60 },
   hudElapsed: { color: "#fff", fontSize: 34, fontWeight: "900", letterSpacing: 0.5, textShadowColor: "rgba(0,0,0,0.6)", textShadowRadius: 6 },
   hudElapsedSub: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 2 },
   hudMicro: { color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: "700", letterSpacing: 0.5 },
@@ -793,6 +918,9 @@ const styles = StyleSheet.create({
   rpRecoText: { color: colors.yellow, fontSize: 10.5, fontWeight: "700" },
   rpLast: { backgroundColor: "rgba(143,211,255,0.12)" },
   rpGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
+  rpScroll: { gap: 2, paddingBottom: spacing.sm },
+  rpSection: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: spacing.sm, marginBottom: spacing.sm },
+  rpSectionText: { color: colors.white, fontSize: 13, fontWeight: "800", letterSpacing: 0.3 },
   rpCard: { width: 224, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 10, gap: 2 },
   rpCardActive: { borderColor: colors.yellow, borderWidth: 2 },
   rpThumb: { width: "100%", aspectRatio: 16 / 9, borderRadius: radius.md, overflow: "hidden", backgroundColor: "#000", marginBottom: 8 },
@@ -805,4 +933,15 @@ const styles = StyleSheet.create({
   rpStats: { flexDirection: "row", gap: 14, marginTop: 6 },
   rpStat: { flexDirection: "row", alignItems: "center", gap: 5 },
   rpStatText: { color: colors.textDim, fontSize: 11.5, fontWeight: "600" },
+
+  /* settings / music panels */
+  spPanel: { width: 520, maxWidth: "92%", backgroundColor: colors.cardElevated, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, ...shadow.card },
+  spRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.borderSoft },
+  spIcon: { width: 38, height: 38, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.05)", alignItems: "center", justifyContent: "center" },
+  spLabel: { color: colors.white, fontSize: 14, fontWeight: "700" },
+  spSub: { color: colors.textDim, fontSize: 11.5, marginTop: 2 },
+  volBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
+  volBars: { flexDirection: "row", gap: 4, alignItems: "center", marginHorizontal: 4 },
+  volSeg: { width: 12, height: 16, borderRadius: 3 },
+  musicFab: { position: "absolute", top: 64, right: 20, width: 42, height: 42, borderRadius: 21, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center", zIndex: 20, ...shadow.card },
 });

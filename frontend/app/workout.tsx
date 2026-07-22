@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, Animated, useWindowDimensions, LayoutChangeEvent, Pressable, Platform } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Animated, useWindowDimensions, LayoutChangeEvent, Pressable, Platform, Switch } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -10,14 +10,16 @@ import { colors, radius, spacing, shadow } from "@/src/theme";
 import { useTelemetry } from "@/src/hooks/useTelemetry";
 import { rideRecorder } from "@/src/lib/ride";
 import { getLastRouteId, setLastRouteId } from "@/src/lib/prefs";
+import { useSettings } from "@/src/lib/settings";
 import { routeVideos, nextInterval, currentWorkout } from "@/src/data";
 import { RouteVideo } from "@/src/components/RouteVideo";
 import {
   WorkoutTopBar, PowerCard, HeartRateCard, CadenceCard, WorkoutTimelineCard,
   ClimbCard, RouteMapCard, WearableDataCard, RideSummaryStrip,
   TrainerControlBar, AlbertoLiveCue, NextUpStrip, SafetyNote, ImmersiveHud, VideoPlaceholder,
-  RoutesButton, RoutePicker,
+  RoutesButton, RoutePicker, SettingsPanel, MusicPanel, MusicButton,
 } from "@/src/components/workout";
+import { useWorkoutAudio } from "@/src/hooks/useWorkoutAudio";
 
 const CUES = [
   "Hold steady at 251 watts.",
@@ -41,6 +43,7 @@ const CONTROLS = [
 
 const MENU = [
   { key: "reconnect", label: "Reconnect Trainer", icon: "bluetooth" as const },
+  { key: "music", label: "Music & Audio", icon: "musical-notes" as const },
   { key: "settings", label: "Workout Settings", icon: "settings" as const },
   { key: "lock", label: "Touch Lock", icon: "lock-closed" as const },
   { key: "peaceful", label: "Peaceful Pause", icon: "leaf" as const },
@@ -93,17 +96,42 @@ export default function LiveWorkout() {
   const [showRoutes, setShowRoutes] = React.useState(false);
   const [showControls, setShowControls] = React.useState(false);
   const [showMenu, setShowMenu] = React.useState(false);
+  const [showSettings, setShowSettings] = React.useState(false);
+  const [showMusic, setShowMusic] = React.useState(false);
+  const [hudVisible, setHudVisible] = React.useState(true);
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
   const [cueIdx, setCueIdx] = React.useState(0);
 
   const { telemetry, connectionState, stale, sendErg, pause, resume, simulateDropout } = useTelemetry();
+  const { settings, setSetting, loaded } = useSettings();
   const erg = telemetry.erg;
 
   const showToast = React.useCallback((text: string) => setToast({ id: Date.now(), text }), []);
 
+  // Heads-up when the workout opens with the HUD turned off.
+  const headsUpShown = React.useRef(false);
   React.useEffect(() => {
-    rideRecorder.reset({ workout: "Threshold Climb", route: "Alpe d'Huez" });
+    if (!loaded || headsUpShown.current) return;
+    headsUpShown.current = true;
+    if (!settings.hudEnabled) {
+      showToast("HUD is turned off — tap the eye icon in full screen to reveal live data.");
+    }
+  }, [loaded, settings.hudEnabled, showToast]);
+
+  // Reset temporary HUD visibility to the saved preference each time we expand.
+  React.useEffect(() => {
+    if (expanded) setHudVisible(settings.hudEnabled);
+  }, [expanded, settings.hudEnabled]);
+
+  React.useEffect(() => {
+    rideRecorder.reset({ workout: "Threshold Climb" });
   }, []);
+
+  // Keep the ride recorder's route in sync so the summary reflects the scenery ridden.
+  React.useEffect(() => {
+    const r = routeVideos[routeIdx];
+    rideRecorder.setRoute({ id: r.id, name: r.title, place: r.place, distance: r.distance, elevation: r.elevation, tag: r.tag });
+  }, [routeIdx]);
 
   // Restore the rider's last route across sessions (falls back to auto-match).
   React.useEffect(() => {
@@ -130,10 +158,18 @@ export default function LiveWorkout() {
     }
   }, [telemetry]);
 
+  const { musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, speak } = useWorkoutAudio();
+
   React.useEffect(() => {
     const id = setInterval(() => setCueIdx((c) => (c + 1) % CUES.length), 5000);
     return () => clearInterval(id);
   }, []);
+
+  // Speak each in-workout instruction aloud as it appears (Alberto, mild French accent).
+  React.useEffect(() => {
+    if (!paused) speak(CUES[cueIdx]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cueIdx]);
 
   const onCenterLayout = (e: LayoutChangeEvent) => setCenterW(e.nativeEvent.layout.width);
 
@@ -154,6 +190,8 @@ export default function LiveWorkout() {
   const onMenuAction = (item: { key: string; label: string }) => {
     setShowMenu(false);
     if (item.key === "reconnect") { simulateDropout(); showToast("Simulating trainer dropout…"); return; }
+    if (item.key === "music") { setShowMusic(true); return; }
+    if (item.key === "settings") { setShowSettings(true); return; }
     if (item.key === "save") { router.replace("/training"); return; }
     showToast(item.label);
   };
@@ -183,15 +221,15 @@ export default function LiveWorkout() {
       <StatusBar hidden />
       <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
         <ScrollView contentContainerStyle={[styles.content, compact && { padding: spacing.sm, gap: spacing.sm }]} showsVerticalScrollIndicator={false} testID="workout-scroll">
-          <WorkoutTopBar elapsed={fmt(telemetry.elapsed)} connectionState={connectionState} stale={stale} onPress={showToast} />
+          <WorkoutTopBar elapsed={fmt(telemetry.elapsed)} connectionState={connectionState} stale={stale} onPress={(m) => (m === "Settings" ? setShowSettings(true) : showToast(m))} />
 
           <View style={styles.bodyRow}>
             <View style={styles.leftBlock}>
               <View style={styles.innerRow}>
                 <View style={[styles.leftCol, { width: leftW }]}>
-                  <PowerCard power={telemetry.power} wkg={(telemetry.power / 78).toFixed(1)} />
-                  <HeartRateCard hr={telemetry.hr} />
-                  <CadenceCard cadence={telemetry.cadence} />
+                  <PowerCard power={telemetry.power} wkg={(telemetry.power / 78).toFixed(1)} connected={settings.hasTrainer} />
+                  <HeartRateCard hr={telemetry.hr} connected={settings.hasWearable} />
+                  <CadenceCard cadence={telemetry.cadence} connected={settings.hasTrainer} />
                 </View>
                 <View style={styles.centerCol} onLayout={onCenterLayout}>
                   <WorkoutTimelineCard width={centerW} onPress={() => showToast("Workout timeline")} />
@@ -208,13 +246,13 @@ export default function LiveWorkout() {
                   <SafetyNote />
                 </View>
               </View>
-              <RideSummaryStrip speed={String(telemetry.speed)} />
+              <RideSummaryStrip speed={String(telemetry.speed)} trainerConnected={settings.hasTrainer} />
             </View>
 
             <View style={[styles.rightCol, { width: rightW }]}>
               <ClimbCard />
               <RouteMapCard />
-              <WearableDataCard />
+              <WearableDataCard connected={settings.hasWearable} />
             </View>
           </View>
 
@@ -230,6 +268,8 @@ export default function LiveWorkout() {
         </ScrollView>
 
         <AlbertoLiveCue message={paused ? "Workout paused — take a breath." : CUES[cueIdx]} />
+
+        <MusicButton musicOn={musicOn} onPress={() => setShowMusic(true)} />
 
         {showControls && (
           <Pressable style={styles.overlay} testID="controls-overlay" onPress={() => setShowControls(false)}>
@@ -278,22 +318,36 @@ export default function LiveWorkout() {
             expanded
             onToggleExpand={() => setExpanded(false)}
           >
-            <ImmersiveHud
-              elapsed={fmt(telemetry.elapsed)}
-              power={telemetry.power}
-              wkg={(telemetry.power / 78).toFixed(1)}
-              hr={telemetry.hr}
-              cadence={telemetry.cadence}
-              speed={telemetry.speed}
-              progress="10.2 km"
-              connectionState={connectionState}
-              stale={stale}
-              paused={paused}
-              cue={CUES[cueIdx]}
-              onPause={onPauseToggle}
-              onEnd={() => { setExpanded(false); router.replace("/summary"); }}
-              onOpenRoutes={() => setShowRoutes(true)}
-            />
+            {hudVisible && (
+              <ImmersiveHud
+                elapsed={fmt(telemetry.elapsed)}
+                power={telemetry.power}
+                wkg={(telemetry.power / 78).toFixed(1)}
+                hr={telemetry.hr}
+                cadence={telemetry.cadence}
+                speed={telemetry.speed}
+                progress="10.2 km"
+                connectionState={connectionState}
+                stale={stale}
+                paused={paused}
+                cue={CUES[cueIdx]}
+                trainerConnected={settings.hasTrainer}
+                wearableConnected={settings.hasWearable}
+                onPause={onPauseToggle}
+                onEnd={() => { setExpanded(false); router.replace("/summary"); }}
+                onOpenRoutes={() => setShowRoutes(true)}
+              />
+            )}
+            <Pressable
+              style={styles.hudEye}
+              onPress={() => setHudVisible((v) => !v)}
+              testID="hud-eye-toggle"
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={hudVisible ? "Hide on-screen data" : "Show on-screen data"}
+            >
+              <Ionicons name={hudVisible ? "eye" : "eye-off"} size={18} color="#fff" />
+            </Pressable>
           </RouteVideo>
         </View>
       )}
@@ -312,6 +366,22 @@ export default function LiveWorkout() {
         />
       )}
 
+      {showSettings && (
+        <SettingsPanel settings={settings} setSetting={setSetting} onClose={() => setShowSettings(false)} />
+      )}
+
+      {showMusic && (
+        <MusicPanel
+          musicOn={musicOn}
+          toggleMusic={toggleMusic}
+          volume={volume}
+          setVolume={setVolume}
+          voiceOn={voiceOn}
+          toggleVoice={toggleVoice}
+          onClose={() => setShowMusic(false)}
+        />
+      )}
+
       <Toast message={toast} />
     </GestureHandlerRootView>
   );
@@ -321,6 +391,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.md, gap: spacing.md },
   immersive: { ...StyleSheet.absoluteFillObject, backgroundColor: "#000", zIndex: 50 },
+  hudEye: { position: "absolute", top: 12, left: 12, width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center", zIndex: 5 },
   inlineRoutes: { position: "absolute", left: 10, bottom: 10 },
   bodyRow: { flexDirection: "row", gap: spacing.md },
   leftBlock: { flex: 1, gap: spacing.md },

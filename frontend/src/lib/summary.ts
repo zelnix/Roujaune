@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { rideRecorder } from "./ride";
+import { rideRecorder, RideRoute } from "./ride";
 
 export type Zone = { z: string; time: string; pct: number; w: number };
 
@@ -104,6 +104,7 @@ function apiBase(): string {
 export function useSummary() {
   const [stats, setStats] = useState<SummaryStats>(FALLBACK_STATS);
   const [loading, setLoading] = useState(true);
+  const [route] = useState<RideRoute>(() => rideRecorder.snapshot().route);
 
   useEffect(() => {
     let alive = true;
@@ -134,7 +135,7 @@ export function useSummary() {
     };
   }, []);
 
-  return { stats, loading };
+  return { stats, loading, route };
 }
 
 // ---- formatting helpers ----
