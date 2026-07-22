@@ -10,7 +10,11 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emergent.coachalbertodash.wsjvnf"
+      "bundleIdentifier": "com.emergent.coachalbertodash.wsjvnf",
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "Find nearby TVs to cast your ride",
+        "NSBonjourServices": ["_googlecast._tcp", "_airplay._tcp"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -36,7 +40,20 @@
           "backgroundColor": "#000000"
         }
       ],
-      "expo-audio"
+      "expo-audio",
+      [
+        "react-native-google-cast",
+        {
+          "receiverAppId": "CC1AD845",
+          "iosStartDiscoveryAfterFirstTapOnCastButton": true
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": { "useFrameworks": "static" }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

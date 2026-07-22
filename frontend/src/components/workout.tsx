@@ -850,7 +850,7 @@ export function CastPanel({ castingTo, onCast, onStop, onClose }: { castingTo: s
             </Pressable>
           );
         })}
-        <Text style={styles.castNote}>Real casting requires a device build — discovery is simulated in preview / Expo Go.</Text>
+        <Text style={styles.castNote}>Because the ride uses a video + live HUD overlay, use your device&apos;s Screen Mirroring (iOS Control Centre / Android Quick Settings) to show the full workout on the TV. Real device discovery requires a native build.</Text>
       </Pressable>
     </Pressable>
   );

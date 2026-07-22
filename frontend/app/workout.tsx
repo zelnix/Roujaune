@@ -20,6 +20,7 @@ import {
   RoutesButton, RoutePicker, SettingsPanel, MusicPanel, MusicButton, CastButton, CastPanel,
 } from "@/src/components/workout";
 import { useWorkoutAudio } from "@/src/hooks/useWorkoutAudio";
+import { useCast } from "@/src/hooks/useCast";
 
 // Alberto's cues are generated live from the rider's real telemetry so the
 // coaching reflects what's actually happening on the bike.
@@ -188,6 +189,7 @@ export default function LiveWorkout() {
   }, [telemetry]);
 
   const { musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, speak, voiceOptions, voiceId, selectVoice } = useWorkoutAudio();
+  const { castSupported, castDeviceName, showCastDialog } = useCast();
 
   // Keep the latest telemetry in a ref so cues read live values without the
   // 5-second speak interval re-firing every telemetry tick.
@@ -333,7 +335,7 @@ export default function LiveWorkout() {
 
         <View style={styles.mediaBar} pointerEvents="box-none">
           <MusicButton musicOn={musicOn} onPress={() => setShowMusic(true)} />
-          <CastButton casting={!!castingTo} onPress={() => setShowCast(true)} />
+          <CastButton casting={castSupported ? !!castDeviceName : !!castingTo} onPress={() => (castSupported ? showCastDialog() : setShowCast(true))} />
         </View>
 
         {showControls && (
