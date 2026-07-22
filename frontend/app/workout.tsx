@@ -415,6 +415,16 @@ export default function LiveWorkout() {
             >
               <Ionicons name={hudVisible ? "eye" : "eye-off"} size={18} color="#fff" />
             </Pressable>
+            <Pressable
+              style={[styles.hudCast, (castSupported ? !!castDeviceName : !!castingTo) && styles.hudCastOn]}
+              onPress={() => (castSupported ? showCastDialog() : setShowCast(true))}
+              testID="hud-cast"
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Cast to TV"
+            >
+              <Ionicons name="tv-outline" size={18} color={(castSupported ? !!castDeviceName : !!castingTo) ? colors.bg : "#fff"} />
+            </Pressable>
           </RouteVideo>
         </View>
       )}
@@ -474,6 +484,8 @@ const styles = StyleSheet.create({
   mediaBar: { position: "absolute", bottom: 24, left: 20, flexDirection: "row", gap: 10, zIndex: 20 },
   immersive: { ...StyleSheet.absoluteFillObject, backgroundColor: "#000", zIndex: 50 },
   hudEye: { position: "absolute", top: 12, left: 12, width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center", zIndex: 5 },
+  hudCast: { position: "absolute", top: 56, left: 12, width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center", zIndex: 5 },
+  hudCastOn: { backgroundColor: colors.yellow, borderColor: colors.yellow },
   inlineRoutes: { position: "absolute", left: 10, bottom: 10 },
   bodyRow: { flexDirection: "row", gap: spacing.md },
   leftBlock: { flex: 1, gap: spacing.md },
