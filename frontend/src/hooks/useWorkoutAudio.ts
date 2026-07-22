@@ -20,16 +20,14 @@ function readableName(v: Speech.Voice): string {
   return tail ? tail.charAt(0).toUpperCase() + tail.slice(1) : "Voice";
 }
 
-// Friendly accent label from a BCP-47 language tag.
-const ACCENTS: Record<string, string> = {
-  "es-es": "Spanish", "es-mx": "Mexican Spanish", "es-us": "US Spanish", "es-ar": "Argentine Spanish",
-  "es-co": "Colombian Spanish", "es-419": "Latin Spanish",
-  "en-gb": "British", "en-us": "American", "en-au": "Australian", "en-ie": "Irish",
-  "en-in": "Indian", "en-za": "South African", "en-ca": "Canadian",
-};
+// The four accent groups Alberto can read English in.
+const ALLOWED = ["es", "en", "it", "fr"] as const;
 function accentOf(lang: string): string {
   const l = (lang || "").toLowerCase();
-  return ACCENTS[l] || (l.startsWith("es") ? "Spanish" : l.startsWith("en") ? "English" : lang);
+  if (l.startsWith("es")) return "Spanish (English)";
+  if (l.startsWith("it")) return "Italian (English)";
+  if (l.startsWith("fr")) return "French (English)";
+  return "English";
 }
 const FEMALE_NAMES = ["monica", "mónica", "paulina", "marisol", "esperanza", "mujer", "sabina", "elena", "samantha", "karen", "victoria", "moira", "tessa", "fiona"];
 const MALE_NAMES = ["jorge", "diego", "carlos", "enrique", "miguel", "pablo", "juan", "hombre", "gonzalo", "daniel", "arthur", "oliver", "aaron", "fred", "reed", "rishi"];
@@ -82,11 +80,14 @@ export function useWorkoutAudio() {
     (async () => {
       try {
         const voices = await Speech.getAvailableVoicesAsync();
-        const relevant = voices.filter((v) => v.identifier);
-        // Keep EVERY voice on the device (deduped by identifier only) so any
-        // voice — any language, male or female — is reachable. Devices often
-        // expose no name/gender metadata, so we number them per accent and let
-        // the rider preview by ear.
+        // Only Spanish, English, Italian and French voices (all read English,
+        // giving Alberto the chosen accent).
+        const relevant = voices.filter((v) => {
+          const l = (v.language ?? "").toLowerCase();
+          return v.identifier && ALLOWED.some((p) => l.startsWith(p));
+        });
+        // Deduped by identifier; devices often expose no name/gender metadata,
+        // so we number them per accent and let the rider preview by ear.
         const seenId = new Set<string>();
         const opts: VoiceOption[] = [];
         const perAccent: Record<string, number> = {};
