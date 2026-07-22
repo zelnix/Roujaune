@@ -6,7 +6,7 @@ import { colors, radius, spacing } from "../theme";
 import { coach } from "../data";
 import { PrimaryButton } from "./ui";
 
-const albertoPortrait = require("../../assets/images/coach_alberto.png");
+const albertoPortrait = require("../../assets/images/coach_alberto_v2.jpg");
 
 export function AlbertoCoachCard({ width, onStart }: { width: number; onStart: () => void }) {
   return (
@@ -18,7 +18,7 @@ export function AlbertoCoachCard({ width, onStart }: { width: number; onStart: (
       style={[styles.card, { width }]}
     >
       <View style={styles.portraitWrap}>
-        <Image source={albertoPortrait} style={styles.portrait} contentFit="cover" accessibilityLabel="Coach Alberto" />
+        <Image source={albertoPortrait} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition="top center" accessibilityLabel="Coach Alberto" />
         <LinearGradient
           colors={["transparent", "rgba(10,9,8,0.9)"]}
           start={{ x: 0, y: 0.5 }}
@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     minHeight: 190,
   },
-  portraitWrap: { width: 150, height: "100%" },
+  portraitWrap: { width: 150, alignSelf: "stretch", minHeight: 190 },
   portrait: { width: "100%", height: "100%" },
   body: { flex: 1, padding: spacing.md, justifyContent: "center" },
   headRow: { flexDirection: "row", alignItems: "flex-start" },

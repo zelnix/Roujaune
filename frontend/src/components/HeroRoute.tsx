@@ -1,5 +1,6 @@
 import React from "react";
-import { View, Text, StyleSheet, ImageBackground } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing } from "../theme";
@@ -45,20 +46,25 @@ export function HeroRoute({
 }) {
   return (
     <View style={[styles.wrap, { height }]} testID="hero-route">
-      <ImageBackground source={heroImg} style={StyleSheet.absoluteFill} resizeMode="cover">
-        <LinearGradient
-          colors={["rgba(5,5,5,0.96)", "rgba(5,5,5,0.5)", "rgba(5,5,5,0.15)", "rgba(5,5,5,0.55)"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={StyleSheet.absoluteFill}
-        />
-        <LinearGradient
-          colors={["rgba(5,5,5,0.7)", "transparent"]}
-          start={{ x: 0, y: 1 }}
-          end={{ x: 0, y: 0.4 }}
-          style={StyleSheet.absoluteFill}
-        />
-      </ImageBackground>
+      <Image
+        source={heroImg}
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+        contentPosition={{ right: 0, top: "42%" }}
+        accessibilityLabel="Cyclist climbing a mountain road at sunset"
+      />
+      <LinearGradient
+        colors={["rgba(5,5,5,0.96)", "rgba(5,5,5,0.55)", "rgba(5,5,5,0.12)", "rgba(5,5,5,0.35)"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <LinearGradient
+        colors={["rgba(5,5,5,0.65)", "transparent"]}
+        start={{ x: 0, y: 1 }}
+        end={{ x: 0, y: 0.4 }}
+        style={StyleSheet.absoluteFill}
+      />
 
       {/* top-left brand */}
       <View style={styles.brandArea}>
