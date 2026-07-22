@@ -9,12 +9,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing, shadow } from "@/src/theme";
 import { useTelemetry } from "@/src/hooks/useTelemetry";
 import { rideRecorder } from "@/src/lib/ride";
-import { routeVideo, nextInterval } from "@/src/data";
+import { routeVideos, nextInterval } from "@/src/data";
 import { RouteVideo } from "@/src/components/RouteVideo";
 import {
   WorkoutTopBar, PowerCard, HeartRateCard, CadenceCard, WorkoutTimelineCard,
   ClimbCard, RouteMapCard, WearableDataCard, RideSummaryStrip,
   TrainerControlBar, AlbertoLiveCue, NextUpStrip, SafetyNote, ImmersiveHud, VideoPlaceholder,
+  RoutesButton, RoutePicker,
 } from "@/src/components/workout";
 
 const CUES = [
@@ -79,6 +80,8 @@ export default function LiveWorkout() {
   const [centerW, setCenterW] = React.useState(560);
   const [paused, setPaused] = React.useState(false);
   const [expanded, setExpanded] = React.useState(false);
+  const [routeIdx, setRouteIdx] = React.useState(0);
+  const [showRoutes, setShowRoutes] = React.useState(false);
   const [showControls, setShowControls] = React.useState(false);
   const [showMenu, setShowMenu] = React.useState(false);
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
@@ -131,6 +134,9 @@ export default function LiveWorkout() {
     showToast(item.label);
   };
 
+  const activeRoute = routeVideos[routeIdx];
+  const onSelectRoute = (i: number) => { setRouteIdx(i); setShowRoutes(false); showToast(`Route: ${routeVideos[i].title}`); };
+
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
       <StatusBar hidden />
@@ -151,7 +157,11 @@ export default function LiveWorkout() {
                   {expanded ? (
                     <VideoPlaceholder width={centerW} onRestore={() => setExpanded(false)} />
                   ) : (
-                    <RouteVideo source={routeVideo.url} title={routeVideo.title} playing={!paused} muted width={centerW} onToggleExpand={() => setExpanded(true)} expanded={false} />
+                    <RouteVideo source={activeRoute.url} title={activeRoute.title} playing={!paused} muted width={centerW} onToggleExpand={() => setExpanded(true)} expanded={false}>
+                      <View style={styles.inlineRoutes} pointerEvents="box-none">
+                        <RoutesButton onPress={() => setShowRoutes(true)} testID="inline-routes" />
+                      </View>
+                    </RouteVideo>
                   )}
                   <NextUpStrip next={nextInterval} />
                   <SafetyNote />
@@ -220,7 +230,7 @@ export default function LiveWorkout() {
       {expanded && (
         <View style={styles.immersive} testID="immersive-overlay">
           <RouteVideo
-            source={routeVideo.url}
+            source={activeRoute.url}
             playing={!paused}
             muted
             fill
@@ -241,9 +251,14 @@ export default function LiveWorkout() {
               cue={CUES[cueIdx]}
               onPause={onPauseToggle}
               onEnd={() => { setExpanded(false); router.replace("/summary"); }}
+              onOpenRoutes={() => setShowRoutes(true)}
             />
           </RouteVideo>
         </View>
+      )}
+
+      {showRoutes && (
+        <RoutePicker routes={routeVideos} activeIndex={routeIdx} onSelect={onSelectRoute} onClose={() => setShowRoutes(false)} />
       )}
 
       <Toast message={toast} />
@@ -255,6 +270,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.md, gap: spacing.md },
   immersive: { ...StyleSheet.absoluteFillObject, backgroundColor: "#000", zIndex: 50 },
+  inlineRoutes: { position: "absolute", left: 10, bottom: 10 },
   bodyRow: { flexDirection: "row", gap: spacing.md },
   leftBlock: { flex: 1, gap: spacing.md },
   innerRow: { flexDirection: "row", gap: spacing.md },

@@ -124,11 +124,25 @@ export const achievement = {
   total: 5,
 };
 
-// Configurable first-person route video (admin-replaceable) for the Live Workout screen.
-export const routeVideo = {
-  url: "https://youtu.be/XlwjMjyU410",
-  title: "Alpe d'Huez — First-Person Route",
+// Configurable first-person route videos (admin-replaceable) for the Live Workout screen.
+export type RouteOption = {
+  id: string;
+  url: string;
+  title: string;
+  place: string;
+  distance: string;
+  elevation: string;
+  tag: string;
+  tagColor: string;
 };
+
+export const routeVideos: RouteOption[] = [
+  { id: "XlwjMjyU410", url: "https://youtu.be/XlwjMjyU410", title: "Alpe d'Huez", place: "France", distance: "16.0 km", elevation: "1,090 m", tag: "Mountain", tagColor: colors.red },
+  { id: "Pyfy8trRybA", url: "https://youtu.be/Pyfy8trRybA", title: "Lake Garda", place: "Italy", distance: "24.0 km", elevation: "420 m", tag: "Rolling", tagColor: colors.yellow },
+  { id: "U94MF1ZF81o", url: "https://youtu.be/U94MF1ZF81o", title: "Alpine Descent", place: "The Alps", distance: "18.0 km", elevation: "−980 m", tag: "Descent", tagColor: colors.green },
+  { id: "AX8sC_kR46M", url: "https://youtu.be/AX8sC_kR46M", title: "Bavaria Autumn", place: "Germany", distance: "30.0 km", elevation: "260 m", tag: "Forest", tagColor: "#E8631C" },
+  { id: "_vdX8QZyWeI", url: "https://youtu.be/_vdX8QZyWeI", title: "Countryside Roads", place: "Open Country", distance: "28.0 km", elevation: "180 m", tag: "Flat", tagColor: colors.green },
+];
 
 // Preview of the interval coming up next (includes RPE + power target).
 export const nextInterval = {

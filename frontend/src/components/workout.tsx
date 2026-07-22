@@ -1,11 +1,13 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Svg, { Rect, Path, Polyline, Circle, Line } from "react-native-svg";
 import { colors, radius, spacing, shadow } from "../theme";
 import { Touchable, SectionLabel } from "./ui";
+import { posterFor } from "../lib/youtube";
+import type { RouteOption } from "../data";
 
 const glyph = require("../../assets/images/logo_glyph_t.png");
 const riderImg = require("../../assets/images/hero_cyclist_b2.jpg");
@@ -490,10 +492,10 @@ function HudChip({ icon, color, label, value, unit }: { icon: React.ReactNode; c
 }
 
 export function ImmersiveHud({
-  elapsed, power, wkg, hr, cadence, speed, progress, connectionState, stale, paused, cue, onPause, onEnd,
+  elapsed, power, wkg, hr, cadence, speed, progress, connectionState, stale, paused, cue, onPause, onEnd, onOpenRoutes,
 }: {
   elapsed: string; power: number; wkg: string; hr: number; cadence: number; speed: string | number; progress: string;
-  connectionState: string; stale: boolean; paused: boolean; cue: string; onPause: () => void; onEnd: () => void;
+  connectionState: string; stale: boolean; paused: boolean; cue: string; onPause: () => void; onEnd: () => void; onOpenRoutes: () => void;
 }) {
   const conn = connMeta(connectionState, stale);
   return (
@@ -510,6 +512,11 @@ export function ImmersiveHud({
           </View>
           <Text style={styles.hudMicro}>{progress} to summit</Text>
         </View>
+      </View>
+
+      {/* routes button (left of the collapse control) */}
+      <View style={styles.hudRoutes} pointerEvents="box-none">
+        <RoutesButton onPress={onOpenRoutes} testID="hud-routes" />
       </View>
 
       {/* Alberto cue */}
@@ -552,6 +559,55 @@ export function VideoPlaceholder({ width, onRestore }: { width: number; onRestor
         <Text style={styles.placeholderBtnText}>Exit full screen</Text>
       </Pressable>
     </View>
+  );
+}
+
+/* ============================ ROUTE PICKER ============================ */
+export function RoutesButton({ onPress, testID = "routes-button" }: { onPress: () => void; testID?: string }) {
+  return (
+    <Pressable onPress={onPress} style={styles.routesBtn} testID={testID} hitSlop={8} accessibilityRole="button" accessibilityLabel="Choose route">
+      <Ionicons name="map" size={14} color="#fff" />
+      <Text style={styles.routesBtnText}>ROUTES</Text>
+    </Pressable>
+  );
+}
+
+export function RoutePicker({ routes, activeIndex, onSelect, onClose }: {
+  routes: RouteOption[]; activeIndex: number; onSelect: (i: number) => void; onClose: () => void;
+}) {
+  return (
+    <Pressable style={styles.rpOverlay} onPress={onClose} testID="route-picker">
+      <Pressable style={styles.rpPanel} onPress={() => { /* swallow */ }}>
+        <View style={styles.rpHead}>
+          <View>
+            <Text style={styles.rpTitle}>Choose your route</Text>
+            <Text style={styles.rpSub}>Immersive first-person scenery — swap any time</Text>
+          </View>
+          <Pressable onPress={onClose} testID="route-picker-close" hitSlop={10}><Ionicons name="close" size={22} color={colors.white} /></Pressable>
+        </View>
+        <ScrollView contentContainerStyle={styles.rpGrid} showsVerticalScrollIndicator={false}>
+          {routes.map((r, i) => {
+            const active = i === activeIndex;
+            return (
+              <Pressable key={r.id} testID={`route-option-${i}`} style={[styles.rpCard, active && styles.rpCardActive]} onPress={() => onSelect(i)} accessibilityRole="button" accessibilityLabel={`Select route ${r.title}`}>
+                <View style={styles.rpThumb}>
+                  <Image source={{ uri: posterFor(r.id) }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+                  <View style={styles.rpThumbScrim} />
+                  <View style={[styles.rpTag, { backgroundColor: r.tagColor }]}><Text style={styles.rpTagText}>{r.tag}</Text></View>
+                  {active && <View style={styles.rpActiveBadge}><Ionicons name="checkmark" size={13} color="#1a1300" /></View>}
+                </View>
+                <Text style={styles.rpName} numberOfLines={1}>{r.title}</Text>
+                <Text style={styles.rpPlace}>{r.place}</Text>
+                <View style={styles.rpStats}>
+                  <View style={styles.rpStat}><MaterialCommunityIcons name="map-marker-distance" size={12} color={colors.textDim} /><Text style={styles.rpStatText}>{r.distance}</Text></View>
+                  <View style={styles.rpStat}><MaterialCommunityIcons name="terrain" size={12} color={colors.textDim} /><Text style={styles.rpStatText}>{r.elevation}</Text></View>
+                </View>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </Pressable>
+    </Pressable>
   );
 }
 
@@ -699,4 +755,27 @@ const styles = StyleSheet.create({
   placeholderTitle: { color: colors.textDim, fontSize: 13.5, fontWeight: "600" },
   placeholderBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 16, paddingVertical: 9 },
   placeholderBtnText: { color: "#fff", fontSize: 13, fontWeight: "700" },
+
+  /* routes button + picker */
+  routesBtn: { flexDirection: "row", alignItems: "center", gap: 6, height: 38, paddingHorizontal: 14, borderRadius: radius.pill, backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)" },
+  routesBtnText: { color: "#fff", fontSize: 12, fontWeight: "800", letterSpacing: 0.6 },
+  hudRoutes: { position: "absolute", top: 12, right: 58 },
+  rpOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.72)", alignItems: "center", justifyContent: "center", zIndex: 60 },
+  rpPanel: { width: 760, maxWidth: "92%", maxHeight: "88%", backgroundColor: colors.cardElevated, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, ...shadow.card },
+  rpHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: spacing.md },
+  rpTitle: { color: colors.white, fontSize: 22, fontWeight: "800" },
+  rpSub: { color: colors.textDim, fontSize: 12.5, marginTop: 3 },
+  rpGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
+  rpCard: { width: 224, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 10, gap: 2 },
+  rpCardActive: { borderColor: colors.yellow, borderWidth: 2 },
+  rpThumb: { width: "100%", aspectRatio: 16 / 9, borderRadius: radius.md, overflow: "hidden", backgroundColor: "#000", marginBottom: 8 },
+  rpThumbScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.12)" },
+  rpTag: { position: "absolute", top: 8, left: 8, borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 3 },
+  rpTagText: { color: "#1a1300", fontSize: 10, fontWeight: "900", letterSpacing: 0.4 },
+  rpActiveBadge: { position: "absolute", top: 8, right: 8, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.yellow, alignItems: "center", justifyContent: "center" },
+  rpName: { color: colors.white, fontSize: 15, fontWeight: "800" },
+  rpPlace: { color: colors.textDim, fontSize: 12 },
+  rpStats: { flexDirection: "row", gap: 14, marginTop: 6 },
+  rpStat: { flexDirection: "row", alignItems: "center", gap: 5 },
+  rpStatText: { color: colors.textDim, fontSize: 11.5, fontWeight: "600" },
 });
