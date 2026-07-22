@@ -22,9 +22,11 @@ Home Alberto "Start Today's Ride" & sidebar Workouts → `/training`. Training "
 
 ## Implemented (2026-06-22)
 - All three screens built and verified by testing agent (100% functional pass each).
+- **Live telemetry pipeline:** FastAPI WebSocket `/api/ws/telemetry` (~5 Hz trainer/wearable stream, BLE-bridge stand-in) with ERG/pause/resume/dropout control; MongoDB-backed workout sessions (`/api/workouts` start/get/list/end). Frontend `useTelemetry` hook (auto-connect, backoff reconnect, stale→estimated detection) drives Power/HR/Cadence/Speed/Elapsed; connection-status pill (LIVE/RECONNECTING/ESTIMATED/OFFLINE); verified end-to-end over wss through ingress.
+- Live workout three-dot **menu overlay** (Reconnect/Settings/Touch Lock/Peaceful Pause/Save & Exit) + Controls panel.
+- RN-web deprecation cleanup: `shadow*`→Platform `boxShadow` on web, `pointerEvents` prop→style, `useNativeDriver` disabled on web. (Minor `textShadow*` warning remains — cosmetic.)
 - Landscape lock (native), phone-landscape responsive variants for `/` and `/training`.
-- Brand images corrected + brightened; 3D wordmark; scrollable sidebar (no label overlap).
-- Bug fixes: coach portrait height-collapse on web; Alberto-card/descriptor overlap; bottom-row equal-width (now 0px diff).
+- Brand images corrected + brightened; 3D wordmark; scrollable sidebar; equal-width bottom row (0px diff).
 
 ## Backlog
 - **P1:** Real backend (FastAPI + MongoDB) + WebSocket/BLE telemetry for live workout (power/cadence/HR, ERG control, trainer dropout/reconnect states); replace simulated loop.
