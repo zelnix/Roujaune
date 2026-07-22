@@ -1,3 +1,5 @@
+import { Platform } from "react-native";
+
 // ROUJAUNE design tokens — premium, cinematic, cycling-focused.
 export const colors = {
   bg: "#050505",
@@ -32,18 +34,24 @@ export const spacing = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 };
 export const radius = { sm: 10, md: 16, lg: 20, xl: 26, pill: 999 };
 
 export const shadow = {
-  card: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.45,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  glow: {
-    shadowColor: colors.red,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.55,
-    shadowRadius: 14,
-    elevation: 10,
-  },
+  card: Platform.select({
+    web: { boxShadow: "0px 8px 16px rgba(0,0,0,0.45)" },
+    default: {
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.45,
+      shadowRadius: 16,
+      elevation: 8,
+    },
+  }) as object,
+  glow: Platform.select({
+    web: { boxShadow: `0px 0px 14px ${colors.red}8C` },
+    default: {
+      shadowColor: colors.red,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.55,
+      shadowRadius: 14,
+      elevation: 10,
+    },
+  }) as object,
 };

@@ -1,0 +1,29 @@
+{
+  "summary": "Full backend + frontend verification of the new real-telemetry pipeline. Backend: 7/7 pytest cases pass — POST /api/workouts/start returns active session with UUID id, GET /api/workouts/{id} & GET /api/workouts return the record (no ObjectId leak), POST /api/workouts/{id}/end persists status=ended + summary, unknown id -> 404. WebSocket /api/ws/telemetry (tested internally at ws://localhost:8001) first frame is {type:status,state:connected}, then continuous telemetry frames at ~5Hz; sending {type:erg,intensity:120} raises avg power by >20W (base ~245W -> hi ~292W); {type:pause} freezes power/cadence (paused=true, values constant across 4 frames); {type:resume} unfreezes (paused=false, values vary again). Frontend at /workout: connection pill shows LIVE (green) once connected; top-bar ELAPSED TIME advanced 00:24:39 -> 00:24:42 over ~3s and Power card value moved 245W -> 247W (driven by WS, not local loop). ERG +5 twice raised ERG INTENSITY to 110% (toast shown). Pause button toggles PAUSE<->RESUME and freezes power (281W constant across 1.5s), Resume restores updates. Menu overlay opens via three-dot menu-button; menu-reconnect triggers dropout — pill transitions LIVE -> ESTIMATED (t=2.5s to 4s) -> LIVE (t>=4.5s); menu-close closes overlay; menu-save navigates to /training. Controls overlay opens, ctrl-skip fires 'Skip Interval' toast and closes. Navigation: end-workout-button -> /training; workout->training->workout flows all work. Home '/' renders fine, no console crashes. Deprecated packages detected: none. React-Native-Web console warnings remain: textShadow* style prop deprecated (from theme shadow helper).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      { "component": "theme (shadow helper)", "issue": "Console warning: '\"textShadow*\" style props are deprecated. Use \"textShadow\".' Non-blocking; migrate helper to the unified textShadow style. Reference: /app/frontend/src/theme.* used by e.g. brand wordmark in workout.tsx / training.tsx." }
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_backend.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Optional cleanup: migrate remaining textShadow* uses in /app/frontend/src/theme.* to the new unified textShadow prop to silence the RN-Web deprecation warning."
+  ],
+  "critical_code_review_comments": [
+    "server.py TrainerSim.dropout gating is correct: when t<dropout_until frames are skipped so the client's 2.2s stale watchdog correctly flips to ESTIMATED (verified visually).",
+    "GET /api/workouts/{id} correctly pops _id before returning (no ObjectId leak).",
+    "useTelemetry auto-reconnects with exponential backoff and stale watchdog — verified behaviour end-to-end.",
+    "All interactive elements on /workout have testID (pause-button, erg-plus/minus, controls-button, ctrl-*, controls-close, menu-button, menu-*, end-workout-button, connection-status)."
+  ],
+  "updated_files": ["/app/backend/tests/test_backend.py (new)"],
+  "success_rate": { "backend": "100% (7/7 pytest)", "frontend": "100% (all 8 features + regression pass)" },
+  "seed_data_creation": "One TEST_Threshold workout session was inserted into MongoDB during the pytest run (marked ended). Safe to leave; prefixed with TEST_.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Viewport used: 1194x834 landscape tablet. Backend WS tested via internal ws://localhost:8001/api/ws/telemetry (public wss also works). Dropout timing: server holds frames for 4s after {type:dropout}; client watchdog flips to ESTIMATED after ~2.2s of silence — sample the connection-status pill between t=2.5s and t=4s after menu-reconnect to observe the non-LIVE state (my initial sample at t=1.2s missed it). ERG INTENSITY value can collide with the '60%' progress text if you use a loose text selector; scope to [data-testid=trainer-control-bar]. When asserting live-value changes, allow ~2-3s and compare inner_text since values jitter.",
+  "rca_of_issue": "N/A — no bugs found this iteration."
+}

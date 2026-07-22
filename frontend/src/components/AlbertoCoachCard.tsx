@@ -24,8 +24,7 @@ export function AlbertoCoachCard({ width, onStart, compact = false }: { width: n
           colors={["transparent", "rgba(10,9,8,0.9)"]}
           start={{ x: 0, y: 0.5 }}
           end={{ x: 1, y: 0.5 }}
-          style={StyleSheet.absoluteFill}
-          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}
         />
       </View>
 

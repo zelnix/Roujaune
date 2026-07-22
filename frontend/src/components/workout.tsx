@@ -25,7 +25,14 @@ export function BrandWordmark() {
   );
 }
 
-export function WorkoutTopBar({ elapsed, onPress }: { elapsed: string; onPress: (m: string) => void }) {
+export function WorkoutTopBar({ elapsed, connectionState, stale, onPress }: { elapsed: string; connectionState: string; stale: boolean; onPress: (m: string) => void }) {
+  const conn = connectionState === "connected" && !stale
+    ? { c: colors.green, label: "LIVE", icon: "wifi" as const }
+    : connectionState === "connected" && stale
+    ? { c: colors.yellow, label: "ESTIMATED", icon: "cellular" as const }
+    : connectionState === "disconnected"
+    ? { c: colors.red, label: "OFFLINE", icon: "cloud-offline" as const }
+    : { c: colors.yellow, label: "RECONNECTING", icon: "sync" as const };
   return (
     <View style={styles.topBar}>
       <BrandWordmark />
@@ -51,7 +58,13 @@ export function WorkoutTopBar({ elapsed, onPress }: { elapsed: string; onPress: 
       <View style={styles.topIcons}>
         <Ionicons name="flame" size={18} color={colors.yellow} />
         <Text style={styles.flameText}>12</Text>
-        <Touchable testID="wifi-icon" scaleTo={0.9} onPress={() => onPress("Connected")}><Ionicons name="wifi" size={20} color={colors.white} /></Touchable>
+        <Touchable testID="connection-status" scaleTo={0.9} onPress={() => onPress(conn.label)}>
+          <View style={[styles.connPill, { borderColor: conn.c }]}>
+            <View style={[styles.connDot, { backgroundColor: conn.c }]} />
+            <Ionicons name={conn.icon} size={14} color={conn.c} />
+            <Text style={[styles.connText, { color: conn.c }]}>{conn.label}</Text>
+          </View>
+        </Touchable>
         <Touchable testID="settings-icon" scaleTo={0.9} onPress={() => onPress("Settings")}><Ionicons name="settings-outline" size={20} color={colors.white} /></Touchable>
       </View>
     </View>
@@ -242,7 +255,7 @@ export function RiderRouteViewport({ width, height, onPress }: { width: number; 
       <Touchable onPress={onPress} lift={false} scaleTo={0.998} style={StyleSheet.absoluteFill} containerStyle={StyleSheet.absoluteFill}>
         <Image source={riderImg} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition={{ right: 0, top: "42%" }} accessibilityLabel="Rider climbing Alpe d'Huez" />
       </Touchable>
-      <View pointerEvents="none" style={styles.elevOverlay}>
+      <View style={[styles.elevOverlay, { pointerEvents: "none" }]}>
         <ElevationTerrain width={width - 4} />
         <View style={styles.vsBadge}>
           <Ionicons name="trending-up" size={12} color={colors.green} />
@@ -427,7 +440,7 @@ export function TrainerControlBar({ paused, erg, onPauseToggle, onErg, onEnd, on
 /* ============================ ALBERTO LIVE CUE ============================ */
 export function AlbertoLiveCue({ message }: { message: string }) {
   return (
-    <View style={styles.cue} testID="alberto-cue" pointerEvents="none">
+    <View testID="alberto-cue" style={[styles.cue, { pointerEvents: "none" }]}>
       <MaterialCommunityIcons name="account-voice" size={16} color={colors.gold} />
       <Text style={styles.cueText}>{message}</Text>
     </View>
@@ -452,6 +465,9 @@ const styles = StyleSheet.create({
   progressPct: { color: colors.yellow, fontSize: 10.5, fontWeight: "700", textAlign: "center", marginTop: 2 },
   topIcons: { flexDirection: "row", alignItems: "center", gap: 12 },
   flameText: { color: colors.white, fontWeight: "800", fontSize: 14, marginLeft: -6 },
+  connPill: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 5 },
+  connDot: { width: 6, height: 6, borderRadius: 3 },
+  connText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
 
   /* metric cards */
   metricCard: { backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md, ...shadow.card },

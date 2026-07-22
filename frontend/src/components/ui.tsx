@@ -36,7 +36,7 @@ export function Touchable({
 }) {
   const scale = React.useRef(new Animated.Value(1)).current;
   const anim = (to: number) =>
-    Animated.spring(scale, { toValue: to, useNativeDriver: true, speed: 40, bounciness: 4 }).start();
+    Animated.spring(scale, { toValue: to, useNativeDriver: Platform.OS !== "web", speed: 40, bounciness: 4 }).start();
   return (
     <Pressable
       testID={testID}

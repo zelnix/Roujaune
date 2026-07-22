@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, Animated, useWindowDimensions, LayoutChangeEvent, Pressable } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Animated, useWindowDimensions, LayoutChangeEvent, Pressable, Platform } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -7,6 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 import { colors, radius, spacing, shadow } from "@/src/theme";
+import { useTelemetry } from "@/src/hooks/useTelemetry";
 import {
   WorkoutTopBar, PowerCard, HeartRateCard, CadenceCard, WorkoutTimelineCard,
   RiderRouteViewport, ClimbCard, RouteMapCard, WearableDataCard, RideSummaryStrip,
@@ -33,6 +34,14 @@ const CONTROLS = [
   { key: "peaceful", label: "Peaceful Pause", icon: "leaf" as const },
 ];
 
+const MENU = [
+  { key: "reconnect", label: "Reconnect Trainer", icon: "bluetooth" as const },
+  { key: "settings", label: "Workout Settings", icon: "settings" as const },
+  { key: "lock", label: "Touch Lock", icon: "lock-closed" as const },
+  { key: "peaceful", label: "Peaceful Pause", icon: "leaf" as const },
+  { key: "save", label: "Save & Exit", icon: "save" as const },
+];
+
 function fmt(sec: number) {
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
@@ -44,13 +53,13 @@ function Toast({ message }: { message: { id: number; text: string } | null }) {
   const anim = React.useRef(new Animated.Value(0)).current;
   React.useEffect(() => {
     if (!message) return;
-    Animated.spring(anim, { toValue: 1, useNativeDriver: true, speed: 18, bounciness: 6 }).start();
-    const t = setTimeout(() => Animated.timing(anim, { toValue: 0, duration: 220, useNativeDriver: true }).start(), 1800);
+    Animated.spring(anim, { toValue: 1, useNativeDriver: Platform.OS !== "web", speed: 18, bounciness: 6 }).start();
+    const t = setTimeout(() => Animated.timing(anim, { toValue: 0, duration: 220, useNativeDriver: Platform.OS !== "web" }).start(), 1800);
     return () => clearTimeout(t);
   }, [message, anim]);
   if (!message) return null;
   return (
-    <Animated.View pointerEvents="none" testID="toast" style={[styles.toast, shadow.glow, { opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] }]}>
+    <Animated.View testID="toast" style={[styles.toast, shadow.glow, { pointerEvents: "none", opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] }]}>
       <Ionicons name="checkmark-circle" size={18} color={colors.yellow} />
       <Text style={styles.toastText}>{message.text}</Text>
     </Animated.View>
@@ -66,31 +75,15 @@ export default function LiveWorkout() {
 
   const [centerW, setCenterW] = React.useState(560);
   const [paused, setPaused] = React.useState(false);
-  const [erg, setErg] = React.useState(100);
   const [showControls, setShowControls] = React.useState(false);
+  const [showMenu, setShowMenu] = React.useState(false);
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
-
-  const [elapsed, setElapsed] = React.useState(1477);
-  const [power, setPower] = React.useState(251);
-  const [hr, setHr] = React.useState(162);
-  const [cadence, setCadence] = React.useState(88);
-  const [speed, setSpeed] = React.useState(26.4);
   const [cueIdx, setCueIdx] = React.useState(0);
 
-  const showToast = React.useCallback((text: string) => setToast({ id: Date.now(), text }), []);
+  const { telemetry, connectionState, stale, sendErg, pause, resume, simulateDropout } = useTelemetry();
+  const erg = telemetry.erg;
 
-  // Simulated live telemetry (stands in for smart-trainer / wearable stream).
-  React.useEffect(() => {
-    if (paused) return;
-    const id = setInterval(() => {
-      setElapsed((e) => e + 1);
-      setPower(251 + Math.round((Math.random() - 0.5) * 10));
-      setHr(162 + Math.round((Math.random() - 0.5) * 4));
-      setCadence(88 + Math.round((Math.random() - 0.5) * 4));
-      setSpeed(+(26.4 + (Math.random() - 0.5) * 0.6).toFixed(1));
-    }, 1000);
-    return () => clearInterval(id);
-  }, [paused]);
+  const showToast = React.useCallback((text: string) => setToast({ id: Date.now(), text }), []);
 
   React.useEffect(() => {
     const id = setInterval(() => setCueIdx((c) => (c + 1) % CUES.length), 5000);
@@ -101,10 +94,12 @@ export default function LiveWorkout() {
   const viewportH = compact ? 240 : 320;
 
   const onErg = (d: number) => {
-    setErg((v) => Math.max(50, Math.min(150, v + d)));
-    showToast(`ERG intensity ${erg + d}%`);
+    const next = Math.max(50, Math.min(150, erg + d));
+    sendErg(next);
+    showToast(`ERG intensity ${next}%`);
   };
   const onPauseToggle = () => {
+    if (paused) { resume(); } else { pause(); }
     setPaused((p) => !p);
     showToast(paused ? "Resuming workout" : "Workout paused");
   };
@@ -112,28 +107,34 @@ export default function LiveWorkout() {
     setShowControls(false);
     showToast(label);
   };
+  const onMenuAction = (item: { key: string; label: string }) => {
+    setShowMenu(false);
+    if (item.key === "reconnect") { simulateDropout(); showToast("Simulating trainer dropout…"); return; }
+    if (item.key === "save") { router.replace("/training"); return; }
+    showToast(item.label);
+  };
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
       <StatusBar hidden />
       <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
         <ScrollView contentContainerStyle={[styles.content, compact && { padding: spacing.sm, gap: spacing.sm }]} showsVerticalScrollIndicator={false} testID="workout-scroll">
-          <WorkoutTopBar elapsed={fmt(elapsed)} onPress={showToast} />
+          <WorkoutTopBar elapsed={fmt(telemetry.elapsed)} connectionState={connectionState} stale={stale} onPress={showToast} />
 
           <View style={styles.bodyRow}>
             <View style={styles.leftBlock}>
               <View style={styles.innerRow}>
                 <View style={[styles.leftCol, { width: leftW }]}>
-                  <PowerCard power={power} wkg="3.2" />
-                  <HeartRateCard hr={hr} />
-                  <CadenceCard cadence={cadence} />
+                  <PowerCard power={telemetry.power} wkg={(telemetry.power / 78).toFixed(1)} />
+                  <HeartRateCard hr={telemetry.hr} />
+                  <CadenceCard cadence={telemetry.cadence} />
                 </View>
                 <View style={styles.centerCol} onLayout={onCenterLayout}>
                   <WorkoutTimelineCard width={centerW} onPress={() => showToast("Workout timeline")} />
                   <RiderRouteViewport width={centerW} height={viewportH} onPress={() => showToast("Route camera")} />
                 </View>
               </View>
-              <RideSummaryStrip speed={String(speed)} />
+              <RideSummaryStrip speed={String(telemetry.speed)} />
             </View>
 
             <View style={[styles.rightCol, { width: rightW }]}>
@@ -150,7 +151,7 @@ export default function LiveWorkout() {
             onErg={onErg}
             onEnd={() => router.replace("/training")}
             onControls={() => setShowControls(true)}
-            onMenu={() => router.replace("/training")}
+            onMenu={() => setShowMenu(true)}
           />
         </ScrollView>
 
@@ -171,6 +172,23 @@ export default function LiveWorkout() {
                   </Pressable>
                 ))}
               </View>
+            </Pressable>
+          </Pressable>
+        )}
+
+        {showMenu && (
+          <Pressable style={styles.overlay} testID="menu-overlay" onPress={() => setShowMenu(false)}>
+            <Pressable style={styles.menuPanel} onPress={(e) => e.stopPropagation()}>
+              <View style={styles.panelHead}>
+                <Text style={styles.panelTitle}>Menu</Text>
+                <Pressable testID="menu-close" onPress={() => setShowMenu(false)} hitSlop={10}><Ionicons name="close" size={22} color={colors.white} /></Pressable>
+              </View>
+              {MENU.map((m) => (
+                <Pressable key={m.key} testID={`menu-${m.key}`} style={styles.menuItem} onPress={() => onMenuAction(m)}>
+                  <Ionicons name={m.icon} size={20} color={colors.yellow} />
+                  <Text style={styles.panelItemText}>{m.label}</Text>
+                </Pressable>
+              ))}
             </Pressable>
           </Pressable>
         )}
@@ -201,4 +219,6 @@ const styles = StyleSheet.create({
   panelGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   panelItem: { flexDirection: "row", alignItems: "center", gap: 10, width: "48%", backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 14 },
   panelItemText: { color: colors.white, fontSize: 14, fontWeight: "600" },
+  menuPanel: { position: "absolute", left: spacing.lg, bottom: 90, width: 300, backgroundColor: colors.cardElevated, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md, ...shadow.card },
+  menuItem: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, paddingHorizontal: 6 },
 });
