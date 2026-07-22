@@ -122,6 +122,180 @@ async def end_workout(session_id: str, summary: WorkoutSummary):
     return WorkoutSession(**doc)
 
 
+# ----------------------- Post-ride summary aggregation -----------------------
+class TelemetrySample(BaseModel):
+    power: float = 0
+    hr: float = 0
+    cadence: float = 0
+    speed: float = 0
+
+
+class SummarizeRequest(BaseModel):
+    workout: str = "Threshold Climb"
+    route: str = "Alpe d'Huez"
+    elapsed: int = 0          # seconds of the ride
+    ftp: int = 287            # rider FTP (watts)
+    weight: float = 78        # kg
+    samples: List[TelemetrySample] = Field(default_factory=list)
+
+
+# Polished reference dataset — matches the design mock. Returned when a ride
+# has too few recorded samples to compute meaningful aggregates (e.g. demo).
+REFERENCE_SUMMARY = {
+    "computed": False,
+    "duration_sec": 3600,
+    "distance_km": 23.7,
+    "elevation_m": 1050,
+    "avg_power": 248,
+    "norm_power": 251,
+    "avg_cadence": 89,
+    "avg_hr": 148,
+    "max_hr": 172,
+    "calories": 622,
+    "tss": 92,
+    "intensity": 0.87,
+    "power_curve": [210, 358, 372, 376, 360, 352, 366, 372, 360, 300, 214],
+    "power_target": 250,
+    "power_max_axis": 400,
+    "hr_curve": [96, 108, 122, 134, 141, 145, 148, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162],
+    "hr_max_axis": 180,
+    "zones": [
+        {"z": "Z1", "time": "0:02:15", "pct": 6, "w": 0.16},
+        {"z": "Z2", "time": "0:05:30", "pct": 15, "w": 0.42},
+        {"z": "Z3", "time": "0:08:45", "pct": 24, "w": 0.68},
+        {"z": "Z4", "time": "0:22:00", "pct": 36, "w": 1.0},
+        {"z": "Z5", "time": "0:05:30", "pct": 9, "w": 0.25},
+    ],
+    "compliance": {"overall": 96, "power": 96, "cadence": 91, "zone4_min": 36, "completed": 100},
+}
+
+
+def _fmt_hms(sec: int) -> str:
+    h = sec // 3600
+    m = (sec % 3600) // 60
+    s = sec % 60
+    return f"{h}:{m:02d}:{s:02d}"
+
+
+def _downsample(vals: List[float], n: int) -> List[float]:
+    if not vals:
+        return []
+    if len(vals) <= n:
+        return [round(v) for v in vals]
+    step = len(vals) / n
+    out = []
+    for i in range(n):
+        a = int(i * step)
+        b = max(a + 1, int((i + 1) * step))
+        chunk = vals[a:b]
+        out.append(round(sum(chunk) / len(chunk)))
+    return out
+
+
+def _normalized_power(power: List[float]) -> float:
+    # 30s rolling average (samples assumed ~5 Hz -> 150-wide window) then 4th-power mean.
+    win = 150
+    if len(power) < win:
+        avg = sum(power) / len(power)
+        return round(avg)
+    rolled = []
+    acc = sum(power[:win])
+    rolled.append(acc / win)
+    for i in range(win, len(power)):
+        acc += power[i] - power[i - win]
+        rolled.append(acc / win)
+    fourth = sum(p ** 4 for p in rolled) / len(rolled)
+    return round(fourth ** 0.25)
+
+
+@api_router.post("/workouts/summarize")
+async def summarize_workout(body: SummarizeRequest):
+    """Compute real ride aggregates from recorded telemetry samples.
+
+    Falls back to a polished reference dataset when the sample count is too
+    low to be meaningful (e.g. a quick demo tap-through)."""
+    powers = [s.power for s in body.samples if s.power is not None]
+    if len(body.samples) < 30 or not powers:
+        return REFERENCE_SUMMARY
+
+    hrs = [s.hr for s in body.samples if s.hr]
+    cads = [s.cadence for s in body.samples if s.cadence]
+    speeds = [s.speed for s in body.samples if s.speed]
+    dur = body.elapsed or int(len(body.samples) * 0.2)
+    ftp = max(1, body.ftp)
+
+    avg_power = round(sum(powers) / len(powers))
+    np_val = _normalized_power(powers)
+    avg_hr = round(sum(hrs) / len(hrs)) if hrs else 0
+    max_hr = round(max(hrs)) if hrs else 0
+    avg_cad = round(sum(cads) / len(cads)) if cads else 0
+    avg_speed = (sum(speeds) / len(speeds)) if speeds else 0
+    distance = round(avg_speed * dur / 3600.0, 1)
+    kj = avg_power * dur / 1000.0
+    calories = round(kj * 0.7)  # ~24% efficiency approximation
+    intensity = round(np_val / ftp, 2)
+    tss = round((dur * np_val * intensity) / (ftp * 3600) * 100)
+
+    # time in zones (fraction of FTP)
+    bounds = [0.55, 0.75, 0.90, 1.05]
+    counts = [0, 0, 0, 0, 0]
+    for p in powers:
+        f = p / ftp
+        idx = 4
+        for i, b in enumerate(bounds):
+            if f < b:
+                idx = i
+                break
+        counts[idx] += 1
+    dt = dur / len(powers)
+    zones = []
+    zmax = max(counts) or 1
+    for i, c in enumerate(counts):
+        secs = int(c * dt)
+        zones.append({
+            "z": f"Z{i+1}",
+            "time": _fmt_hms(secs),
+            "pct": round(c / len(powers) * 100),
+            "w": round(c / zmax, 2),
+        })
+
+    zone4_min = round(counts[3] * dt / 60)
+    target = np_val
+    in_band = sum(1 for p in powers if abs(p - target) <= target * 0.08)
+    power_compliance = round(in_band / len(powers) * 100)
+    cad_in = sum(1 for c in cads if 85 <= c <= 100) if cads else 0
+    cadence_compliance = round(cad_in / len(cads) * 100) if cads else 0
+    overall = round((power_compliance + cadence_compliance) / 2)
+
+    return {
+        "computed": True,
+        "duration_sec": dur,
+        "distance_km": distance,
+        "elevation_m": round(distance * 44),  # ~ climb estimate
+        "avg_power": avg_power,
+        "norm_power": np_val,
+        "avg_cadence": avg_cad,
+        "avg_hr": avg_hr,
+        "max_hr": max_hr,
+        "calories": calories,
+        "tss": tss,
+        "intensity": intensity,
+        "power_curve": _downsample(powers, 11),
+        "power_target": target,
+        "power_max_axis": 400,
+        "hr_curve": _downsample(hrs, 20) if hrs else [],
+        "hr_max_axis": 180,
+        "zones": zones,
+        "compliance": {
+            "overall": overall,
+            "power": power_compliance,
+            "cadence": cadence_compliance,
+            "zone4_min": zone4_min,
+            "completed": 100,
+        },
+    }
+
+
 # ----------------------- Trainer telemetry (BLE bridge stand-in) -----------------------
 class TrainerSim:
     """Server-side smart-trainer/wearable simulator.

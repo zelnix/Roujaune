@@ -38,3 +38,11 @@ Home Alberto "Start Today's Ride" & sidebar Workouts → `/training`. Training "
 ## Next Tasks
 1. Decide on backend + live telemetry integration scope.
 2. Flesh out the remaining navigation destinations as real screens.
+
+## Workout Complete summary (2026-06-22)
+- `/summary` **Workout Complete** screen built to match the supplied high-fidelity reference (real reusable components, no screenshot backgrounds):
+  - Header (brand+tagline / "Workout Complete" title w/ checkmark+sparkles / clock+flame+wifi), bespoke wider Sidebar (Overview active, Calendar, Workouts, Routes, Progress, Wellness, Connections, Settings + Alberto coach avatar).
+  - Hero Summary Card (rider image + "ALLEZ OOP!!" + "Strong ride / You held your threshold well." + Alberto recap), 10-cell Primary Ride Metrics Grid, Compliance card (overall ring + 4 compliance columns), Charts row (Power bars w/ amber area + dashed target, HR line, Time-in-Zones table), Sync & Export row (visual-only, toast), Right column (Route Summary w/ elevation map, Achievements, Recovery & Next Steps ring+items), Bottom Action Bar (View Full Analysis / Save & Exit→Home / Share Ride / Plan Tomorrow's Ride→/training).
+- **Data:** hybrid — backend `POST /api/workouts/summarize` computes real aggregates (avg/NP power, HR, cadence, distance, calories, IF, TSS, time-in-zones, compliance, downsampled charts) from telemetry samples recorded live during `/workout` (`src/lib/ride.ts`); falls back to polished reference dataset when <30 samples (demo). `src/lib/summary.ts` (`useSummary` hook + fallback + static content).
+- Live Workout **End Workout** now navigates to `/summary`.
+- Sync/Export are visual-only for now; real Strava/Garmin/TrainingPeaks integrations deferred (backlog).

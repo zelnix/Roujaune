@@ -8,6 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { colors, radius, spacing, shadow } from "@/src/theme";
 import { useTelemetry } from "@/src/hooks/useTelemetry";
+import { rideRecorder } from "@/src/lib/ride";
 import {
   WorkoutTopBar, PowerCard, HeartRateCard, CadenceCard, WorkoutTimelineCard,
   RiderRouteViewport, ClimbCard, RouteMapCard, WearableDataCard, RideSummaryStrip,
@@ -86,6 +87,20 @@ export default function LiveWorkout() {
   const showToast = React.useCallback((text: string) => setToast({ id: Date.now(), text }), []);
 
   React.useEffect(() => {
+    rideRecorder.reset({ workout: "Threshold Climb", route: "Alpe d'Huez" });
+  }, []);
+
+  // Record live telemetry so the summary screen can compute real aggregates.
+  React.useEffect(() => {
+    if (telemetry.source === "trainer") {
+      rideRecorder.push(
+        { power: telemetry.power, hr: telemetry.hr, cadence: telemetry.cadence, speed: telemetry.speed },
+        telemetry.elapsed,
+      );
+    }
+  }, [telemetry]);
+
+  React.useEffect(() => {
     const id = setInterval(() => setCueIdx((c) => (c + 1) % CUES.length), 5000);
     return () => clearInterval(id);
   }, []);
@@ -149,7 +164,7 @@ export default function LiveWorkout() {
             erg={erg}
             onPauseToggle={onPauseToggle}
             onErg={onErg}
-            onEnd={() => router.replace("/training")}
+            onEnd={() => router.replace("/summary")}
             onControls={() => setShowControls(true)}
             onMenu={() => setShowMenu(true)}
           />
