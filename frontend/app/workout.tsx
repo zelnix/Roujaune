@@ -108,6 +108,8 @@ export default function LiveWorkout() {
   const rightW = compact ? 300 : 340;
 
   const [centerW, setCenterW] = React.useState(560);
+  const [availH, setAvailH] = React.useState(0);
+  const [contentH, setContentH] = React.useState(0);
   const [paused, setPaused] = React.useState(false);
   const [expanded, setExpanded] = React.useState(false);
   const [routeIdx, setRouteIdx] = React.useState(autoRouteIndex);
@@ -244,56 +246,74 @@ export default function LiveWorkout() {
     showToast(`Surprise route: ${routeVideos[i].title}`);
   };
 
+  // On tablets, scale the whole workout down to fit the screen (no scrolling);
+  // phones (short landscape height) keep the scroll view.
+  const fitScale = !compact && availH > 0 && contentH > availH ? availH / contentH : 1;
+
+  const body = (
+    <>
+      <WorkoutTopBar elapsed={fmt(telemetry.elapsed)} connectionState={connectionState} stale={stale} onPress={(m) => (m === "Settings" ? setShowSettings(true) : showToast(m))} />
+
+      <View style={styles.bodyRow}>
+        <View style={styles.leftBlock}>
+          <View style={styles.innerRow}>
+            <View style={[styles.leftCol, { width: leftW }]}>
+              <PowerCard power={telemetry.power} wkg={(telemetry.power / 78).toFixed(1)} connected={settings.hasTrainer} />
+              <HeartRateCard hr={telemetry.hr} connected={settings.hasWearable} />
+              <CadenceCard cadence={telemetry.cadence} connected={settings.hasTrainer} />
+            </View>
+            <View style={styles.centerCol} onLayout={onCenterLayout}>
+              <WorkoutTimelineCard width={centerW} onPress={() => showToast("Workout timeline")} />
+              {expanded ? (
+                <VideoPlaceholder width={centerW} onRestore={() => setExpanded(false)} />
+              ) : (
+                <RouteVideo source={activeRoute.url} title={`${activeRoute.title}${routeAuto ? " · Auto-matched" : activeRoute.id === lastRouteId ? " · Last ride" : ""}`} playing={!paused} muted width={centerW} onToggleExpand={() => setExpanded(true)} expanded={false}>
+                  <View style={styles.inlineRoutes} pointerEvents="box-none">
+                    <RoutesButton onPress={() => setShowRoutes(true)} testID="inline-routes" />
+                  </View>
+                </RouteVideo>
+              )}
+              <NextUpStrip next={nextInterval} />
+              <SafetyNote />
+            </View>
+          </View>
+          <RideSummaryStrip speed={String(telemetry.speed)} trainerConnected={settings.hasTrainer} />
+        </View>
+
+        <View style={[styles.rightCol, { width: rightW }]}>
+          <ClimbCard />
+          <RouteMapCard />
+          <WearableDataCard connected={settings.hasWearable} />
+        </View>
+      </View>
+
+      <TrainerControlBar
+        paused={paused}
+        erg={erg}
+        onPauseToggle={onPauseToggle}
+        onErg={onErg}
+        onEnd={() => router.replace("/summary")}
+        onControls={() => setShowControls(true)}
+        onMenu={() => setShowMenu(true)}
+      />
+    </>
+  );
+
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
       <StatusBar hidden />
       <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
-        <ScrollView contentContainerStyle={[styles.content, compact && { padding: spacing.sm, gap: spacing.sm }]} showsVerticalScrollIndicator={false} testID="workout-scroll">
-          <WorkoutTopBar elapsed={fmt(telemetry.elapsed)} connectionState={connectionState} stale={stale} onPress={(m) => (m === "Settings" ? setShowSettings(true) : showToast(m))} />
-
-          <View style={styles.bodyRow}>
-            <View style={styles.leftBlock}>
-              <View style={styles.innerRow}>
-                <View style={[styles.leftCol, { width: leftW }]}>
-                  <PowerCard power={telemetry.power} wkg={(telemetry.power / 78).toFixed(1)} connected={settings.hasTrainer} />
-                  <HeartRateCard hr={telemetry.hr} connected={settings.hasWearable} />
-                  <CadenceCard cadence={telemetry.cadence} connected={settings.hasTrainer} />
-                </View>
-                <View style={styles.centerCol} onLayout={onCenterLayout}>
-                  <WorkoutTimelineCard width={centerW} onPress={() => showToast("Workout timeline")} />
-                  {expanded ? (
-                    <VideoPlaceholder width={centerW} onRestore={() => setExpanded(false)} />
-                  ) : (
-                    <RouteVideo source={activeRoute.url} title={`${activeRoute.title}${routeAuto ? " · Auto-matched" : activeRoute.id === lastRouteId ? " · Last ride" : ""}`} playing={!paused} muted width={centerW} onToggleExpand={() => setExpanded(true)} expanded={false}>
-                      <View style={styles.inlineRoutes} pointerEvents="box-none">
-                        <RoutesButton onPress={() => setShowRoutes(true)} testID="inline-routes" />
-                      </View>
-                    </RouteVideo>
-                  )}
-                  <NextUpStrip next={nextInterval} />
-                  <SafetyNote />
-                </View>
-              </View>
-              <RideSummaryStrip speed={String(telemetry.speed)} trainerConnected={settings.hasTrainer} />
-            </View>
-
-            <View style={[styles.rightCol, { width: rightW }]}>
-              <ClimbCard />
-              <RouteMapCard />
-              <WearableDataCard connected={settings.hasWearable} />
+        {compact ? (
+          <ScrollView contentContainerStyle={[styles.content, { padding: spacing.sm, gap: spacing.sm }]} showsVerticalScrollIndicator={false} testID="workout-scroll">
+            {body}
+          </ScrollView>
+        ) : (
+          <View style={styles.fitOuter} onLayout={(e) => setAvailH(e.nativeEvent.layout.height)} testID="workout-fit">
+            <View style={[styles.content, styles.fitInner, { transform: [{ scale: fitScale }] }]} onLayout={(e) => setContentH(e.nativeEvent.layout.height)}>
+              {body}
             </View>
           </View>
-
-          <TrainerControlBar
-            paused={paused}
-            erg={erg}
-            onPauseToggle={onPauseToggle}
-            onErg={onErg}
-            onEnd={() => router.replace("/summary")}
-            onControls={() => setShowControls(true)}
-            onMenu={() => setShowMenu(true)}
-          />
-        </ScrollView>
+        )}
 
         <AlbertoLiveCue message={liveCue} />
 
@@ -421,6 +441,8 @@ export default function LiveWorkout() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.md, gap: spacing.md },
+  fitOuter: { flex: 1, justifyContent: "center" },
+  fitInner: { width: "100%" },
   immersive: { ...StyleSheet.absoluteFillObject, backgroundColor: "#000", zIndex: 50 },
   hudEye: { position: "absolute", top: 12, left: 12, width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center", zIndex: 5 },
   inlineRoutes: { position: "absolute", left: 10, bottom: 10 },
