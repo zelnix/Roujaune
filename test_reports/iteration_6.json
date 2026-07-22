@@ -1,0 +1,49 @@
+{
+  "summary": "Frontend-only testing of new /workout live-workout screen and /training regression. All /workout sections render correctly (top bar, power/hr/cadence cards, workout-timeline, rider viewport, climb/route/wearable cards, ride-summary-strip, trainer control bar, alberto-cue). Live telemetry loop is ticking (elapsed 00:24:40 -> 00:24:44 over ~3.2s). Pause toggles PAUSE<->RESUME with toast; ERG +/- adjusts intensity (100 -> 105 -> 100 -> 95) with toast; controls-button opens overlay showing all 10 ctrl-* items; tapping ctrl-skip fires toast 'Skip Interval' and closes overlay; controls-close closes overlay. Navigation: /training -> /workout via start-workout-button, /workout -> /training via end-workout-button. Home '/' still renders. REGRESSION FAILURE: /training bottom row cards are NOT equal width (before-you-ride-card=244.83px vs fb50-card/mpc-card=210.84px, diff=33.98px > 2px). Root cause: PreRideCard's LinearGradient root uses styles.bottomCard directly; unlike fb50/mpc which are wrapped in Touchable with containerStyle={flex:1, flexBasis:0, minWidth:0}, PreRideCard does not have an equivalent outer flex container that reliably applies flex-basis:0 on the web layout.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "PreRideCard (before-you-ride-card)",
+        "issue": "Bottom-row card is ~34px wider than sibling cards (244.83px vs 210.84px). The flex:1/flexBasis:0/minWidth:0 declared on styles.bottomCard is not equalizing when applied directly to the LinearGradient root, while fb50/mpc use an outer Touchable wrapper with containerStyle that includes those flex props. Reference: /app/frontend/src/components/training.tsx:303 (PreRideCard LinearGradient root) vs lines 326 & 366 (fb50/mpc Touchable wrappers).",
+        "testID": "before-you-ride-card",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {
+        "component": "workout screen (Toast + others)",
+        "issue": "Console warning: 'Animated: useNativeDriver is not supported (RCTAnimation module missing)' when the workout toast animates. Web-only warning; consider setting useNativeDriver:false explicitly on web or gating it, otherwise harmless. Reference: /app/frontend/app/workout.tsx:47-48."
+      },
+      {
+        "component": "AlbertoLiveCue / Toast (workout & training)",
+        "issue": "Console warning: 'props.pointerEvents is deprecated. Use style.pointerEvents'. Move pointerEvents from prop to style. Reference: /app/frontend/app/workout.tsx:53 and /app/frontend/src/components/workout.tsx:430."
+      },
+      {
+        "component": "Global styling",
+        "issue": "Console warnings: 'shadow*' style props deprecated (use boxShadow) and 'textShadow*' deprecated (use textShadow). Coming from theme/shadow helpers. Not blocking but should be modernized. Reference: /app/frontend/src/theme.* (shadow definitions)."
+      }
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix training regression: wrap PreRideCard in an outer <View style={{flex:1, flexBasis:0, minWidth:0}}> (mirroring fb50/mpc pattern) so all three bottom cards share equal width. File: /app/frontend/src/components/training.tsx around line 303.",
+    "Optional cleanup: move pointerEvents from prop to style on Toast and AlbertoLiveCue to silence deprecation warning.",
+    "Optional cleanup: migrate shadow*/textShadow* style props to boxShadow/textShadow in the theme shadow helper.",
+    "Optional: pass useNativeDriver:false on web for the toast Animated.spring/timing (or guard by Platform)."
+  ],
+  "critical_code_review_comments": [
+    "workout.tsx uses simulated setInterval telemetry (expected per spec).",
+    "All interactive elements on /workout have testID (pause-button, erg-plus/minus, controls-button, ctrl-* items, controls-close, end-workout-button, menu-button).",
+    "menu-button on /workout also navigates to /training via router.replace — semantics may be unintended (a menu button typically opens a menu, not navigates away). Consider hooking it to a menu overlay in a follow-up."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "n/a", "frontend": "~92% (11/12 features pass; 1 regression on /training bottom-row equal width)" },
+  "seed_data_creation": "None",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Viewport used: 1194x834 landscape tablet. /workout is full-screen (no sidebar). Elapsed time text matches regex /^\\d{2}:\\d{2}:\\d{2}$/. NOTE: ERG intensity value '100%'/'95%'/'105%' can collide with the top-bar progress-percentage element ('60%') if you use a loose selector — target inside trainer-control-bar via role/parent locator instead. Toast auto-dismisses ~1.8s; assert immediately after action. Controls overlay is not visible=false when closed — it is unmounted (count=0).",
+  "rca_of_issue": "Regression on /training bottom row: PreRideCard renders its LinearGradient directly with styles.bottomCard (flex:1, flexBasis:0, minWidth:0). On the RN-Web layout, flex-basis:0 + minWidth:0 declared on the flex item itself is not being honoured for this LinearGradient element, so its intrinsic content width wins over its siblings. The fb50-card and mpc-card avoid this by wrapping their LinearGradient/View in a Touchable that receives containerStyle={{flex:1, flexBasis:0, minWidth:0}} — the outer wrapper becomes the flex item. Fix: mirror that pattern for PreRideCard by wrapping it in an outer <View style={{flex:1, flexBasis:0, minWidth:0}}> (or a Touchable) so the flex item and the visual card are separate elements. Reproduction: open /training at 1194x834, measure widths of before-you-ride-card, fb50-card, mpc-card via getBoundingClientRect(); observe ~34px delta."
+}

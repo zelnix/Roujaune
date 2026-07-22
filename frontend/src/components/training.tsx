@@ -323,7 +323,7 @@ export function PreRideCard() {
 /* ------------------------- FB50 ------------------------- */
 export function FB50RecommendationCard({ onPress }: { onPress: () => void }) {
   return (
-    <Touchable testID="fb50-card" onPress={onPress} lift style={{ flex: 1 }} containerStyle={{ flex: 1 }}>
+    <Touchable testID="fb50-card" onPress={onPress} lift style={{ flex: 1 }} containerStyle={{ flex: 1, flexBasis: 0, minWidth: 0 }}>
       <LinearGradient colors={["#20190A", "#0E0B06"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.bottomCard}>
         <SectionLabel color={colors.yellow}>FB50 RECOMMENDATION</SectionLabel>
         <View style={styles.recRow}>
@@ -363,7 +363,7 @@ function SunsetArt() {
 
 export function MPCRecommendationCard({ onPress }: { onPress: () => void }) {
   return (
-    <Touchable testID="mpc-card" onPress={onPress} lift style={{ flex: 1 }} containerStyle={{ flex: 1 }}>
+    <Touchable testID="mpc-card" onPress={onPress} lift style={{ flex: 1 }} containerStyle={{ flex: 1, flexBasis: 0, minWidth: 0 }}>
       <View style={styles.bottomCard}>
         <SunsetArt />
         <LinearGradient colors={["rgba(5,5,5,0.72)", "rgba(5,5,5,0.2)"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
@@ -439,7 +439,7 @@ const styles = StyleSheet.create({
   equipDot: { width: 20, height: 20, borderRadius: 10, alignItems: "center", justifyContent: "center" },
 
   /* bottom cards */
-  bottomCard: { flex: 1, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md, overflow: "hidden", minHeight: 130, ...shadow.card },
+  bottomCard: { flex: 1, flexBasis: 0, minWidth: 0, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md, overflow: "hidden", minHeight: 130, ...shadow.card },
   prRow: { flexDirection: "row", alignItems: "center", marginTop: 12 },
   prTitle: { color: colors.white, fontSize: 15, fontWeight: "700" },
   prSub: { color: colors.textDim, fontSize: 12.5, marginTop: 1 },

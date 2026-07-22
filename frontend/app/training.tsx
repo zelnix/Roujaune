@@ -160,7 +160,7 @@ export default function TodaysTraining() {
               <View style={[styles.rightCol, { width: rightColW }, compact && styles.fullCol]}>
                 <ReadinessCard />
                 <TrainingLoadCard width={rightColW} />
-                <WorkoutBreakdownCard onStart={() => showToast("Starting Threshold Climb…")} />
+                <WorkoutBreakdownCard onStart={() => router.push("/workout")} />
                 <EquipmentCard onItemPress={(label) => showToast(`${label} status`)} />
               </View>
             </View>
