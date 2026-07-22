@@ -123,3 +123,17 @@ export const achievement = {
   progress: 4,
   total: 5,
 };
+
+// Configurable first-person route video (admin-replaceable) for the Live Workout screen.
+export const routeVideo = {
+  url: "https://youtu.be/XlwjMjyU410",
+  title: "Alpe d'Huez — First-Person Route",
+};
+
+// Preview of the interval coming up next (includes RPE + power target).
+export const nextInterval = {
+  label: "Recovery Spin",
+  time: "3:00",
+  target: "150 W",
+  rpe: "RPE 4",
+};

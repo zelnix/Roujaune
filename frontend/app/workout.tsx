@@ -9,10 +9,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing, shadow } from "@/src/theme";
 import { useTelemetry } from "@/src/hooks/useTelemetry";
 import { rideRecorder } from "@/src/lib/ride";
+import { routeVideo, nextInterval } from "@/src/data";
+import { RouteVideo } from "@/src/components/RouteVideo";
 import {
   WorkoutTopBar, PowerCard, HeartRateCard, CadenceCard, WorkoutTimelineCard,
-  RiderRouteViewport, ClimbCard, RouteMapCard, WearableDataCard, RideSummaryStrip,
-  TrainerControlBar, AlbertoLiveCue,
+  ClimbCard, RouteMapCard, WearableDataCard, RideSummaryStrip,
+  TrainerControlBar, AlbertoLiveCue, NextUpStrip, SafetyNote,
 } from "@/src/components/workout";
 
 const CUES = [
@@ -106,7 +108,6 @@ export default function LiveWorkout() {
   }, []);
 
   const onCenterLayout = (e: LayoutChangeEvent) => setCenterW(e.nativeEvent.layout.width);
-  const viewportH = compact ? 240 : 320;
 
   const onErg = (d: number) => {
     const next = Math.max(50, Math.min(150, erg + d));
@@ -146,7 +147,9 @@ export default function LiveWorkout() {
                 </View>
                 <View style={styles.centerCol} onLayout={onCenterLayout}>
                   <WorkoutTimelineCard width={centerW} onPress={() => showToast("Workout timeline")} />
-                  <RiderRouteViewport width={centerW} height={viewportH} onPress={() => showToast("Route camera")} />
+                  <RouteVideo source={routeVideo.url} title={routeVideo.title} playing={!paused} muted width={centerW} />
+                  <NextUpStrip next={nextInterval} />
+                  <SafetyNote />
                 </View>
               </View>
               <RideSummaryStrip speed={String(telemetry.speed)} />

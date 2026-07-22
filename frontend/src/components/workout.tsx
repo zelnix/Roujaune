@@ -447,6 +447,31 @@ export function AlbertoLiveCue({ message }: { message: string }) {
   );
 }
 
+/* ============================ NEXT-UP PREVIEW + SAFETY ============================ */
+export function NextUpStrip({ next }: { next: { label: string; time: string; target: string; rpe: string } }) {
+  return (
+    <View style={styles.nextUp} testID="next-up-strip">
+      <View style={styles.nextUpLead}>
+        <Ionicons name="play-skip-forward" size={13} color={colors.yellow} />
+        <Text style={styles.nextUpLabel}>NEXT UP</Text>
+      </View>
+      <Text style={styles.nextUpName} numberOfLines={1}>{next.label}</Text>
+      <View style={styles.nextUpTag}><Ionicons name="time-outline" size={12} color={colors.textDim} /><Text style={styles.nextUpTagText}>{next.time}</Text></View>
+      <View style={styles.nextUpTag}><Ionicons name="flash" size={12} color={colors.textDim} /><Text style={styles.nextUpTagText}>{next.target}</Text></View>
+      <View style={styles.nextUpTag}><MaterialCommunityIcons name="gauge" size={13} color={colors.textDim} /><Text style={styles.nextUpTagText}>{next.rpe}</Text></View>
+    </View>
+  );
+}
+
+export function SafetyNote() {
+  return (
+    <View style={styles.safety} testID="safety-note">
+      <Ionicons name="shield-checkmark-outline" size={13} color={colors.textDim} />
+      <Text style={styles.safetyText}>Use this screen only when your device is positioned safely. Do not hold or operate your device while cycling outdoors.</Text>
+    </View>
+  );
+}
+
 const mh = { flexDirection: "row" as const, alignItems: "center" as const, gap: 6 };
 const styles = StyleSheet.create({
   /* top bar */
@@ -549,4 +574,14 @@ const styles = StyleSheet.create({
   /* cue */
   cue: { position: "absolute", top: 10, alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(12,10,9,0.9)", borderWidth: 1, borderColor: "rgba(233,180,76,0.4)", borderRadius: radius.pill, paddingHorizontal: 16, paddingVertical: 8 },
   cueText: { color: colors.white, fontSize: 13, fontWeight: "600" },
+
+  /* next-up + safety */
+  nextUp: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: colors.card, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.md, paddingVertical: 10 },
+  nextUpLead: { flexDirection: "row", alignItems: "center", gap: 6 },
+  nextUpLabel: { color: colors.yellow, fontSize: 10.5, fontWeight: "800", letterSpacing: 0.8 },
+  nextUpName: { color: colors.white, fontSize: 14, fontWeight: "700", flex: 1 },
+  nextUpTag: { flexDirection: "row", alignItems: "center", gap: 4 },
+  nextUpTagText: { color: colors.textDim, fontSize: 12, fontWeight: "600" },
+  safety: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 4, paddingTop: 2 },
+  safetyText: { color: colors.textFaint, fontSize: 11, flex: 1, lineHeight: 15 },
 });
