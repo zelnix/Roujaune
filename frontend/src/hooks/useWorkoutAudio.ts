@@ -16,24 +16,26 @@ export function useWorkoutAudio() {
   const [volume, setVolumeState] = useState(0.5);
   const [voiceOn, setVoiceOn] = useState(true);
   const speaking = useRef(false);
-  const voice = useRef<{ id?: string; lang: string }>({ id: undefined, lang: "en-GB" });
+  const voice = useRef<{ id?: string; lang: string }>({ id: undefined, lang: "es-ES" });
 
-  // Pick an older British male voice (prefer named en-GB male voices such as
-  // Daniel/Arthur/Oliver/George, which read as mature British English).
+  // Pick a male Spanish voice reading English text — this yields a mild Spanish
+  // accent while the English words stay clear (prefer named es-ES/es-US male
+  // voices such as Jorge/Diego/Carlos/Enrique/Miguel).
   useEffect(() => {
     (async () => {
       try {
         const voices = await Speech.getAvailableVoicesAsync();
         const nameOf = (v: Speech.Voice) => `${v.name ?? ""} ${v.identifier ?? ""}`.toLowerCase();
-        const maleHints = ["daniel", "arthur", "oliver", "george", "graham", "male"];
+        const maleHints = ["jorge", "diego", "carlos", "enrique", "miguel", "pablo", "juan", "male", "hombre"];
         const isMale = (v: Speech.Voice) => maleHints.some((n) => nameOf(v).includes(n));
-        const gb = voices.filter((v) => (v.language ?? "").toLowerCase() === "en-gb");
-        const en = voices.filter((v) => (v.language ?? "").toLowerCase().startsWith("en"));
+        const es = voices.filter((v) => (v.language ?? "").toLowerCase().startsWith("es"));
+        const esES = es.filter((v) => (v.language ?? "").toLowerCase() === "es-es");
         const chosen =
-          gb.find(isMale) || gb[0] || en.find(isMale) || en[0];
-        if (chosen) voice.current = { id: chosen.identifier, lang: chosen.language ?? "en-GB" };
+          esES.find(isMale) || es.find(isMale) || esES[0] || es[0] ||
+          voices.filter((v) => (v.language ?? "").toLowerCase().startsWith("en")).find(isMale);
+        if (chosen) voice.current = { id: chosen.identifier, lang: chosen.language ?? "es-ES" };
       } catch {
-        /* keep default en-GB */
+        /* keep default es-ES */
       }
     })();
   }, []);
@@ -73,10 +75,10 @@ export function useWorkoutAudio() {
     Speech.stop();
     duck(true);
     Speech.speak(text, {
-      voice: voice.current.id,        // older British male
+      voice: voice.current.id,        // male Spanish voice → mild Spanish accent
       language: voice.current.lang,
-      pitch: 0.85,                    // lower, mature tone
-      rate: 0.88,                     // measured, unhurried delivery
+      pitch: 0.9,
+      rate: 0.92,                     // clear, well-paced English
       onDone: () => duck(false),
       onStopped: () => duck(false),
       onError: () => duck(false),
