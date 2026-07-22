@@ -17,30 +17,32 @@ const coachImg = require("../../assets/images/coach_alberto_b2.jpg");
 const ZONE_COLORS = ["#43C65A", "#9ACD32", colors.yellow, "#E8631C", colors.red];
 
 /* ======================= HEADER ======================= */
-export function SummaryHeader({ brandWidth, onToast }: { brandWidth: number; onToast: (m: string) => void }) {
+export function SummaryHeader({ brandWidth, phone = false, onToast }: { brandWidth: number; phone?: boolean; onToast: (m: string) => void }) {
   return (
     <View style={styles.headerRow} testID="summary-header">
       <View style={[styles.brandCol, { width: brandWidth }]}>
         <View style={styles.brandRow}>
-          <Image source={glyph} style={{ width: 30, height: 30 }} contentFit="contain" />
-          <Text style={styles.brandText}>
-            <Text style={{ color: colors.red }}>ROU</Text>
-            <Text style={{ color: colors.yellow }}>JAUNE</Text>
-          </Text>
+          <Image source={glyph} style={{ width: phone ? 26 : 30, height: phone ? 26 : 30 }} contentFit="contain" />
+          {!phone && (
+            <Text style={styles.brandText}>
+              <Text style={{ color: colors.red }}>ROU</Text>
+              <Text style={{ color: colors.yellow }}>JAUNE</Text>
+            </Text>
+          )}
         </View>
-        <Text style={styles.brandTagline}>Your strongest ride is your own.</Text>
+        {!phone && <Text style={styles.brandTagline}>Your strongest ride is your own.</Text>}
       </View>
 
       <View style={styles.titleCol}>
         <View style={styles.titleRow}>
           <Sparkle x={-6} y={2} />
-          <Text style={styles.title}>Workout Complete</Text>
-          <View style={styles.titleCheck}>
-            <Ionicons name="checkmark" size={17} color={colors.yellow} />
+          <Text style={[styles.title, phone && { fontSize: 24 }]}>Workout Complete</Text>
+          <View style={[styles.titleCheck, phone && { width: 22, height: 22, borderRadius: 11 }]}>
+            <Ionicons name="checkmark" size={phone ? 14 : 17} color={colors.yellow} />
           </View>
           <Sparkle x={8} y={-4} />
         </View>
-        <Text style={styles.subtitle}>{C.title}  •  {C.date}</Text>
+        <Text style={[styles.subtitle, phone && { fontSize: 11 }]}>{C.title}  •  {C.date}</Text>
       </View>
 
       <View style={styles.statusCol}>
@@ -77,27 +79,28 @@ const SIDE_ITEMS = [
   { key: "settings", label: "Settings", icon: "settings-outline" as const },
 ];
 
-export function SummarySidebar({ active, onSelect, width }: { active: string; onSelect: (k: string) => void; width: number }) {
+export function SummarySidebar({ active, onSelect, width, iconOnly = false }: { active: string; onSelect: (k: string) => void; width: number; iconOnly?: boolean }) {
   return (
-    <View style={[styles.sidebar, { width }]} testID="summary-sidebar">
+    <View style={[styles.sidebar, { width }, iconOnly && { paddingHorizontal: 6 }]} testID="summary-sidebar">
       <View style={{ gap: 4 }}>
         {SIDE_ITEMS.map((it) => {
           const on = active === it.key;
+          const rowStyle = [styles.sideRow, iconOnly && styles.sideRowIcon];
           return (
             <Touchable key={it.key} testID={`side-${it.key}`} onPress={() => onSelect(it.key)} scaleTo={0.96} lift={false}>
               {on ? (
                 <LinearGradient
                   colors={["rgba(224,30,43,0.95)", "rgba(110,17,22,0.85)"]}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                  style={[styles.sideRow, styles.sideRowActive, shadow.glow]}
+                  style={[rowStyle, styles.sideRowActive, shadow.glow]}
                 >
                   <Ionicons name={it.icon} size={19} color="#fff" />
-                  <Text style={[styles.sideLabel, { color: "#fff", fontWeight: "700" }]}>{it.label}</Text>
+                  {!iconOnly && <Text style={[styles.sideLabel, { color: "#fff", fontWeight: "700" }]}>{it.label}</Text>}
                 </LinearGradient>
               ) : (
-                <View style={styles.sideRow}>
+                <View style={rowStyle}>
                   <Ionicons name={it.icon} size={19} color={colors.textDim} />
-                  <Text style={styles.sideLabel}>{it.label}</Text>
+                  {!iconOnly && <Text style={styles.sideLabel}>{it.label}</Text>}
                 </View>
               )}
             </Touchable>
@@ -106,36 +109,36 @@ export function SummarySidebar({ active, onSelect, width }: { active: string; on
       </View>
 
       <View style={styles.sideCoach}>
-        <View style={styles.coachAvatarWrap}>
-          <Image source={coachImg} style={styles.coachAvatar} contentFit="cover" contentPosition="top center" />
+        <View style={[styles.coachAvatarWrap, iconOnly && { width: 40, height: 40 }]}>
+          <Image source={coachImg} style={[styles.coachAvatar, iconOnly && { width: 40, height: 40, borderRadius: 20 }]} contentFit="cover" contentPosition="top center" />
           <View style={styles.coachDot} />
         </View>
-        <Text style={styles.coachName}>Alberto</Text>
-        <Text style={styles.coachRole}>Coach</Text>
+        {!iconOnly && <Text style={styles.coachName}>Alberto</Text>}
+        {!iconOnly && <Text style={styles.coachRole}>Coach</Text>}
       </View>
     </View>
   );
 }
 
 /* ======================= HERO SUMMARY ======================= */
-export function HeroSummaryCard() {
+export function HeroSummaryCard({ compact = false }: { compact?: boolean }) {
   return (
     <View style={styles.hero} testID="hero-summary-card">
-      <View style={styles.heroImgWrap}>
+      <View style={[styles.heroImgWrap, compact && { minHeight: 130 }]}>
         <Image source={heroImg} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition={{ top: "30%" }} accessibilityLabel="Rider climbing" />
         <LinearGradient colors={["transparent", "rgba(5,5,5,0.35)"]} style={StyleSheet.absoluteFill} />
-        <Text style={styles.heroCallout}>{C.callout}</Text>
+        <Text style={[styles.heroCallout, compact && { fontSize: 18, lineHeight: 18 }]}>{C.callout}</Text>
       </View>
 
-      <View style={styles.heroBody}>
-        <Text style={styles.heroHeadline}>{C.headline}</Text>
-        <Text style={styles.heroSub}>{C.subhead}</Text>
+      <View style={[styles.heroBody, compact && { padding: spacing.md }]}>
+        <Text style={[styles.heroHeadline, compact && { fontSize: 22 }]}>{C.headline}</Text>
+        <Text style={[styles.heroSub, compact && { fontSize: 17 }]}>{C.subhead}</Text>
 
-        <View style={styles.recapCard}>
-          <Image source={coachImg} style={styles.recapAvatar} contentFit="cover" contentPosition="top center" />
+        <View style={[styles.recapCard, compact && { marginTop: 10, padding: 10 }]}>
+          <Image source={coachImg} style={[styles.recapAvatar, compact && { width: 40, height: 40, borderRadius: 20 }]} contentFit="cover" contentPosition="top center" />
           <View style={{ flex: 1 }}>
             <Text style={styles.recapTitle}>{C.recapTitle}</Text>
-            <Text style={styles.recapText}>{C.recap}</Text>
+            <Text style={styles.recapText} numberOfLines={compact ? 2 : undefined}>{C.recap}</Text>
           </View>
         </View>
       </View>
@@ -145,16 +148,16 @@ export function HeroSummaryCard() {
 
 /* ======================= METRICS GRID ======================= */
 type Cell = { icon: React.ReactNode; label: string; value: string; unit?: string };
-function MetricCell({ icon, label, value, unit, last }: Cell & { last?: boolean }) {
+function MetricCell({ icon, label, value, unit, last, compact }: Cell & { last?: boolean; compact?: boolean }) {
   return (
-    <View style={[styles.mCell, !last && styles.mCellDiv]}>
+    <View style={[styles.mCell, !last && styles.mCellDiv, compact && { paddingHorizontal: spacing.sm }]}>
       <View style={styles.mHead}>{icon}<Text style={styles.mLabel}>{label}</Text></View>
-      <Text style={styles.mValue}>{value}<Text style={styles.mUnit}>{unit ? ` ${unit}` : ""}</Text></Text>
+      <Text style={[styles.mValue, compact && { fontSize: 19 }]}>{value}<Text style={styles.mUnit}>{unit ? ` ${unit}` : ""}</Text></Text>
     </View>
   );
 }
 
-export function MetricsGrid({ stats }: { stats: SummaryStats }) {
+export function MetricsGrid({ stats, compact = false }: { stats: SummaryStats; compact?: boolean }) {
   const y = colors.yellow, r = colors.red, w = colors.white;
   const row1: Cell[] = [
     { icon: <Ionicons name="time-outline" size={14} color={w} />, label: "DURATION", value: fmtDuration(stats.duration_sec) },
@@ -172,9 +175,9 @@ export function MetricsGrid({ stats }: { stats: SummaryStats }) {
   ];
   return (
     <View style={styles.metricsCard} testID="metrics-grid">
-      <View style={styles.mRow}>{row1.map((c, i) => <MetricCell key={c.label} {...c} last={i === row1.length - 1} />)}</View>
+      <View style={styles.mRow}>{row1.map((c, i) => <MetricCell key={c.label} {...c} last={i === row1.length - 1} compact={compact} />)}</View>
       <View style={styles.mRowDiv} />
-      <View style={styles.mRow}>{row2.map((c, i) => <MetricCell key={c.label} {...c} last={i === row2.length - 1} />)}</View>
+      <View style={styles.mRow}>{row2.map((c, i) => <MetricCell key={c.label} {...c} last={i === row2.length - 1} compact={compact} />)}</View>
     </View>
   );
 }
@@ -206,12 +209,12 @@ function ComplianceCol({ label, value, unit, pct, color }: { label: string; valu
   );
 }
 
-export function ComplianceCard({ stats }: { stats: SummaryStats }) {
+export function ComplianceCard({ stats, compact = false }: { stats: SummaryStats; compact?: boolean }) {
   const g = colors.green, y = colors.yellow;
   const cm = stats.compliance;
   return (
-    <View style={styles.complianceCard} testID="compliance-card">
-      <Ring size={128} stroke={11} pct={cm.overall} color={g} big={`${cm.overall}%`} small={"OVERALL\nCOMPLIANCE"} />
+    <View style={[styles.complianceCard, compact && { padding: spacing.md, gap: spacing.sm }]} testID="compliance-card">
+      <Ring size={compact ? 96 : 128} stroke={compact ? 9 : 11} pct={cm.overall} color={g} big={`${cm.overall}%`} small={"OVERALL\nCOMPLIANCE"} />
       <View style={styles.compDiv} />
       <ComplianceCol label={"TARGET POWER\nCOMPLIANCE"} value={String(cm.power)} pct={cm.power} color={g} />
       <ComplianceCol label={"CADENCE\nCOMPLIANCE"} value={String(cm.cadence)} pct={cm.cadence} color={g} />
@@ -321,9 +324,9 @@ function HRLineChart({ stats, width }: { stats: SummaryStats; width: number }) {
   );
 }
 
-function TimeInZonesPanel({ stats }: { stats: SummaryStats }) {
+function TimeInZonesPanel({ stats, full = false }: { stats: SummaryStats; full?: boolean }) {
   return (
-    <View style={styles.zonesCard} testID="zones-panel">
+    <View style={[styles.zonesCard, full && { width: "100%" }]} testID="zones-panel">
       <Text style={styles.zonesTitle}>TIME IN ZONES</Text>
       <View style={{ gap: 7, marginTop: 8 }}>
         {stats.zones.map((z, i) => {
@@ -354,7 +357,17 @@ function fmtHms(sec: number) {
   return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-export function ChartsRow({ stats, width }: { stats: SummaryStats; width: number }) {
+export function ChartsRow({ stats, width, vertical = false }: { stats: SummaryStats; width: number; vertical?: boolean }) {
+  if (vertical) {
+    const w = Math.max(220, width - spacing.md * 2);
+    return (
+      <View style={styles.chartsCol} testID="charts-row">
+        <PowerBarsChart stats={stats} width={w} />
+        <HRLineChart stats={stats} width={w} />
+        <TimeInZonesPanel stats={stats} full />
+      </View>
+    );
+  }
   const zonesW = 220;
   const chartW = Math.max(220, (width - zonesW - spacing.md * 2) / 2);
   return (
@@ -374,15 +387,15 @@ const SYNC_ICON: Record<string, { icon: React.ReactNode }> = {
   wellness: { icon: <MaterialCommunityIcons name="flower-tulip" size={18} color="#B983FF" /> },
 };
 
-export function SyncExportRow({ onToast }: { onToast: (m: string) => void }) {
+export function SyncExportRow({ onToast, compact = false }: { onToast: (m: string) => void; compact?: boolean }) {
   return (
-    <View style={styles.syncCard} testID="sync-export-row">
+    <View style={[styles.syncCard, compact && styles.syncCardWrap]} testID="sync-export-row">
       <View style={styles.syncLabelWrap}>
         <Ionicons name="code-slash" size={15} color={colors.textDim} />
         <Text style={styles.syncLabel}>SYNC & EXPORT</Text>
       </View>
       {C.sync.map((s) => (
-        <Touchable key={s.key} testID={`sync-${s.key}`} onPress={() => onToast(`${s.label} — ${s.status}`)} scaleTo={0.96} lift={false} containerStyle={{ flex: 1 }}>
+        <Touchable key={s.key} testID={`sync-${s.key}`} onPress={() => onToast(`${s.label} — ${s.status}`)} scaleTo={0.96} lift={false} containerStyle={compact ? { minWidth: "44%", flexGrow: 1 } : { flex: 1 }}>
           <View style={styles.syncItem}>
             {SYNC_ICON[s.key].icon}
             <View style={{ flexShrink: 1 }}>
@@ -509,31 +522,33 @@ export function RecoveryCard({ score }: { score: number }) {
 }
 
 /* ======================= BOTTOM ACTION BAR ======================= */
-export function BottomActionBar({ onView, onSave, onShare, onPlan }: { onView: () => void; onSave: () => void; onShare: () => void; onPlan: () => void }) {
+export function BottomActionBar({ onView, onSave, onShare, onPlan, compact = false }: { onView: () => void; onSave: () => void; onShare: () => void; onPlan: () => void; compact?: boolean }) {
+  const btn = [styles.actBtn, compact && { height: 46 }];
+  const txt = [styles.actText, compact && { fontSize: 12 }];
   return (
     <View style={styles.actionBar} testID="bottom-action-bar">
       <Touchable testID="action-view" onPress={onView} scaleTo={0.97} style={{ flex: 1.2 }} containerStyle={{ flex: 1.2 }}>
-        <View style={[styles.actBtn, { backgroundColor: colors.yellow }]}>
-          <MaterialCommunityIcons name="chart-line" size={18} color="#1a1300" />
-          <Text style={[styles.actText, { color: "#1a1300" }]}>VIEW FULL ANALYSIS</Text>
+        <View style={[btn, { backgroundColor: colors.yellow }]}>
+          <MaterialCommunityIcons name="chart-line" size={compact ? 16 : 18} color="#1a1300" />
+          <Text style={[txt, { color: "#1a1300" }]} numberOfLines={1}>{compact ? "ANALYSIS" : "VIEW FULL ANALYSIS"}</Text>
         </View>
       </Touchable>
       <Touchable testID="action-save" onPress={onSave} scaleTo={0.97} style={{ flex: 1 }} containerStyle={{ flex: 1 }}>
-        <View style={[styles.actBtn, styles.actDark]}>
-          <Ionicons name="save-outline" size={18} color={colors.white} />
-          <Text style={styles.actText}>SAVE & EXIT</Text>
+        <View style={[btn, styles.actDark]}>
+          <Ionicons name="save-outline" size={compact ? 16 : 18} color={colors.white} />
+          <Text style={txt} numberOfLines={1}>SAVE & EXIT</Text>
         </View>
       </Touchable>
       <Touchable testID="action-share" onPress={onShare} scaleTo={0.97} style={{ flex: 1 }} containerStyle={{ flex: 1 }}>
-        <View style={[styles.actBtn, { backgroundColor: colors.red }]}>
-          <Ionicons name="share-social" size={18} color="#fff" />
-          <Text style={styles.actText}>SHARE RIDE</Text>
+        <View style={[btn, { backgroundColor: colors.red }]}>
+          <Ionicons name="share-social" size={compact ? 16 : 18} color="#fff" />
+          <Text style={txt} numberOfLines={1}>SHARE RIDE</Text>
         </View>
       </Touchable>
       <Touchable testID="action-plan" onPress={onPlan} scaleTo={0.97} style={{ flex: 1.1 }} containerStyle={{ flex: 1.1 }}>
-        <View style={[styles.actBtn, styles.actDark]}>
-          <Ionicons name="calendar-outline" size={18} color={colors.white} />
-          <Text style={styles.actText}>PLAN TOMORROW&apos;S RIDE</Text>
+        <View style={[btn, styles.actDark]}>
+          <Ionicons name="calendar-outline" size={compact ? 16 : 18} color={colors.white} />
+          <Text style={txt} numberOfLines={1}>{compact ? "PLAN RIDE" : "PLAN TOMORROW'S RIDE"}</Text>
         </View>
       </Touchable>
     </View>
@@ -563,6 +578,7 @@ const styles = StyleSheet.create({
   /* sidebar */
   sidebar: { ...cardBase, paddingVertical: spacing.md, paddingHorizontal: 10, justifyContent: "space-between" },
   sideRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 11, paddingHorizontal: 12, borderRadius: radius.md },
+  sideRowIcon: { justifyContent: "center", gap: 0, paddingHorizontal: 0, paddingVertical: 12 },
   sideRowActive: { borderWidth: 1, borderColor: "rgba(224,30,43,0.5)" },
   sideLabel: { color: colors.textDim, fontSize: 13.5, fontWeight: "600" },
   sideCoach: { alignItems: "center", paddingTop: spacing.md },
@@ -608,6 +624,7 @@ const styles = StyleSheet.create({
 
   /* charts */
   chartsRow: { flexDirection: "row", gap: spacing.md },
+  chartsCol: { flexDirection: "column", gap: spacing.md },
   chartCard: { ...cardBase, flex: 1, padding: spacing.md, paddingBottom: spacing.sm },
   chartHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
   chartTitle: { color: colors.textDim, fontSize: 11, fontWeight: "800", letterSpacing: 0.8 },
@@ -636,6 +653,7 @@ const styles = StyleSheet.create({
 
   /* sync */
   syncCard: { ...cardBase, flexDirection: "row", alignItems: "center", paddingVertical: 10, paddingHorizontal: spacing.md, gap: spacing.md },
+  syncCardWrap: { flexWrap: "wrap", rowGap: spacing.sm },
   syncLabelWrap: { flexDirection: "row", alignItems: "center", gap: 6, paddingRight: spacing.md, borderRightWidth: 1, borderRightColor: colors.borderSoft },
   syncLabel: { color: colors.textDim, fontSize: 10.5, fontWeight: "800", letterSpacing: 0.6 },
   syncItem: { flexDirection: "row", alignItems: "center", gap: 8 },

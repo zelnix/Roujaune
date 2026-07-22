@@ -33,10 +33,11 @@ function Toast({ message }: { message: { id: number; text: string } | null }) {
 export default function WorkoutComplete() {
   const { width, height } = useWindowDimensions();
   const router = useRouter();
-  const compact = height < 620;
-  const navW = compact ? 132 : 176;
+  const phone = height < 500;             // phone landscape
+  const compact = height < 620;           // small tablet / large phone
+  const navW = phone ? 58 : compact ? 132 : 176;
   const rightW = compact ? 300 : 344;
-  const pad = compact ? spacing.md : spacing.lg;
+  const pad = phone ? spacing.sm : compact ? spacing.md : spacing.lg;
 
   const { stats } = useSummary();
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
@@ -56,12 +57,12 @@ export default function WorkoutComplete() {
       <StatusBar hidden />
       <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
         <View style={{ paddingHorizontal: pad, paddingTop: spacing.sm }}>
-          <SummaryHeader brandWidth={navW} onToast={showToast} />
+          <SummaryHeader brandWidth={navW} phone={phone} onToast={showToast} />
         </View>
 
         <View style={styles.body}>
           <View style={{ paddingLeft: pad }}>
-            <SummarySidebar active="overview" onSelect={onSideSelect} width={navW} />
+            <SummarySidebar active="overview" onSelect={onSideSelect} width={navW} iconOnly={phone} />
           </View>
 
           <ScrollView
@@ -70,26 +71,30 @@ export default function WorkoutComplete() {
             showsVerticalScrollIndicator={false}
             testID="summary-scroll"
           >
-            <View style={styles.contentRow}>
+            <View style={[styles.contentRow, phone && styles.contentCol]}>
               <View style={styles.mainCol} onLayout={onMainLayout}>
-                <HeroSummaryCard />
-                <MetricsGrid stats={stats} />
-                <ComplianceCard stats={stats} />
-                <ChartsRow stats={stats} width={mainW} />
-                <SyncExportRow onToast={showToast} />
+                <HeroSummaryCard compact={phone} />
+                <MetricsGrid stats={stats} compact={compact} />
+                <ComplianceCard stats={stats} compact={phone} />
+                <ChartsRow stats={stats} width={mainW} vertical={phone} />
+                {phone && <RightColumn score={78} phone />}
+                <SyncExportRow onToast={showToast} compact={phone} />
               </View>
 
-              <View style={[styles.rightCol, { width: rightW }]}>
-                <RouteSummaryCard />
-                <AchievementsCard />
-                <RecoveryCard score={78} />
-              </View>
+              {!phone && (
+                <View style={[styles.rightCol, { width: rightW }]}>
+                  <RouteSummaryCard />
+                  <AchievementsCard />
+                  <RecoveryCard score={78} />
+                </View>
+              )}
             </View>
           </ScrollView>
         </View>
 
         <View style={{ paddingHorizontal: pad, paddingBottom: spacing.sm }}>
           <BottomActionBar
+            compact={phone}
             onView={() => showToast("Opening full analysis")}
             onSave={() => router.replace("/")}
             onShare={() => showToast("Preparing shareable ride card")}
@@ -103,13 +108,28 @@ export default function WorkoutComplete() {
   );
 }
 
+// On phone landscape the right-hand cards flow below the main content in a wrap row.
+function RightColumn({ score, phone }: { score: number; phone: boolean }) {
+  return (
+    <View style={phone ? styles.rightWrap : undefined}>
+      <View style={phone && styles.rightWrapItemWide}><RouteSummaryCard /></View>
+      <View style={phone && styles.rightWrapItem}><AchievementsCard /></View>
+      <View style={phone && styles.rightWrapItem}><RecoveryCard score={score} /></View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   body: { flex: 1, flexDirection: "row" },
   scroll: { paddingTop: spacing.xs, paddingBottom: spacing.md, gap: spacing.md },
   contentRow: { flexDirection: "row", gap: spacing.md },
+  contentCol: { flexDirection: "column" },
   mainCol: { flex: 1, gap: spacing.md },
   rightCol: { gap: spacing.md },
+  rightWrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
+  rightWrapItemWide: { width: "100%" },
+  rightWrapItem: { flex: 1, flexBasis: 0, minWidth: 220 },
   toast: { position: "absolute", bottom: 90, alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(20,18,16,0.96)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 18, paddingVertical: 11 },
   toastText: { color: colors.white, fontWeight: "700", fontSize: 14 },
 });
