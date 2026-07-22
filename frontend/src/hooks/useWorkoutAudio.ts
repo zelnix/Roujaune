@@ -9,32 +9,31 @@ const DUCK = 0.22; // music volume multiplier while Alberto is speaking
 
 /** Cycling music + Alberto's spoken coaching cues.
  * Music softens (ducks) while a cue is spoken, then returns to full volume.
- * Alberto speaks with a mild French accent (fr-FR voice reading English). */
+ * Alberto speaks as an older British male (en-GB voice reading English). */
 export function useWorkoutAudio() {
   const player = useAudioPlayer(MUSIC_SOURCE);
   const [musicOn, setMusicOn] = useState(true);
   const [volume, setVolumeState] = useState(0.5);
   const [voiceOn, setVoiceOn] = useState(true);
   const speaking = useRef(false);
-  const voice = useRef<{ id?: string; lang: string }>({ id: undefined, lang: "fr-FR" });
+  const voice = useRef<{ id?: string; lang: string }>({ id: undefined, lang: "en-GB" });
 
-  // Pick a deep male voice with a mild French accent (prefer French-Canadian /
-  // named male French voices, which read more evenly than default fr-FR voices).
+  // Pick an older British male voice (prefer named en-GB male voices such as
+  // Daniel/Arthur/Oliver/George, which read as mature British English).
   useEffect(() => {
     (async () => {
       try {
         const voices = await Speech.getAvailableVoicesAsync();
         const nameOf = (v: Speech.Voice) => `${v.name ?? ""} ${v.identifier ?? ""}`.toLowerCase();
-        const maleHints = ["thomas", "nicolas", "mathieu", "henri", "paul", "daniel", "male", "homme"];
+        const maleHints = ["daniel", "arthur", "oliver", "george", "graham", "male"];
         const isMale = (v: Speech.Voice) => maleHints.some((n) => nameOf(v).includes(n));
-        const fr = voices.filter((v) => (v.language ?? "").toLowerCase().startsWith("fr"));
-        const frCA = fr.filter((v) => (v.language ?? "").toLowerCase() === "fr-ca");
+        const gb = voices.filter((v) => (v.language ?? "").toLowerCase() === "en-gb");
+        const en = voices.filter((v) => (v.language ?? "").toLowerCase().startsWith("en"));
         const chosen =
-          frCA.find(isMale) || fr.find(isMale) || frCA[0] || fr[0] ||
-          voices.filter((v) => (v.language ?? "").toLowerCase().startsWith("en")).find(isMale);
-        if (chosen) voice.current = { id: chosen.identifier, lang: chosen.language ?? "fr-FR" };
+          gb.find(isMale) || gb[0] || en.find(isMale) || en[0];
+        if (chosen) voice.current = { id: chosen.identifier, lang: chosen.language ?? "en-GB" };
       } catch {
-        /* keep default fr-FR */
+        /* keep default en-GB */
       }
     })();
   }, []);
@@ -74,10 +73,10 @@ export function useWorkoutAudio() {
     Speech.stop();
     duck(true);
     Speech.speak(text, {
-      voice: voice.current.id,        // deep male, mild French accent
+      voice: voice.current.id,        // older British male
       language: voice.current.lang,
-      pitch: 0.78,                    // deeper
-      rate: 0.9,
+      pitch: 0.85,                    // lower, mature tone
+      rate: 0.88,                     // measured, unhurried delivery
       onDone: () => duck(false),
       onStopped: () => duck(false),
       onError: () => duck(false),
