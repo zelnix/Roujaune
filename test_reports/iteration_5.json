@@ -1,0 +1,48 @@
+{
+  "summary": "Frontend-only UI test of '/training' at TWO viewports: tablet 1194x834 and phone-landscape 844x390 (compact height<560). RESULTS: (a) SPACING BUG FIX FAILED — bottom-row cards are NOT equal width. Tablet: before-you-ride=244.8px, fb50=210.8px, mpc=210.8px (max_diff=34px). Compact: pre=257.3, fb50=223.4, mpc=223.3 (max_diff=34px). Gaps between cards are correct (16px, no huge empty space), but before-you-ride is ~34px wider than fb50/mpc in both viewports. (b) EQUIPMENT TOAST FIX VERIFIED — tapping equip-fan and equip-smart-trainer now fire toast 'Fan status' / 'Smart Trainer status' on both viewports. (c) COMPACT PHONE-LANDSCAPE (844x390) — 'Today's Training' heading renders on a single line (bbox w=736, h=34, NOT wrapping one letter per line); brand-header + title + date + alberto-coach-card stack vertically (alberto y=201 > title y=127); body is single column (main-workout w=736, readiness w=736, both full-width); start-workout-button full width (w=702); sidebar nav-help reachable (visible). (d) TABLET REGRESSION — 3-column header preserved (alberto-coach-card centred at top y=16), all mock data intact, all cards render. (e) INTERACTIONS — all 10 tested testIDs fire correct toasts on both viewports: view-details-button ('Opening workout details'), preview-route-button ('Previewing Alpe d'Huez'), start-workout-button ('Starting Threshold Climb…'), route-image ('Opening route map'), fb50-card ('Starting Pre-Ride Activation'), mpc-card ('Starting Calm Start'), alberto-coach-card ('Message from Alberto'), flame-pill ('12 day streak 🔥'), bell-pill ('You have 3 notifications'), profile-pill ('Profile'). (f) NAV REGRESSION — start-ride-button → /training ✓, nav-home → / ✓, nav-workouts → /training ✓. Deprecated packages detected: none new (only prior react-native-web shadow*/textShadow*/pointerEvents/useNativeDriver console warnings from iteration_4 persist — non-blocking).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "PreRideCard / FB50RecommendationCard / MPCRecommendationCard bottom-row",
+        "issue": "Spacing fix regression — the three bottom cards are NOT equal width as required by the review spec. Measured on tablet 1194x834: before-you-ride=244.8px, fb50=210.8px, mpc=210.8px (max_diff=34px). Same 34px delta on phone-landscape 844x390. Root cause: PreRideCard renders `<LinearGradient style={styles.bottomCard}>` directly (bottomCard has flex:1) as a child of `styles.bottomRow`, while FB50/MPC wrap their LinearGradient inside a `<Touchable style={{flex:1}} containerStyle={{flex:1}}>`. On react-native-web, Pressable renders with `flex-basis: auto` by default, so the two Touchable-wrapped cards end up with a smaller effective flex basis than the direct LinearGradient. Fix: either (a) wrap PreRideCard in a `<View style={{flex:1}}>` matching the Touchable-wrapper shape (or vice-versa), or (b) apply an explicit `flexBasis: 0, minWidth: 0` on each of the three bottom cards to force equal distribution, or (c) apply `flex: 1, flexBasis: 0` via a shared style used by all three. Reference: /app/frontend/src/components/training.tsx:301-321 (PreRideCard), :324-343 (FB50), :364-377 (MPC); /app/frontend/src/components/training.tsx:442 (bottomCard) and /app/frontend/app/training.tsx:203 (bottomRow).",
+        "testID": "before-you-ride-card / fb50-card / mpc-card",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "/training (phone-landscape compact 844x390)",
+        "issues": [
+          "Compact layout renders correctly overall: title reads on single line, header stacks vertically, body single column, sidebar reachable, start-workout-button full width. Only the bottom-row width inequality (see ui_bugs) is off."
+        ]
+      }
+    ],
+    "react_native_issues": [
+      {
+        "component": "Deprecated shadow* / textShadow* / pointerEvents style props (from iteration_4)",
+        "issue": "react-native-web console warnings persist: '\"shadow*\" style props are deprecated. Use \"boxShadow\".' / '\"textShadow*\" style props are deprecated. Use \"textShadow\".' / 'props.pointerEvents is deprecated. Use style.pointerEvents'. Non-blocking. Reference: /app/frontend/src/theme.ts (shadow.card/shadow.glow), BrandHeader textShadow*, and pointerEvents=\"none\" on Toast Animated.View at /app/frontend/app/training.tsx:41 and /app/frontend/app/index.tsx."
+      }
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_5.json"],
+  "action_items": [
+    "PRIMARY: Fix equal-width for the three bottom cards on '/training' (before-you-ride-card, fb50-card, mpc-card). Recommended fix: add `flexBasis: 0, minWidth: 0` to `styles.bottomCard` in /app/frontend/src/components/training.tsx (currently only has `flex: 1`). This forces all flex children to compute width from the flex factor alone rather than min-content. Also add matching `flexBasis:0` on the Touchable containerStyle for fb50/mpc (containerStyle={{flex:1, flexBasis:0, minWidth:0}}) OR wrap PreRideCard in a `<View style={{flex:1, flexBasis:0, minWidth:0}}>`. Retest at both 1194x834 and 844x390 — widths should differ by <=1px.",
+    "OPTIONAL: extract the duplicated Toast component from /app/frontend/app/training.tsx and /app/frontend/app/index.tsx into /app/frontend/src/components/ui.tsx (DRY).",
+    "OPTIONAL: migrate deprecated react-native-web style props (shadow* -> boxShadow, textShadow* -> textShadow, pointerEvents prop -> style.pointerEvents)."
+  ],
+  "critical_code_review_comments": [
+    "styles.bottomCard uses only `flex: 1` without `flexBasis: 0` — on react-native-web with a mix of Pressable-wrapped and direct-LinearGradient children, this collapses to content-driven sizing, hence the ~34px width delta.",
+    "Touchable in ui.tsx: containerStyle goes on Pressable, style goes on inner Animated.View. Callers pass `style={{flex:1}} containerStyle={{flex:1}}` for fb50/mpc — but PreRideCard has no such wrapper. Consider unifying all three bottom cards behind a single wrapper (e.g. a `<BottomCardSlot>` view) so future spacing changes only touch one file.",
+    "compact detection `height < 560` works for 844x390 (390<560=true). Note it also triggers on any short viewport; consider `width < height ? portrait : landscape-compact` logic if pure landscape detection is intended.",
+    "Toast auto-dismiss window is 1.9s — during rapid interaction tests, back-to-back taps may not each see a fresh toast without a >=2.2s delay; testers should be aware."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "N/A (frontend-only)", "frontend": "83% (5/6 spec items pass; bottom-row equal-width fix still broken on both tablet and phone-landscape)" },
+  "seed_data_creation": "None (no backend).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Two viewports: tablet 1194x834 and phone-landscape 844x390 (compact when height<560). Because expo-router keeps '/' mounted behind '/training' on web, always filter shared testIDs with `:visible` (e.g. `[data-testid=\"nav-home\"]:visible`). Toast testID='toast' auto-dismisses ~1.9s — insert `wait_for_timeout(2200)` between toast tests. Content is inside ScrollView testID='training-scroll'; scroll via `document.querySelector('[data-testid=\"training-scroll\"]').scrollTo({top:N})`. To verify the equal-width fix: measure bounding_box widths of `[data-testid=\"before-you-ride-card\"]:visible`, `[data-testid=\"fb50-card\"]:visible`, `[data-testid=\"mpc-card\"]:visible` — max-min should be <=1px on BOTH viewports (currently 34px on both). Equipment toast now works correctly; navigation flows all pass.",
+  "rca_of_issue": "BOTTOM-ROW EQUAL-WIDTH — Reproduction: open /training at 1194x834, scroll training-scroll to y=2000, measure the 3 bottom cards' widths; before-you-ride is 244.8px vs fb50/mpc at 210.8px. Root cause: `styles.bottomCard` uses `{ flex: 1 }` without `flexBasis: 0`. React-native-web maps `flex:1` to `flex:1 1 auto` (auto basis) so children distribute width based on min-content in addition to the flex grow factor. PreRideCard is a direct `<LinearGradient>` child with flex:1; FB50/MPC are `<Pressable(Touchable)>` wrapping an inner `<Animated.View>` wrapping a `<LinearGradient>` — the extra wrapper levels do not carry the same intrinsic min-content, so they end up narrower. Mitigation: add `flexBasis: 0` (and `minWidth: 0`) to `styles.bottomCard` AND to the Touchable containerStyle on fb50/mpc; alternatively wrap PreRideCard in `<View style={{flex:1, flexBasis:0, minWidth:0}}>` to match the Touchable wrapper. Verified by inspection of /app/frontend/src/components/training.tsx:301-321,324-343,364-377,442 and /app/frontend/src/components/ui.tsx:40-55."
+}

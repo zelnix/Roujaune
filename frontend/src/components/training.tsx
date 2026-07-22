@@ -264,7 +264,7 @@ export function WorkoutBreakdownCard({ onStart }: { onStart: () => void }) {
 }
 
 /* ------------------------- equipment ------------------------- */
-export function EquipmentCard() {
+export function EquipmentCard({ onItemPress }: { onItemPress?: (label: string) => void }) {
   const items = [
     { label: "Smart Trainer", ok: true },
     { label: "Heart Rate Monitor", ok: true },
@@ -277,7 +277,7 @@ export function EquipmentCard() {
       <SectionLabel color={colors.red}>EQUIPMENT</SectionLabel>
       <View style={{ marginTop: 8, gap: 8 }}>
         {items.map((it) => (
-          <Touchable key={it.label} testID={`equip-${it.label.toLowerCase().replace(/\s+/g, "-")}`} scaleTo={0.98} lift={false} onPress={() => {}}>
+          <Touchable key={it.label} testID={`equip-${it.label.toLowerCase().replace(/\s+/g, "-")}`} scaleTo={0.98} lift={false} onPress={() => onItemPress?.(it.label)}>
             <View style={styles.equipRow}>
               <Text style={styles.equipLabel}>{it.label}</Text>
               {it.ok ? (
@@ -323,7 +323,7 @@ export function PreRideCard() {
 /* ------------------------- FB50 ------------------------- */
 export function FB50RecommendationCard({ onPress }: { onPress: () => void }) {
   return (
-    <Touchable testID="fb50-card" onPress={onPress} lift style={{ flex: 1 }}>
+    <Touchable testID="fb50-card" onPress={onPress} lift style={{ flex: 1 }} containerStyle={{ flex: 1 }}>
       <LinearGradient colors={["#20190A", "#0E0B06"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.bottomCard}>
         <SectionLabel color={colors.yellow}>FB50 RECOMMENDATION</SectionLabel>
         <View style={styles.recRow}>
@@ -363,7 +363,7 @@ function SunsetArt() {
 
 export function MPCRecommendationCard({ onPress }: { onPress: () => void }) {
   return (
-    <Touchable testID="mpc-card" onPress={onPress} lift style={{ flex: 1 }}>
+    <Touchable testID="mpc-card" onPress={onPress} lift style={{ flex: 1 }} containerStyle={{ flex: 1 }}>
       <View style={styles.bottomCard}>
         <SunsetArt />
         <LinearGradient colors={["rgba(5,5,5,0.72)", "rgba(5,5,5,0.2)"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />

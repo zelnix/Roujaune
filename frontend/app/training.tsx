@@ -76,7 +76,9 @@ export default function TodaysTraining() {
   const { width, height } = useWindowDimensions();
   const compact = height < 560;
   const navWidth = compact ? Math.max(72, Math.min(88, width * 0.09)) : Math.max(84, Math.min(104, width * 0.085));
-  const rightColW = compact ? 280 : 330;
+  const contentPadH = compact ? spacing.md : spacing.lg;
+  const mainWidth = width - navWidth - contentPadH * 2;
+  const rightColW = compact ? mainWidth : 330;
 
   const router = useRouter();
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
@@ -111,26 +113,41 @@ export default function TodaysTraining() {
             testID="training-scroll"
           >
             {/* header */}
-            <View style={styles.header}>
-              <View style={styles.headerLeft}>
-                <BrandHeader compact showDescriptor={false} />
-                <Text style={styles.pageTitle}>Today&apos;s Training</Text>
+            {compact ? (
+              <View style={{ gap: spacing.sm }}>
+                <View style={styles.compactTopRow}>
+                  <BrandHeader compact showDescriptor={false} />
+                  <TopStatus onPress={showToast} />
+                </View>
+                <Text style={[styles.pageTitle, { fontSize: 30, marginTop: 2 }]}>Today&apos;s Training</Text>
                 <View style={styles.dateRow}>
                   <Ionicons name="calendar-outline" size={15} color={colors.textDim} />
                   <Text style={styles.dateText}>Wednesday, 12 May 2025</Text>
                 </View>
+                <AlbertoTrainingCard width={mainWidth} onPress={() => showToast("Message from Alberto")} />
               </View>
+            ) : (
+              <View style={styles.header}>
+                <View style={styles.headerLeft}>
+                  <BrandHeader compact showDescriptor={false} />
+                  <Text style={styles.pageTitle}>Today&apos;s Training</Text>
+                  <View style={styles.dateRow}>
+                    <Ionicons name="calendar-outline" size={15} color={colors.textDim} />
+                    <Text style={styles.dateText}>Wednesday, 12 May 2025</Text>
+                  </View>
+                </View>
 
-              <AlbertoTrainingCard width={compact ? 340 : 400} onPress={() => showToast("Message from Alberto")} />
+                <AlbertoTrainingCard width={400} onPress={() => showToast("Message from Alberto")} />
 
-              <View style={{ width: rightColW, alignItems: "flex-end" }}>
-                <TopStatus onPress={showToast} />
+                <View style={{ width: rightColW, alignItems: "flex-end" }}>
+                  <TopStatus onPress={showToast} />
+                </View>
               </View>
-            </View>
+            )}
 
             {/* body */}
-            <View style={styles.body}>
-              <View style={styles.leftCol} onLayout={onLeftLayout}>
+            <View style={[styles.body, compact && { flexDirection: "column" }]}>
+              <View style={[styles.leftCol, compact && styles.fullCol]} onLayout={onLeftLayout}>
                 <MainWorkoutCard chartWidth={chartWidth} onDetails={() => showToast("Opening workout details")} />
                 <RouteWeatherCard onPreview={() => showToast("Previewing Alpe d'Huez")} onImagePress={() => showToast("Opening route map")} />
                 <View style={styles.bottomRow}>
@@ -140,11 +157,11 @@ export default function TodaysTraining() {
                 </View>
               </View>
 
-              <View style={[styles.rightCol, { width: rightColW }]}>
+              <View style={[styles.rightCol, { width: rightColW }, compact && styles.fullCol]}>
                 <ReadinessCard />
                 <TrainingLoadCard width={rightColW} />
                 <WorkoutBreakdownCard onStart={() => showToast("Starting Threshold Climb…")} />
-                <EquipmentCard />
+                <EquipmentCard onItemPress={(label) => showToast(`${label} status`)} />
               </View>
             </View>
           </ScrollView>
@@ -162,6 +179,8 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.xl, gap: spacing.md },
 
   header: { flexDirection: "row", alignItems: "flex-start", gap: spacing.lg },
+  compactTopRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  fullCol: { width: "100%", flex: 0 },
   headerLeft: { flex: 1 },
   pageTitle: { color: colors.white, fontSize: 44, fontWeight: "800", letterSpacing: -0.5, marginTop: 8 },
   dateRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },

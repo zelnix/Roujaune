@@ -21,6 +21,7 @@ export function Touchable({
   children,
   onPress,
   style,
+  containerStyle,
   testID,
   scaleTo = 0.97,
   lift = true,
@@ -28,6 +29,7 @@ export function Touchable({
   children: React.ReactNode;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
+  containerStyle?: StyleProp<ViewStyle>;
   testID?: string;
   scaleTo?: number;
   lift?: boolean;
@@ -38,6 +40,7 @@ export function Touchable({
   return (
     <Pressable
       testID={testID}
+      style={containerStyle}
       onPress={() => {
         if (Platform.OS !== "web") Haptics.selectionAsync();
         onPress?.();
