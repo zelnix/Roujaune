@@ -45,16 +45,18 @@ export function useWorkoutAudio() {
       try {
         const voices = await Speech.getAvailableVoicesAsync();
         const nameOf = (v: Speech.Voice) => `${v.name ?? ""} ${v.identifier ?? ""}`.toLowerCase();
-        const maleHints = ["jorge", "diego", "carlos", "enrique", "miguel", "pablo", "juan", "male", "hombre"];
-        const femaleHints = ["monica", "paulina", "marisol", "female", "mujer", "samantha", "karen", "victoria"];
-        const isMale = (v: Speech.Voice) => maleHints.some((n) => nameOf(v).includes(n));
-        const notFemale = (v: Speech.Voice) => !femaleHints.some((n) => nameOf(v).includes(n));
+        const maleNames = ["jorge", "diego", "carlos", "enrique", "miguel", "pablo", "juan", "hombre", "gonzalo"];
+        const femaleNames = ["monica", "mónica", "paulina", "marisol", "esperanza", "mujer", "sabina", "elena"];
+        // NOTE: check female first — the substring "female" contains "male",
+        // so a female voice must never be classified as male.
+        const isFemale = (v: Speech.Voice) => nameOf(v).includes("female") || femaleNames.some((n) => nameOf(v).includes(n));
+        const isMale = (v: Speech.Voice) => !isFemale(v) && (nameOf(v).includes("#male") || / male/.test(nameOf(v)) || maleNames.some((n) => nameOf(v).includes(n)));
         const es = voices.filter((v) => (v.language ?? "").toLowerCase().startsWith("es"));
         const en = voices.filter((v) => (v.language ?? "").toLowerCase().startsWith("en"));
         const chosen =
-          es.find(isMale) ||             // explicit Spanish male
-          es.find(notFemale) ||          // any Spanish voice not obviously female
-          en.find(isMale);               // last resort: English male (no accent)
+          es.find(isMale) ||                 // explicit Spanish male
+          es.find((v) => !isFemale(v)) ||    // any Spanish voice that isn't female
+          en.find(isMale);                   // last resort: English male (no accent)
         if (chosen) voice.current = { id: chosen.identifier, lang: chosen.language ?? "es-ES" };
       } catch {
         /* keep default es-ES */
