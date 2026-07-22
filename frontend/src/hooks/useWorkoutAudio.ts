@@ -82,13 +82,11 @@ export function useWorkoutAudio() {
     (async () => {
       try {
         const voices = await Speech.getAvailableVoicesAsync();
-        const relevant = voices.filter((v) => {
-          const l = (v.language ?? "").toLowerCase();
-          return v.identifier && (l.startsWith("es") || l.startsWith("en"));
-        });
-        // Keep EVERY voice (deduped by identifier only) so any voice — male or
-        // female — is reachable. Devices often expose no name/gender metadata,
-        // so we number them per accent and let the rider preview by ear.
+        const relevant = voices.filter((v) => v.identifier);
+        // Keep EVERY voice on the device (deduped by identifier only) so any
+        // voice — any language, male or female — is reachable. Devices often
+        // expose no name/gender metadata, so we number them per accent and let
+        // the rider preview by ear.
         const seenId = new Set<string>();
         const opts: VoiceOption[] = [];
         const perAccent: Record<string, number> = {};
