@@ -158,7 +158,7 @@ export default function LiveWorkout() {
     }
   }, [telemetry]);
 
-  const { musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, speak } = useWorkoutAudio();
+  const { musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, speak, voiceOptions, voiceId, selectVoice } = useWorkoutAudio();
 
   React.useEffect(() => {
     const id = setInterval(() => setCueIdx((c) => (c + 1) % CUES.length), 5000);
@@ -378,6 +378,9 @@ export default function LiveWorkout() {
           setVolume={setVolume}
           voiceOn={voiceOn}
           toggleVoice={toggleVoice}
+          voiceOptions={voiceOptions}
+          voiceId={voiceId}
+          selectVoice={selectVoice}
           onClose={() => setShowMusic(false)}
         />
       )}

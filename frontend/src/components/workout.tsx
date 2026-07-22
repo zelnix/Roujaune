@@ -705,8 +705,9 @@ export function SettingsPanel({ settings, setSetting, onClose }: {
   );
 }
 
-export function MusicPanel({ musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, onClose }: {
-  musicOn: boolean; toggleMusic: () => void; volume: number; setVolume: (v: number) => void; voiceOn: boolean; toggleVoice: () => void; onClose: () => void;
+export function MusicPanel({ musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, voiceOptions, voiceId, selectVoice, onClose }: {
+  musicOn: boolean; toggleMusic: () => void; volume: number; setVolume: (v: number) => void; voiceOn: boolean; toggleVoice: () => void;
+  voiceOptions: { id: string; label: string; accent: string; gender: "male" | "female" | "neutral" }[]; voiceId?: string; selectVoice: (id: string) => void; onClose: () => void;
 }) {
   const level = Math.round(volume * 5);
   return (
@@ -737,8 +738,28 @@ export function MusicPanel({ musicOn, toggleMusic, volume, setVolume, voiceOn, t
 
         <View style={styles.spRow}>
           <View style={styles.spIcon}><Ionicons name="mic" size={18} color={colors.yellow} /></View>
-          <View style={{ flex: 1 }}><Text style={styles.spLabel}>Alberto&apos;s voice</Text><Text style={styles.spSub}>Spoken cues · mild Spanish accent · softens music</Text></View>
+          <View style={{ flex: 1 }}><Text style={styles.spLabel}>Alberto&apos;s voice</Text><Text style={styles.spSub}>Spoken cues · softens music</Text></View>
           <Switch testID="toggle-voice" value={voiceOn} onValueChange={toggleVoice} trackColor={{ true: colors.red, false: "rgba(255,255,255,0.2)" }} thumbColor="#fff" />
+        </View>
+
+        <View style={[styles.voiceBlock, !voiceOn && { opacity: 0.4 }]} pointerEvents={voiceOn ? "auto" : "none"}>
+          <Text style={styles.voiceHint}>Voice & accent · tap to preview</Text>
+          {voiceOptions.length === 0 ? (
+            <Text style={styles.spSub}>Loading device voices…</Text>
+          ) : (
+            <ScrollView style={styles.voiceList} showsVerticalScrollIndicator={false}>
+              {voiceOptions.map((v) => {
+                const active = v.id === voiceId;
+                return (
+                  <Pressable key={v.id} testID={`voice-${v.id}`} onPress={() => selectVoice(v.id)} style={[styles.voiceRow, active && styles.voiceRowActive]}>
+                    <Ionicons name={v.gender === "female" ? "woman" : v.gender === "male" ? "man" : "person"} size={16} color={active ? colors.yellow : colors.textDim} />
+                    <Text style={[styles.voiceLabel, active && { color: colors.white }]} numberOfLines={1}>{v.label}</Text>
+                    <Ionicons name={active ? "checkmark-circle" : "play-circle-outline"} size={18} color={active ? colors.yellow : colors.textDim} />
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          )}
         </View>
       </Pressable>
     </Pressable>
@@ -944,6 +965,12 @@ const styles = StyleSheet.create({
   volBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
   volBars: { flexDirection: "row", gap: 4, alignItems: "center", marginHorizontal: 4 },
   volSeg: { width: 12, height: 16, borderRadius: 3 },
+  voiceBlock: { borderTopWidth: 1, borderTopColor: colors.borderSoft, paddingTop: 12, marginTop: 4 },
+  voiceHint: { color: colors.textDim, fontSize: 11.5, fontWeight: "700", letterSpacing: 0.4, marginBottom: 8, textTransform: "uppercase" },
+  voiceList: { maxHeight: 168 },
+  voiceRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, paddingHorizontal: 12, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: "rgba(255,255,255,0.03)", marginBottom: 6 },
+  voiceRowActive: { borderColor: colors.yellow, backgroundColor: "rgba(245,197,24,0.10)" },
+  voiceLabel: { flex: 1, color: colors.textDim, fontSize: 13.5, fontWeight: "700" },
   musicFab: { position: "absolute", bottom: 24, left: 20, flexDirection: "row", alignItems: "center", gap: 7, height: 46, paddingHorizontal: 16, borderRadius: 23, borderWidth: 1.5, zIndex: 20, ...shadow.glow },
   musicFabOn: { backgroundColor: colors.yellow, borderColor: colors.yellow },
   musicFabOff: { backgroundColor: colors.card, borderColor: colors.border },

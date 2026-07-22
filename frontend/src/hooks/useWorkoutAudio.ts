@@ -1,11 +1,35 @@
 import { useAudioPlayer } from "expo-audio";
 import * as Speech from "expo-speech";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getVoiceId, setVoiceId } from "../lib/prefs";
 
 // Royalty-free instrumental track used as upbeat cycling music (admin-replaceable).
 const MUSIC_SOURCE = { uri: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3" };
 
 const DUCK = 0.22; // music volume multiplier while Alberto is speaking
+const PREVIEW = "Alright, let's ride. Hold steady and breathe.";
+
+export type VoiceOption = { id: string; label: string; accent: string; gender: "male" | "female" | "neutral"; lang: string };
+
+// Friendly accent label from a BCP-47 language tag.
+const ACCENTS: Record<string, string> = {
+  "es-es": "Spanish", "es-mx": "Mexican Spanish", "es-us": "US Spanish", "es-ar": "Argentine Spanish",
+  "es-co": "Colombian Spanish", "es-419": "Latin Spanish",
+  "en-gb": "British", "en-us": "American", "en-au": "Australian", "en-ie": "Irish",
+  "en-in": "Indian", "en-za": "South African", "en-ca": "Canadian",
+};
+function accentOf(lang: string): string {
+  const l = (lang || "").toLowerCase();
+  return ACCENTS[l] || (l.startsWith("es") ? "Spanish" : l.startsWith("en") ? "English" : lang);
+}
+const FEMALE_NAMES = ["monica", "mónica", "paulina", "marisol", "esperanza", "mujer", "sabina", "elena", "samantha", "karen", "victoria", "moira", "tessa", "fiona"];
+const MALE_NAMES = ["jorge", "diego", "carlos", "enrique", "miguel", "pablo", "juan", "hombre", "gonzalo", "daniel", "arthur", "oliver", "aaron", "fred", "reed", "rishi"];
+function genderOf(v: Speech.Voice): "male" | "female" | "neutral" {
+  const s = `${v.name ?? ""} ${v.identifier ?? ""}`.toLowerCase();
+  if (s.includes("female") || FEMALE_NAMES.some((n) => s.includes(n))) return "female";
+  if (/ male|#male/.test(s) || MALE_NAMES.some((n) => s.includes(n))) return "male";
+  return "neutral";
+}
 
 // Speak numbers in English words so a Spanish voice doesn't read digits in
 // Spanish (e.g. "251" → "two hundred fifty one").
@@ -36,28 +60,45 @@ export function useWorkoutAudio() {
   const speaking = useRef(false);
   const voice = useRef<{ id?: string; lang: string }>({ id: undefined, lang: "es-ES" });
   const voiceReady = useRef(false);
+  const [voiceOptions, setVoiceOptions] = useState<VoiceOption[]>([]);
+  const [voiceId, setVoiceIdState] = useState<string | undefined>(undefined);
 
-  // Pick a MALE Spanish voice reading English (mild Spanish accent). Never fall
-  // back to a female voice — if no Spanish male exists, use an English male so
-  // the gender stays consistent throughout the workout.
+  // Build a curated, de-duplicated list of Spanish/English voices for the
+  // selector, and choose Alberto's default (a Spanish male) or the rider's
+  // previously saved voice.
   useEffect(() => {
     (async () => {
       try {
         const voices = await Speech.getAvailableVoicesAsync();
-        const nameOf = (v: Speech.Voice) => `${v.name ?? ""} ${v.identifier ?? ""}`.toLowerCase();
-        const maleNames = ["jorge", "diego", "carlos", "enrique", "miguel", "pablo", "juan", "hombre", "gonzalo"];
-        const femaleNames = ["monica", "mónica", "paulina", "marisol", "esperanza", "mujer", "sabina", "elena"];
-        // NOTE: check female first — the substring "female" contains "male",
-        // so a female voice must never be classified as male.
-        const isFemale = (v: Speech.Voice) => nameOf(v).includes("female") || femaleNames.some((n) => nameOf(v).includes(n));
-        const isMale = (v: Speech.Voice) => !isFemale(v) && (nameOf(v).includes("#male") || / male/.test(nameOf(v)) || maleNames.some((n) => nameOf(v).includes(n)));
-        const es = voices.filter((v) => (v.language ?? "").toLowerCase().startsWith("es"));
-        const en = voices.filter((v) => (v.language ?? "").toLowerCase().startsWith("en"));
-        const chosen =
-          es.find(isMale) ||                 // explicit Spanish male
-          es.find((v) => !isFemale(v)) ||    // any Spanish voice that isn't female
-          en.find(isMale);                   // last resort: English male (no accent)
-        if (chosen) voice.current = { id: chosen.identifier, lang: chosen.language ?? "es-ES" };
+        const relevant = voices.filter((v) => {
+          const l = (v.language ?? "").toLowerCase();
+          return l.startsWith("es") || l.startsWith("en");
+        });
+        // De-duplicate by accent + gender so the list stays clean.
+        const seen = new Set<string>();
+        const opts: VoiceOption[] = [];
+        for (const v of relevant) {
+          if (!v.identifier) continue;
+          const gender = genderOf(v);
+          const accent = accentOf(v.language ?? "");
+          const key = `${accent}|${gender}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          const label = `${accent} ${gender === "female" ? "(female)" : gender === "male" ? "(male)" : ""}`.trim();
+          opts.push({ id: v.identifier, label, accent, gender, lang: v.language ?? "es-ES" });
+        }
+        // Sort: Spanish male first (Alberto's default), then other males, then females.
+        const rank = (o: VoiceOption) =>
+          (o.accent === "Spanish" && o.gender === "male" ? 0 : o.gender === "male" ? 1 : o.gender === "neutral" ? 2 : 3);
+        opts.sort((a, b) => rank(a) - rank(b) || a.label.localeCompare(b.label));
+        setVoiceOptions(opts);
+
+        const saved = await getVoiceId();
+        const chosen = (saved && opts.find((o) => o.id === saved)) || opts[0];
+        if (chosen) {
+          voice.current = { id: chosen.id, lang: chosen.lang };
+          setVoiceIdState(chosen.id);
+        }
       } catch {
         /* keep default es-ES */
       } finally {
@@ -111,5 +152,22 @@ export function useWorkoutAudio() {
     });
   }, [voiceOn, duck]);
 
-  return { musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, speak };
+  /** Change Alberto's voice, persist it, and speak a short preview. */
+  const selectVoice = useCallback((id: string) => {
+    const opt = voiceOptions.find((o) => o.id === id);
+    if (!opt) return;
+    voice.current = { id: opt.id, lang: opt.lang };
+    setVoiceIdState(opt.id);
+    setVoiceId(opt.id);
+    Speech.stop();
+    if (voiceOn) {
+      duck(true);
+      Speech.speak(PREVIEW, {
+        voice: opt.id, language: opt.lang, pitch: 0.9, rate: 0.92,
+        onDone: () => duck(false), onStopped: () => duck(false), onError: () => duck(false),
+      });
+    }
+  }, [voiceOptions, voiceOn, duck]);
+
+  return { musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, speak, voiceOptions, voiceId, selectVoice };
 }
