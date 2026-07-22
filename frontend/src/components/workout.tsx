@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -472,6 +472,89 @@ export function SafetyNote() {
   );
 }
 
+/* ============================ IMMERSIVE VIDEO HUD ============================ */
+function connMeta(connectionState: string, stale: boolean) {
+  if (connectionState === "connected" && !stale) return { c: colors.green, label: "LIVE", icon: "wifi" as const };
+  if (connectionState === "connected" && stale) return { c: colors.yellow, label: "ESTIMATED", icon: "cellular" as const };
+  if (connectionState === "disconnected") return { c: colors.red, label: "OFFLINE", icon: "cloud-offline" as const };
+  return { c: colors.yellow, label: "RECONNECTING", icon: "sync" as const };
+}
+
+function HudChip({ icon, color, label, value, unit }: { icon: React.ReactNode; color: string; label: string; value: string | number; unit: string }) {
+  return (
+    <View style={styles.hudChip}>
+      <View style={styles.hudChipHead}>{icon}<Text style={[styles.hudChipLabel, { color }]}>{label}</Text></View>
+      <Text style={styles.hudChipVal}>{value}<Text style={styles.hudChipUnit}> {unit}</Text></Text>
+    </View>
+  );
+}
+
+export function ImmersiveHud({
+  elapsed, power, wkg, hr, cadence, speed, progress, connectionState, stale, paused, cue, onPause, onEnd,
+}: {
+  elapsed: string; power: number; wkg: string; hr: number; cadence: number; speed: string | number; progress: string;
+  connectionState: string; stale: boolean; paused: boolean; cue: string; onPause: () => void; onEnd: () => void;
+}) {
+  const conn = connMeta(connectionState, stale);
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none" testID="immersive-hud">
+      {/* top scrim + status */}
+      <LinearGradient colors={["rgba(0,0,0,0.7)", "transparent"]} style={styles.hudTopScrim} pointerEvents="none" />
+      <View style={styles.hudTopLeft} pointerEvents="none">
+        <Text style={styles.hudElapsed}>{elapsed}</Text>
+        <View style={styles.hudElapsedSub}>
+          <Text style={styles.hudMicro}>ELAPSED</Text>
+          <View style={[styles.hudConn, { borderColor: conn.c }]}>
+            <View style={[styles.hudConnDot, { backgroundColor: conn.c }]} />
+            <Text style={[styles.hudConnText, { color: conn.c }]}>{conn.label}</Text>
+          </View>
+          <Text style={styles.hudMicro}>{progress} to summit</Text>
+        </View>
+      </View>
+
+      {/* Alberto cue */}
+      <View style={styles.hudCue} pointerEvents="none">
+        <MaterialCommunityIcons name="account-voice" size={15} color={colors.gold} />
+        <Text style={styles.hudCueText} numberOfLines={1}>{paused ? "Workout paused — take a breath." : cue}</Text>
+      </View>
+
+      {/* bottom scrim + metrics + controls */}
+      <LinearGradient colors={["transparent", "rgba(0,0,0,0.82)"]} style={styles.hudBotScrim} pointerEvents="none" />
+      <View style={styles.hudBottom} pointerEvents="box-none">
+        <View style={styles.hudChips} pointerEvents="none">
+          <HudChip icon={<Ionicons name="flash" size={13} color={colors.yellow} />} color={colors.yellow} label="POWER" value={power} unit={`W · ${wkg} W/kg`} />
+          <HudChip icon={<Ionicons name="heart" size={13} color={colors.red} />} color={colors.red} label="HEART RATE" value={hr} unit="bpm" />
+          <HudChip icon={<Ionicons name="sync" size={13} color={colors.yellow} />} color={colors.yellow} label="CADENCE" value={cadence} unit="rpm" />
+          <HudChip icon={<Ionicons name="speedometer-outline" size={13} color="#fff" />} color="#fff" label="SPEED" value={speed} unit="km/h" />
+        </View>
+        <View style={styles.hudControls}>
+          <Pressable onPress={onPause} style={[styles.hudBtn, styles.hudPause]} testID="hud-pause" accessibilityRole="button" accessibilityLabel={paused ? "Resume workout" : "Pause workout"}>
+            <Ionicons name={paused ? "play" : "pause"} size={18} color="#1a1300" />
+            <Text style={styles.hudPauseText}>{paused ? "RESUME" : "PAUSE"}</Text>
+          </Pressable>
+          <Pressable onPress={onEnd} style={[styles.hudBtn, styles.hudEnd]} testID="hud-end" accessibilityRole="button" accessibilityLabel="End workout">
+            <Ionicons name="stop" size={18} color="#fff" />
+            <Text style={styles.hudEndText}>END</Text>
+          </Pressable>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+export function VideoPlaceholder({ width, onRestore }: { width: number; onRestore: () => void }) {
+  return (
+    <View style={[styles.placeholder, { width, aspectRatio: 16 / 9 }]} testID="video-placeholder">
+      <Ionicons name="tv-outline" size={30} color={colors.textDim} />
+      <Text style={styles.placeholderTitle}>Route playing in immersive mode</Text>
+      <Pressable onPress={onRestore} style={styles.placeholderBtn} testID="video-restore" accessibilityRole="button" accessibilityLabel="Exit immersive mode">
+        <Ionicons name="contract" size={15} color="#fff" />
+        <Text style={styles.placeholderBtnText}>Exit full screen</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 const mh = { flexDirection: "row" as const, alignItems: "center" as const, gap: 6 };
 const styles = StyleSheet.create({
   /* top bar */
@@ -584,4 +667,36 @@ const styles = StyleSheet.create({
   nextUpTagText: { color: colors.textDim, fontSize: 12, fontWeight: "600" },
   safety: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 4, paddingTop: 2 },
   safetyText: { color: colors.textFaint, fontSize: 11, flex: 1, lineHeight: 15 },
+
+  /* immersive HUD */
+  hudTopScrim: { position: "absolute", top: 0, left: 0, right: 0, height: 110 },
+  hudTopLeft: { position: "absolute", top: 16, left: 18 },
+  hudElapsed: { color: "#fff", fontSize: 34, fontWeight: "900", letterSpacing: 0.5, textShadowColor: "rgba(0,0,0,0.6)", textShadowRadius: 6 },
+  hudElapsedSub: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 2 },
+  hudMicro: { color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: "700", letterSpacing: 0.5 },
+  hudConn: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: "rgba(0,0,0,0.35)" },
+  hudConnDot: { width: 6, height: 6, borderRadius: 3 },
+  hudConnText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
+  hudCue: { position: "absolute", top: 18, alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(12,10,9,0.72)", borderWidth: 1, borderColor: "rgba(233,180,76,0.4)", borderRadius: radius.pill, paddingHorizontal: 16, paddingVertical: 8, maxWidth: "52%" },
+  hudCueText: { color: "#fff", fontSize: 13, fontWeight: "600" },
+  hudBotScrim: { position: "absolute", left: 0, right: 0, bottom: 0, height: 150 },
+  hudBottom: { position: "absolute", left: 18, right: 18, bottom: 16, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: spacing.md },
+  hudChips: { flexDirection: "row", gap: 10, flex: 1, flexWrap: "wrap" },
+  hudChip: { backgroundColor: "rgba(0,0,0,0.5)", borderWidth: 1, borderColor: "rgba(255,255,255,0.14)", borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 9, minWidth: 118 },
+  hudChipHead: { flexDirection: "row", alignItems: "center", gap: 6 },
+  hudChipLabel: { fontSize: 9.5, fontWeight: "800", letterSpacing: 0.6 },
+  hudChipVal: { color: "#fff", fontSize: 26, fontWeight: "900", marginTop: 2 },
+  hudChipUnit: { color: "rgba(255,255,255,0.7)", fontSize: 11, fontWeight: "700" },
+  hudControls: { flexDirection: "row", gap: 10 },
+  hudBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: radius.md, paddingHorizontal: 22, height: 52 },
+  hudPause: { backgroundColor: colors.yellow },
+  hudPauseText: { color: "#1a1300", fontSize: 15, fontWeight: "900" },
+  hudEnd: { backgroundColor: colors.red },
+  hudEndText: { color: "#fff", fontSize: 15, fontWeight: "900" },
+
+  /* inline placeholder while expanded */
+  placeholder: { borderRadius: radius.lg, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: "#0A0A0A", alignItems: "center", justifyContent: "center", gap: 10 },
+  placeholderTitle: { color: colors.textDim, fontSize: 13.5, fontWeight: "600" },
+  placeholderBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 16, paddingVertical: 9 },
+  placeholderBtnText: { color: "#fff", fontSize: 13, fontWeight: "700" },
 });

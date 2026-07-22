@@ -14,7 +14,7 @@ import { RouteVideo } from "@/src/components/RouteVideo";
 import {
   WorkoutTopBar, PowerCard, HeartRateCard, CadenceCard, WorkoutTimelineCard,
   ClimbCard, RouteMapCard, WearableDataCard, RideSummaryStrip,
-  TrainerControlBar, AlbertoLiveCue, NextUpStrip, SafetyNote,
+  TrainerControlBar, AlbertoLiveCue, NextUpStrip, SafetyNote, ImmersiveHud, VideoPlaceholder,
 } from "@/src/components/workout";
 
 const CUES = [
@@ -78,6 +78,7 @@ export default function LiveWorkout() {
 
   const [centerW, setCenterW] = React.useState(560);
   const [paused, setPaused] = React.useState(false);
+  const [expanded, setExpanded] = React.useState(false);
   const [showControls, setShowControls] = React.useState(false);
   const [showMenu, setShowMenu] = React.useState(false);
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
@@ -147,7 +148,11 @@ export default function LiveWorkout() {
                 </View>
                 <View style={styles.centerCol} onLayout={onCenterLayout}>
                   <WorkoutTimelineCard width={centerW} onPress={() => showToast("Workout timeline")} />
-                  <RouteVideo source={routeVideo.url} title={routeVideo.title} playing={!paused} muted width={centerW} />
+                  {expanded ? (
+                    <VideoPlaceholder width={centerW} onRestore={() => setExpanded(false)} />
+                  ) : (
+                    <RouteVideo source={routeVideo.url} title={routeVideo.title} playing={!paused} muted width={centerW} onToggleExpand={() => setExpanded(true)} expanded={false} />
+                  )}
                   <NextUpStrip next={nextInterval} />
                   <SafetyNote />
                 </View>
@@ -212,6 +217,35 @@ export default function LiveWorkout() {
         )}
       </SafeAreaView>
 
+      {expanded && (
+        <View style={styles.immersive} testID="immersive-overlay">
+          <RouteVideo
+            source={routeVideo.url}
+            playing={!paused}
+            muted
+            fill
+            expanded
+            onToggleExpand={() => setExpanded(false)}
+          >
+            <ImmersiveHud
+              elapsed={fmt(telemetry.elapsed)}
+              power={telemetry.power}
+              wkg={(telemetry.power / 78).toFixed(1)}
+              hr={telemetry.hr}
+              cadence={telemetry.cadence}
+              speed={telemetry.speed}
+              progress="10.2 km"
+              connectionState={connectionState}
+              stale={stale}
+              paused={paused}
+              cue={CUES[cueIdx]}
+              onPause={onPauseToggle}
+              onEnd={() => { setExpanded(false); router.replace("/summary"); }}
+            />
+          </RouteVideo>
+        </View>
+      )}
+
       <Toast message={toast} />
     </GestureHandlerRootView>
   );
@@ -220,6 +254,7 @@ export default function LiveWorkout() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.md, gap: spacing.md },
+  immersive: { ...StyleSheet.absoluteFillObject, backgroundColor: "#000", zIndex: 50 },
   bodyRow: { flexDirection: "row", gap: spacing.md },
   leftBlock: { flex: 1, gap: spacing.md },
   innerRow: { flexDirection: "row", gap: spacing.md },
