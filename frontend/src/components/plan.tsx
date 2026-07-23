@@ -53,6 +53,7 @@ export const PLAN = {
   adaptationStatus: "Plan is adapting as you improve",
   progressPct: 25,
   progress: { weeks: "3 / 12", workouts: "15", time: "10.2 h", tss: "1,420", ctl: "+8.4", atl: "92", tsb: "+6" },
+  weekTargets: { rides: 5, duration: "6h 24m", distance_km: 165, elevation_m: 1800 },
   tip: "Consistency compounds. Focus on the process this phase and the results will come.",
 };
 
