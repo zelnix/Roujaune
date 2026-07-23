@@ -1,0 +1,33 @@
+{
+  "summary": "Coach Chat + Coach Preference + Dynamic Coach Identity verified end-to-end. Backend: 6/6 pytest passed (chat reply shape, per-coach persistence, Adriana thread isolation, DELETE cleanup, essential style shape, empty-message 400). Frontend (tablet 1280x900): COACH PREFERENCE card renders with all 4 style + 4 voice-guidance options selectable (visual red border + checkmark), coach-alberto/coach-adriana + preview-* present, side nav in locked order (railnav-*: home, training, routes, workouts, calendar, progress, community, wellness, connections, then settings/help). Selecting coach-adriana propagates dynamic identity: /settings hint mentions Adriana, /plan header reads 'Adapted by Adriana', 'Message Adriana' button, 'Adriana's Tip' footer, and NO 'Alberto' text leaks. CoachChatModal opens on message-coach tap, empty state shows 'Ciao, I'm Adriana.' greeting + 4 chat-suggestion chips + chat-input + chat-send, chat-close closes the modal. LLM budget respected: 2 total /api/coach/chat POSTs (both from backend); frontend verified UI/structure only without sending. Alberto/Adriana chat histories cleaned up after tests.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_coach_chat.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Minor a11y polish, non-blocking) SideNavigation railnav items don't set aria-current/aria-selected on the active item — visual highlight works fine (Training Plan red on /plan, Settings red on /settings), but ARIA state isn't exposed. Consider adding accessibilityState={{ selected: item.key === active }} on the active rail item and/or aria-current='page' for screen readers.",
+    "(Minor a11y polish) style-*/guidance-* options use accessibilityState={{ selected: on }} which does not map to aria-selected in RN Web (only reflected via CSS class). Visual selection is correct; if you want E2E tests to assert selection via ARIA, add role='radio' + aria-checked, or expose data-selected."
+  ],
+  "critical_code_review_comments": [
+    "Backend /api/coach/chat correctly rejects empty/whitespace messages before hitting the LLM (400), preserving cost.",
+    "coach_chat persists user+coach message pair atomically via $push with $each; per-coach thread id 'chat-{coach}' ensures Alberto/Adriana are isolated.",
+    "CoachChatModal fetches history whenever `visible` toggles or `persona.name` changes and stops any in-flight Speech on close — good lifecycle handling.",
+    "Dynamic coach signature/labels flow through `useCoach()` — no hardcoded 'Alberto' strings observed on /plan when Adriana is selected."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_coach_chat.py (new)"
+  ],
+  "success_rate": { "backend": "100%", "frontend": "100%" },
+  "seed_data_creation": "None. Both coach chat histories cleared before and after tests to leave a clean state.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Coach chat backend + frontend are stable as of iteration 13. LLM cost budget is 2 POST /api/coach/chat calls per full run — reuse the response across shape/persistence assertions and skip actually sending from the UI when possible. Side nav testIDs are `railnav-{key}` (not `nav-*`). Suggestion chips render only once history fetch resolves; wait_for_selector('[data-testid=\"chat-suggestion\"]') after opening the modal, don't rely on chat-input alone.",
+  "rca_of_issue": "N/A — no defects found."
+}

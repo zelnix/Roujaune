@@ -1,5 +1,7 @@
 import React from "react";
-import { View, Text, StyleSheet, Animated, ScrollView, useWindowDimensions } from "react-native";
+import { View, Text, StyleSheet, Animated, ScrollView, useWindowDimensions, Pressable } from "react-native";
+import { Image } from "expo-image";
+import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
@@ -15,6 +17,7 @@ import {
 } from "@/src/components/plan";
 import { SideNavigation } from "@/src/components/SideNavigation";
 import { EditGoalsModal, ProgressModal, AdaptationsModal } from "@/src/components/plan-modals";
+import { CoachChatModal } from "@/src/components/CoachChatModal";
 import type { EditableGoal } from "@/src/lib/plan";
 
 function Toast({ message }: { message: { id: number; text: string } | null }) {
@@ -52,6 +55,7 @@ export default function TrainingPlanScreen() {
   const [showGoals, setShowGoals] = React.useState(false);
   const [showProgress, setShowProgress] = React.useState(false);
   const [showAdaptations, setShowAdaptations] = React.useState(false);
+  const [showChat, setShowChat] = React.useState(false);
   const [goalsOverride, setGoalsOverride] = React.useState<EditableGoal[] | null>(null);
 
   const displayPlan = React.useMemo(
@@ -132,6 +136,17 @@ export default function TrainingPlanScreen() {
         </View>
         <View style={styles.headerRight}>
           <TopStatus persona={persona} onPress={showToast} />
+          <Pressable
+            testID="message-coach"
+            onPress={() => setShowChat(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`Message ${persona.name}`}
+            style={({ hovered }: any) => [styles.messageBtn, hovered && styles.messageBtnHover]}
+          >
+            <Image source={persona.image} style={styles.messageAvatar} contentFit="cover" contentPosition="top center" />
+            <Text style={styles.messageBtnText}>Message {persona.name}</Text>
+            <Ionicons name="chatbubble-ellipses" size={15} color={C.yellow} />
+          </Pressable>
           <PlanSelector value={selectedPlan} onPress={cyclePlan} />
           {loading ? (
             <View style={styles.syncPill}><Text style={styles.syncText}>Syncing plan…</Text></View>
@@ -170,6 +185,7 @@ export default function TrainingPlanScreen() {
         />
         <ProgressModal visible={showProgress} onClose={() => setShowProgress(false)} />
         <AdaptationsModal visible={showAdaptations} onClose={() => setShowAdaptations(false)} persona={persona} />
+        <CoachChatModal visible={showChat} onClose={() => setShowChat(false)} persona={persona} />
       </SafeAreaView>
     </GestureHandlerRootView>
   );
@@ -181,6 +197,10 @@ const styles = StyleSheet.create({
   gridInner: { gap: 14 },
   headerRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 20 },
   headerRight: { alignItems: "flex-end", gap: 12 },
+  messageBtn: { flexDirection: "row", alignItems: "center", gap: 9, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12, minHeight: 44 },
+  messageBtnHover: { borderColor: "rgba(255,194,10,0.4)", backgroundColor: "rgba(255,255,255,0.05)" },
+  messageAvatar: { width: 26, height: 26, borderRadius: 13, backgroundColor: "rgba(255,255,255,0.08)" },
+  messageBtnText: { color: C.white, fontSize: 13, fontWeight: "700" },
   syncPill: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: C.border },
   syncText: { color: C.dim, fontSize: 11, fontWeight: "600" },
   liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.green },

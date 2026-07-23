@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Speech from "expo-speech";
 import { AppScaffold, Card, SectionTitle, Toggle } from "@/src/components/app-scaffold";
 import { CC } from "@/src/components/calendar";
-import { useCoach, setCoach, COACHES, CoachId } from "@/src/lib/coach-persona";
+import { useCoach, setCoach, COACHES, CoachId, COACH_STYLES, VOICE_GUIDANCE_OPTS, useCoachStyle, setCoachStyle, useVoiceGuidance, setVoiceGuidance, CoachStyle, VoiceGuidance } from "@/src/lib/coach-persona";
 
 const PITCH: Record<CoachId, number> = { alberto: 0.82, adriana: 1.22 };
 const PREVIEW_LINE = "Alright, let's ride. Hold steady and breathe — you've got this.";
@@ -33,6 +33,8 @@ async function resolveCoachVoice(voiceNum: number): Promise<{ id?: string; lang:
 
 export default function SettingsScreen() {
   const persona = useCoach();
+  const coachStyle = useCoachStyle();
+  const voiceGuidance = useVoiceGuidance();
   const [units, setUnits] = React.useState<"metric" | "imperial">("metric");
   const [previewing, setPreviewing] = React.useState<CoachId | null>(null);
   const [toggles, setToggles] = React.useState({ coachAudio: true, autoSync: true, weeklyReport: true, restReminders: false });
@@ -103,6 +105,44 @@ export default function SettingsScreen() {
         </Card>
       </View>
 
+      <Card testID="coach-preference">
+        <SectionTitle label="COACH PREFERENCE" color={CC.rouge} />
+        <Text style={s.groupLabel}>Coaching Style</Text>
+        <View style={s.optionGrid}>
+          {COACH_STYLES.map((o) => {
+            const on = coachStyle === o.id;
+            return (
+              <Pressable key={o.id} testID={`style-${o.id}`} onPress={() => setCoachStyle(o.id as CoachStyle)} accessibilityState={{ selected: on }}
+                style={[s.optionCard, on && s.optionOn]}>
+                <View style={s.optionHead}>
+                  <Text style={[s.optionLabel, on && { color: CC.white }]}>{o.label}</Text>
+                  {on ? <Ionicons name="checkmark-circle" size={16} color={CC.rouge} /> : <View style={s.optionDot} />}
+                </View>
+                <Text style={s.optionHint}>{o.hint}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text style={[s.groupLabel, { marginTop: 18 }]}>Voice Guidance</Text>
+        <View style={s.optionGrid}>
+          {VOICE_GUIDANCE_OPTS.map((o) => {
+            const on = voiceGuidance === o.id;
+            return (
+              <Pressable key={o.id} testID={`guidance-${o.id}`} onPress={() => setVoiceGuidance(o.id as VoiceGuidance)} accessibilityState={{ selected: on }}
+                style={[s.optionCard, on && s.optionOn]}>
+                <View style={s.optionHead}>
+                  <Text style={[s.optionLabel, on && { color: CC.white }]}>{o.label}</Text>
+                  {on ? <Ionicons name="checkmark-circle" size={16} color={CC.rouge} /> : <View style={s.optionDot} />}
+                </View>
+                <Text style={s.optionHint}>{o.hint}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={s.coachHint}>Applies to {persona.name}&apos;s live cues, previews, summaries and recovery guidance across the app.</Text>
+      </Card>
+
       <Card testID="preferences">
         <SectionTitle label="TRAINING PREFERENCES" />
         <View style={[s.prefRow, s.divider]}>
@@ -114,7 +154,7 @@ export default function SettingsScreen() {
         </View>
         <PrefToggle label="Coach audio cues" sub="Live spoken coaching during rides" on={toggles.coachAudio} onToggle={() => set("coachAudio")} testID="tg-coachAudio" divider />
         <PrefToggle label="Auto-sync activities" sub="Send completed rides to connected services" on={toggles.autoSync} onToggle={() => set("autoSync")} testID="tg-autoSync" divider />
-        <PrefToggle label="Weekly report" sub="Alberto's summary every Sunday" on={toggles.weeklyReport} onToggle={() => set("weeklyReport")} testID="tg-weeklyReport" divider />
+        <PrefToggle label="Weekly report" sub={`${persona.name}'s summary every Sunday`} on={toggles.weeklyReport} onToggle={() => set("weeklyReport")} testID="tg-weeklyReport" divider />
         <PrefToggle label="Rest-day reminders" sub="Gentle nudge to recover" on={toggles.restReminders} onToggle={() => set("restReminders")} testID="tg-restReminders" />
       </Card>
 
@@ -173,6 +213,14 @@ const s = StyleSheet.create({
   previewHover: { borderColor: "rgba(255,255,255,0.28)", backgroundColor: "rgba(255,255,255,0.06)" },
   previewText: { color: CC.white, fontSize: 12, fontWeight: "700" },
   coachHint: { color: CC.dim, fontSize: 11.5, marginTop: 12, lineHeight: 16 },
+  groupLabel: { color: CC.white, fontSize: 13, fontWeight: "700", marginBottom: 10 },
+  optionGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  optionCard: { flexGrow: 1, flexBasis: "47%", backgroundColor: "rgba(255,255,255,0.02)", borderRadius: 12, borderWidth: 1.5, borderColor: CC.borderSoft, paddingVertical: 12, paddingHorizontal: 14 },
+  optionOn: { borderColor: CC.rouge, backgroundColor: "rgba(201,23,39,0.06)" },
+  optionHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  optionLabel: { color: CC.dim, fontSize: 14, fontWeight: "700", flex: 1 },
+  optionDot: { width: 16, height: 16, borderRadius: 8, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.22)" },
+  optionHint: { color: CC.dim, fontSize: 11.5, marginTop: 4, lineHeight: 15 },
   prefRow: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 14 },
   divider: { borderBottomWidth: 1, borderBottomColor: CC.borderSoft },
   prefTitle: { color: CC.white, fontSize: 14, fontWeight: "700" },

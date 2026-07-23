@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Rect, Path, Circle, Line, Text as SvgText, Defs, LinearGradient as SvgGrad, Stop } from "react-native-svg";
-import { CoachPersona } from "../lib/coach-persona";
+import { CoachPersona, useCoach } from "../lib/coach-persona";
 import { usePlanBadge } from "../lib/plan-badge";
 
 /* ── palette additions (French/Italian cycling heritage) ─────────────────── */
@@ -92,8 +92,8 @@ export function StatusCheck({ done }: { done: boolean }) {
   );
 }
 
-function Signature({ size = 20 }: { size?: number }) {
-  return <Text style={[s.signature, { fontSize: size }]}>Alberto</Text>;
+function Signature({ size = 20, name = "Alberto" }: { size?: number; name?: string }) {
+  return <Text style={[s.signature, { fontSize: size }]}>{name}</Text>;
 }
 
 /* ── charts ─────────────────────────────────────────────────────────────── */
@@ -233,7 +233,7 @@ export function TrainingPlanSidebar({ active, onSelect, persona, onMessage, sync
           <View style={{ flex: 1 }}>
             <Text style={s.coachName}>{persona.name}</Text>
             <Text style={s.coachRole}>Your Coach</Text>
-            <Signature size={17} />
+            <Signature size={17} name={persona.signature} />
           </View>
         </View>
         <Pressable testID="message-coach" onPress={onMessage} accessibilityRole="button" accessibilityLabel={`Message ${persona.name}`}
@@ -248,10 +248,11 @@ export function TrainingPlanSidebar({ active, onSelect, persona, onMessage, sync
 
 /* ── header / tabs / selector ───────────────────────────────────────────── */
 export function PlanHeader() {
+  const persona = useCoach();
   return (
     <View>
       <Text style={s.pageTitle} accessibilityRole="header">Your Training Plan</Text>
-      <Text style={s.pageSub}>A structured plan. Built for your goals. Adapted by Alberto.</Text>
+      <Text style={s.pageSub}>A structured plan. Built for your goals. Adapted by {persona.name}.</Text>
     </View>
   );
 }
@@ -541,12 +542,13 @@ export function PlanProgressStrip({ onProgress }: { onProgress: () => void }) {
 
 export function AlbertoTipFooter() {
   const PLAN = useP();
+  const persona = useCoach();
   return (
     <View style={s.tip} testID="alberto-tip">
       <Ionicons name="star" size={17} color={C.yellow} />
-      <Text style={s.tipLabel}>Alberto&apos;s Tip</Text>
+      <Text style={s.tipLabel}>{persona.name}&apos;s Tip</Text>
       <Text style={s.tipText} numberOfLines={2}>{PLAN.tip}</Text>
-      <Signature size={22} />
+      <Signature size={22} name={persona.signature} />
     </View>
   );
 }

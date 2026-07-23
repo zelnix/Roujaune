@@ -348,6 +348,35 @@ def coach_system(name: str = "Alberto", gender: str = "male") -> str:
     )
 
 
+STYLE_TONE = {
+    "balanced": "Balance encouragement with practical, performance-minded advice.",
+    "performance": "Lean into performance: be direct, data-driven and results-focused, while staying supportive and never shaming.",
+    "calm": "Be especially calm, warm and reassuring. Reduce pressure and support the rider's wellbeing.",
+    "essential": "Be concise and to the point. Keep answers brief and actionable.",
+}
+
+
+def coach_chat_system(name: str = "Alberto", gender: str = "male", style: str = "balanced") -> str:
+    """System prompt for the conversational coach chat (Alberto/Adriana Intelligence)."""
+    pronoun = "he/him" if gender == "male" else "she/her"
+    tone = STYLE_TONE.get(style, STYLE_TONE["balanced"])
+    return (
+        f"You are {name}, a former professional cyclist who won multiple Grand Tours and now the "
+        f"rider's personal cycling coach in the Roujaune app (part of Harmony Wellness Group). "
+        f"You are a professor of cycling coaching, a team director and a sports psychologist. Your pronouns are {pronoun}.\n"
+        "You are having a warm, one-to-one chat with your rider. Speak in first person, human and encouraging, never robotic.\n"
+        "You can help with: training plans and periodisation, individual workouts and pacing, climbing and "
+        "tactics, smart-trainer and ERG guidance, route choices, post-ride analysis, recovery and nutrition basics, "
+        "motivation and race psychology, FB50 (Fit Beyond 50) cyclist strength, mobility, balance, posture, core, "
+        "glute activation and pre/post-ride mobility, and My Peaceful Companion wellbeing (Calm Start, Peaceful Pause, "
+        "breathing, readiness check-ins, reflection). When you suggest an FB50 exercise, briefly explain why it helps their cycling.\n"
+        f"{tone}\n"
+        "Rules: reply in 2 to 4 short sentences (a little more only if the rider asks for detail). Plain conversational "
+        "text only. No markdown, no bullet lists, no headings, no emojis, no quotation marks. Never say you are an AI, a "
+        "model or a bot; you are the rider's coach. For pain, injury or medical concerns, gently suggest seeing a professional."
+    )
+
+
 class CoachCueRequest(BaseModel):
     power: int = 0
     hr: int = 0
@@ -474,6 +503,84 @@ async def coach_debrief(req: CoachDebriefRequest):
     except Exception as e:
         logging.exception("coach_debrief failed")
         raise HTTPException(status_code=502, detail=f"Debrief generation failed: {e}")
+
+
+# ----------------------- Coach: conversational chat -----------------------
+def _chat_id(coach_name: str) -> str:
+    return f"chat-{coach_name.lower()}"
+
+
+class CoachChatRequest(BaseModel):
+    coach_name: str = "Alberto"
+    coach_gender: str = "male"
+    coaching_style: str = "balanced"
+    message: str
+
+
+@api_router.get("/coach/chat/history")
+async def coach_chat_history(coach_name: str = "Alberto"):
+    """Return the rider's saved conversation with the given coach (per-coach thread)."""
+    doc = await db.coach_chats.find_one({"id": _chat_id(coach_name)})
+    return {"messages": (doc or {}).get("messages", [])}
+
+
+@api_router.delete("/coach/chat/history")
+async def clear_coach_chat_history(coach_name: str = "Alberto"):
+    await db.coach_chats.update_one(
+        {"id": _chat_id(coach_name)}, {"$set": {"messages": []}}, upsert=True
+    )
+    return {"ok": True}
+
+
+@api_router.post("/coach/chat")
+async def coach_chat(req: CoachChatRequest):
+    """Send a message to the selected coach and get an in-persona reply. The full
+    conversation is persisted per coach so history survives across sessions."""
+    key = os.environ.get("EMERGENT_LLM_KEY")
+    if not key:
+        raise HTTPException(status_code=503, detail="Coaching model not configured")
+    if not (req.message or "").strip():
+        raise HTTPException(status_code=400, detail="Empty message")
+
+    cid = _chat_id(req.coach_name)
+    doc = await db.coach_chats.find_one({"id": cid})
+    history = (doc or {}).get("messages", [])
+
+    recent = history[-10:]
+    transcript = "\n".join(
+        f"{'Rider' if m.get('role') == 'user' else req.coach_name}: {m.get('text')}" for m in recent
+    )
+    prompt = (f"Conversation so far:\n{transcript}\n\n" if transcript else "") + \
+        f"Rider: {req.message.strip()}\n{req.coach_name}:"
+
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(
+            api_key=key,
+            session_id=cid,
+            system_message=coach_chat_system(req.coach_name, req.coach_gender, req.coaching_style),
+        ).with_model("anthropic", "claude-sonnet-4-6")
+        reply = await chat.send_message(UserMessage(text=prompt))
+        reply = (reply or "").strip().strip('"')
+        if not reply:
+            raise ValueError("empty reply")
+    except Exception as e:
+        logging.exception("coach_chat failed")
+        raise HTTPException(status_code=502, detail=f"Coach chat failed: {e}")
+
+    user_msg = {"id": uuid.uuid4().hex, "role": "user", "text": req.message.strip(), "at": now_iso()}
+    coach_msg = {"id": uuid.uuid4().hex, "role": "coach", "text": reply, "at": now_iso()}
+    try:
+        await db.coach_chats.update_one(
+            {"id": cid},
+            {"$push": {"messages": {"$each": [user_msg, coach_msg]}},
+             "$set": {"coach_name": req.coach_name}},
+            upsert=True,
+        )
+    except Exception:
+        logging.warning("coach chat persist failed")
+
+    return {"reply": reply, "user_message": user_msg, "coach_message": coach_msg}
 
 
 async def _refresh_adaptation_after_ride(req: "CoachDebriefRequest", plan_id: str = "build-and-climb"):
