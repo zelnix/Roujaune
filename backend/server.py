@@ -632,6 +632,74 @@ async def get_plan(id: str = "build-and-climb"):
         return BUILD_AND_CLIMB
 
 
+class AdaptationRequest(BaseModel):
+    plan_id: str = "build-and-climb"
+    coach_name: str = "Alberto"
+    coach_gender: str = "male"
+    refresh: bool = False
+
+
+@api_router.post("/coach/adaptation")
+async def coach_adaptation(req: AdaptationRequest):
+    """Generate the coach's plan-adaptation insight, based on the rider's plan and
+    progress. Cached per plan+coach so it only regenerates when refresh=True."""
+    key = os.environ.get("EMERGENT_LLM_KEY")
+    if not key:
+        raise HTTPException(status_code=503, detail="Coaching model not configured")
+
+    # Load the plan (seed if needed) so the insight is grounded in real data.
+    plan = await db.training_plans.find_one({"id": req.plan_id})
+    if not plan:
+        await db.training_plans.update_one({"id": req.plan_id}, {"$set": BUILD_AND_CLIMB}, upsert=True)
+        plan = dict(BUILD_AND_CLIMB)
+
+    cache_key = f"adaptation_ai_{req.coach_name.lower()}"
+    if not req.refresh and plan.get(cache_key):
+        return {"adaptation": plan[cache_key], "cached": True}
+
+    prog = plan.get("progress", {})
+    goals_txt = ", ".join(
+        f"{g.get('title')} ({'done' if g.get('status') == 'complete' else 'in progress'})"
+        for g in plan.get("goals", [])
+    ) or "n/a"
+    phase = plan.get("phase", {})
+    prompt = (
+        f"The rider is on the '{plan.get('title')}' plan: {plan.get('description')}\n"
+        f"Current phase: {phase.get('name')} ({phase.get('weeks')}). "
+        f"Week {plan.get('current_week')} of {plan.get('duration_weeks')}.\n"
+        f"Progress so far: {prog.get('workouts')} workouts, {prog.get('time')} ridden, "
+        f"{prog.get('tss')} TSS, fitness CTL {prog.get('ctl')}, fatigue ATL {prog.get('atl')}, "
+        f"form TSB {prog.get('tsb')}. Goals: {goals_txt}.\n"
+        "As the rider's coach, write a short, warm adaptation note (2 to 3 sentences) explaining "
+        "how you are adjusting their upcoming training based on this progress. Be specific about "
+        "training zones and volume. First person, no lists, no emojis, no quotation marks. "
+        "Reply with the note only, no preamble, greeting or heading."
+    )
+
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(
+            api_key=key,
+            session_id=f"{req.coach_name.lower()}-adaptation",
+            system_message=coach_system(req.coach_name, req.coach_gender),
+        ).with_model("anthropic", "claude-sonnet-4-6")
+        reply = await chat.send_message(UserMessage(text=prompt))
+        text = (reply or "").strip().strip('"')
+        if not text:
+            raise ValueError("empty adaptation")
+        try:
+            await db.training_plans.update_one(
+                {"id": req.plan_id},
+                {"$set": {cache_key: text, f"{cache_key}_at": now_iso()}},
+            )
+        except Exception:
+            logging.warning("adaptation cache write failed")
+        return {"adaptation": text, "cached": False}
+    except Exception as e:
+        logging.exception("coach_adaptation failed")
+        raise HTTPException(status_code=502, detail=f"Adaptation generation failed: {e}")
+
+
 
 app.include_router(api_router)
 

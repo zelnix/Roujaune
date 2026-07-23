@@ -5,7 +5,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { useCoach } from "@/src/lib/coach-persona";
-import { usePlan } from "@/src/lib/plan";
+import { usePlan, useAdaptation } from "@/src/lib/plan";
 import {
   C, PLAN_OPTIONS, PlanPhase, KeyWorkout, PlanProvider,
   TrainingPlanSidebar, PlanHeader, TopStatus, PlanSelector, PlanTabs,
@@ -37,6 +37,7 @@ export default function TrainingPlanScreen() {
   const router = useRouter();
   const persona = useCoach();
   const { plan, loading, live } = usePlan();
+  const adaptation = useAdaptation(persona.name, persona.gender);
   const { width } = useWindowDimensions();
   const compact = width < 700; // phones scroll; tablets fill
 
@@ -88,7 +89,7 @@ export default function TrainingPlanScreen() {
   const workoutsRow = (
     <View style={styles.rowGap}>
       <KeyWorkoutsCard onView={() => showToast("View all workouts")} onWorkout={onWorkout} onNext={() => showToast("More workouts")} />
-      <View style={{ width: 440 }}><AlbertoAdaptationsCard persona={persona} width={440} onViewAll={() => showToast("All adaptations")} /></View>
+      <View style={{ width: 440 }}><AlbertoAdaptationsCard persona={persona} width={440} onViewAll={() => showToast("All adaptations")} text={adaptation.text} loading={adaptation.loading} onRefresh={adaptation.refresh} /></View>
     </View>
   );
   const progress = <PlanProgressStrip onProgress={() => showToast("Opening Progress")} />;
@@ -98,11 +99,11 @@ export default function TrainingPlanScreen() {
   if (tab === "Phases") {
     body = (<>{hero}<CurrentPhaseRoadmap onPhase={onPhase} /><KeyWorkoutsCard onView={() => showToast("View all workouts")} onWorkout={onWorkout} onNext={() => showToast("More workouts")} />{tip}</>);
   } else if (tab === "Key Workouts") {
-    body = (<><KeyWorkoutsCard onView={() => showToast("View all workouts")} onWorkout={onWorkout} onNext={() => showToast("More workouts")} /><View style={styles.rowGap}><WeeklyLoadCard width={fullW - 460} onFilter={() => showToast("Filter: This Plan")} /><View style={{ width: 440 }}><AlbertoAdaptationsCard persona={persona} width={440} onViewAll={() => showToast("All adaptations")} /></View></View>{tip}</>);
+    body = (<><KeyWorkoutsCard onView={() => showToast("View all workouts")} onWorkout={onWorkout} onNext={() => showToast("More workouts")} /><View style={styles.rowGap}><WeeklyLoadCard width={fullW - 460} onFilter={() => showToast("Filter: This Plan")} /><View style={{ width: 440 }}><AlbertoAdaptationsCard persona={persona} width={440} onViewAll={() => showToast("All adaptations")} text={adaptation.text} loading={adaptation.loading} onRefresh={adaptation.refresh} /></View></View>{tip}</>);
   } else if (tab === "Load & Progress") {
     body = (<><WeeklyLoadCard width={fullW} onFilter={() => showToast("Filter: This Plan")} />{progress}{tip}</>);
   } else if (tab === "Adaptations") {
-    body = (<><AlbertoAdaptationsCard persona={persona} width={fullW} onViewAll={() => showToast("All adaptations")} />{progress}{tip}</>);
+    body = (<><AlbertoAdaptationsCard persona={persona} width={fullW} onViewAll={() => showToast("All adaptations")} text={adaptation.text} loading={adaptation.loading} onRefresh={adaptation.refresh} />{progress}{tip}</>);
   } else {
     body = (<>{hero}{roadmapRow}{workoutsRow}{progress}{tip}</>);
   }

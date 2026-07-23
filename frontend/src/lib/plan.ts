@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import React from "react";
 import { PLAN, TrainingPlan } from "../components/plan";
 
 function apiBase(): string {
@@ -56,4 +57,38 @@ export function usePlan(id = "build-and-climb") {
   }, [id]);
 
   return { plan, loading, live };
+}
+
+/** Fetch the coach's AI-generated plan adaptation. Cached server-side per
+ * plan+coach; pass refresh() to regenerate. Falls back to the plan's static
+ * adaptation text while loading or on error so the card never looks empty. */
+export function useAdaptation(coachName: string, coachGender: string, planId = "build-and-climb") {
+  const [text, setText] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = React.useCallback(async (refresh = false) => {
+    setLoading(true);
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 30000);
+      const res = await fetch(`${apiBase()}/api/coach/adaptation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan_id: planId, coach_name: coachName, coach_gender: coachGender, refresh }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data?.adaptation) setText(data.adaptation);
+    } catch {
+      /* keep whatever we have; card falls back to static text */
+    } finally {
+      setLoading(false);
+    }
+  }, [coachName, coachGender, planId]);
+
+  useEffect(() => { load(false); }, [load]);
+
+  return { text, loading, refresh: () => load(true) };
 }

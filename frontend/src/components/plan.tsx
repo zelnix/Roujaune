@@ -460,17 +460,27 @@ export function KeyWorkoutsCard({ onView, onWorkout, onNext }: { onView: () => v
 }
 
 /* ── adaptations ────────────────────────────────────────────────────────── */
-export function AlbertoAdaptationsCard({ persona, onViewAll, width = 430 }: { persona: CoachPersona; onViewAll: () => void; width?: number }) {
+export function AlbertoAdaptationsCard({ persona, onViewAll, width = 430, text, loading, onRefresh }: { persona: CoachPersona; onViewAll: () => void; width?: number; text?: string | null; loading?: boolean; onRefresh?: () => void }) {
   const PLAN = useP();
+  const body = text || PLAN.adaptation;
   return (
     <View style={[s.card, { flex: 1 }]} testID="adaptations">
       <View style={s.cardHeadRow}>
         <View style={s.cardHead}><Text style={[s.cardHeadText, { color: C.rouge }]}>{persona.name.toUpperCase()}&apos;S ADAPTATIONS</Text></View>
-        <Text style={s.lastUpdated}>Last updated Today</Text>
+        <View style={s.linkRow}>
+          {loading ? <Text style={s.lastUpdated}>Thinking…</Text> : <Text style={s.lastUpdated}>Last updated Today</Text>}
+          {onRefresh ? (
+            <Pressable testID="refresh-adaptation" onPress={onRefresh} hitSlop={8} disabled={loading}
+              accessibilityRole="button" accessibilityLabel="Regenerate adaptation"
+              style={({ hovered }: any) => [{ marginLeft: 8 }, hovered && { opacity: 0.7 }]}>
+              <Ionicons name="refresh" size={15} color={loading ? C.dim : C.white} />
+            </Pressable>
+          ) : null}
+        </View>
       </View>
       <View style={s.adaptRow}>
         <Image source={persona.image} style={s.adaptAvatar} contentFit="cover" contentPosition="top center" />
-        <Text style={s.adaptText}>{PLAN.adaptation}</Text>
+        <Text style={[s.adaptText, loading && !text && { opacity: 0.5 }]}>{body}</Text>
       </View>
       <View style={s.adaptFooter}>
         <View style={s.statusChip}>
