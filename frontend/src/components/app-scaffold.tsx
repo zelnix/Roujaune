@@ -57,10 +57,10 @@ function Toast({ message }: { message: { id: number; text: string } | null }) {
 }
 
 export function AppScaffold({
-  active, title, subtitle, headerRight, children,
+  active, title, subtitle, headerRight, minimalStatus, children,
 }: {
   active: string; title: string; subtitle: string;
-  headerRight?: React.ReactNode; children: React.ReactNode;
+  headerRight?: React.ReactNode; minimalStatus?: boolean; children: React.ReactNode;
 }) {
   const router = useRouter();
   const persona = useCoach();
@@ -99,7 +99,7 @@ export function AppScaffold({
               </View>
               <View style={styles.headerRight}>
                 {headerRight}
-                <TopStatus persona={persona} onPress={showToast} />
+                <TopStatus persona={persona} onPress={showToast} minimal={minimalStatus} />
               </View>
             </View>
             {children}

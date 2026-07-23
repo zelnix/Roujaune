@@ -257,17 +257,21 @@ export function PlanHeader() {
   );
 }
 
-export function TopStatus({ persona, onPress }: { persona: CoachPersona; onPress: (m: string) => void }) {
+export function TopStatus({ persona, onPress, minimal }: { persona: CoachPersona; onPress: (m: string) => void; minimal?: boolean }) {
   return (
     <View style={s.statusRow}>
-      <Pressable testID="flame" onPress={() => onPress("12 day streak 🔥")} style={s.statusPill} hitSlop={8}>
-        <Ionicons name="flame" size={18} color={C.yellow} />
-        <Text style={s.statusCount}>12</Text>
-      </Pressable>
-      <Pressable testID="bell" onPress={() => onPress("You have 3 notifications")} style={s.statusPill} hitSlop={8}>
-        <Ionicons name="notifications-outline" size={20} color={C.white} />
-        <View style={s.badge}><Text style={s.badgeText}>3</Text></View>
-      </Pressable>
+      {!minimal && (
+        <>
+          <Pressable testID="flame" onPress={() => onPress("12 day streak 🔥")} style={s.statusPill} hitSlop={8}>
+            <Ionicons name="flame" size={18} color={C.yellow} />
+            <Text style={s.statusCount}>12</Text>
+          </Pressable>
+          <Pressable testID="bell" onPress={() => onPress("You have 3 notifications")} style={s.statusPill} hitSlop={8}>
+            <Ionicons name="notifications-outline" size={20} color={C.white} />
+            <View style={s.badge}><Text style={s.badgeText}>3</Text></View>
+          </Pressable>
+        </>
+      )}
       <Pressable testID="profile" onPress={() => onPress("Profile")} style={s.profileWrap} hitSlop={6}>
         <Image source={persona.image} style={s.profileImg} contentFit="cover" contentPosition="top center" />
         <Ionicons name="chevron-down" size={16} color={C.dim} />

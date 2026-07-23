@@ -5,8 +5,31 @@ import { getVoiceId, setVoiceId } from "../lib/prefs";
 import { useCoach, setCoach as persistCoach, COACHES, CoachId, getCoachRate } from "../lib/coach-persona";
 import { detectGender, COACH_PITCH } from "../lib/coach-voice";
 
-// Royalty-free instrumental track used as upbeat cycling music (admin-replaceable).
-const MUSIC_SOURCE = { uri: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3" };
+// 10 royalty-free upbeat instrumental tracks that rotate randomly during a
+// ride (admin-replaceable). When one finishes, a new random track plays; no
+// track repeats until the whole set has been played.
+const MUSIC_TRACKS = [
+  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
+  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3",
+  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3",
+  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
+  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3",
+  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3",
+  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3",
+];
+
+// A fresh shuffled play order (Fisher–Yates) so tracks rotate without repeats.
+function shuffledOrder(n: number): number[] {
+  const a = Array.from({ length: n }, (_, i) => i);
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
 const DUCK = 0.22; // music volume multiplier while Alberto is speaking
 const PREVIEW = "Alright, let's ride. Hold steady and breathe.";
@@ -88,7 +111,13 @@ const PITCH = COACH_PITCH;
  * Music softens (ducks) while a cue is spoken, then returns to full volume.
  * Alberto speaks as a male voice with a mild Spanish accent (reading English). */
 export function useWorkoutAudio() {
-  const player = useAudioPlayer(MUSIC_SOURCE);
+  // Random rotation state: a shuffled order + a pointer into it. `trackIdx` is
+  // the current track (surfaced for the UI's "now playing" label if needed).
+  const orderRef = useRef<number[]>(shuffledOrder(MUSIC_TRACKS.length));
+  const ptrRef = useRef(0);
+  const [firstUri] = useState(() => MUSIC_TRACKS[orderRef.current[0]]);
+  const [trackIdx, setTrackIdx] = useState(() => orderRef.current[0]);
+  const player = useAudioPlayer({ uri: firstUri });
   const [musicOn, setMusicOn] = useState(true);
   const [volume, setVolumeState] = useState(0.5);
   const [voiceOn, setVoiceOn] = useState(true);
@@ -188,9 +217,38 @@ export function useWorkoutAudio() {
 
   const status = useAudioPlayerStatus(player);
 
+  // No native loop — we advance to the next random track when one finishes.
   useEffect(() => {
-    try { player.loop = true; } catch { /* noop */ }
+    try { player.loop = false; } catch { /* noop */ }
   }, [player]);
+
+  // Advance to the next track in the shuffled order (reshuffles once exhausted).
+  const advanceTrack = useCallback(() => {
+    ptrRef.current += 1;
+    if (ptrRef.current >= orderRef.current.length) {
+      orderRef.current = shuffledOrder(MUSIC_TRACKS.length);
+      ptrRef.current = 0;
+    }
+    const idx = orderRef.current[ptrRef.current];
+    setTrackIdx(idx);
+    try {
+      player.replace({ uri: MUSIC_TRACKS[idx] });
+      player.loop = false;
+      player.volume = musicOn ? volume * (speaking.current ? DUCK : 1) : 0;
+      if (musicOn) player.play();
+    } catch { /* player not ready */ }
+  }, [player, musicOn, volume]);
+
+  // When the current track finishes, roll to the next random one.
+  const finishedRef = useRef(false);
+  useEffect(() => {
+    if (status?.didJustFinish && !finishedRef.current) {
+      finishedRef.current = true;
+      advanceTrack();
+    } else if (!status?.didJustFinish) {
+      finishedRef.current = false;
+    }
+  }, [status?.didJustFinish, advanceTrack]);
 
   // Start / update playback as soon as the track is loaded (fixes music not
   // playing until the volume was nudged).
@@ -269,5 +327,5 @@ export function useWorkoutAudio() {
     }
   }, [voiceOptions, voiceOn, duck]);
 
-  return { musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, speak, voiceOptions, voiceId, selectVoice, coach, chooseCoach, coachName: COACHES[coach].name };
+  return { musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, speak, voiceOptions, voiceId, selectVoice, coach, chooseCoach, coachName: COACHES[coach].name, trackIdx, trackCount: MUSIC_TRACKS.length };
 }

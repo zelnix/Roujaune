@@ -90,7 +90,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <AppScaffold active="profile" title="Profile" subtitle="Your rider identity, season progress and achievements.">
+    <AppScaffold active="profile" title="Profile" subtitle="Your rider identity, season progress and achievements." minimalStatus>
       <View style={[s.row, !twoCol && { flexDirection: "column" }]}>
         {/* Rider identity */}
         <Card testID="profile-identity" style={{ flex: 1 }}>
