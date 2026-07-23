@@ -47,6 +47,7 @@ export default function CalendarScreen() {
   const persona = useCoach();
   const { width } = useWindowDimensions();
   const compact = width < 720; // phones scroll a stacked view
+  const goBack = () => (router.canGoBack() ? router.back() : router.replace("/plan"));
   const { week, setWeek, loading, reload } = useCalendarWeek();
 
   const [selected, setSelected] = React.useState(1); // Tuesday
@@ -116,7 +117,7 @@ export default function CalendarScreen() {
         <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
           <ScrollView contentContainerStyle={{ padding: 14, gap: 14 }}>
             <View style={styles.headerRow}>
-              <Pressable testID="calendar-back" onPress={() => router.back()} accessibilityLabel="Go back" hitSlop={10} style={styles.backBtn}>
+              <Pressable testID="calendar-back" onPress={goBack} accessibilityLabel="Go back" hitSlop={10} style={styles.backBtn}>
                 <Ionicons name="chevron-back" size={22} color={CC.white} />
               </Pressable>
               <View style={{ flex: 1 }}>
@@ -144,7 +145,7 @@ export default function CalendarScreen() {
             <View style={styles.headerRow}>
               <Pressable
                 testID="calendar-back"
-                onPress={() => router.back()}
+                onPress={goBack}
                 accessibilityRole="button"
                 accessibilityLabel="Go back"
                 hitSlop={10}

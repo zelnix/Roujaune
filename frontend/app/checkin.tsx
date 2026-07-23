@@ -57,6 +57,7 @@ export default function CheckinScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const twoCol = width >= 720;
+  const goBack = () => (router.canGoBack() ? router.back() : router.replace("/"));
 
   const [sleepHours, setSleepHours] = React.useState(7.5);
   const [sleepQuality, setSleepQuality] = React.useState(4);
@@ -99,7 +100,7 @@ export default function CheckinScreen() {
       <StatusBar hidden />
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={["top", "bottom", "left", "right"]}>
         <View style={styles.header}>
-          <Pressable testID="checkin-back" onPress={() => router.back()} hitSlop={10} accessibilityLabel="Go back" style={styles.backBtn}>
+          <Pressable testID="checkin-back" onPress={goBack} hitSlop={10} accessibilityLabel="Go back" style={styles.backBtn}>
             <Ionicons name="chevron-back" size={22} color={colors.white} />
           </Pressable>
           <View style={{ flex: 1 }}>
@@ -127,7 +128,7 @@ export default function CheckinScreen() {
               {result.safetyOverride ? (
                 <Text style={styles.safetyNote}>You reported a symptom that needs care. Please rest today and consider speaking with a medical professional before training.</Text>
               ) : null}
-              <Pressable testID="checkin-done" onPress={() => router.back()} style={styles.primaryBtn}>
+              <Pressable testID="checkin-done" onPress={goBack} style={styles.primaryBtn}>
                 <Text style={styles.primaryBtnText}>Done</Text>
               </Pressable>
               <Pressable testID="checkin-redo" onPress={() => { setResult(null); setSaving(false); }} style={styles.ghostBtn}>
