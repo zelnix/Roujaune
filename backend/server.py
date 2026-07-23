@@ -25,6 +25,15 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
+# Outdoor ride syncing (imported AFTER load_dotenv so provider/env config resolves)
+import providers as _providers_pkg  # noqa: E402  (bootstraps the provider registry)
+from providers.base import PROVIDERS, get_provider  # noqa: E402
+from providers.sandbox import generate_sandbox_activities  # noqa: E402
+import crypto_util  # noqa: E402
+import activity_sync  # noqa: E402
+
+CYCLING_USER_ID = "me"  # single-user app
+
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
@@ -336,6 +345,204 @@ async def ride_history(limit: int = 20):
     return docs
 
 
+# ----------------------- Outdoor ride syncing (connections) -----------------------
+async def _rider_ftp() -> int:
+    try:
+        s = await db.settings.find_one({"id": "app"})
+        if s and s.get("ftp"):
+            return int(s["ftp"])
+    except Exception:
+        pass
+    return 200
+
+
+async def _account_view(provider_id: str, acc: Optional[dict]) -> dict:
+    p = get_provider(provider_id)
+    meta = dict(p.meta) if p else {"id": provider_id, "name": provider_id, "kind": "unknown", "requires_native_build": False, "icon": "link-outline"}
+    configured = bool(p and p.is_configured())
+    if not acc:
+        status = "not_configured" if (meta.get("kind") == "cloud_oauth" and not configured) else (
+            "requires_build" if meta.get("requires_native_build") else "disconnected")
+        return {**meta, "configured": configured, "connection_status": status,
+                "connected": False, "last_successful_sync_at": None, "last_sync_attempt_at": None,
+                "provider_account_id": None, "permissions": [], "disable_route_import": False,
+                "disable_auto_sync": False}
+    return {**meta, "configured": configured,
+            "connection_status": acc.get("connection_status", "connected"),
+            "connected": acc.get("connection_status") in ("connected", "syncing"),
+            "last_successful_sync_at": acc.get("last_successful_sync_at"),
+            "last_sync_attempt_at": acc.get("last_sync_attempt_at"),
+            "provider_account_id": acc.get("provider_account_id"),
+            "permissions": acc.get("permissions", []),
+            "disable_route_import": acc.get("disable_route_import", False),
+            "disable_auto_sync": acc.get("disable_auto_sync", False),
+            "last_error": acc.get("last_error")}
+
+
+@api_router.get("/connections")
+async def list_connections():
+    """All supported providers with the rider's connection + sync status."""
+    accounts = {a["provider"]: a for a in await db.connected_accounts.find({"user_id": CYCLING_USER_ID}).to_list(length=50)}
+    out = []
+    for pid in PROVIDERS:
+        out.append(await _account_view(pid, accounts.get(pid)))
+    imported = await db.cycling_activities.count_documents({"user_id": CYCLING_USER_ID})
+    return {"providers": out, "encryption_ready": crypto_util.encryption_ready(), "imported_activities": imported}
+
+
+@api_router.post("/connections/{provider_id}/authorize")
+async def connection_authorize(provider_id: str, body: dict):
+    """Return the provider OAuth authorize URL. PKCE is backend-mediated: we
+    generate + store the code_verifier keyed by state, so the client only needs
+    to open the URL and hand back the returned code."""
+    import secrets, hashlib, base64
+    p = get_provider(provider_id)
+    if not p:
+        raise HTTPException(404, "Unknown provider")
+    if not p.is_configured():
+        return {"setup_required": True, "message": f"{p.meta['name']} credentials are not configured yet."}
+    verifier = secrets.token_urlsafe(64)[:96]
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    state = str(uuid.uuid4())
+    redirect_uri = body.get("redirect_uri", "")
+    await db.oauth_pending.update_one({"state": state}, {"$set": {
+        "state": state, "verifier": verifier, "provider": provider_id,
+        "redirect_uri": redirect_uri, "created_at": now_iso()}}, upsert=True)
+    url = await p.build_authorize_url(state, challenge, redirect_uri)
+    return {"authorize_url": url, "state": state}
+
+
+@api_router.post("/connections/{provider_id}/callback")
+async def connection_callback(provider_id: str, body: dict):
+    """Exchange the OAuth code, store encrypted tokens, and run the initial import."""
+    p = get_provider(provider_id)
+    if not p:
+        raise HTTPException(404, "Unknown provider")
+    if not p.is_configured():
+        raise HTTPException(400, "Provider not configured")
+    if not crypto_util.encryption_ready():
+        raise HTTPException(500, "Token encryption not configured (ENCRYPTION_KEY missing)")
+    pend = await db.oauth_pending.find_one({"state": body.get("state")})
+    verifier = (pend or {}).get("verifier") or body.get("code_verifier", "")
+    redirect_uri = (pend or {}).get("redirect_uri") or body.get("redirect_uri", "")
+    try:
+        tok = await p.exchange_code(body.get("code", ""), verifier, redirect_uri)
+    except Exception as e:
+        logging.warning(f"oauth exchange failed: {e}")
+        raise HTTPException(400, "Authorisation failed")
+    if pend:
+        await db.oauth_pending.delete_one({"state": body["state"]})
+    expiry = int(datetime.now(timezone.utc).timestamp()) + int(tok.get("expires_in", 3600))
+    acc = {
+        "id": str(uuid.uuid4()), "user_id": CYCLING_USER_ID, "provider": provider_id,
+        "provider_account_id": tok.get("provider_account_id"),
+        "access_token_encrypted": crypto_util.encrypt_token(tok.get("access_token")),
+        "refresh_token_encrypted": crypto_util.encrypt_token(tok.get("refresh_token")),
+        "token_expiry": expiry, "permissions": tok.get("permissions", []),
+        "connection_status": "connected", "sync_cursor": None,
+        "disable_route_import": False, "disable_auto_sync": False,
+        "created_at": now_iso(), "updated_at": now_iso(),
+        "last_successful_sync_at": None, "last_sync_attempt_at": None,
+    }
+    await db.connected_accounts.update_one(
+        {"user_id": CYCLING_USER_ID, "provider": provider_id}, {"$set": acc}, upsert=True)
+    result = await _run_sync(provider_id, initial=True)
+    return {"connected": True, "sync": result}
+
+
+async def _run_sync(provider_id: str, initial: bool = False) -> dict:
+    """Incremental (or initial historical) sync for a connected provider."""
+    p = get_provider(provider_id)
+    acc = await db.connected_accounts.find_one({"user_id": CYCLING_USER_ID, "provider": provider_id})
+    if not p or not acc:
+        raise HTTPException(400, "Not connected")
+    await db.connected_accounts.update_one({"id": acc["id"]}, {"$set": {"connection_status": "syncing", "last_sync_attempt_at": now_iso()}})
+    now = int(datetime.now(timezone.utc).timestamp())
+    since = acc.get("sync_cursor") or (now - 86400 * (90 if initial else 30))
+    access = crypto_util.decrypt_token(acc.get("access_token_encrypted"))
+    # refresh if expired
+    if acc.get("token_expiry") and acc["token_expiry"] < now + 60 and acc.get("refresh_token_encrypted"):
+        try:
+            rt = crypto_util.decrypt_token(acc["refresh_token_encrypted"])
+            newtok = await p.refresh(rt)
+            access = newtok["access_token"]
+            await db.connected_accounts.update_one({"id": acc["id"]}, {"$set": {
+                "access_token_encrypted": crypto_util.encrypt_token(newtok["access_token"]),
+                "refresh_token_encrypted": crypto_util.encrypt_token(newtok.get("refresh_token")),
+                "token_expiry": now + int(newtok.get("expires_in", 3600))}})
+        except Exception as e:
+            logging.warning(f"token refresh failed: {e}")
+            await db.connected_accounts.update_one({"id": acc["id"]}, {"$set": {"connection_status": "reauth_required", "last_error": "Reauthorisation required"}})
+            return {"status": "reauth_required"}
+    # fetch with simple retry/backoff
+    ftp = await _rider_ftp()
+    activities, err = [], None
+    for attempt in range(3):
+        try:
+            activities = await p.fetch_activities(access, since, now)
+            err = None
+            break
+        except Exception as e:
+            err = str(e)
+            await asyncio.sleep(0.5 * (2 ** attempt))
+    if err is not None:
+        await db.connected_accounts.update_one({"id": acc["id"]}, {"$set": {"connection_status": "sync_failed", "last_error": err[:200]}})
+        return {"status": "sync_failed", "error": err[:200]}
+    summary = await activity_sync.ingest_activities(
+        db, CYCLING_USER_ID, [dict(a) for a in activities], ftp, disable_route=acc.get("disable_route_import", False))
+    await db.connected_accounts.update_one({"id": acc["id"]}, {"$set": {
+        "connection_status": "connected", "sync_cursor": now,
+        "last_successful_sync_at": now_iso(), "last_error": None}})
+    return {"status": "connected", **summary}
+
+
+@api_router.post("/connections/{provider_id}/sync")
+async def connection_sync(provider_id: str):
+    return await _run_sync(provider_id, initial=False)
+
+
+@api_router.post("/connections/{provider_id}/disconnect")
+async def connection_disconnect(provider_id: str):
+    await db.connected_accounts.delete_one({"user_id": CYCLING_USER_ID, "provider": provider_id})
+    return {"disconnected": True}
+
+
+@api_router.delete("/connections/{provider_id}/data")
+async def connection_delete_data(provider_id: str):
+    return await activity_sync.delete_imported(db, CYCLING_USER_ID, provider_id)
+
+
+@api_router.patch("/connections/{provider_id}/settings")
+async def connection_settings(provider_id: str, body: dict):
+    patch = {}
+    for k in ("disable_route_import", "disable_auto_sync"):
+        if k in body:
+            patch[k] = bool(body[k])
+    if patch:
+        patch["updated_at"] = now_iso()
+        await db.connected_accounts.update_one({"user_id": CYCLING_USER_ID, "provider": provider_id}, {"$set": patch})
+    acc = await db.connected_accounts.find_one({"user_id": CYCLING_USER_ID, "provider": provider_id})
+    return await _account_view(provider_id, acc)
+
+
+@api_router.get("/connections/activities")
+async def imported_activities(limit: int = 50):
+    docs = await db.cycling_activities.find({"user_id": CYCLING_USER_ID}).sort("started_at", -1).to_list(length=limit)
+    for d in docs:
+        d.pop("_id", None)
+        d.pop("route_data", None)  # keep the list response lightweight
+    return docs
+
+
+@api_router.post("/connections/sandbox/import")
+async def sandbox_import(count: int = 3):
+    """TEST-ONLY: run the import pipeline with demo outdoor rides (no live provider)."""
+    ftp = await _rider_ftp()
+    acts = [dict(a) for a in generate_sandbox_activities(count)]
+    summary = await activity_sync.ingest_activities(db, CYCLING_USER_ID, acts, ftp)
+    return {"sandbox": True, **summary}
+
+
 # ----------------------- Coach: AI coaching cue -----------------------
 def coach_system(name: str = "Alberto", gender: str = "male") -> str:
     champion = "who won multiple Grand Tours"
@@ -642,12 +849,24 @@ async def get_rider_season(days: int = 0):
     while d.isoformat() in ride_days:
         streak += 1
         d -= timedelta(days=1)
+
+    def _agg(rs):
+        return {
+            "rides": len(rs),
+            "distance_km": round(sum((r.get("distance_km") or 0) for r in rs), 1),
+            "elevation_m": int(sum((r.get("elevation_m") or 0) for r in rs)),
+            "hours": round(sum((r.get("duration_sec") or 0) for r in rs) / 3600, 1),
+        }
+    outdoor = [r for r in rides if r.get("indoor_outdoor") == "outdoor"]
+    indoor = [r for r in rides if r.get("indoor_outdoor") != "outdoor"]
     return {
         "rides": count,
         "distance_km": round(dist, 1),
         "elevation_m": int(elev),
         "hours": round(secs / 3600, 1),
         "streak": streak,
+        "indoor": _agg(indoor),
+        "outdoor": _agg(outdoor),
     }
 
 
@@ -1830,11 +2049,6 @@ async def get_wellness():
 @api_router.get("/community")
 async def get_community():
     return COMMUNITY_DATA
-
-
-@api_router.get("/connections")
-async def get_connections():
-    return CONNECTIONS_DATA
 
 
 app.include_router(api_router)

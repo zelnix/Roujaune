@@ -128,7 +128,7 @@ export default function Dashboard() {
                 <FeaturedRouteCard onPress={() => showToast("Exploring Col du Galibier")} />
               </View>
               <View style={styles.midColWide}>
-                <CalendarCard onToast={showToast} />
+                <CalendarCard onToast={showToast} onOpenCalendar={() => router.push("/calendar")} />
               </View>
             </View>
 

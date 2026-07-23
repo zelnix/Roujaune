@@ -237,20 +237,19 @@ metadata:
 
 test_plan:
   current_focus:
-    - "POST /api/rider/checkin — stores daily check-in, returns readiness (incl. safety override on symptoms)"
-    - "GET /api/rider/readiness/today — returns latest stored readiness"
-    - "GET /api/calendar/week — today's readiness ring overridden by latest check-in (source 'Daily check-in')"
-    - "Daily Check-in screen (/checkin): scales, sleep stepper, symptoms, submit -> result card"
-    - "Home: live READINESS cell (tap -> /checkin), ReadinessGate banner when score<55 or safety override"
-    - "Plan screen: CalendarCard live 'THIS WEEK'S PLAN', 3-goal limit in Edit Goals, header pills removed"
-    - "12 new leveled workouts (VO2/Threshold/Sprint/Recovery Foundation/Development/Performance) in catalog"
-    - "rider_level.py enhanced with longest_ride/missed/improving signals"
+    - "Outdoor ride syncing Phase 1 — provider-adapter backend + Connections UI"
+    - "GET /api/connections — lists garmin/apple_health/health_connect with status + encryption_ready"
+    - "POST /api/connections/sandbox/import — TEST pipeline: import/dedup/classify/mirror"
+    - "Re-import is idempotent (updated, not duplicated); DELETE /connections/{id}/data removes rides + history mirror"
+    - "Ride classification: climbing/recovery/tempo/intervals/endurance/event from available fields"
+    - "GET /api/rider/season returns indoor/outdoor breakdown; imported rides flow into totals"
+    - "Connections screen: OUTDOOR RIDE SYNC section (Garmin 'Setup required', native 'Needs app build'), IMPORTED OUTDOOR RIDES list, toggles (route/auto-sync), sync/disconnect/delete"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
     -agent: "main"
-    -comment: "New P1 batch: Daily Check-in + readiness engine wiring, live readiness on Home/Calendar, readiness plan gating banner (CTAs: Start recovery ride -> /workout, Browse recovery -> /workout-list?type=recovery), 12 new leveled workouts, rider_level enhancements. Backend self-tested via curl (checkin/today/calendar override/safety override all pass). Please validate backend endpoints and frontend flows. Note: readiness is stored as a singleton 'latest' + per-date; calendar overrides only the selected_date day. Current demo readiness reset to a healthy ~76-82. To test the gate, POST a low check-in."
+    -comment: "Outdoor Ride Syncing Phase 1 built. Garmin uses REAL OAuth (backend-mediated PKCE) but is NOT configured (no GARMIN_CLIENT_ID/SECRET yet) so it reports 'Setup required' — this is expected; live OAuth cannot be tested until the user provides Garmin developer credentials. Apple Health / Health Connect are device-native and require a build. To validate the full import pipeline + UI WITHOUT live Garmin, use the TEST-ONLY endpoint POST /api/connections/sandbox/import?count=4 (provider 'sandbox'), then check /api/connections/activities, /api/rider/season (outdoor breakdown), and the Connections screen 'IMPORTED OUTDOOR RIDES' list. Please DELETE via /api/connections/sandbox/data when done so demo rides don't linger. Tokens are encrypted (ENCRYPTION_KEY set). Do NOT attempt real Garmin OAuth. Backend self-tested: import=4/reimport updated=4 dup=0/delete works/classification correct."
 
 #====================================================================================================
