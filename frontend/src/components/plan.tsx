@@ -5,6 +5,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Rect, Path, Circle, Line, Text as SvgText, Defs, LinearGradient as SvgGrad, Stop } from "react-native-svg";
 import { CoachPersona } from "../lib/coach-persona";
+import { usePlanBadge } from "../lib/plan-badge";
 
 /* ── palette additions (French/Italian cycling heritage) ─────────────────── */
 export const C = {
@@ -194,7 +195,8 @@ const NAV = [
   { key: "settings", label: "Settings", icon: "settings-outline" },
 ] as const;
 
-export function TrainingPlanSidebar({ active, onSelect, persona, onMessage }: { active: string; onSelect: (k: string) => void; persona: CoachPersona; onMessage: () => void }) {
+export function TrainingPlanSidebar({ active, onSelect, persona, onMessage, sync }: { active: string; onSelect: (k: string) => void; persona: CoachPersona; onMessage: () => void; sync?: React.ReactNode }) {
+  const planBadge = usePlanBadge();
   return (
     <View style={s.sidebar} testID="training-plan-sidebar">
       <View style={s.brand}>
@@ -208,13 +210,15 @@ export function TrainingPlanSidebar({ active, onSelect, persona, onMessage }: { 
       <ScrollView style={{ flex: 1, width: "100%" }} contentContainerStyle={s.navList} showsVerticalScrollIndicator={false}>
         {NAV.map((n) => {
           const on = active === n.key;
+          const showBadge = n.key === "training" && planBadge && !on;
           return (
-            <Pressable key={n.key} testID={`nav-${n.key}`} onPress={() => onSelect(n.key)} accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={n.label}
+            <Pressable key={n.key} testID={`nav-${n.key}`} onPress={() => onSelect(n.key)} accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={showBadge ? `${n.label}, plan updated after your last ride` : n.label}
               style={({ hovered }: any) => [s.navRow, hovered && !on && s.navRowHover]}>
               {on && <LinearGradient colors={[C.rouge, C.deepRouge]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill as any} />}
               {on && <View style={s.navIndicator} />}
               <Ionicons name={n.icon as any} size={20} color={on ? "#fff" : C.dim} />
               <Text style={[s.navLabel, on && { color: "#fff", fontWeight: "700" }]} numberOfLines={1}>{n.label}</Text>
+              {showBadge ? <View style={s.navBadge} accessibilityLabel="Plan updated" /> : null}
             </Pressable>
           );
         })}
@@ -237,6 +241,7 @@ export function TrainingPlanSidebar({ active, onSelect, persona, onMessage }: { 
           <Text style={s.msgBtnText}>Message {persona.name}</Text>
         </Pressable>
       </View>
+      {sync}
     </View>
   );
 }
@@ -559,6 +564,7 @@ const s = StyleSheet.create({
   navRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 11, paddingHorizontal: 12, borderRadius: 12, overflow: "hidden", minHeight: 44 },
   navRowHover: { backgroundColor: "rgba(255,255,255,0.05)" },
   navIndicator: { position: "absolute", left: 0, top: 9, bottom: 9, width: 3.5, backgroundColor: C.yellow, borderTopRightRadius: 4, borderBottomRightRadius: 4 },
+  navBadge: { width: 9, height: 9, borderRadius: 5, backgroundColor: C.rouge, borderWidth: 1.5, borderColor: C.nav },
   navLabel: { color: C.dim, fontSize: 13.5, fontWeight: "600" },
   coachCard: { backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 12, marginTop: 10 },
   coachRow: { flexDirection: "row", gap: 10, alignItems: "center" },

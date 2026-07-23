@@ -748,6 +748,168 @@ async def coach_adaptation(req: AdaptationRequest):
 
 
 
+# ----------------------- Calendar (weekly scheduling) -----------------------
+CALENDAR_WEEK = {
+    "id": "2025-05-12",
+    "start_date": "2025-05-12",
+    "end_date": "2025-05-18",
+    "range_label": "12 \u2013 18 May 2025",
+    "selected_date": "2025-05-13",
+    "days": [
+        {
+            "date": "2025-05-12", "day_name": "MON", "day_num": "12 MAY", "focus": "Endurance Base",
+            "cycling": {"id": "c1", "type": "cycling", "title": "Endurance Ride", "duration": "1h 30m", "zone": "Z2", "tss": "65 TSS", "status": "completed", "color": "green", "created_by": "Alberto"},
+            "fb50": {"id": "f1", "type": "fb50", "title": "Lower Body Strength", "duration": "20 min", "status": "completed", "category": "FB50"},
+            "wellness": {"id": "r1", "type": "wellness", "title": "Evening Reflection", "brand": "My Peaceful Companion", "duration": "5 min", "status": "completed"},
+            "readiness": {"score": 82, "status": "Good"},
+        },
+        {
+            "date": "2025-05-13", "day_name": "TUE", "day_num": "13 MAY", "focus": "Threshold Power",
+            "cycling": {"id": "c2", "type": "cycling", "title": "Threshold Climb", "duration": "1h 00m", "zone": "Z4", "tss": "92 TSS", "status": "today", "color": "rouge", "target_power": 251, "created_by": "Alberto", "profile": [0.5, 0.7, 0.6, 0.85, 0.7, 0.95, 0.75, 0.9, 0.65, 0.88, 0.7, 0.5, 0.6, 0.8]},
+            "fb50": {"id": "f2", "type": "fb50", "title": "Mobility Flow", "duration": "15 min", "status": "scheduled", "category": "FB50"},
+            "wellness": {"id": "r2", "type": "wellness", "title": "Breathing Reset Session", "brand": "My Peaceful Companion", "duration": "6 min", "status": "scheduled"},
+            "readiness": {"score": 76, "status": "Good"},
+        },
+        {
+            "date": "2025-05-14", "day_name": "WED", "day_num": "14 MAY", "focus": "Recovery",
+            "cycling": {"id": "c3", "type": "cycling", "title": "Recovery Ride", "duration": "1h 15m", "zone": "Z1", "tss": "45 TSS", "status": "completed", "color": "blue", "created_by": "Alberto"},
+            "fb50": {"id": "f3", "type": "fb50", "title": "Core Stability", "duration": "20 min", "status": "planned", "category": "FB50"},
+            "wellness": {"id": "r3", "type": "wellness", "title": "Body Scan Meditation", "brand": "My Peaceful Companion", "duration": "10 min", "status": "planned"},
+            "readiness": {"score": 68, "status": "Moderate"},
+        },
+        {
+            "date": "2025-05-15", "day_name": "THU", "day_num": "15 MAY", "focus": "Sweet Spot Power",
+            "cycling": {"id": "c4", "type": "cycling", "title": "Sweet Spot", "duration": "1h 20m", "zone": "Z3", "tss": "75 TSS", "status": "planned", "color": "amber", "created_by": "Alberto"},
+            "fb50": {"id": "f4", "type": "fb50", "title": "Hip Mobility", "duration": "15 min", "status": "planned", "category": "FB50"},
+            "wellness": {"id": "r4", "type": "wellness", "title": "Gratitude Reflection", "brand": "My Peaceful Companion", "duration": "5 min", "status": "planned"},
+            "readiness": {"score": 78, "status": "Good"},
+        },
+        {
+            "date": "2025-05-16", "day_name": "FRI", "day_num": "16 MAY", "focus": "Endurance Base",
+            "cycling": {"id": "c5", "type": "cycling", "title": "Endurance Ride", "duration": "1h 45m", "zone": "Z2", "tss": "70 TSS", "status": "planned", "color": "green", "created_by": "Alberto"},
+            "fb50": {"id": "f5", "type": "fb50", "title": "Upper Body Strength", "duration": "20 min", "status": "planned", "category": "FB50"},
+            "wellness": {"id": "r5", "type": "wellness", "title": "Mindful Visualization", "brand": "My Peaceful Companion", "duration": "8 min", "status": "planned"},
+            "readiness": {"score": 72, "status": "Good"},
+        },
+        {
+            "date": "2025-05-17", "day_name": "SAT", "day_num": "17 MAY", "focus": "Long Ride Endurance",
+            "cycling": {"id": "c6", "type": "cycling", "title": "Long Ride", "duration": "3h 00m", "zone": "Z2", "tss": "120 TSS", "status": "planned", "color": "green", "created_by": "Alberto"},
+            "fb50": {"id": "f6", "type": "fb50", "title": "Post-Ride Mobility", "duration": "20 min", "status": "planned", "category": "FB50"},
+            "wellness": {"id": "r6", "type": "wellness", "title": "Recovery Reflection", "brand": "My Peaceful Companion", "duration": "5 min", "status": "planned"},
+            "readiness": {"score": 65, "status": "Moderate"},
+        },
+        {
+            "date": "2025-05-18", "day_name": "SUN", "day_num": "18 MAY", "focus": "Recovery",
+            "cycling": {"id": "c7", "type": "cycling", "title": "Rest Day", "subtitle": "Wellness Focus", "duration": "", "zone": "", "tss": "", "status": "rest", "color": "purple", "created_by": "Alberto"},
+            "fb50": {"id": "f7", "type": "fb50", "title": "Active Recovery Walk", "duration": "30 min", "status": "planned", "category": "Recovery"},
+            "wellness": {"id": "r7", "type": "wellness", "title": "Weekly Check-In", "brand": "My Peaceful Companion", "duration": "10 min", "status": "planned", "checkin": True},
+            "readiness": {"score": 84, "status": "Good"},
+        },
+    ],
+    "summary": {
+        "workouts_completed": 5, "workouts_planned": 7, "duration": "6h 24m", "tss": "287",
+        "zones": [
+            {"z": "Z1", "pct": 6, "time": "00:24:15", "color": "green"},
+            {"z": "Z2", "pct": 18, "time": "01:12:30", "color": "greenyellow"},
+            {"z": "Z3", "pct": 24, "time": "01:36:45", "color": "yellow"},
+            {"z": "Z4", "pct": 36, "time": "02:24:00", "color": "orange"},
+            {"z": "Z5", "pct": 16, "time": "01:06:30", "color": "rouge"},
+        ],
+    },
+    "tip": "Great week ahead. The threshold session today will make a big difference on the climbs.",
+}
+
+
+@api_router.get("/calendar/week")
+async def get_calendar_week(start: str = "2025-05-12"):
+    """Return a scheduling week (seeded into Mongo on first read)."""
+    try:
+        doc = await db.calendar_weeks.find_one({"start_date": start})
+        if not doc:
+            await db.calendar_weeks.update_one({"start_date": start}, {"$set": CALENDAR_WEEK}, upsert=True)
+            doc = dict(CALENDAR_WEEK)
+        doc.pop("_id", None)
+        return doc
+    except Exception:
+        logging.exception("get_calendar_week failed")
+        return CALENDAR_WEEK
+
+
+class MoveSessionRequest(BaseModel):
+    week_start: str = "2025-05-12"
+    session_type: str  # cycling | fb50 | wellness
+    from_date: str
+    to_date: str
+
+
+@api_router.post("/calendar/move")
+async def move_calendar_session(req: MoveSessionRequest):
+    """Move a session from one day to another and mark it rescheduled."""
+    doc = await db.calendar_weeks.find_one({"start_date": req.week_start})
+    if not doc:
+        doc = dict(CALENDAR_WEEK)
+    days = doc["days"]
+    src = next((d for d in days if d["date"] == req.from_date), None)
+    dst = next((d for d in days if d["date"] == req.to_date), None)
+    if not src or not dst or req.session_type not in ("cycling", "fb50", "wellness"):
+        raise HTTPException(status_code=400, detail="Invalid move")
+    sess = src.get(req.session_type)
+    if not sess:
+        raise HTTPException(status_code=400, detail="No session to move")
+    sess = dict(sess)
+    sess["status"] = "rescheduled"
+    sess["scheduled_date"] = req.to_date
+    dst[req.session_type] = sess
+    src[req.session_type] = None
+    await db.calendar_weeks.update_one({"start_date": req.week_start}, {"$set": {"days": days}}, upsert=True)
+    doc.pop("_id", None)
+    return doc
+
+
+class ReviewRequest(BaseModel):
+    session_title: str
+    session_type: str = "cycling"
+    from_day: str
+    to_day: str
+    to_focus: str = ""
+    to_existing: str = ""
+    coach_name: str = "Alberto"
+    coach_gender: str = "male"
+
+
+@api_router.post("/calendar/review")
+async def review_calendar_change(req: ReviewRequest):
+    """Alberto reviews a proposed schedule change and returns supportive guidance."""
+    key = os.environ.get("EMERGENT_LLM_KEY")
+    fallback = (
+        f"Moving {req.session_title} to {req.to_day} looks reasonable. "
+        "Keep an easy day either side so you stay fresh for your key efforts."
+    )
+    if not key:
+        return {"message": fallback, "ok": True}
+    prompt = (
+        f"The rider wants to move their {req.session_type} session '{req.session_title}' "
+        f"from {req.from_day} to {req.to_day}. {req.to_day} focus is '{req.to_focus}'"
+        + (f" and already has '{req.to_existing}' scheduled." if req.to_existing else ".")
+        + " As their coach, review this schedule change in 1 to 2 short sentences: say whether it "
+        "works, flag any back-to-back intensity or recovery concern, and suggest an adjustment if "
+        "needed. Supportive tone, first person, no lists, no emojis, no quotation marks."
+    )
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(
+            api_key=key,
+            session_id=f"{req.coach_name.lower()}-scheduling",
+            system_message=coach_system(req.coach_name, req.coach_gender),
+        ).with_model("anthropic", "claude-sonnet-4-6")
+        reply = await chat.send_message(UserMessage(text=prompt))
+        text = (reply or "").strip().strip('"') or fallback
+        return {"message": text, "ok": True}
+    except Exception:
+        logging.exception("review_calendar_change failed")
+        return {"message": fallback, "ok": True}
+
+
 app.include_router(api_router)
 
 app.add_middleware(

@@ -6,6 +6,7 @@ import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { useCoach } from "@/src/lib/coach-persona";
 import { usePlan, useAdaptation } from "@/src/lib/plan";
+import { markPlanSeen } from "@/src/lib/plan-badge";
 import {
   C, PLAN_OPTIONS, PlanPhase, KeyWorkout, PlanProvider,
   TrainingPlanSidebar, PlanHeader, TopStatus, PlanSelector, PlanTabs,
@@ -50,9 +51,13 @@ export default function TrainingPlanScreen() {
 
   const showToast = React.useCallback((t: string) => setToast({ id: Date.now(), text: t }), []);
 
+  // Opening the plan clears the "updated after your last ride" badge.
+  React.useEffect(() => { markPlanSeen(); }, []);
+
   const onSelectNav = (key: string) => {
     if (key === "home") { router.replace("/"); return; }
     if (key === "training") return;
+    if (key === "calendar") { router.push("/calendar"); return; }
     if (key === "workouts") { router.push("/workout"); return; }
     showToast(`${key.charAt(0).toUpperCase() + key.slice(1)} — coming soon`);
   };
