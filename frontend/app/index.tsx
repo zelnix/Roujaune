@@ -122,7 +122,7 @@ export default function Dashboard() {
 
             <View style={[styles.midRow, compact && { minHeight: 210 }]}>
               <View style={styles.midCol}>
-                <TrainingPlanCard onPress={() => showToast("Opening training plan")} />
+                <TrainingPlanCard onPress={() => router.push("/plan")} />
               </View>
               <View style={styles.midCol}>
                 <FeaturedRouteCard onPress={() => showToast("Exploring Col du Galibier")} />

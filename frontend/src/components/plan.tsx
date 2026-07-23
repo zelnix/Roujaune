@@ -20,7 +20,7 @@ const heroImg = require("../../assets/images/hero_cyclist_b2.jpg");
 /* ── mock data (matches the reference exactly) ───────────────────────────── */
 export type PlanGoal = { id: string; title: string; description: string; status: "complete" | "incomplete" };
 export type PlanPhase = { id: string; number: number; name: string; weeks: string; pct: number; active?: boolean; points: number[] };
-export type KeyWorkout = { id: string; title: string; icon: keyof typeof Ionicons.glyphMap; duration: string; zone: string; tss: string; footer: string; color: string; profile: number[] };
+export type KeyWorkout = { id: string; title: string; icon: keyof typeof Ionicons.glyphMap; duration: string; zone: string; tss: string; footer: string; color: string; profile: number[]; completed?: boolean; status?: string; actual_tss?: string; actual_duration?: string };
 
 export const PLAN = {
   title: "Build & Climb",
@@ -53,7 +53,8 @@ export const PLAN = {
   adaptationStatus: "Plan is adapting as you improve",
   progressPct: 25,
   progress: { weeks: "3 / 12", workouts: "15", time: "10.2 h", tss: "1,420", ctl: "+8.4", atl: "92", tsb: "+6" },
-  weekTargets: { rides: 5, duration: "6h 24m", distance_km: 165, elevation_m: 1800 },
+  weekTargets: { rides: 5, duration: "6h 24m", distance_km: 165, elevation_m: 1800, supplementary: 2 },
+  autoAdjustment: undefined as string | undefined,
   tip: "Consistency compounds. Focus on the process this phase and the results will come.",
 };
 
@@ -435,17 +436,17 @@ export function KeyWorkoutCard({ w, onPress }: { w: KeyWorkout; onPress: () => v
     <Pressable testID={`workout-${w.id}`} onPress={onPress} accessibilityRole="button" accessibilityLabel={`${w.title}, ${w.duration}, zone ${w.zone}, ${w.tss}, ${w.footer}`}
       style={({ hovered, pressed }: any) => [s.woCard, hovered && s.phaseCardHover, pressed && { opacity: 0.85 }]}>
       <View style={s.woHead}>
-        <Ionicons name={w.icon} size={16} color={w.color} />
+        <Ionicons name={w.completed ? "checkmark-circle" : w.icon} size={16} color={w.completed ? C.green : w.color} />
         <Text style={s.woTitle} numberOfLines={1}>{w.title}</Text>
       </View>
-      <Text style={s.woDuration}>{w.duration}</Text>
-      <View style={s.woProfile}><WorkoutProfile bars={w.profile} color={w.color} /></View>
+      <Text style={s.woDuration}>{w.completed && w.actual_duration ? w.actual_duration : w.duration}</Text>
+      <View style={s.woProfile}><WorkoutProfile bars={w.profile} color={w.completed ? C.green : w.color} /></View>
       <View style={s.woTags}>
-        <View style={[s.zoneTag, { borderColor: w.color }]}><Text style={[s.zoneTagText, { color: w.color }]}>{w.zone}</Text></View>
-        <Text style={s.tssText}>{w.tss}</Text>
+        <View style={[s.zoneTag, { borderColor: w.completed ? C.green : w.color }]}><Text style={[s.zoneTagText, { color: w.completed ? C.green : w.color }]}>{w.zone}</Text></View>
+        <Text style={s.tssText}>{w.completed && w.actual_tss ? w.actual_tss : w.tss}</Text>
       </View>
       <View style={s.woFooterDivider} />
-      <Text style={s.woFooter}>{w.footer}</Text>
+      <Text style={[s.woFooter, w.completed && { color: C.green, fontWeight: "700" }]}>{w.completed ? "\u2713 Completed" : w.footer}</Text>
     </Pressable>
   );
 }
@@ -495,6 +496,12 @@ export function AlbertoAdaptationsCard({ persona, onViewAll, width = 430, text, 
         <Image source={persona.image} style={s.adaptAvatar} contentFit="cover" contentPosition="top center" />
         <Text style={[s.adaptText, loading && !text && { opacity: 0.5 }]}>{body}</Text>
       </View>
+      {PLAN.autoAdjustment ? (
+        <View style={s.autoAdjustRow} testID="auto-adjustment">
+          <Ionicons name="sparkles" size={14} color={C.yellow} />
+          <Text style={s.autoAdjustText}>{PLAN.autoAdjustment}</Text>
+        </View>
+      ) : null}
       <View style={s.adaptFooter}>
         <View style={s.statusChip}>
           <Ionicons name="checkmark-circle" size={15} color={C.green} />
@@ -758,6 +765,8 @@ const s = StyleSheet.create({
   adaptRow: { flexDirection: "row", gap: 12, marginTop: 6 },
   adaptAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: "rgba(255,255,255,0.08)" },
   adaptText: { flex: 1, color: C.white, fontSize: 13, lineHeight: 19 },
+  autoAdjustRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginTop: 12, backgroundColor: "rgba(255,209,102,0.10)", borderWidth: 1, borderColor: "rgba(255,209,102,0.28)", borderRadius: 10, padding: 10 },
+  autoAdjustText: { flex: 1, color: C.yellow, fontSize: 12.5, lineHeight: 18, fontWeight: "600" },
   atRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   atZoneChip: { minWidth: 34, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
   atZoneText: { fontSize: 12, fontWeight: "900" },

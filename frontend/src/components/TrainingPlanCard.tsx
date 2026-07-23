@@ -4,9 +4,18 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, radius, spacing } from "../theme";
 import { trainingPlan } from "../data";
+import { usePlan } from "../lib/plan";
 import { CircularProgress, ClimbBars, SecondaryButton, SectionLabel } from "./ui";
 
 export function TrainingPlanCard({ onPress }: { onPress: () => void }) {
+  const { plan } = usePlan();
+  // Next workout = first not-yet-completed key workout in the plan.
+  const next = plan.workouts.find((w) => !w.completed) ?? plan.workouts[0];
+  const title = plan.title ?? trainingPlan.title;
+  const week = plan.phase ? `${plan.phase.name} · ${plan.phase.weeks}` : trainingPlan.week;
+  const progress = (plan.progressPct ?? trainingPlan.progress * 100) / 100;
+  const bars = next?.profile?.length ? next.profile : trainingPlan.bars;
+
   return (
     <LinearGradient
       testID="training-plan-card"
@@ -18,10 +27,10 @@ export function TrainingPlanCard({ onPress }: { onPress: () => void }) {
       <View style={styles.topRow}>
         <View style={{ flex: 1 }}>
           <SectionLabel color={colors.red}>TRAINING PLAN</SectionLabel>
-          <Text style={styles.title}>{trainingPlan.title}</Text>
-          <Text style={styles.week}>{trainingPlan.week}</Text>
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.week}>{week}</Text>
         </View>
-        <CircularProgress progress={trainingPlan.progress} color={colors.yellow} size={56} stroke={5} />
+        <CircularProgress progress={progress} color={colors.yellow} size={56} stroke={5} />
       </View>
 
       <View style={styles.divider} />
@@ -29,15 +38,15 @@ export function TrainingPlanCard({ onPress }: { onPress: () => void }) {
       <SectionLabel color={colors.red}>NEXT WORKOUT</SectionLabel>
       <View style={styles.workoutRow}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.workout}>{trainingPlan.nextWorkout}</Text>
+          <Text style={styles.workout}>{next?.title ?? trainingPlan.nextWorkout}</Text>
           <View style={styles.metaRow}>
             <Ionicons name="time-outline" size={13} color={colors.textDim} />
-            <Text style={styles.meta}>{trainingPlan.duration}</Text>
+            <Text style={styles.meta}>{next?.duration ?? trainingPlan.duration}</Text>
             <Ionicons name="flash" size={13} color={colors.yellow} style={{ marginLeft: 10 }} />
-            <Text style={styles.meta}>{trainingPlan.tss}</Text>
+            <Text style={styles.meta}>{next?.tss ?? trainingPlan.tss}</Text>
           </View>
         </View>
-        <ClimbBars data={trainingPlan.bars} color={colors.redBright} width={80} height={42} />
+        <ClimbBars data={bars} color={colors.redBright} width={80} height={42} />
       </View>
 
       <SecondaryButton testID="view-plan-button" label="View Plan" tone="red" onPress={onPress} style={{ marginTop: spacing.sm }} />

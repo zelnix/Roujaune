@@ -6,10 +6,15 @@ import { LinearGradient } from "expo-linear-gradient";
 import { colors, radius, spacing } from "../theme";
 import { coach } from "../data";
 import { useCoach } from "../lib/coach-persona";
+import { usePlan } from "../lib/plan";
 import { PrimaryButton } from "./ui";
 
 export function AlbertoCoachCard({ width, onStart, onMessage, compact = false }: { width: number; onStart: () => void; onMessage?: () => void; compact?: boolean }) {
   const persona = useCoach();
+  const { plan } = usePlan();
+  const next = (plan.workouts?.find((w) => !w.completed) ?? plan.workouts?.[0]) as any;
+  const headline = next?.title ?? coach.quote;
+  const support = next ? `Next up · ${next.duration} · ${next.zone}${next.footer ? ` · ${next.footer}` : ""}` : coach.support;
   const portraitW = compact ? 108 : 150;
   return (
     <LinearGradient
@@ -33,13 +38,13 @@ export function AlbertoCoachCard({ width, onStart, onMessage, compact = false }:
         <View style={styles.headRow}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.name, compact && { fontSize: 15 }]}>{persona.name}</Text>
-            <Text style={styles.role}>{coach.role}</Text>
+            <Text style={styles.role}>{plan.title ?? coach.role}</Text>
           </View>
           <Text style={[styles.quoteMark, compact && { fontSize: 34, lineHeight: 34 }]}>&#8220;</Text>
         </View>
 
-        <Text style={[styles.quote, compact && { fontSize: 18, lineHeight: 21 }]}>{coach.quote}</Text>
-        <Text style={[styles.support, compact && { fontSize: 11, lineHeight: 15, marginTop: 5 }]}>{coach.support}</Text>
+        <Text style={[styles.quote, compact && { fontSize: 18, lineHeight: 21 }]}>{headline}</Text>
+        <Text style={[styles.support, compact && { fontSize: 11, lineHeight: 15, marginTop: 5 }]}>{support}</Text>
 
         <PrimaryButton
           testID="start-ride-button"

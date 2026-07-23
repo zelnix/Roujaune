@@ -1,0 +1,44 @@
+{
+  "summary": "Iter 22 cross-cutting validation for Green Lantern (ROUJAUNE couch-to-road). Backend: 10/10 pytest cases pass — /api/plan returns 'From Couch to Road' with week_targets {rides:3,duration:'1h 15m',distance_km:24,elevation_m:70,supplementary:3}, progress_pct=0 (empty history) and workouts ctr-ride-1/2/3; /api/calendar/week returns 27 Jul–2 Aug 2026 with Tuesday cycling status 'today', all days carry readiness; /api/rider/season?days=7 returns rides:0/supplementary:0 in the empty zero-state; POST /api/workouts/summarize {workout_id:ctr-ride-1,samples:[]} flips workouts[0].status→completed and adds actual_tss/actual_duration/auto_adjustment on /api/plan and flips Tuesday cycling→completed on /api/calendar/week; POST /api/workouts/summarize with manual RPE body returns manual:true and tss>0 computed from RPE (rpe 3 → intensity 0.60 → tss ~15); POST /api/rider/supplementary/complete increments season.supplementary count. Frontend: Home shows Alberto hero 'From Couch to Road' + 'Welcome Ride · Next up · 20 min · RPE 2–3 · Week 1 · Tue', MetricSummaryStrip has WEEKLY RIDES 0/of 3 planned, TRAINING TIME 0h 0m/1h 15m, DISTANCE 0/24 km, ELEVATION 0/70 m, SUPPLEMENTARY 0/3 planned (actuals correctly zero); Training Plan card shows 'From Couch to Road' with 'View Plan' button that navigates to /plan. Plan screen: Key Workout 'Welcome Ride' tap → /training?workoutId=ctr-ride-1. Calendar 27 Jul–2 Aug 2026 selecting Tuesday and 'View Workout' navigates to /training?workoutId=ctr-ride-1 (NOT /workout). /training?workoutId=ctr-ride-3 shows 'First Endu…' with 'What to Expect' intervals; 'Start Workout' navigates to /workout?workoutId=ctr-ride-3. /workout End Workout → prompt (testID end-ride-prompt) with Save/Abandon/Resume; Abandon returns to '/' and season.rides stays 0 (not recorded); Save navigates to /summary. State was reset after each test.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/calendar/week", "issue": "Module-level state pollution: get_calendar_week (server.py:2026-2035) mutates the shared _CTR_WEEK1 spec dicts in place when applying ctr progress. After a POST /api/workouts/summarize (ctr-ride-*), Tuesday cycling remains status='completed' with the actual duration/TSS overlay even after ride_history is fully cleared, until the backend process is restarted. This means the calendar/plan cannot be 'reset' by deleting ride_history alone. Fix: deep-copy the spec (spec.get('cycling') → copy.deepcopy(spec.get('cycling'))) inside _ctr_calendar_week, so each request returns a fresh dict.", "priority": "HIGH"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/training", "issues": ["Header still shows a hardcoded date 'Wednesday, 12 May 2025'. Consider showing the couch-to-road day the workout is on (e.g. 'Tuesday, 28 July 2026' for ctr-ride-1)."]}
+    ],
+    "react_native_issues": [
+      {"component": "CalendarCard (home /)", "issue": "Console error: 'Each child in a list should have a unique \"key\" prop. Check the render method of View. It was passed a child from CalendarCard.' Reference: /app/frontend/src/components/CalendarCard.tsx"},
+      {"component": "textShadow style", "issue": "'textShadow*' style props are deprecated on RN Web. Use shorthand textShadow. Emits on /plan and /calendar."},
+      {"component": "pointerEvents prop", "issue": "props.pointerEvents deprecated on RN Web. Move to style.pointerEvents (still present on /calendar and elsewhere)."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter22_cross_cutting.py",
+    "/app/test_reports/pytest/iter22.xml"
+  ],
+  "action_items": [
+    "HIGH — Fix _CTR_WEEK1 in-place mutation in get_calendar_week (server.py L2026-2035). Deep-copy the spec cycling/fb50/wellness dicts inside _ctr_calendar_week, or copy `c` before mutating in the overlay. Reproduce: mongosh delete ride_history & supplementary_log, curl /api/calendar/week (Tue=today), POST /api/workouts/summarize {workout_id:'ctr-ride-1',samples:[]}, mongosh delete ride_history again, curl /api/calendar/week → Tue still 'completed' / 60 min / 92 TSS until backend restart.",
+    "Add missing key prop to the day cells inside CalendarCard.tsx (home calendar) — currently logs a React key warning.",
+    "Cosmetic: hydrate /training header date & subtitle from the active workout day (currently hardcoded 'Wednesday, 12 May 2025')."
+  ],
+  "critical_code_review_comments": [
+    "server.py get_calendar_week overlay mutates module globals — a general pattern smell; return fresh dicts from _ctr_calendar_week.",
+    "server.py is 2349 lines — well above the 700-line guideline; consider splitting couch-to-road plan/calendar helpers and Garmin/Google sync into modules.",
+    "frontend/src/lib/programs/couch-to-road.ts is a single very large file; split per-phase to stay under 700 lines."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter22_cross_cutting.py (new)"
+  ],
+  "success_rate": {"backend": "100% (10/10 pytest, but state-pollution bug found via cross-run verification)", "frontend": "100%"},
+  "seed_data_creation": "None — mongosh used to delete ride_history and supplementary_log around each test to keep the rider in zero-state.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend BASE_URL = EXPO_PUBLIC_BACKEND_URL from /app/frontend/.env. Rider 'Green Lantern' triggers couch-to-road. Cleanup after any summarize/supplementary test: mongosh test_database → db.ride_history.deleteMany({}); db.supplementary_log.deleteMany({}); AND `sudo supervisorctl restart backend` — because get_calendar_week mutates the shared _CTR_WEEK1 dicts and Mongo-only cleanup leaves 'completed' overlays behind. testIDs: end-ride-prompt / end-save / end-abandon / end-resume on /workout; metric-summary-strip on /; day-head-{0..6} on /calendar.",
+  "rca_of_issue": "get_calendar_week mutates module-level _CTR_WEEK1 dicts. Repro: (1) mongosh delete ride_history+supplementary_log; (2) curl /api/calendar/week → Tue cycling {status:'today', duration:'20 min', tss:'12 TSS'}; (3) curl -X POST /api/workouts/summarize -d '{\"workout_id\":\"ctr-ride-1\",\"samples\":[]}'; (4) mongosh delete ride_history again; (5) curl /api/calendar/week → Tue cycling {status:'completed', duration:'60 min', tss:'92 TSS'} — pollution persists until `sudo supervisorctl restart backend`. Fix: copy.deepcopy on spec dicts inside _ctr_calendar_week, so the overlay in get_calendar_week never mutates the module-level template."
+}

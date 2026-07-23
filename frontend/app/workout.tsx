@@ -163,6 +163,7 @@ export default function LiveWorkout() {
   const [showSettings, setShowSettings] = React.useState(false);
   const [showMusic, setShowMusic] = React.useState(false);
   const [showCast, setShowCast] = React.useState(false);
+  const [endPrompt, setEndPrompt] = React.useState(false);
 
   const [hudVisible, setHudVisible] = React.useState(true);
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
@@ -288,6 +289,16 @@ export default function LiveWorkout() {
     setShowControls(false);
     showToast(label);
   };
+  // Ending a ride prompts to save or abandon. On abandon nothing is persisted
+  // (the summary screen is what saves), so the ride is never recorded.
+  const requestEnd = () => { setExpanded(false); if (!paused) { pause(); setPaused(true); } setEndPrompt(true); };
+  const onSaveRide = () => { setEndPrompt(false); router.replace("/summary"); };
+  const onAbandonRide = () => {
+    setEndPrompt(false);
+    rideRecorder.reset({ workout: workoutTitle, workoutId: selected?.id, ftp });
+    router.replace("/");
+  };
+  const onResumeRide = () => { setEndPrompt(false); if (paused) { resume(); setPaused(false); } };
   const onMenuAction = (item: { key: string; label: string }) => {
     setShowMenu(false);
     if (item.key === "reconnect") { simulateDropout(); showToast("Simulating trainer dropout…"); return; }
@@ -469,7 +480,7 @@ export default function LiveWorkout() {
         erg={erg}
         onPauseToggle={onPauseToggle}
         onErg={onErg}
-        onEnd={() => router.replace("/summary")}
+        onEnd={requestEnd}
         onControls={() => setShowControls(true)}
         onMenu={() => setShowMenu(true)}
       />
@@ -563,7 +574,7 @@ export default function LiveWorkout() {
                 trainerConnected={trainerOn}
                 wearableConnected={wearableOn}
                 onPause={onPauseToggle}
-                onEnd={() => { setExpanded(false); router.replace("/summary"); }}
+                onEnd={requestEnd}
                 onOpenRoutes={() => setShowRoutes(true)}
               />
             )}
@@ -633,6 +644,27 @@ export default function LiveWorkout() {
         <CastPanel onClose={() => setShowCast(false)} />
       )}
 
+      {endPrompt && (
+        <View style={styles.overlay}>
+          <View style={styles.endPanel} testID="end-ride-prompt">
+            <Ionicons name="flag" size={30} color={colors.yellow} />
+            <Text style={styles.endTitle}>End this ride?</Text>
+            <Text style={styles.endSub}>Save your ride to record it in your progress and plan, or abandon it — abandoned rides are not recorded.</Text>
+            <Pressable testID="end-save" onPress={onSaveRide} style={({ hovered }: any) => [styles.endSave, hovered && { opacity: 0.9 }]}>
+              <Ionicons name="checkmark-circle" size={18} color="#fff" />
+              <Text style={styles.endSaveText}>Save Ride</Text>
+            </Pressable>
+            <Pressable testID="end-abandon" onPress={onAbandonRide} style={({ hovered }: any) => [styles.endAbandon, hovered && { backgroundColor: "rgba(224,30,43,0.14)" }]}>
+              <Ionicons name="trash-outline" size={17} color={colors.red} />
+              <Text style={styles.endAbandonText}>Abandon Ride</Text>
+            </Pressable>
+            <Pressable testID="end-resume" onPress={onResumeRide} style={styles.endResume}>
+              <Text style={styles.endResumeText}>Resume</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
       <Toast message={toast} />
     </GestureHandlerRootView>
   );
@@ -669,4 +701,14 @@ const styles = StyleSheet.create({
   panelItemText: { color: colors.white, fontSize: 14, fontWeight: "600" },
   menuPanel: { position: "absolute", left: spacing.lg, bottom: 90, width: 300, backgroundColor: colors.cardElevated, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md, ...shadow.card },
   menuItem: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, paddingHorizontal: 6 },
+
+  endPanel: { width: 440, maxWidth: "90%", backgroundColor: colors.cardElevated, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, alignItems: "center", gap: 10, ...shadow.card },
+  endTitle: { color: colors.white, fontSize: 22, fontWeight: "800", marginTop: 4 },
+  endSub: { color: colors.textDim, fontSize: 13.5, lineHeight: 19, textAlign: "center", marginBottom: 6 },
+  endSave: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.red, borderRadius: radius.md, paddingVertical: 14, width: "100%", ...shadow.glow },
+  endSaveText: { color: "#fff", fontSize: 15, fontWeight: "800" },
+  endAbandon: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: radius.md, paddingVertical: 13, width: "100%", borderWidth: 1, borderColor: "rgba(224,30,43,0.4)", backgroundColor: "rgba(224,30,43,0.06)" },
+  endAbandonText: { color: colors.red, fontSize: 14.5, fontWeight: "700" },
+  endResume: { paddingVertical: 8, marginTop: 2 },
+  endResumeText: { color: colors.textDim, fontSize: 14, fontWeight: "700" },
 });

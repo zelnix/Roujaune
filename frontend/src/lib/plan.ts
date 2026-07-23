@@ -25,6 +25,8 @@ function normalize(d: any): TrainingPlan {
     adaptationStatus: d.adaptation_status ?? d.adaptationStatus ?? PLAN.adaptationStatus,
     progressPct: d.progress_pct ?? d.progressPct ?? PLAN.progressPct,
     progress: d.progress ?? PLAN.progress,
+    weekTargets: d.week_targets ?? d.weekTargets ?? PLAN.weekTargets,
+    autoAdjustment: d.auto_adjustment ?? d.autoAdjustment ?? undefined,
     tip: d.tip ?? PLAN.tip,
   };
 }

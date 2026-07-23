@@ -6,6 +6,7 @@ import { colors, radius, spacing } from "../theme";
 import { ReadinessScale } from "./ui";
 import { useRiderSeason } from "../lib/rider-profile";
 import { useSettings } from "../lib/settings";
+import { usePlan } from "../lib/plan";
 import { useTodayReadiness, readinessTone } from "../lib/checkin";
 
 function fmtHours(h: number) {
@@ -19,17 +20,20 @@ function fmtHours(h: number) {
 export function MetricSummaryStrip() {
   const season = useRiderSeason(7);
   const { settings } = useSettings();
+  const { plan } = usePlan();
   const { readiness } = useTodayReadiness();
   const router = useRouter();
+  const t = plan.weekTargets;
 
   const rTone = readinessTone(readiness.available ? readiness.score : undefined, readiness.safetyOverride);
   const readinessValue = readiness.available && !readiness.safetyOverride ? `${readiness.score}%` : readiness.safetyOverride ? "!" : "—";
 
   const cells = [
-    { key: "rides", label: "WEEKLY RIDES", icon: "bicycle" as const, iconColor: colors.red, value: season ? `${season.rides}` : "—", status: "This week" },
-    { key: "time", label: "TRAINING TIME", icon: "time-outline" as const, iconColor: colors.green, value: season ? fmtHours(season.hours) : "—", status: "This week" },
-    { key: "distance", label: "DISTANCE", icon: "navigate" as const, iconColor: "#40A9C6", value: season ? `${season.distance_km.toLocaleString()} km` : "—", status: "This week" },
-    { key: "elevation", label: "ELEVATION", icon: "trending-up" as const, iconColor: colors.green, value: season ? `${season.elevation_m.toLocaleString()} m` : "—", status: "Gained this week" },
+    { key: "rides", label: "WEEKLY RIDES", icon: "bicycle" as const, iconColor: colors.red, value: season ? `${season.rides}` : "0", status: `of ${t.rides} planned` },
+    { key: "time", label: "TRAINING TIME", icon: "time-outline" as const, iconColor: colors.green, value: season ? fmtHours(season.hours) : "0h 0m", status: `of ${t.duration} planned` },
+    { key: "distance", label: "DISTANCE", icon: "navigate" as const, iconColor: "#40A9C6", value: season ? `${season.distance_km.toLocaleString()} km` : "0 km", status: `of ${t.distance_km.toLocaleString()} km planned` },
+    { key: "elevation", label: "ELEVATION", icon: "trending-up" as const, iconColor: colors.green, value: season ? `${season.elevation_m.toLocaleString()} m` : "0 m", status: `of ${t.elevation_m.toLocaleString()} m planned` },
+    { key: "supp", label: "SUPPLEMENTARY", icon: "barbell" as const, iconColor: "#B98CFF", value: `${season?.supplementary ?? 0}`, status: `of ${t.supplementary ?? 0} planned` },
     { key: "ftp", label: "FTP", icon: "flash" as const, iconColor: colors.yellow, value: `${settings.ftp} W`, status: "Current" },
   ];
 

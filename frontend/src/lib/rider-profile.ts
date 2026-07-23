@@ -74,7 +74,7 @@ export function useRiderProfile() {
   return { profile, avatar, loaded, update, setAvatar };
 }
 
-export type SeasonStats = { rides: number; distance_km: number; elevation_m: number; hours: number; streak: number };
+export type SeasonStats = { rides: number; distance_km: number; elevation_m: number; hours: number; streak: number; supplementary?: number };
 
 export type Weather = { value: string; sub: string } | null;
 

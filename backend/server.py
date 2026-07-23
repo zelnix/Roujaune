@@ -144,10 +144,12 @@ class TelemetrySample(BaseModel):
 
 class SummarizeRequest(BaseModel):
     workout: str = "Threshold Climb"
+    workout_id: Optional[str] = None
     route: Optional[Dict[str, Any]] = None   # {id,name,place,distance,elevation,tag}
     elapsed: int = 0          # seconds of the ride
     ftp: int = 287            # rider FTP (watts)
     weight: float = 78        # kg
+    manual: Optional[Dict[str, Any]] = None  # user-entered metrics when no telemetry
     samples: List[TelemetrySample] = Field(default_factory=list)
 
 
@@ -224,8 +226,12 @@ def _normalized_power(power: List[float]) -> float:
 async def summarize_workout(body: SummarizeRequest):
     """Compute real ride aggregates from recorded telemetry samples.
 
-    Falls back to a polished reference dataset when the sample count is too
-    low to be meaningful (e.g. a quick demo tap-through)."""
+    When the rider enters data manually (no trainer/wearable telemetry) we build
+    the summary from those values instead of a demo dataset."""
+    if body.manual:
+        result = _manual_summary(body)
+        rid = await _save_ride_history(body, result)
+        return {**result, "id": rid}
     powers = [s.power for s in body.samples if s.power is not None]
     if len(body.samples) < 30 or not powers:
         rid = await _save_ride_history(body, REFERENCE_SUMMARY)
@@ -311,6 +317,66 @@ async def summarize_workout(body: SummarizeRequest):
     return {**result, "id": rid}
 
 
+def _manual_summary(body: SummarizeRequest) -> dict:
+    """Build a ride summary from user-entered metrics. TSS is derived from power
+    when supplied, otherwise estimated from perceived effort (RPE) + duration."""
+    m = body.manual or {}
+    ftp = max(1, body.ftp)
+
+    def _num(key, cast=int, default=0):
+        try:
+            v = m.get(key)
+            return cast(v) if v not in (None, "") else default
+        except (TypeError, ValueError):
+            return default
+
+    dur = _num("duration_sec", int, 0) or int(body.elapsed or 0)
+    avg_power = _num("avg_power", int, 0)
+    distance = round(_num("distance_km", float, 0.0), 1)
+    elev = _num("elevation_m", int, 0)
+    avg_hr = _num("avg_hr", int, 0)
+    avg_cad = _num("avg_cadence", int, 0)
+    rpe = _num("rpe", float, 0.0)
+
+    if avg_power and dur:
+        intensity = round(avg_power / ftp, 2)
+        tss = round((dur * avg_power * intensity) / (ftp * 3600) * 100)
+        calories = round(avg_power * dur / 1000.0 * 0.9)
+    elif rpe and dur:
+        if_map = {1: 0.40, 2: 0.50, 3: 0.60, 4: 0.68, 5: 0.75, 6: 0.82, 7: 0.88, 8: 0.94, 9: 1.0, 10: 1.05}
+        intensity = if_map.get(int(round(rpe)), 0.60)
+        tss = round((dur / 3600.0) * intensity * intensity * 100)
+        calories = round((dur / 60.0) * (6 + rpe))
+    else:
+        intensity = 0.0
+        tss = 0
+        calories = 0
+
+    return {
+        "computed": True,
+        "manual": True,
+        "duration_sec": dur,
+        "distance_km": distance,
+        "elevation_m": elev,
+        "avg_power": avg_power,
+        "norm_power": avg_power,
+        "avg_cadence": avg_cad,
+        "avg_hr": avg_hr,
+        "max_hr": avg_hr,
+        "calories": calories,
+        "tss": tss,
+        "intensity": intensity,
+        "power_curve": [],
+        "power_target": avg_power,
+        "power_max_axis": max(400, avg_power + 50),
+        "hr_curve": [],
+        "hr_max_axis": 180,
+        "zones": [],
+        "compliance": {"overall": 0, "power": 0, "cadence": 0, "zone4_min": 0, "completed": 100},
+    }
+
+
+
 async def _save_ride_history(body: SummarizeRequest, result: dict) -> Optional[str]:
     """Persist a lightweight ride-history record (route + key metrics).
 
@@ -321,6 +387,7 @@ async def _save_ride_history(body: SummarizeRequest, result: dict) -> Optional[s
             "id": rid,
             "created_at": now_iso(),
             "workout": body.workout,
+            "workout_id": body.workout_id,
             "route": body.route,
             "duration_sec": result.get("duration_sec"),
             "distance_km": result.get("distance_km"),
@@ -859,15 +926,36 @@ async def get_rider_season(days: int = 0):
         }
     outdoor = [r for r in rides if r.get("indoor_outdoor") == "outdoor"]
     indoor = [r for r in rides if r.get("indoor_outdoor") != "outdoor"]
+    try:
+        supplementary = await db.supplementary_log.count_documents(query)
+    except Exception:
+        supplementary = 0
     return {
         "rides": count,
         "distance_km": round(dist, 1),
         "elevation_m": int(elev),
         "hours": round(secs / 3600, 1),
         "streak": streak,
+        "supplementary": supplementary,
         "indoor": _agg(indoor),
         "outdoor": _agg(outdoor),
     }
+
+
+class SupplementaryLog(BaseModel):
+    kind: str = "strength"   # strength | mobility | recovery | balance
+    title: str = "Supplementary session"
+    date: Optional[str] = None
+
+
+@api_router.post("/rider/supplementary/complete")
+async def complete_supplementary(body: SupplementaryLog):
+    """Log a completed non-cycling session (strength/mobility/recovery/balance)
+    so the home 'Supplementary Training' actual reflects it."""
+    doc = {"id": str(uuid.uuid4()), "created_at": now_iso(), "kind": body.kind, "title": body.title, "date": body.date}
+    await db.supplementary_log.insert_one(doc)
+    doc.pop("_id", None)
+    return {"ok": True, "logged": doc}
 
 
 @api_router.get("/rider/achievements")
@@ -1448,7 +1536,7 @@ BUILD_AND_CLIMB = {
     ],
     "adaptation": "Great consistency and strong threshold work. I've slightly increased your time in Zone 4 and added more endurance volume to build your climbing engine.",
     "adaptation_status": "Plan is adapting as you improve",
-    "week_targets": {"rides": 5, "duration": "6h 24m", "distance_km": 165, "elevation_m": 1800},
+    "week_targets": {"rides": 5, "duration": "6h 24m", "distance_km": 165, "elevation_m": 1800, "supplementary": 2},
     "progress_pct": 25,
     "progress": {"weeks": "3 / 12", "workouts": "15", "time": "10.2 h", "tss": "1,420", "ctl": "+8.4", "atl": "92", "tsb": "+6"},
     "tip": "Consistency compounds. Focus on the process this phase and the results will come.",
@@ -1495,7 +1583,7 @@ COUCH_TO_ROAD_PLAN = {
     ],
     "adaptation": "Welcome to From Couch to Road. This first week is all about getting comfortable on the bike and finding a calm, repeatable rhythm. Keep every ride easy and conversational \u2014 your endurance will build itself from here.",
     "adaptation_status": "Beginner plan \u2014 starts 27 July",
-    "week_targets": {"rides": 3, "duration": "1h 15m", "distance_km": 24, "elevation_m": 70},
+    "week_targets": {"rides": 3, "duration": "1h 15m", "distance_km": 24, "elevation_m": 70, "supplementary": 3},
     "progress_pct": 2,
     "progress": {"weeks": "1 / 16", "workouts": "0", "time": "0.0 h", "tss": "0", "ctl": "\u2014", "atl": "\u2014", "tsb": "\u2014"},
     "tip": "Your smoothest controllable cadence is more important than matching an exact number.",
@@ -1568,6 +1656,43 @@ def _ctr_calendar_week() -> dict:
     }
 
 
+# Planned TSS per From Couch to Road ride id (Week 1 surfaced in plan/calendar).
+_CTR_PLANNED_TSS = {"ctr-ride-1": 12, "ctr-ride-2": 15, "ctr-ride-3": 18}
+
+
+async def _ctr_progress() -> dict:
+    """Aggregate completed From Couch to Road rides from ride_history so the plan,
+    calendar and home screens reflect saved workouts, plus a coach auto-adjustment
+    line based on how the most recent ride compared to plan."""
+    try:
+        rides = await db.ride_history.find({"workout_id": {"$regex": "^ctr-ride-"}}).sort("created_at", 1).to_list(2000)
+    except Exception:
+        rides = []
+    completed: dict = {}
+    total_sec = 0
+    total_tss = 0
+    for r in rides:
+        wid = r.get("workout_id")
+        total_sec += int(r.get("duration_sec") or 0)
+        total_tss += int(r.get("tss") or 0)
+        completed[wid] = {"duration_sec": r.get("duration_sec"), "tss": r.get("tss"), "distance_km": r.get("distance_km")}
+    adj = ""
+    if rides:
+        last = rides[-1]
+        planned = _CTR_PLANNED_TSS.get(last.get("workout_id"))
+        actual = int(last.get("tss") or 0)
+        if planned and actual:
+            if actual > planned * 1.15:
+                adj = "Your last ride ran a little harder than planned, so I've kept your next session relaxed to protect recovery."
+            elif actual < planned * 0.7:
+                adj = "Your last ride stayed nicely controlled \u2014 you're ready to build gently from here."
+            else:
+                adj = "Your last ride was right on plan. Keep this steady rhythm going into your next session."
+        else:
+            adj = "Great work \u2014 I've logged that ride and factored it into your plan."
+    return {"completed": completed, "count": len(completed), "hours": round(total_sec / 3600.0, 1), "tss": total_tss, "auto_adjustment": adj}
+
+
 @api_router.get("/plan")
 async def get_plan(id: str = "build-and-climb"):
     """Return the rider's current training plan (seeded into Mongo on first read).
@@ -1576,7 +1701,26 @@ async def get_plan(id: str = "build-and-climb"):
     try:
         rider = await _rider_doc()
         if (rider.get("name") or "").strip().lower() == "green lantern" or id == COUCH_TO_ROAD_PLAN["id"]:
-            return dict(COUCH_TO_ROAD_PLAN)
+            prog = await _ctr_progress()
+            plan = dict(COUCH_TO_ROAD_PLAN)
+            workouts = []
+            for w in plan["workouts"]:
+                w = dict(w)
+                c = prog["completed"].get(w["id"])
+                if c:
+                    w["status"] = "completed"
+                    w["completed"] = True
+                    if c.get("tss") is not None:
+                        w["actual_tss"] = f"{c['tss']} TSS"
+                    if c.get("duration_sec"):
+                        w["actual_duration"] = f"{round(c['duration_sec'] / 60)} min"
+                workouts.append(w)
+            plan["workouts"] = workouts
+            plan["progress"] = {**plan["progress"], "workouts": str(prog["count"]), "time": f"{prog['hours']} h", "tss": str(prog["tss"])}
+            plan["progress_pct"] = min(100, round(prog["count"] / 48 * 100))
+            if prog["auto_adjustment"]:
+                plan["auto_adjustment"] = prog["auto_adjustment"]
+            return plan
         doc = await db.training_plans.find_one({"id": id})
         if not doc:
             await db.training_plans.update_one({"id": id}, {"$set": BUILD_AND_CLIMB}, upsert=True)
@@ -1878,6 +2022,17 @@ async def get_calendar_week(start: str = "2025-05-12"):
         is_ctr = (rider.get("name") or "").strip().lower() == "green lantern"
         if is_ctr:
             doc = _ctr_calendar_week()
+            prog = await _ctr_progress()
+            for day in doc["days"]:
+                c = day.get("cycling")
+                if c and c.get("workout_id") in prog["completed"]:
+                    act = prog["completed"][c["workout_id"]]
+                    c["status"] = "completed"
+                    c["color"] = "green"
+                    if act.get("tss") is not None:
+                        c["tss"] = f"{act['tss']} TSS"
+                    if act.get("duration_sec"):
+                        c["duration"] = f"{round(act['duration_sec'] / 60)} min"
         else:
             doc = await db.calendar_weeks.find_one({"start_date": start})
             if not doc or doc.get("seed_version") != CALENDAR_WEEK["seed_version"]:

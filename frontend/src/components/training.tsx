@@ -16,6 +16,12 @@ import Svg, {
 import { colors, radius, spacing, shadow } from "../theme";
 import { PrimaryButton, SecondaryButton, ReadinessScale, SectionLabel, Touchable } from "./ui";
 import { useCoach } from "../lib/coach-persona";
+import type { Workout } from "../lib/workout-catalog";
+
+function fmtDur(min: number): string {
+  if (!min) return "—";
+  return min >= 60 ? `${Math.floor(min / 60)}h ${String(min % 60).padStart(2, "0")}m` : `${min} min`;
+}
 
 const routeImg = require("../../assets/images/hero_cyclist_b2.jpg");
 
@@ -103,7 +109,10 @@ function WorkoutMetric({ icon, value, label }: { icon: React.ReactNode; value: s
 }
 
 /* ------------------------- main workout card ------------------------- */
-export function MainWorkoutCard({ onDetails, chartWidth }: { onDetails: () => void; chartWidth: number }) {
+export function MainWorkoutCard({ onDetails, chartWidth, workout }: { onDetails: () => void; chartWidth: number; workout?: Workout }) {
+  const title = workout ? workout.name : "Threshold Climb";
+  const desc = workout ? workout.description : "Improve your lactate threshold and climbing sustainability with steady high-intensity efforts.";
+  const durationText = workout ? fmtDur(workout.duration) : "1h 00m";
   return (
     <LinearGradient
       testID="main-workout-card"
@@ -115,16 +124,26 @@ export function MainWorkoutCard({ onDetails, chartWidth }: { onDetails: () => vo
       <View style={styles.mainTopRow}>
         <View style={{ flex: 1 }}>
           <SectionLabel color={colors.red}>MAIN WORKOUT</SectionLabel>
-          <Text style={styles.workoutTitle}>Threshold Climb</Text>
+          <Text style={styles.workoutTitle}>{title}</Text>
           <View style={styles.tagRow}>
-            <Tag icon={<MaterialCommunityIcons name="chart-timeline-variant" size={14} color={colors.red} />} label="Structured Workout" />
-            <Tag icon={<Ionicons name="trending-up" size={14} color={colors.yellow} />} label="Climbing" />
-            <Tag icon={<Ionicons name="sync" size={14} color="#5AA9E6" />} label="ERG Mode" />
+            {workout ? (
+              <>
+                <Tag icon={<MaterialCommunityIcons name="chart-timeline-variant" size={14} color={colors.red} />} label="Structured Workout" />
+                <Tag icon={<Ionicons name="bicycle" size={14} color={colors.green} />} label="Beginner" />
+                <Tag icon={<Ionicons name="pulse" size={14} color="#5AA9E6" />} label={workout.focus} />
+              </>
+            ) : (
+              <>
+                <Tag icon={<MaterialCommunityIcons name="chart-timeline-variant" size={14} color={colors.red} />} label="Structured Workout" />
+                <Tag icon={<Ionicons name="trending-up" size={14} color={colors.yellow} />} label="Climbing" />
+                <Tag icon={<Ionicons name="sync" size={14} color="#5AA9E6" />} label="ERG Mode" />
+              </>
+            )}
           </View>
-          <Text style={styles.workoutDesc}>Improve your lactate threshold and climbing sustainability with steady high-intensity efforts.</Text>
+          <Text style={styles.workoutDesc}>{desc}</Text>
         </View>
         <View style={{ alignItems: "flex-end" }}>
-          <Text style={styles.duration}>1h 00m</Text>
+          <Text style={styles.duration}>{durationText}</Text>
           <Text style={styles.durationLabel}>Duration</Text>
         </View>
       </View>
@@ -135,14 +154,29 @@ export function MainWorkoutCard({ onDetails, chartWidth }: { onDetails: () => vo
       </View>
 
       <View style={styles.metricsRow}>
-        <WorkoutMetric icon={<Ionicons name="flash" size={22} color={colors.yellow} />} value="251 W" label="Target Power" />
-        <View style={styles.metricDivider} />
-        <WorkoutMetric icon={<MaterialCommunityIcons name="chart-bar" size={22} color={colors.red} />} value="Z4" label="Target Zone" />
-        <View style={styles.metricDivider} />
-        <WorkoutMetric icon={<MaterialCommunityIcons name="speedometer" size={22} color={colors.red} />} value="92 TSS" label="Training Load" />
-        <View style={styles.metricDivider} />
-        <WorkoutMetric icon={<MaterialCommunityIcons name="terrain" size={22} color={colors.yellow} />} value="1,050 m" label="Elevation Gain" />
-        <SecondaryButton testID="view-details-button" label="View Details" onPress={onDetails} style={{ marginLeft: spacing.md }} />
+        {workout ? (
+          <>
+            <WorkoutMetric icon={<Ionicons name="time-outline" size={22} color={colors.green} />} value={fmtDur(workout.duration)} label="Duration" />
+            <View style={styles.metricDivider} />
+            <WorkoutMetric icon={<Ionicons name="list" size={22} color={colors.red} />} value={`${workout.segmentSpec?.length ?? 0}`} label="Intervals" />
+            <View style={styles.metricDivider} />
+            <WorkoutMetric icon={<MaterialCommunityIcons name="speedometer" size={22} color={colors.red} />} value={`${workout.tss} TSS`} label="Training Load" />
+            <View style={styles.metricDivider} />
+            <WorkoutMetric icon={<MaterialCommunityIcons name="podium" size={22} color={colors.yellow} />} value={workout.difficulty} label="Level" />
+            <SecondaryButton testID="view-details-button" label="View Details" onPress={onDetails} style={{ marginLeft: spacing.md }} />
+          </>
+        ) : (
+          <>
+            <WorkoutMetric icon={<Ionicons name="flash" size={22} color={colors.yellow} />} value="251 W" label="Target Power" />
+            <View style={styles.metricDivider} />
+            <WorkoutMetric icon={<MaterialCommunityIcons name="chart-bar" size={22} color={colors.red} />} value="Z4" label="Target Zone" />
+            <View style={styles.metricDivider} />
+            <WorkoutMetric icon={<MaterialCommunityIcons name="speedometer" size={22} color={colors.red} />} value="92 TSS" label="Training Load" />
+            <View style={styles.metricDivider} />
+            <WorkoutMetric icon={<MaterialCommunityIcons name="terrain" size={22} color={colors.yellow} />} value="1,050 m" label="Elevation Gain" />
+            <SecondaryButton testID="view-details-button" label="View Details" onPress={onDetails} style={{ marginLeft: spacing.md }} />
+          </>
+        )}
       </View>
     </LinearGradient>
   );
@@ -241,19 +275,21 @@ export function TrainingLoadCard({ width }: { width: number }) {
 }
 
 /* ------------------------- what to expect + start ------------------------- */
-export function WorkoutBreakdownCard({ onStart }: { onStart: () => void }) {
-  const rows = [
-    { label: "Warm Up", meta: "15 min", state: "done" as const },
-    { label: "Threshold Blocks", meta: "3 x 12 min", state: "active" as const },
-    { label: "Cool Down", meta: "15 min", state: "todo" as const },
-  ];
+export function WorkoutBreakdownCard({ onStart, workout }: { onStart: () => void; workout?: Workout }) {
+  const rows = workout
+    ? (workout.segmentSpec ?? []).map((s, i) => ({ label: s.label, meta: fmtDur(s.minutes), state: "todo" as const, key: `${s.label}-${i}` }))
+    : [
+        { label: "Warm Up", meta: "15 min", state: "done" as const, key: "wu" },
+        { label: "Threshold Blocks", meta: "3 x 12 min", state: "active" as const, key: "main" },
+        { label: "Cool Down", meta: "15 min", state: "todo" as const, key: "cd" },
+      ];
   return (
     <View style={styles.sideCard} testID="what-to-expect-card">
       <SectionLabel color={colors.textDim}>WHAT TO EXPECT</SectionLabel>
       <View style={{ marginTop: 10, gap: 10 }}>
         {rows.map((r) => (
-          <View key={r.label} style={styles.expectRow}>
-            <Text style={styles.expectLabel}>{r.label}</Text>
+          <View key={r.key} style={styles.expectRow}>
+            <Text style={styles.expectLabel} numberOfLines={1}>{r.label}</Text>
             <Text style={styles.expectMeta}>{r.meta}</Text>
             <StatusDot state={r.state} />
           </View>

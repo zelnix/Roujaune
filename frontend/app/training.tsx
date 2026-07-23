@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, ScrollView, Animated, useWindowDimensions, LayoutChangeEvent, Platform } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -12,6 +12,7 @@ import { BrandHeader } from "@/src/components/BrandHeader";
 import { navItems, navFooter } from "@/src/data";
 import { useCoach } from "@/src/lib/coach-persona";
 import { usePlan } from "@/src/lib/plan";
+import { getWorkout } from "@/src/lib/workout-catalog";
 import {
   AlbertoTrainingCard,
   MainWorkoutCard,
@@ -55,9 +56,13 @@ export default function TodaysTraining() {
   const rightColW = compact ? mainWidth : 330;
 
   const router = useRouter();
+  const params = useLocalSearchParams();
   const { plan } = usePlan();
-  const todayRideId = (plan.workouts?.[0] as any)?.id as string | undefined;
-  const startRide = () => router.push(todayRideId ? ({ pathname: "/workout", params: { workoutId: todayRideId } } as any) : "/workout");
+  const paramId = typeof params.workoutId === "string" ? params.workoutId : undefined;
+  const nextPlanRide = (plan.workouts?.find((w) => !w.completed) ?? plan.workouts?.[0]) as any;
+  const activeId = (paramId || nextPlanRide?.id) as string | undefined;
+  const activeWorkout = getWorkout(activeId);
+  const startRide = () => router.push(activeId ? ({ pathname: "/workout", params: { workoutId: activeId } } as any) : "/workout");
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
   const [leftW, setLeftW] = React.useState(560);
 
@@ -129,7 +134,7 @@ export default function TodaysTraining() {
             {/* body */}
             <View style={[styles.body, compact && { flexDirection: "column" }]}>
               <View style={[styles.leftCol, compact && styles.fullCol]} onLayout={onLeftLayout}>
-                <MainWorkoutCard chartWidth={chartWidth} onDetails={() => showToast("Opening workout details")} />
+                <MainWorkoutCard chartWidth={chartWidth} workout={activeWorkout} onDetails={() => showToast("Opening workout details")} />
                 <RouteWeatherCard onPreview={() => showToast("Previewing Alpe d'Huez")} onImagePress={() => showToast("Opening route map")} />
                 <View style={styles.bottomRow}>
                   <View style={styles.bottomSlot}>
@@ -143,7 +148,7 @@ export default function TodaysTraining() {
               <View style={[styles.rightCol, { width: rightColW }, compact && styles.fullCol]}>
                 <ReadinessCard />
                 <TrainingLoadCard width={rightColW} />
-                <WorkoutBreakdownCard onStart={startRide} />
+                <WorkoutBreakdownCard onStart={startRide} workout={activeWorkout} />
                 <EquipmentCard onItemPress={(label) => showToast(`${label} status`)} />
               </View>
             </View>

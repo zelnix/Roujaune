@@ -76,18 +76,20 @@ export function CalendarCard({ onToast, onOpenCalendar, scope = "today" }: { onT
     const days = week?.days ?? [];
 
     if (scope === "week") {
-      // The week's main (cycling) session per day.
+      // One row per day using that day's primary session (ride → strength →
+      // recovery), so rest, recovery and strength/balance days are all shown.
       return days
         .map((d) => {
           const c = d.cycling;
-          if (!c) return null;
+          const s = c ?? d.fb50 ?? d.wellness;
+          if (!s) return null;
           const day = d.day_name ? d.day_name.charAt(0) + d.day_name.slice(1).toLowerCase() : "";
-          const rest = c.status === "rest";
+          const rest = c?.status === "rest";
           return {
             key: d.date,
-            label: `${day} · ${rest ? "Rest Day" : c.title}`,
-            time: rest ? "Rest" : c.duration || "—",
-            state: state(c.status),
+            label: `${day} · ${rest ? "Rest Day" : s.title}`,
+            time: rest ? "Rest" : s.duration || "—",
+            state: state(rest ? "rest" : s.status),
           };
         })
         .filter((r): r is NonNullable<typeof r> => !!r);
@@ -123,30 +125,34 @@ export function CalendarCard({ onToast, onOpenCalendar, scope = "today" }: { onT
           ))}
         </View>
 
-        <View style={styles.daysGrid}>
-          {grid.map((d, i) => {
-            const inMonth = d.month() === month.month();
-            const num = d.date();
-            const isSel = inMonth && num === selected;
-            const dots = inMonth ? dotByDate[d.format("YYYY-MM-DD")] : undefined;
-            return (
-              <Touchable
-                key={i}
-                testID={`day-${d.format("YYYY-MM-DD")}`}
-                scaleTo={0.85}
-                lift={false}
-                onPress={() => inMonth && setSelected(num)}
-                style={styles.dayCell}
-              >
-                <View style={[styles.dayInner, isSel && styles.daySelected]}>
-                  <Text style={[styles.dayText, !inMonth && styles.dayFaint, isSel && styles.daySelectedText]}>
-                    {num}
-                  </Text>
-                </View>
-                {dots ? <ActivityDots dots={dots} /> : <View style={{ height: 7 }} />}
-              </Touchable>
-            );
-          })}
+        <View>
+          {Array.from({ length: Math.ceil(grid.length / 7) }, (_, r) => grid.slice(r * 7, r * 7 + 7)).map((wk, r) => (
+            <View key={r} style={styles.weekGrid}>
+              {wk.map((d, i) => {
+                const inMonth = d.month() === month.month();
+                const num = d.date();
+                const isSel = inMonth && num === selected;
+                const dots = inMonth ? dotByDate[d.format("YYYY-MM-DD")] : undefined;
+                return (
+                  <Touchable
+                    key={i}
+                    testID={`day-${d.format("YYYY-MM-DD")}`}
+                    scaleTo={0.85}
+                    lift={false}
+                    onPress={() => inMonth && setSelected(num)}
+                    style={styles.dayCell}
+                  >
+                    <View style={[styles.dayInner, isSel && styles.daySelected]}>
+                      <Text style={[styles.dayText, !inMonth && styles.dayFaint, isSel && styles.daySelectedText]}>
+                        {num}
+                      </Text>
+                    </View>
+                    {dots ? <ActivityDots dots={dots} /> : <View style={{ height: 7 }} />}
+                  </Touchable>
+                );
+              })}
+            </View>
+          ))}
         </View>
         <View style={{ flex: 1 }} />
         <SecondaryButton
@@ -196,7 +202,8 @@ const styles = StyleSheet.create({
   weekRow: { flexDirection: "row", marginTop: spacing.sm },
   weekDay: { flex: 1, textAlign: "center", color: colors.textFaint, fontSize: 9.5, fontWeight: "700" },
   daysGrid: { flexDirection: "row", flexWrap: "wrap", marginTop: 4 },
-  dayCell: { width: `${100 / 7}%`, alignItems: "center", paddingVertical: 2 },
+  weekGrid: { flexDirection: "row", marginTop: 4 },
+  dayCell: { flex: 1, alignItems: "center", paddingVertical: 2 },
   dayInner: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center" },
   daySelected: { backgroundColor: colors.red },
   dayText: { color: colors.white, fontSize: 12.5, fontWeight: "600" },

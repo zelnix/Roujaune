@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { rideRecorder, RideRoute } from "./ride";
 import { getCoach, COACHES } from "./coach-persona";
 import { getWorkout, buildSegments, targetWatts } from "./workout-catalog";
@@ -7,6 +7,7 @@ export type Zone = { z: string; time: string; pct: number; w: number };
 
 export type SummaryStats = {
   computed: boolean;
+  manual?: boolean;
   id?: string | null;
   duration_sec: number;
   distance_km: number;
@@ -173,37 +174,57 @@ export function useSummary() {
   const [stats, setStats] = useState<SummaryStats>(FALLBACK_STATS);
   const [loading, setLoading] = useState(true);
   const [route] = useState<RideRoute>(() => rideRecorder.snapshot().route);
+  const [needsManual, setNeedsManual] = useState(false);
+  const [recordedElapsed] = useState<number>(() => rideRecorder.snapshot().elapsed);
+
+  const post = useCallback(async (manual?: Record<string, any>) => {
+    const rec = rideRecorder.snapshot();
+    setLoading(true);
+    try {
+      const res = await fetch(`${apiBase()}/api/workouts/summarize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workout: rec.workout,
+          workout_id: rec.workoutId,
+          route: rec.route,
+          elapsed: rec.elapsed,
+          ftp: rec.ftp,
+          samples: manual ? [] : rec.samples,
+          manual: manual ?? null,
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as SummaryStats;
+      setStats(data);
+      setNeedsManual(false);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     let alive = true;
     const rec = rideRecorder.snapshot();
-    (async () => {
-      try {
-        const res = await fetch(`${apiBase()}/api/workouts/summarize`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            workout: rec.workout,
-            route: rec.route,
-            elapsed: rec.elapsed,
-            samples: rec.samples,
-          }),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = (await res.json()) as SummaryStats;
-        if (alive) setStats(data);
-      } catch {
-        if (alive) setStats(FALLBACK_STATS);
-      } finally {
-        if (alive) setLoading(false);
+    const powers = rec.samples.filter((s) => s.power && s.power > 0);
+    const hasData = rec.samples.length >= 30 && powers.length > 0;
+    if (!hasData) {
+      // No telemetry captured from the smart trainer / wearables — prompt the
+      // rider to enter their ride data manually instead of showing demo values.
+      if (alive) {
+        setNeedsManual(true);
+        setLoading(false);
       }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
+      return () => { alive = false; };
+    }
+    post();
+    return () => { alive = false; };
+  }, [post]);
 
-  return { stats, loading, route };
+  return { stats, loading, route, needsManual, recordedElapsed, submitManual: (fields: Record<string, any>) => post(fields) };
 }
 
 /** Fetch Alberto's AI post-ride debrief once the ride stats are computed.
