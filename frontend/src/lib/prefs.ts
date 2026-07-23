@@ -5,6 +5,15 @@ const VOICE_KEY = "roujaune:voiceId";
 const COACH_KEY = "roujaune:coachId";
 const COACH_STYLE_KEY = "roujaune:coachStyle";
 const VOICE_GUIDANCE_KEY = "roujaune:voiceGuidance";
+const SPEECH_RATE_KEY = "roujaune:speechRate";
+
+/** Persisted speaking speed for coach TTS (0.8 slow – 1.1 fast; default 0.95). */
+export async function getSpeechRate(): Promise<number | null> {
+  try { const v = await AsyncStorage.getItem(SPEECH_RATE_KEY); return v ? parseFloat(v) : null; } catch { return null; }
+}
+export async function setSpeechRate(rate: number): Promise<void> {
+  try { await AsyncStorage.setItem(SPEECH_RATE_KEY, String(rate)); } catch { /* noop */ }
+}
 
 /** Persisted coaching style ("balanced" | "performance" | "calm" | "essential"). */
 export async function getCoachStyle(): Promise<string | null> {

@@ -2,7 +2,7 @@ import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import * as Speech from "expo-speech";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getVoiceId, setVoiceId } from "../lib/prefs";
-import { useCoach, setCoach as persistCoach, COACHES, CoachId } from "../lib/coach-persona";
+import { useCoach, setCoach as persistCoach, COACHES, CoachId, getCoachRate } from "../lib/coach-persona";
 import { detectGender, COACH_PITCH } from "../lib/coach-voice";
 
 // Royalty-free instrumental track used as upbeat cycling music (admin-replaceable).
@@ -218,7 +218,7 @@ export function useWorkoutAudio() {
       voice: voice.current.id,
       language: voice.current.lang,
       pitch: pitchRef.current,
-      rate: 0.92,                     // clear, well-paced English
+      rate: getCoachRate(),           // rider's chosen speaking speed
       onDone: () => duck(false),
       onStopped: () => duck(false),
       onError: () => duck(false),
@@ -238,7 +238,7 @@ export function useWorkoutAudio() {
     if (voiceOn) {
       duck(true);
       Speech.speak(PREVIEW, {
-        voice: opt.id, language: opt.lang, pitch: pitchRef.current, rate: 0.92,
+        voice: opt.id, language: opt.lang, pitch: pitchRef.current, rate: getCoachRate(),
         onDone: () => duck(false), onStopped: () => duck(false), onError: () => duck(false),
       });
     }
@@ -262,7 +262,7 @@ export function useWorkoutAudio() {
       if (voiceOn) {
         duck(true);
         Speech.speak(PREVIEW, {
-          voice: chosen.id, language: chosen.lang, pitch: PITCH[id], rate: 0.92,
+          voice: chosen.id, language: chosen.lang, pitch: PITCH[id], rate: getCoachRate(),
           onDone: () => duck(false), onStopped: () => duck(false), onError: () => duck(false),
         });
       }

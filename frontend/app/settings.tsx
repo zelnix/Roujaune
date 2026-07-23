@@ -5,8 +5,9 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Speech from "expo-speech";
 import { AppScaffold, Card, SectionTitle, Toggle } from "@/src/components/app-scaffold";
 import { CC } from "@/src/components/calendar";
-import { useCoach, setCoach, COACHES, CoachId, COACH_STYLES, VOICE_GUIDANCE_OPTS, useCoachStyle, setCoachStyle, useVoiceGuidance, setVoiceGuidance, CoachStyle, VoiceGuidance } from "@/src/lib/coach-persona";
-import { resolveBothCoachVoices, ResolvedVoice, COACH_PITCH } from "@/src/lib/coach-voice";
+import { useCoach, setCoach, COACHES, CoachId, COACH_STYLES, VOICE_GUIDANCE_OPTS, useCoachStyle, setCoachStyle, useVoiceGuidance, setVoiceGuidance, CoachStyle, VoiceGuidance, SPEECH_RATES, useCoachRate, setCoachRate } from "@/src/lib/coach-persona";
+import { resolveBothCoachVoices, ResolvedVoice, COACH_PITCH, loadSpanishVoices, CoachVoiceOption } from "@/src/lib/coach-voice";
+import { getVoiceId, setVoiceId } from "@/src/lib/prefs";
 
 const PREVIEW_LINE = "Alright, let's ride. Hold steady and breathe — you've got this.";
 
@@ -14,28 +15,48 @@ export default function SettingsScreen() {
   const persona = useCoach();
   const coachStyle = useCoachStyle();
   const voiceGuidance = useVoiceGuidance();
+  const speechRate = useCoachRate();
   const voices = React.useRef<Record<CoachId, ResolvedVoice> | null>(null);
+  const [available, setAvailable] = React.useState<CoachVoiceOption[]>([]);
+  const [savedVoice, setSavedVoice] = React.useState<Record<CoachId, string | null>>({ alberto: null, adriana: null });
   const [units, setUnits] = React.useState<"metric" | "imperial">("metric");
   const [previewing, setPreviewing] = React.useState<CoachId | null>(null);
   const [toggles, setToggles] = React.useState({ coachAudio: true, autoSync: true, weeklyReport: true, restReminders: false });
   const set = (k: keyof typeof toggles) => setToggles((t) => ({ ...t, [k]: !t[k] }));
 
-  React.useEffect(() => { resolveBothCoachVoices().then((r) => { voices.current = r; }); }, []);
+  const refreshVoices = React.useCallback(async () => {
+    const saved = { alberto: await getVoiceId("alberto"), adriana: await getVoiceId("adriana") };
+    setSavedVoice(saved);
+    voices.current = await resolveBothCoachVoices(saved);
+    setAvailable(await loadSpanishVoices());
+  }, []);
 
-  const previewVoice = async (id: CoachId) => {
+  React.useEffect(() => { refreshVoices(); }, [refreshVoices]);
+
+  const previewVoice = async (id: CoachId, voiceId?: string) => {
     Speech.stop();
     setPreviewing(id);
-    const v = voices.current?.[id] ?? (await resolveBothCoachVoices())[id];
+    const v = voiceId
+      ? { id: voiceId, lang: available.find((o) => o.id === voiceId)?.lang ?? "es-ES" }
+      : (voices.current?.[id] ?? (await resolveBothCoachVoices({ alberto: savedVoice.alberto, adriana: savedVoice.adriana }))[id]);
     Speech.speak(PREVIEW_LINE, {
       voice: v.id,
       language: v.lang,
       pitch: COACH_PITCH[id],
-      rate: 0.92,
+      rate: speechRate,
       onDone: () => setPreviewing(null),
       onStopped: () => setPreviewing(null),
       onError: () => setPreviewing(null),
     });
   };
+
+  const chooseVoice = async (voiceId: string) => {
+    await setVoiceId(persona.id, voiceId);
+    setSavedVoice((sv) => ({ ...sv, [persona.id]: voiceId }));
+    voices.current = await resolveBothCoachVoices({ ...savedVoice, [persona.id]: voiceId });
+    previewVoice(persona.id, voiceId);
+  };
+
   React.useEffect(() => () => { Speech.stop(); }, []);
 
   return (
@@ -125,6 +146,44 @@ export default function SettingsScreen() {
         <Text style={s.coachHint}>Applies to {persona.name}&apos;s live cues, previews, summaries and recovery guidance across the app.</Text>
       </Card>
 
+      <Card testID="voice-tuning">
+        <SectionTitle label="VOICE FINE-TUNING" color={CC.rouge} />
+        <Text style={s.groupLabel}>Speaking speed</Text>
+        <View style={s.speedRow}>
+          {SPEECH_RATES.map((r) => {
+            const on = Math.abs(speechRate - r.rate) < 0.001;
+            return (
+              <Pressable key={r.id} testID={`rate-${r.id}`} onPress={() => setCoachRate(r.rate)} accessibilityState={{ selected: on }}
+                style={[s.speedBtn, on && s.speedOn]}>
+                <Text style={[s.speedText, on && { color: CC.white }]}>{r.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <View style={s.voiceHead}>
+          <Text style={[s.groupLabel, { marginTop: 18, marginBottom: 0 }]}>Voice for {persona.name}</Text>
+          <Image source={persona.image} style={s.voiceHeadAvatar} contentFit="cover" contentPosition="top center" />
+        </View>
+        {available.length === 0 ? (
+          <Text style={s.coachHint}>Voice options appear here on your device. Open the app in Expo Go or a build to choose from your installed Spanish voices.</Text>
+        ) : (
+          <View style={s.voiceGrid}>
+            {available.map((v) => {
+              const on = savedVoice[persona.id] === v.id;
+              return (
+                <Pressable key={v.id} testID={`voice-${v.id}`} onPress={() => chooseVoice(v.id)} accessibilityState={{ selected: on }}
+                  style={[s.voiceChip, on && s.voiceChipOn]}>
+                  <Ionicons name={on ? "checkmark-circle" : "mic-outline"} size={14} color={on ? CC.rouge : CC.dim} />
+                  <Text style={[s.voiceChipText, on && { color: CC.white }]}>{v.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+        <Text style={s.coachHint}>Pick which installed Spanish voice {persona.name} uses. Tapping a voice previews it. Switch coaches above to tune the other.</Text>
+      </Card>
+
       <Card testID="preferences">
         <SectionTitle label="TRAINING PREFERENCES" />
         <View style={[s.prefRow, s.divider]}>
@@ -203,6 +262,16 @@ const s = StyleSheet.create({
   optionLabel: { color: CC.dim, fontSize: 14, fontWeight: "700", flex: 1 },
   optionDot: { width: 16, height: 16, borderRadius: 8, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.22)" },
   optionHint: { color: CC.dim, fontSize: 11.5, marginTop: 4, lineHeight: 15 },
+  speedRow: { flexDirection: "row", gap: 10 },
+  speedBtn: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 12, borderRadius: 12, borderWidth: 1.5, borderColor: CC.borderSoft, backgroundColor: "rgba(255,255,255,0.02)", minHeight: 46 },
+  speedOn: { borderColor: CC.rouge, backgroundColor: "rgba(201,23,39,0.08)" },
+  speedText: { color: CC.dim, fontSize: 13.5, fontWeight: "700" },
+  voiceHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 18, marginBottom: 10 },
+  voiceHeadAvatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(255,255,255,0.08)" },
+  voiceGrid: { flexDirection: "row", flexWrap: "wrap", gap: 9 },
+  voiceChip: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1.5, borderColor: CC.borderSoft, borderRadius: 999, paddingVertical: 9, paddingHorizontal: 14, backgroundColor: "rgba(255,255,255,0.02)", minHeight: 42 },
+  voiceChipOn: { borderColor: CC.rouge, backgroundColor: "rgba(201,23,39,0.08)" },
+  voiceChipText: { color: CC.dim, fontSize: 12.5, fontWeight: "700" },
   prefRow: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 14 },
   divider: { borderBottomWidth: 1, borderBottomColor: CC.borderSoft },
   prefTitle: { color: CC.white, fontSize: 14, fontWeight: "700" },

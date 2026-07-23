@@ -1,19 +1,24 @@
 import * as Speech from "expo-speech";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CoachId } from "../lib/coach-persona";
+import { CoachId, getCoachRate } from "../lib/coach-persona";
+import { getVoiceId } from "../lib/prefs";
 import { resolveBothCoachVoices, ResolvedVoice, COACH_PITCH } from "../lib/coach-voice";
 
 /** Lightweight coach text-to-speech for the chat (independent of the workout
  * audio engine). Uses the shared gender-first picker so Alberto speaks with a
  * Spanish-accented male voice and Adriana with a Spanish-accented female voice,
- * kept distinct from each other. Tracks the currently-playing message id. */
+ * honoring the rider's per-coach manual pick and speaking-speed preference. */
 export function useCoachSpeech(coachId: CoachId) {
   const resolved = useRef<Record<CoachId, ResolvedVoice> | null>(null);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
-    resolveBothCoachVoices().then((r) => { if (alive) resolved.current = r; });
+    (async () => {
+      const saved = { alberto: await getVoiceId("alberto"), adriana: await getVoiceId("adriana") };
+      const r = await resolveBothCoachVoices(saved);
+      if (alive) resolved.current = r;
+    })();
     return () => { alive = false; try { Speech.stop(); } catch { /* noop */ } };
   }, []);
 
@@ -29,7 +34,7 @@ export function useCoachSpeech(coachId: CoachId) {
       voice: v.id,
       language: v.lang,
       pitch: COACH_PITCH[coachId],
-      rate: 0.94,
+      rate: getCoachRate(),
       onDone: () => setSpeakingId(null),
       onStopped: () => setSpeakingId(null),
       onError: () => setSpeakingId(null),

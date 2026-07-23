@@ -1,5 +1,5 @@
 import React from "react";
-import { getCoachId, setCoachId, getCoachStyle as loadStyle, setCoachStyle as saveStyle, getVoiceGuidance as loadGuidance, setVoiceGuidance as saveGuidance } from "./prefs";
+import { getCoachId, setCoachId, getCoachStyle as loadStyle, setCoachStyle as saveStyle, getVoiceGuidance as loadGuidance, setVoiceGuidance as saveGuidance, getSpeechRate as loadRate, setSpeechRate as saveRate } from "./prefs";
 
 export type CoachId = "alberto" | "adriana";
 export type CoachGender = "male" | "female";
@@ -123,4 +123,28 @@ export function useVoiceGuidance(): VoiceGuidance {
   const [, force] = React.useReducer((x) => x + 1, 0);
   React.useEffect(() => { initGuidance(); const l = () => force(); guidanceListeners.add(l); return () => { guidanceListeners.delete(l); }; }, []);
   return curGuidance;
+}
+
+/* ── speaking speed (TTS rate) ───────────────────────────────────────────── */
+export const SPEECH_RATES: { id: string; label: string; rate: number }[] = [
+  { id: "slow", label: "Slower", rate: 0.8 },
+  { id: "normal", label: "Normal", rate: 0.95 },
+  { id: "fast", label: "Faster", rate: 1.12 },
+];
+export const DEFAULT_RATE = 0.95;
+let curRate = DEFAULT_RATE;
+let rateLoaded = false;
+const rateListeners = new Set<() => void>();
+const emitRate = () => rateListeners.forEach((l) => l());
+function initRate() {
+  if (rateLoaded) return;
+  rateLoaded = true;
+  loadRate().then((r) => { if (typeof r === "number" && !isNaN(r)) { curRate = r; emitRate(); } });
+}
+export function getCoachRate(): number { return curRate; }
+export function setCoachRate(rate: number) { if (curRate === rate) return; curRate = rate; saveRate(rate); emitRate(); }
+export function useCoachRate(): number {
+  const [, force] = React.useReducer((x) => x + 1, 0);
+  React.useEffect(() => { initRate(); const l = () => force(); rateListeners.add(l); return () => { rateListeners.delete(l); }; }, []);
+  return curRate;
 }
