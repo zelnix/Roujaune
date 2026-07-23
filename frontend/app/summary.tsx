@@ -7,7 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 import { colors, radius, spacing, shadow } from "@/src/theme";
-import { useSummary } from "@/src/lib/summary";
+import { useSummary, useCoachDebrief } from "@/src/lib/summary";
 import {
   SummaryHeader, SummarySidebar, HeroSummaryCard, MetricsGrid, ComplianceCard,
   ChartsRow, SyncExportRow, RouteSummaryCard, AchievementsCard, RecoveryCard, BottomActionBar,
@@ -40,6 +40,7 @@ export default function WorkoutComplete() {
   const pad = phone ? spacing.sm : compact ? spacing.md : spacing.lg;
 
   const { stats, route } = useSummary();
+  const { debrief, loading: debriefLoading } = useCoachDebrief(stats, route);
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
   const [mainW, setMainW] = React.useState(600);
   const showToast = React.useCallback((text: string) => setToast({ id: Date.now(), text }), []);
@@ -73,7 +74,7 @@ export default function WorkoutComplete() {
           >
             <View style={[styles.contentRow, phone && styles.contentCol]}>
               <View style={styles.mainCol} onLayout={onMainLayout}>
-                <HeroSummaryCard compact={phone} />
+                <HeroSummaryCard compact={phone} recap={debrief} recapLoading={debriefLoading} />
                 <MetricsGrid stats={stats} compact={compact} routeName={route.name} />
                 <ComplianceCard stats={stats} compact={phone} />
                 <ChartsRow stats={stats} width={mainW} vertical={phone} />

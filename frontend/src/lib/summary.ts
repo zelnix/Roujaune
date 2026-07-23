@@ -138,6 +138,56 @@ export function useSummary() {
   return { stats, loading, route };
 }
 
+/** Fetch Alberto's AI post-ride debrief once the ride stats are computed.
+ * Falls back to the static recap text while loading or on any error. */
+export function useCoachDebrief(stats: SummaryStats, route: RideRoute) {
+  const [debrief, setDebrief] = useState<string>(summaryContent.recap);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    const rec = rideRecorder.snapshot();
+    (async () => {
+      try {
+        const res = await fetch(`${apiBase()}/api/coach/debrief`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            workout: rec.workout || summaryContent.title,
+            route: route?.name ?? rec.route ?? null,
+            duration_sec: stats.duration_sec,
+            distance_km: stats.distance_km,
+            elevation_m: stats.elevation_m,
+            avg_power: stats.avg_power,
+            norm_power: stats.norm_power,
+            power_target: stats.power_target,
+            avg_cadence: stats.avg_cadence,
+            avg_hr: stats.avg_hr,
+            max_hr: stats.max_hr,
+            calories: stats.calories,
+            tss: stats.tss,
+            intensity: stats.intensity,
+            compliance: stats.compliance?.overall ?? 0,
+            zones: stats.zones?.map((z) => ({ z: z.z, pct: z.pct })) ?? [],
+          }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const text = (data?.debrief ?? "").toString().trim();
+        if (alive && text) setDebrief(text);
+      } catch {
+        /* keep fallback recap */
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stats.duration_sec, stats.avg_power, stats.tss]);
+
+  return { debrief, loading };
+}
+
 // ---- formatting helpers ----
 export function fmtDuration(sec: number): string {
   const h = Math.floor(sec / 3600);

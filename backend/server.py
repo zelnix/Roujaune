@@ -387,6 +387,63 @@ async def coach_cue(req: CoachCueRequest):
         raise HTTPException(status_code=502, detail=f"Coaching generation failed: {e}")
 
 
+class CoachDebriefRequest(BaseModel):
+    workout: str = "Threshold Climb"
+    route: Optional[str] = None
+    duration_sec: int = 0
+    distance_km: float = 0
+    elevation_m: int = 0
+    avg_power: int = 0
+    norm_power: int = 0
+    power_target: int = 0
+    avg_cadence: int = 0
+    avg_hr: int = 0
+    max_hr: int = 0
+    calories: int = 0
+    tss: int = 0
+    intensity: float = 0
+    compliance: int = 0
+    zones: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+@api_router.post("/coach/debrief")
+async def coach_debrief(req: CoachDebriefRequest):
+    """Alberto's post-ride debrief: effort, zones and one tip for next time."""
+    key = os.environ.get("EMERGENT_LLM_KEY")
+    if not key:
+        raise HTTPException(status_code=503, detail="Coaching model not configured")
+
+    mins = req.duration_sec // 60
+    zones_txt = ", ".join(f"{z.get('z')} {z.get('pct', 0)}%" for z in req.zones) if req.zones else "n/a"
+    prompt = (
+        f"The rider just finished: {req.workout} on {req.route or 'the trainer'}.\n"
+        f"Duration {mins} min, {req.distance_km} km, {req.elevation_m} m climbing.\n"
+        f"Avg power {req.avg_power} W (normalised {req.norm_power} W, target {req.power_target} W), "
+        f"avg cadence {req.avg_cadence} rpm, avg HR {req.avg_hr} bpm (max {req.max_hr}).\n"
+        f"TSS {req.tss}, intensity {req.intensity}, calories {req.calories}, "
+        f"plan compliance {req.compliance}%. Time in zones: {zones_txt}.\n"
+        "Give a warm, personal post-ride debrief: 2 to 3 short sentences. "
+        "Praise what went well, note one thing physiologically/tactically, and end with "
+        "one concrete tip for next time. Speak as Alberto, first person, no lists, no emojis."
+    )
+
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(
+            api_key=key,
+            session_id="alberto-debrief",
+            system_message=ALBERTO_SYSTEM,
+        ).with_model("anthropic", "claude-sonnet-4-6")
+        reply = await chat.send_message(UserMessage(text=prompt))
+        text = (reply or "").strip().strip('"')
+        if not text:
+            raise ValueError("empty debrief")
+        return {"debrief": text}
+    except Exception as e:
+        logging.exception("coach_debrief failed")
+        raise HTTPException(status_code=502, detail=f"Debrief generation failed: {e}")
+
+
 # ----------------------- Trainer telemetry (BLE bridge stand-in) -----------------------
 class TrainerSim:
     """Server-side smart-trainer/wearable simulator.

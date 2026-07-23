@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -121,7 +121,8 @@ export function SummarySidebar({ active, onSelect, width, iconOnly = false }: { 
 }
 
 /* ======================= HERO SUMMARY ======================= */
-export function HeroSummaryCard({ compact = false }: { compact?: boolean }) {
+export function HeroSummaryCard({ compact = false, recap, recapLoading = false }: { compact?: boolean; recap?: string; recapLoading?: boolean }) {
+  const recapText = recap ?? C.recap;
   return (
     <View style={styles.hero} testID="hero-summary-card">
       <View style={[styles.heroImgWrap, compact && { minHeight: 130 }]}>
@@ -137,8 +138,11 @@ export function HeroSummaryCard({ compact = false }: { compact?: boolean }) {
         <View style={[styles.recapCard, compact && { marginTop: 10, padding: 10 }]}>
           <Image source={coachImg} style={[styles.recapAvatar, compact && { width: 40, height: 40, borderRadius: 20 }]} contentFit="cover" contentPosition="top center" />
           <View style={{ flex: 1 }}>
-            <Text style={styles.recapTitle}>{C.recapTitle}</Text>
-            <Text style={styles.recapText} numberOfLines={compact ? 2 : undefined}>{C.recap}</Text>
+            <View style={styles.recapTitleRow}>
+              <Text style={styles.recapTitle}>{C.recapTitle}</Text>
+              {recapLoading && <ActivityIndicator size="small" color={colors.yellow} />}
+            </View>
+            <Text style={styles.recapText} numberOfLines={compact ? 3 : undefined}>{recapLoading ? "Alberto is reviewing your ride…" : recapText}</Text>
           </View>
         </View>
       </View>
@@ -600,6 +604,7 @@ const styles = StyleSheet.create({
   heroSub: { color: colors.white, fontSize: 27, fontWeight: "800", letterSpacing: -0.5, marginTop: 2 },
   recapCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: colors.borderSoft, borderRadius: radius.md, padding: 12, marginTop: 16 },
   recapAvatar: { width: 52, height: 52, borderRadius: 26 },
+  recapTitleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
   recapTitle: { color: colors.yellow, fontSize: 13, fontWeight: "800" },
   recapText: { color: colors.textDim, fontSize: 13, marginTop: 3, lineHeight: 18 },
 
