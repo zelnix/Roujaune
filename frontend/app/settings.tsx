@@ -10,6 +10,27 @@ import { useCoach, setCoach, COACHES, CoachId } from "@/src/lib/coach-persona";
 const PITCH: Record<CoachId, number> = { alberto: 0.82, adriana: 1.22 };
 const PREVIEW_LINE = "Alright, let's ride. Hold steady and breathe — you've got this.";
 
+/** Resolve a coach's configured device voice: the Nth Spanish voice in device
+ * order (Alberto → 18, Adriana → 7), matching the workout audio logic. */
+async function resolveCoachVoice(voiceNum: number): Promise<{ id?: string; lang: string }> {
+  try {
+    const voices = await Speech.getAvailableVoicesAsync();
+    const seen = new Set<string>();
+    const es: Speech.Voice[] = [];
+    for (const v of voices) {
+      if (!v.identifier || seen.has(v.identifier)) continue;
+      if (!(v.language ?? "").toLowerCase().startsWith("es")) continue;
+      seen.add(v.identifier);
+      es.push(v);
+    }
+    const pick = es[voiceNum - 1] ?? es[0];
+    if (pick) return { id: pick.identifier, lang: pick.language ?? "es-ES" };
+  } catch {
+    /* fall through to pitch-only preview */
+  }
+  return { lang: "es-ES" };
+}
+
 export default function SettingsScreen() {
   const persona = useCoach();
   const [units, setUnits] = React.useState<"metric" | "imperial">("metric");
@@ -17,10 +38,13 @@ export default function SettingsScreen() {
   const [toggles, setToggles] = React.useState({ coachAudio: true, autoSync: true, weeklyReport: true, restReminders: false });
   const set = (k: keyof typeof toggles) => setToggles((t) => ({ ...t, [k]: !t[k] }));
 
-  const previewVoice = (id: CoachId) => {
+  const previewVoice = async (id: CoachId) => {
     Speech.stop();
     setPreviewing(id);
+    const v = await resolveCoachVoice(COACHES[id].voiceNum);
     Speech.speak(PREVIEW_LINE, {
+      voice: v.id,
+      language: v.lang,
       pitch: PITCH[id],
       rate: 0.92,
       onDone: () => setPreviewing(null),

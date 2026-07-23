@@ -60,19 +60,25 @@ function numbersToWords(text: string): string {
   });
 }
 
-/** Choose the device voice for a coach persona. Priority: the rider's saved
- * pick for THIS coach → the exact Spanish (English) voice number → a
- * matching-gender voice → any voice. `avoidId` keeps the two coaches distinct
- * so Alberto and Adriana never share the same device voice. */
+/** Choose the device voice for a coach persona. Priority: the EXACT requested
+ * Spanish (English) voice number (Alberto → 18, Adriana → 7, as configured) →
+ * the rider's manual pick for this coach (only when that number isn't on the
+ * device) → a matching-gender voice → any voice. `avoidId` keeps the two
+ * coaches distinct so Alberto and Adriana never share the same device voice. */
 function pickVoiceForCoach(opts: VoiceOption[], coachId: CoachId, savedId?: string | null, avoidId?: string): VoiceOption | undefined {
   if (!opts.length) return undefined;
   const persona = COACHES[coachId];
-  if (savedId) { const s = opts.find((o) => o.id === savedId); if (s) return s; }
   const notAvoid = (o: VoiceOption) => o.id !== avoidId;
 
+  // 1. The exact requested voice number — the rider's previously-set preference.
   const byNum = opts.find((o) => o.accent === "Spanish (English)" && o.num === persona.voiceNum && notAvoid(o));
   if (byNum) return byNum;
 
+  // 2. A manual pick made in the workout voice panel (fallback when this device
+  //    doesn't expose the exact requested number, e.g. the web preview).
+  if (savedId) { const s = opts.find((o) => o.id === savedId && notAvoid(o)); if (s) return s; }
+
+  // 3. Gender / distinct fallback so the two coaches still sound different.
   const es = opts.filter((o) => o.accent === "Spanish (English)");
   const pool = es.length ? es : opts;
   const byGender = pool.filter((o) => o.gender === persona.gender && notAvoid(o));
@@ -80,7 +86,6 @@ function pickVoiceForCoach(opts: VoiceOption[], coachId: CoachId, savedId?: stri
 
   const anyDistinct = pool.filter(notAvoid);
   if (anyDistinct.length) {
-    // Bias female coach toward the far end of the list to maximise timbre spread.
     return persona.gender === "female" ? anyDistinct[anyDistinct.length - 1] : anyDistinct[0];
   }
   return pool[0] || opts[0];
