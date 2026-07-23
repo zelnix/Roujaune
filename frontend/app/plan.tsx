@@ -29,7 +29,7 @@ function Toast({ message }: { message: { id: number; text: string } | null }) {
   }, [message, op]);
   if (!message) return null;
   return (
-    <Animated.View pointerEvents="none" style={[styles.toast, { opacity: op }]}>
+    <Animated.View style={[styles.toast, { opacity: op, pointerEvents: "none" }]}>
       <Text style={styles.toastText}>{message.text}</Text>
     </Animated.View>
   );
