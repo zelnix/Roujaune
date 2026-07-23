@@ -6,48 +6,30 @@ import * as Speech from "expo-speech";
 import { AppScaffold, Card, SectionTitle, Toggle } from "@/src/components/app-scaffold";
 import { CC } from "@/src/components/calendar";
 import { useCoach, setCoach, COACHES, CoachId, COACH_STYLES, VOICE_GUIDANCE_OPTS, useCoachStyle, setCoachStyle, useVoiceGuidance, setVoiceGuidance, CoachStyle, VoiceGuidance } from "@/src/lib/coach-persona";
+import { resolveBothCoachVoices, ResolvedVoice, COACH_PITCH } from "@/src/lib/coach-voice";
 
-const PITCH: Record<CoachId, number> = { alberto: 0.82, adriana: 1.22 };
 const PREVIEW_LINE = "Alright, let's ride. Hold steady and breathe — you've got this.";
-
-/** Resolve a coach's configured device voice: the Nth Spanish voice in device
- * order (Alberto → 18, Adriana → 7), matching the workout audio logic. */
-async function resolveCoachVoice(voiceNum: number): Promise<{ id?: string; lang: string }> {
-  try {
-    const voices = await Speech.getAvailableVoicesAsync();
-    const seen = new Set<string>();
-    const es: Speech.Voice[] = [];
-    for (const v of voices) {
-      if (!v.identifier || seen.has(v.identifier)) continue;
-      if (!(v.language ?? "").toLowerCase().startsWith("es")) continue;
-      seen.add(v.identifier);
-      es.push(v);
-    }
-    const pick = es[voiceNum - 1] ?? es[0];
-    if (pick) return { id: pick.identifier, lang: pick.language ?? "es-ES" };
-  } catch {
-    /* fall through to pitch-only preview */
-  }
-  return { lang: "es-ES" };
-}
 
 export default function SettingsScreen() {
   const persona = useCoach();
   const coachStyle = useCoachStyle();
   const voiceGuidance = useVoiceGuidance();
+  const voices = React.useRef<Record<CoachId, ResolvedVoice> | null>(null);
   const [units, setUnits] = React.useState<"metric" | "imperial">("metric");
   const [previewing, setPreviewing] = React.useState<CoachId | null>(null);
   const [toggles, setToggles] = React.useState({ coachAudio: true, autoSync: true, weeklyReport: true, restReminders: false });
   const set = (k: keyof typeof toggles) => setToggles((t) => ({ ...t, [k]: !t[k] }));
 
+  React.useEffect(() => { resolveBothCoachVoices().then((r) => { voices.current = r; }); }, []);
+
   const previewVoice = async (id: CoachId) => {
     Speech.stop();
     setPreviewing(id);
-    const v = await resolveCoachVoice(COACHES[id].voiceNum);
+    const v = voices.current?.[id] ?? (await resolveBothCoachVoices())[id];
     Speech.speak(PREVIEW_LINE, {
       voice: v.id,
       language: v.lang,
-      pitch: PITCH[id],
+      pitch: COACH_PITCH[id],
       rate: 0.92,
       onDone: () => setPreviewing(null),
       onStopped: () => setPreviewing(null),
@@ -89,7 +71,7 @@ export default function SettingsScreen() {
                   style={[s.coachCard, on && s.coachOn]}>
                   <Image source={c.image} style={s.coachImg} contentFit="cover" contentPosition="top center" />
                   <Text style={[s.coachName, on && { color: CC.white }]}>{c.name}</Text>
-                  <Text style={s.coachRole}>Voice {c.voiceNum}</Text>
+                  <Text style={s.coachRole}>{c.gender === "male" ? "Spanish accent · male" : "Spanish accent · female"}</Text>
                   {on && <View style={s.coachCheck}><Ionicons name="checkmark" size={13} color="#04210F" /></View>}
                   <Pressable testID={`preview-${id}`} onPress={() => previewVoice(id)} hitSlop={8}
                     accessibilityRole="button" accessibilityLabel={`Preview ${c.name}'s voice`}

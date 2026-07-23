@@ -15,6 +15,8 @@ import { FeaturedRouteCard } from "@/src/components/FeaturedRouteCard";
 import { CalendarCard } from "@/src/components/CalendarCard";
 import { ProgressCard, CommunityCard, WellnessCard, AchievementCard } from "@/src/components/BottomCards";
 import { navItems, navFooter } from "@/src/data";
+import { useCoach } from "@/src/lib/coach-persona";
+import { CoachChatModal } from "@/src/components/CoachChatModal";
 
 function Toast({ message }: { message: { id: number; text: string } | null }) {
   const anim = React.useRef(new Animated.Value(0)).current;
@@ -54,7 +56,9 @@ export default function Dashboard() {
   const heroHeight = compact ? Math.max(320, Math.round(height * 0.94)) : 432;
 
   const router = useRouter();
+  const persona = useCoach();
   const [active, setActive] = React.useState("home");
+  const [showChat, setShowChat] = React.useState(false);
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
 
   const showToast = React.useCallback((text: string) => {
@@ -100,6 +104,7 @@ export default function Dashboard() {
               height={heroHeight}
               onStart={() => router.push("/training")}
               onToast={showToast}
+              onMessage={() => setShowChat(true)}
               compact={compact}
             />
 
@@ -128,6 +133,7 @@ export default function Dashboard() {
       </SafeAreaView>
 
       <Toast message={toast} />
+      <CoachChatModal visible={showChat} onClose={() => setShowChat(false)} persona={persona} />
     </GestureHandlerRootView>
   );
 }

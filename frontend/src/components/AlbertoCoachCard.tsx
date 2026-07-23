@@ -1,13 +1,14 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Image } from "expo-image";
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, radius, spacing } from "../theme";
 import { coach } from "../data";
 import { useCoach } from "../lib/coach-persona";
 import { PrimaryButton } from "./ui";
 
-export function AlbertoCoachCard({ width, onStart, compact = false }: { width: number; onStart: () => void; compact?: boolean }) {
+export function AlbertoCoachCard({ width, onStart, onMessage, compact = false }: { width: number; onStart: () => void; onMessage?: () => void; compact?: boolean }) {
   const persona = useCoach();
   const portraitW = compact ? 108 : 150;
   return (
@@ -46,6 +47,18 @@ export function AlbertoCoachCard({ width, onStart, compact = false }: { width: n
           onPress={onStart}
           style={{ marginTop: spacing.sm, alignSelf: "stretch" }}
         />
+        {onMessage ? (
+          <Pressable
+            testID="home-message-coach"
+            onPress={onMessage}
+            accessibilityRole="button"
+            accessibilityLabel={`Message ${persona.name}`}
+            style={({ hovered }: any) => [styles.msgBtn, hovered && styles.msgBtnHover]}
+          >
+            <Ionicons name="chatbubble-ellipses-outline" size={15} color={colors.yellow} />
+            <Text style={styles.msgText}>Message {persona.name}</Text>
+          </Pressable>
+        ) : null}
       </View>
     </LinearGradient>
   );
@@ -69,4 +82,7 @@ const styles = StyleSheet.create({
   quoteMark: { color: colors.gold, fontSize: 46, lineHeight: 46, fontWeight: "800", marginTop: -6 },
   quote: { color: colors.white, fontSize: 24, fontWeight: "800", lineHeight: 27, marginTop: 2 },
   support: { color: colors.textDim, fontSize: 12.5, lineHeight: 17, marginTop: 8, marginBottom: 4 },
+  msgBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 8, borderWidth: 1, borderColor: "rgba(255,194,10,0.35)", borderRadius: radius.md, paddingVertical: 9, backgroundColor: "rgba(255,194,10,0.06)", minHeight: 40 },
+  msgBtnHover: { backgroundColor: "rgba(255,194,10,0.14)" },
+  msgText: { color: colors.yellow, fontSize: 12.5, fontWeight: "700" },
 });

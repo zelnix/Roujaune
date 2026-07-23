@@ -3,6 +3,7 @@ import * as Speech from "expo-speech";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getVoiceId, setVoiceId } from "../lib/prefs";
 import { useCoach, setCoach as persistCoach, COACHES, CoachId } from "../lib/coach-persona";
+import { detectGender, COACH_PITCH } from "../lib/coach-voice";
 
 // Royalty-free instrumental track used as upbeat cycling music (admin-replaceable).
 const MUSIC_SOURCE = { uri: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3" };
@@ -30,16 +31,8 @@ function accentOf(lang: string): string {
   if (l.startsWith("fr")) return "French (English)";
   return "English";
 }
-const FEMALE_NAMES = ["monica", "mónica", "paulina", "marisol", "esperanza", "mujer", "sabina", "elena", "samantha", "karen", "victoria", "moira", "tessa", "fiona"];
-const MALE_NAMES = ["jorge", "diego", "carlos", "enrique", "miguel", "pablo", "juan", "hombre", "gonzalo", "daniel", "arthur", "oliver", "aaron", "fred", "reed", "rishi"];
 function genderOf(v: Speech.Voice): "male" | "female" | "neutral" {
-  const s = `${v.name ?? ""} ${v.identifier ?? ""}`.toLowerCase();
-  const isFemale = s.includes("female") || FEMALE_NAMES.some((n) => s.includes(n));
-  if (isFemale) return "female";
-  // Strip "female" so the substring "male" inside it can't cause a false match.
-  const sm = s.replace(/female/g, "");
-  if (sm.includes("male") || MALE_NAMES.some((n) => s.includes(n))) return "male";
-  return "neutral";
+  return detectGender(v);
 }
 
 // Speak numbers in English words so a Spanish voice doesn't read digits in
@@ -60,40 +53,36 @@ function numbersToWords(text: string): string {
   });
 }
 
-/** Choose the device voice for a coach persona. Priority: the EXACT requested
- * Spanish (English) voice number (Alberto → 18, Adriana → 7, as configured) →
- * the rider's manual pick for this coach (only when that number isn't on the
- * device) → a matching-gender voice → any voice. `avoidId` keeps the two
- * coaches distinct so Alberto and Adriana never share the same device voice. */
+/** Choose the device voice for a coach persona — GENDER-FIRST so Alberto is a
+ * Spanish-accented male voice and Adriana a Spanish-accented female voice.
+ * Priority: the rider's explicit manual pick for this coach → Spanish + matching
+ * gender (distinct from the other coach) → matching gender → any distinct Spanish
+ * → any distinct. `avoidId` keeps the two coaches on different device voices. */
 function pickVoiceForCoach(opts: VoiceOption[], coachId: CoachId, savedId?: string | null, avoidId?: string): VoiceOption | undefined {
   if (!opts.length) return undefined;
   const persona = COACHES[coachId];
+  const opp = persona.gender === "male" ? "female" : "male";
   const notAvoid = (o: VoiceOption) => o.id !== avoidId;
 
-  // 1. The exact requested voice number — the rider's previously-set preference.
-  const byNum = opts.find((o) => o.accent === "Spanish (English)" && o.num === persona.voiceNum && notAvoid(o));
-  if (byNum) return byNum;
+  // 1. The rider's own manual pick for this coach always wins.
+  if (savedId) { const s = opts.find((o) => o.id === savedId); if (s) return s; }
 
-  // 2. A manual pick made in the workout voice panel (fallback when this device
-  //    doesn't expose the exact requested number, e.g. the web preview).
-  if (savedId) { const s = opts.find((o) => o.id === savedId && notAvoid(o)); if (s) return s; }
-
-  // 3. Gender / distinct fallback so the two coaches still sound different.
   const es = opts.filter((o) => o.accent === "Spanish (English)");
-  const pool = es.length ? es : opts;
-  const byGender = pool.filter((o) => o.gender === persona.gender && notAvoid(o));
-  if (byGender.length) return byGender[0];
-
-  const anyDistinct = pool.filter(notAvoid);
-  if (anyDistinct.length) {
-    return persona.gender === "female" ? anyDistinct[anyDistinct.length - 1] : anyDistinct[0];
-  }
-  return pool[0] || opts[0];
+  const tiers: VoiceOption[][] = [
+    es.filter((o) => o.gender === persona.gender && notAvoid(o)),  // Spanish + gender + distinct
+    es.filter((o) => o.gender === persona.gender),                 // Spanish + gender
+    es.filter((o) => o.gender !== opp && notAvoid(o)),             // Spanish, not opposite gender, distinct
+    es.filter(notAvoid),                                           // any Spanish distinct
+    opts.filter((o) => o.gender === persona.gender && notAvoid(o)),// any accent + gender distinct
+    opts.filter(notAvoid),                                         // any distinct
+  ];
+  for (const t of tiers) { if (t.length) return t[0]; }
+  return opts[0];
 }
 
-// Per-coach speaking pitch — a clear separation so the two coaches sound
-// distinct even when the device exposes only one usable voice.
-const PITCH: Record<CoachId, number> = { alberto: 0.82, adriana: 1.22 };
+// Per-coach speaking pitch (shared) — a gentle secondary distinction now that
+// voices are gender-correct.
+const PITCH = COACH_PITCH;
 
 /** Cycling music + the coach's spoken cues.
  * Music softens (ducks) while a cue is spoken, then returns to full volume.

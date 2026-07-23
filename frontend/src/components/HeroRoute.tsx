@@ -39,12 +39,14 @@ export function HeroRoute({
   height,
   onStart,
   onToast,
+  onMessage,
   compact = false,
 }: {
   width: number;
   height: number;
   onStart: () => void;
   onToast: (m: string) => void;
+  onMessage?: () => void;
   compact?: boolean;
 }) {
   const persona = useCoach();
@@ -101,6 +103,7 @@ export function HeroRoute({
         <AlbertoCoachCard
           width={compact ? Math.min(380, width * 0.56) : Math.min(460, width * 0.44)}
           onStart={onStart}
+          onMessage={onMessage}
           compact={compact}
         />
       </View>
