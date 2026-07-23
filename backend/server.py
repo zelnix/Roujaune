@@ -510,6 +510,64 @@ def _chat_id(coach_name: str) -> str:
     return f"chat-{coach_name.lower()}"
 
 
+async def _build_rider_context(plan_id: str = "build-and-climb") -> str:
+    """Assemble a compact, factual snapshot of the rider (latest ride, current
+    plan phase/progress, readiness) so the coach can reference real numbers in
+    chat. Best-effort — returns whatever is available, never raises."""
+    lines: List[str] = []
+    try:
+        plan = await db.training_plans.find_one({"id": plan_id})
+        if not plan:
+            plan = dict(BUILD_AND_CLIMB)
+        phase = plan.get("phase", {})
+        prog = plan.get("progress", {})
+        goals = [g.get("title") for g in plan.get("goals", []) if g.get("status") != "complete"]
+        lines.append(
+            f"Plan: {plan.get('title')} — {phase.get('name')} ({phase.get('weeks')}), "
+            f"week {plan.get('current_week')} of {plan.get('duration_weeks')}."
+        )
+        if prog:
+            lines.append(
+                f"Progress: {prog.get('workouts')} workouts done, {prog.get('time')} ridden, "
+                f"{prog.get('tss')} TSS, fitness CTL {prog.get('ctl')}, fatigue ATL {prog.get('atl')}, form TSB {prog.get('tsb')}."
+            )
+        if goals:
+            lines.append("Open goals: " + ", ".join(goals) + ".")
+    except Exception:
+        logging.warning("rider context: plan lookup failed")
+
+    try:
+        ride = await db.ride_history.find().sort("created_at", -1).to_list(length=1)
+        if ride:
+            r = ride[0]
+            mins = (r.get("duration_sec") or 0) // 60
+            lines.append(
+                f"Last ride: {r.get('workout')} on {r.get('route') or 'the trainer'}, "
+                f"{mins} min, {r.get('distance_km')} km, avg power {r.get('avg_power')} W, TSS {r.get('tss')}."
+            )
+    except Exception:
+        logging.warning("rider context: ride lookup failed")
+
+    try:
+        rd = WELLNESS_DATA.get("readiness", {})
+        vit = {v.get("key"): v for v in WELLNESS_DATA.get("vitals", [])}
+        sleep = vit.get("sleep", {}).get("value")
+        hrv = vit.get("hrv", {}).get("value")
+        stress = vit.get("stress", {}).get("value")
+        lines.append(
+            f"Readiness: {rd.get('score')}% ({rd.get('status')}); sleep {sleep}, HRV {hrv}, stress {stress}."
+        )
+    except Exception:
+        logging.warning("rider context: readiness lookup failed")
+
+    if not lines:
+        return ""
+    return (
+        "Here is the rider's current context (use it naturally only when relevant; "
+        "do not dump these numbers unprompted):\n- " + "\n- ".join(lines)
+    )
+
+
 class CoachChatRequest(BaseModel):
     coach_name: str = "Alberto"
     coach_gender: str = "male"
@@ -546,12 +604,17 @@ async def coach_chat(req: CoachChatRequest):
     doc = await db.coach_chats.find_one({"id": cid})
     history = (doc or {}).get("messages", [])
 
+    rider_ctx = await _build_rider_context()
+
     recent = history[-10:]
     transcript = "\n".join(
         f"{'Rider' if m.get('role') == 'user' else req.coach_name}: {m.get('text')}" for m in recent
     )
-    prompt = (f"Conversation so far:\n{transcript}\n\n" if transcript else "") + \
-        f"Rider: {req.message.strip()}\n{req.coach_name}:"
+    prompt = (
+        f"{rider_ctx}\n\n" if rider_ctx else ""
+    ) + (
+        f"Conversation so far:\n{transcript}\n\n" if transcript else ""
+    ) + f"Rider: {req.message.strip()}\n{req.coach_name}:"
 
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
