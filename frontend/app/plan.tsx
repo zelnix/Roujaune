@@ -15,8 +15,6 @@ import {
 } from "@/src/components/plan";
 import { SideNavigation } from "@/src/components/SideNavigation";
 
-const DESIGN_W = 1280; // 96px rail + 1184px content (content geometry the cards are authored for)
-
 function Toast({ message }: { message: { id: number; text: string } | null }) {
   const op = React.useRef(new Animated.Value(0)).current;
   React.useEffect(() => {
@@ -73,9 +71,6 @@ export default function TrainingPlanScreen() {
   };
   const onPhase = (p: PlanPhase) => showToast(`${p.name} · ${p.weeks} · ${p.pct}% complete`);
   const onWorkout = (w: KeyWorkout) => showToast(`${w.title} · ${w.duration} · ${w.tss}`);
-
-  const fitScaleX = 1;
-  const fitScaleY = 1;
 
   const rightW = 336;
   const contentW = availW > 0 ? availW : width - 96;
@@ -140,17 +135,19 @@ export default function TrainingPlanScreen() {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: C.bg }}>
       <StatusBar hidden />
       <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={["top", "bottom", "left"]}>
-        <View
-          style={styles.fitOuter}
-          onLayout={(e) => { setAvailW(e.nativeEvent.layout.width); setAvailH(e.nativeEvent.layout.height); }}
-        >
-          <PlanProvider value={plan}>
-            <View style={[styles.canvas, { width: DESIGN_W, transform: [{ scaleX: fitScaleX }, { scaleY: fitScaleY }] }]}>
-              <SideNavigation active="training" onSelect={onSelectNav} width={96} />
-              <View style={styles.content}>{Grid}</View>
-            </View>
-          </PlanProvider>
-        </View>
+        <PlanProvider value={plan}>
+          <View style={styles.canvas}>
+            {!compact && <SideNavigation active="training" onSelect={onSelectNav} width={96} />}
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={styles.content}
+              showsVerticalScrollIndicator={false}
+              onLayout={(e) => setAvailW(e.nativeEvent.layout.width)}
+            >
+              {Grid}
+            </ScrollView>
+          </View>
+        </PlanProvider>
         <Toast message={toast} />
       </SafeAreaView>
     </GestureHandlerRootView>
@@ -158,9 +155,8 @@ export default function TrainingPlanScreen() {
 }
 
 const styles = StyleSheet.create({
-  fitOuter: { flex: 1, alignItems: "center", justifyContent: "center" },
-  canvas: { flexDirection: "row", alignSelf: "center" },
-  content: { flex: 1, paddingHorizontal: 22, paddingVertical: 18 },
+  canvas: { flex: 1, flexDirection: "row", backgroundColor: C.bg },
+  content: { paddingHorizontal: 22, paddingVertical: 18 },
   gridInner: { gap: 14 },
   headerRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 20 },
   headerRight: { alignItems: "flex-end", gap: 12 },
