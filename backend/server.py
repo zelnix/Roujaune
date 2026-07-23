@@ -216,8 +216,8 @@ async def summarize_workout(body: SummarizeRequest):
     low to be meaningful (e.g. a quick demo tap-through)."""
     powers = [s.power for s in body.samples if s.power is not None]
     if len(body.samples) < 30 or not powers:
-        await _save_ride_history(body, REFERENCE_SUMMARY)
-        return REFERENCE_SUMMARY
+        rid = await _save_ride_history(body, REFERENCE_SUMMARY)
+        return {**REFERENCE_SUMMARY, "id": rid}
 
     hrs = [s.hr for s in body.samples if s.hr]
     cads = [s.cadence for s in body.samples if s.cadence]
@@ -295,15 +295,18 @@ async def summarize_workout(body: SummarizeRequest):
             "completed": 100,
         },
     }
-    await _save_ride_history(body, result)
-    return result
+    rid = await _save_ride_history(body, result)
+    return {**result, "id": rid}
 
 
-async def _save_ride_history(body: SummarizeRequest, result: dict):
-    """Persist a lightweight ride-history record (route + key metrics)."""
+async def _save_ride_history(body: SummarizeRequest, result: dict) -> Optional[str]:
+    """Persist a lightweight ride-history record (route + key metrics).
+
+    Returns the new record id so the debrief can later be cached against it."""
     try:
+        rid = str(uuid.uuid4())
         doc = {
-            "id": str(uuid.uuid4()),
+            "id": rid,
             "created_at": now_iso(),
             "workout": body.workout,
             "route": body.route,
@@ -313,10 +316,13 @@ async def _save_ride_history(body: SummarizeRequest, result: dict):
             "avg_power": result.get("avg_power"),
             "tss": result.get("tss"),
             "computed": result.get("computed", False),
+            "debrief": None,
         }
         await db.ride_history.insert_one(doc)
+        return rid
     except Exception as e:  # never block the summary on history write
         logger.warning(f"ride_history insert failed: {e}")
+        return None
 
 
 @api_router.get("/rides/history")
@@ -388,6 +394,7 @@ async def coach_cue(req: CoachCueRequest):
 
 
 class CoachDebriefRequest(BaseModel):
+    ride_id: Optional[str] = None
     workout: str = "Threshold Climb"
     route: Optional[str] = None
     duration_sec: int = 0
@@ -412,6 +419,15 @@ async def coach_debrief(req: CoachDebriefRequest):
     key = os.environ.get("EMERGENT_LLM_KEY")
     if not key:
         raise HTTPException(status_code=503, detail="Coaching model not configured")
+
+    # Return the cached debrief if this ride already has one.
+    if req.ride_id:
+        try:
+            doc = await db.ride_history.find_one({"id": req.ride_id})
+            if doc and doc.get("debrief"):
+                return {"debrief": doc["debrief"], "cached": True}
+        except Exception:
+            logging.warning("debrief cache lookup failed")
 
     mins = req.duration_sec // 60
     zones_txt = ", ".join(f"{z.get('z')} {z.get('pct', 0)}%" for z in req.zones) if req.zones else "n/a"
@@ -438,7 +454,13 @@ async def coach_debrief(req: CoachDebriefRequest):
         text = (reply or "").strip().strip('"')
         if not text:
             raise ValueError("empty debrief")
-        return {"debrief": text}
+        # Cache it against the ride so revisits don't re-generate (or re-charge).
+        if req.ride_id:
+            try:
+                await db.ride_history.update_one({"id": req.ride_id}, {"$set": {"debrief": text}})
+            except Exception:
+                logging.warning("debrief cache write failed")
+        return {"debrief": text, "cached": False}
     except Exception as e:
         logging.exception("coach_debrief failed")
         raise HTTPException(status_code=502, detail=f"Debrief generation failed: {e}")

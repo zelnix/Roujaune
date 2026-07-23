@@ -5,6 +5,7 @@ export type Zone = { z: string; time: string; pct: number; w: number };
 
 export type SummaryStats = {
   computed: boolean;
+  id?: string | null;
   duration_sec: number;
   distance_km: number;
   elevation_m: number;
@@ -153,6 +154,7 @@ export function useCoachDebrief(stats: SummaryStats, route: RideRoute) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            ride_id: stats.id ?? null,
             workout: rec.workout || summaryContent.title,
             route: route?.name ?? rec.route ?? null,
             duration_sec: stats.duration_sec,
