@@ -810,6 +810,15 @@ export function CastButton({ casting, onPress }: { casting: boolean; onPress: ()
   );
 }
 
+export function RiderButton({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable style={[styles.mediaPill, styles.mediaPillOff]} onPress={onPress} testID="rider-button" hitSlop={8} accessibilityRole="button" accessibilityLabel="Choose and customise your rider">
+      <Ionicons name="bicycle" size={22} color={colors.white} />
+      <Text style={[styles.mediaPillLabel, { color: colors.white }]}>Rider</Text>
+    </Pressable>
+  );
+}
+
 const CAST_DEVICES = [
   { id: "living", name: "Living Room TV", kind: "tv" as const },
   { id: "studio", name: "Studio Display", kind: "monitor" as const },

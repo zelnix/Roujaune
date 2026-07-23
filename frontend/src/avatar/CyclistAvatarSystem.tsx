@@ -6,7 +6,7 @@ import { CyclistAvatar } from "./CyclistAvatar";
 export { AvatarSelector } from "./AvatarSelector";
 export { AvatarCustomizer } from "./AvatarCustomizer";
 export { CyclistAvatar } from "./CyclistAvatar";
-export { useAvatarAnimation } from "./useAvatarAnimation";
+export { useAvatarAnimation, useAutoStanding } from "./useAvatarAnimation";
 export * from "./avatarConfigs";
 
 /** Persisted avatar choice: which avatar + any appearance overrides. */

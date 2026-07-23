@@ -2,6 +2,25 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const LAST_ROUTE_KEY = "roujaune:lastRouteId";
 const VOICE_KEY = "roujaune:voiceId";
+const AVATAR_KEY = "roujaune:avatarChoice";
+
+/** Persisted avatar choice ({ avatarId, appearance }) as JSON. */
+export async function getAvatarChoice(): Promise<any | null> {
+  try {
+    const v = await AsyncStorage.getItem(AVATAR_KEY);
+    return v ? JSON.parse(v) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function setAvatarChoice(choice: any): Promise<void> {
+  try {
+    await AsyncStorage.setItem(AVATAR_KEY, JSON.stringify(choice));
+  } catch {
+    /* noop */
+  }
+}
 
 /** Persisted identifier of Alberto's chosen TTS voice (across sessions). */
 export async function getVoiceId(): Promise<string | null> {

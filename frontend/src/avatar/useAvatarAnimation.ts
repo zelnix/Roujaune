@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useFrameCallback, useSharedValue, SharedValue } from "react-native-reanimated";
 import { AvatarInputs } from "./avatarConfigs";
 
@@ -68,4 +68,21 @@ export function useAvatarAnimation(inputs: AvatarInputs): AvatarMotion {
   });
 
   return { crank, wheel, lean, stand, effort };
+}
+
+/** Decide when the rider stands out of the saddle to climb, from power + cadence.
+ * Standing = a big-gear grind (high power, low cadence). Uses hysteresis so the
+ * rider doesn't flicker in/out of the saddle near the threshold. */
+export function useAutoStanding(power: number, cadence: number): boolean {
+  const [standing, setStanding] = useState(false);
+  useEffect(() => {
+    setStanding((prev) => {
+      // Enter: strong effort while cadence drops (climbing surge).
+      if (!prev && power >= 285 && cadence <= 74) return true;
+      // Exit: effort eases or cadence spins back up (back in the saddle).
+      if (prev && (power <= 245 || cadence >= 84)) return false;
+      return prev;
+    });
+  }, [power, cadence]);
+  return standing;
 }

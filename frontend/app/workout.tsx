@@ -9,7 +9,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing, shadow } from "@/src/theme";
 import { useTelemetry } from "@/src/hooks/useTelemetry";
 import { rideRecorder } from "@/src/lib/ride";
-import { getLastRouteId, setLastRouteId } from "@/src/lib/prefs";
+import { getLastRouteId, setLastRouteId, getAvatarChoice, setAvatarChoice } from "@/src/lib/prefs";
 import { useSettings } from "@/src/lib/settings";
 import { routeVideos, nextInterval, currentWorkout } from "@/src/data";
 import { RouteVideo } from "@/src/components/RouteVideo";
@@ -17,11 +17,13 @@ import {
   WorkoutTopBar, PowerCard, HeartRateCard, CadenceCard, WorkoutTimelineCard,
   ClimbCard, RouteMapCard, WearableDataCard, RideSummaryStrip,
   TrainerControlBar, AlbertoLiveCue, NextUpStrip, SafetyNote, ImmersiveHud, VideoPlaceholder,
-  RoutesButton, RoutePicker, SettingsPanel, MusicPanel, MusicButton, CastButton, CastPanel,
+  RoutesButton, RoutePicker, SettingsPanel, MusicPanel, MusicButton, CastButton, CastPanel, RiderButton,
 } from "@/src/components/workout";
 import { useWorkoutAudio } from "@/src/hooks/useWorkoutAudio";
 import { useCast } from "@/src/hooks/useCast";
 import { fetchCoachCue } from "@/src/lib/coach";
+import { CyclistAvatarOverlay, DEFAULT_CHOICE, AvatarChoice, useAutoStanding } from "@/src/avatar/CyclistAvatarSystem";
+import { AvatarSheet } from "@/src/avatar/AvatarSheet";
 
 // Alberto's cues are generated live from the rider's real telemetry so the
 // coaching reflects what's actually happening on the bike.
@@ -129,11 +131,26 @@ export default function LiveWorkout() {
   const [showMusic, setShowMusic] = React.useState(false);
   const [showCast, setShowCast] = React.useState(false);
   const [castingTo, setCastingTo] = React.useState<string | null>(null);
+  const [showRider, setShowRider] = React.useState(false);
+  const [avatarChoice, setAvatarChoiceState] = React.useState<AvatarChoice>(DEFAULT_CHOICE);
+
+  // Load the rider's saved avatar + kit once.
+  React.useEffect(() => {
+    (async () => {
+      const saved = await getAvatarChoice();
+      if (saved?.avatarId) setAvatarChoiceState(saved);
+    })();
+  }, []);
+  const updateAvatar = React.useCallback((c: AvatarChoice) => { setAvatarChoiceState(c); setAvatarChoice(c); }, []);
+
   const [hudVisible, setHudVisible] = React.useState(true);
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
   const [cueIdx] = React.useState(0);
 
   const { telemetry, connectionState, stale, sendErg, pause, resume, simulateDropout } = useTelemetry();
+
+  // Rider stands out of the saddle to climb, based on power + cadence.
+  const autoStanding = useAutoStanding(telemetry.power, telemetry.cadence);
   const { settings, setSetting, loaded } = useSettings();
   const erg = telemetry.erg;
 
@@ -380,7 +397,22 @@ export default function LiveWorkout() {
         <View style={styles.mediaBar} pointerEvents="box-none">
           <MusicButton musicOn={musicOn} onPress={() => setShowMusic(true)} />
           <CastButton casting={castSupported ? !!castDeviceName : !!castingTo} onPress={() => (castSupported ? showCastDialog() : setShowCast(true))} />
+          <RiderButton onPress={() => setShowRider(true)} />
         </View>
+
+        <CyclistAvatarOverlay
+          choice={avatarChoice}
+          size={132}
+          style={styles.avatarOverlay}
+          inputs={{
+            cadence: telemetry.cadence,
+            power: telemetry.power,
+            resistance: 45,
+            speed: telemetry.speed,
+            isStanding: autoStanding,
+            isPaused: paused,
+          }}
+        />
 
         {showControls && (
           <Pressable style={styles.overlay} testID="controls-overlay" onPress={() => setShowControls(false)}>
@@ -515,6 +547,10 @@ export default function LiveWorkout() {
         />
       )}
 
+      {showRider && (
+        <AvatarSheet choice={avatarChoice} onChange={updateAvatar} onClose={() => setShowRider(false)} />
+      )}
+
       <Toast message={toast} />
     </GestureHandlerRootView>
   );
@@ -526,6 +562,7 @@ const styles = StyleSheet.create({
   fitOuter: { flex: 1, alignItems: "center", justifyContent: "center" },
   fitInner: { width: DESIGN_W },
   mediaBar: { position: "absolute", bottom: 24, left: 20, flexDirection: "row", gap: 10, zIndex: 20 },
+  avatarOverlay: { position: "absolute", left: 6, bottom: 78, zIndex: 18 },
   immersive: { ...StyleSheet.absoluteFillObject, backgroundColor: "#000", zIndex: 50 },
   hudEye: { position: "absolute", top: 12, left: 12, width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center", zIndex: 5 },
   hudCast: { position: "absolute", top: 56, left: 12, width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center", zIndex: 5 },
