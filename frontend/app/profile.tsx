@@ -57,6 +57,7 @@ export default function ProfileScreen() {
 
   const [editing, setEditing] = React.useState(false);
   const genderLabel = GENDERS.find((g) => g.id === profile.gender)?.label ?? "—";
+  const locationText = [profile.city, profile.region, profile.country].map((p) => p?.trim()).filter(Boolean).join(", ");
 
   const pickImage = async () => {
     // Contextual permission handling for the photo library.
@@ -104,6 +105,12 @@ export default function ProfileScreen() {
             <View style={{ flex: 1 }}>
               <Text style={s.name}>{profile.name}</Text>
               <Text style={s.org}>Roujaune · Harmony Wellness Group</Text>
+              {locationText ? (
+                <View style={s.locRow}>
+                  <Ionicons name="location" size={13} color={CC.yellow} />
+                  <Text style={s.locText}>{locationText}</Text>
+                </View>
+              ) : null}
               <View style={s.badgeRow}>
                 <View style={s.tierBadge}>
                   <Ionicons name="star" size={11} color="#241B00" />
@@ -268,6 +275,8 @@ const s = StyleSheet.create({
   cameraBadge: { position: "absolute", right: -2, bottom: -2, width: 28, height: 28, borderRadius: 14, backgroundColor: CC.yellow, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: CC.bg },
   name: { color: CC.white, fontSize: 24, fontWeight: "900" },
   org: { color: CC.dim, fontSize: 13, marginTop: 2 },
+  locRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 6 },
+  locText: { color: CC.white, fontSize: 13, fontWeight: "600" },
   badgeRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" },
   tierBadge: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: CC.yellow, borderRadius: 999, paddingVertical: 5, paddingHorizontal: 11 },
   tierText: { color: "#241B00", fontSize: 12, fontWeight: "800" },

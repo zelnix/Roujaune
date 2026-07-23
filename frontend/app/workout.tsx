@@ -577,6 +577,9 @@ export default function LiveWorkout() {
                 onPause={onPauseToggle}
                 onEnd={() => { setExpanded(false); router.replace("/summary"); }}
                 onOpenRoutes={() => setShowRoutes(true)}
+                musicOn={musicOn}
+                trackName={trackName}
+                onSkip={() => { nextTrack(); showToast("Skipped to next track"); }}
               />
             )}
             <Pressable

@@ -608,11 +608,12 @@ function HudChip({ icon, color, label, value, unit }: { icon: React.ReactNode; c
 
 export function ImmersiveHud({
   elapsed, power, wkg, hr, cadence, speed, progress, connectionState, stale, paused, cue, onPause, onEnd, onOpenRoutes,
-  trainerConnected = true, wearableConnected = true,
+  trainerConnected = true, wearableConnected = true, musicOn, trackName, onSkip,
 }: {
   elapsed: string; power: number; wkg: string; hr: number; cadence: number; speed: string | number; progress: string;
   connectionState: string; stale: boolean; paused: boolean; cue: string; onPause: () => void; onEnd: () => void; onOpenRoutes: () => void;
   trainerConnected?: boolean; wearableConnected?: boolean;
+  musicOn?: boolean; trackName?: string; onSkip?: () => void;
 }) {
   const conn = connMeta(connectionState, stale);
   const NC = "—";
@@ -636,6 +637,17 @@ export function ImmersiveHud({
       <View style={styles.hudRoutes} pointerEvents="box-none">
         <RoutesButton onPress={onOpenRoutes} testID="hud-routes" />
       </View>
+
+      {/* now-playing (see/skip music without collapsing the ride) */}
+      {musicOn && trackName ? (
+        <View style={styles.hudNowPlaying} pointerEvents="box-none" testID="hud-now-playing">
+          <Ionicons name="musical-notes" size={13} color={colors.yellow} />
+          <Text style={styles.hudNowPlayingText} numberOfLines={1}>{trackName}</Text>
+          <Pressable onPress={onSkip} hitSlop={10} testID="hud-skip-track" accessibilityRole="button" accessibilityLabel="Skip to next track" style={styles.hudSkipBtn}>
+            <Ionicons name="play-skip-forward" size={15} color="#fff" />
+          </Pressable>
+        </View>
+      ) : null}
 
       {/* Alberto cue */}
       <View style={styles.hudCue} pointerEvents="none">
@@ -1102,6 +1114,9 @@ const styles = StyleSheet.create({
   routesBtn: { flexDirection: "row", alignItems: "center", gap: 6, height: 38, paddingHorizontal: 14, borderRadius: radius.pill, backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)" },
   routesBtnText: { color: "#fff", fontSize: 12, fontWeight: "800", letterSpacing: 0.6 },
   hudRoutes: { position: "absolute", top: 12, right: 58 },
+  hudNowPlaying: { position: "absolute", top: 56, right: 58, flexDirection: "row", alignItems: "center", gap: 8, maxWidth: 220, backgroundColor: "rgba(12,10,9,0.78)", borderWidth: 1, borderColor: "rgba(255,255,255,0.16)", borderRadius: radius.pill, paddingLeft: 12, paddingRight: 5, paddingVertical: 5 },
+  hudNowPlayingText: { color: "#fff", fontSize: 12, fontWeight: "700", flexShrink: 1 },
+  hudSkipBtn: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.08)" },
   rpOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.72)", alignItems: "center", justifyContent: "center", zIndex: 60 },
   rpPanel: { width: 760, maxWidth: "92%", maxHeight: "88%", backgroundColor: colors.cardElevated, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, ...shadow.card },
   rpHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: spacing.sm },
