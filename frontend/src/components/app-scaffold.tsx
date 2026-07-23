@@ -15,7 +15,7 @@ import { CC } from "./calendar";
 const ROUTE: Record<string, string> = {
   home: "/", training: "/plan", calendar: "/calendar", workouts: "/workouts",
   routes: "/routes", progress: "/progress", wellness: "/wellness",
-  community: "/community", connections: "/connections", settings: "/settings",
+  community: "/community", connections: "/connections", settings: "/settings", help: "/help",
 };
 
 function useApiData<T>(path: string) {

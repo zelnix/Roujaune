@@ -18,8 +18,9 @@ import { SideNavigation } from "@/src/components/SideNavigation";
 import {
   CC, DateControls, RowLabel, DayHeader, FocusCell, TrainingSessionCard, FB50SessionCard,
   WellnessSessionCard, ReadinessRing, SelectedDayPanel, WeekSummaryCard, QuickActionsCard,
-  CalendarTipFooter, DraggableSession, ReadinessDetail,
+  CalendarTipFooter, DraggableSession, ReadinessDetail, ScheduledSessionCard,
 } from "@/src/components/calendar";
+import { unscheduleWorkout } from "@/src/lib/workout-prefs";
 
 const LABEL_W = 66;
 
@@ -49,7 +50,7 @@ export default function CalendarScreen() {
   const persona = useCoach();
   const { width } = useWindowDimensions();
   const compact = width < 720; // phones scroll a stacked view
-  const { week, setWeek, loading } = useCalendarWeek();
+  const { week, setWeek, loading, reload } = useCalendarWeek();
 
   const [selected, setSelected] = React.useState(1); // Tuesday
   const [toast, setToast] = React.useState<{ id: number; text: string; undo?: () => void } | null>(null);
@@ -66,7 +67,7 @@ export default function CalendarScreen() {
     if (key === "home") { router.replace("/"); return; }
     if (key === "training") { markPlanSeen(); router.replace("/plan"); return; }
     if (key === "workouts") { router.push("/workouts"); return; }
-    const routes: Record<string, string> = { routes: "/routes", progress: "/progress", wellness: "/wellness", community: "/community", connections: "/connections", settings: "/settings" };
+    const routes: Record<string, string> = { routes: "/routes", progress: "/progress", wellness: "/wellness", community: "/community", connections: "/connections", settings: "/settings", help: "/help" };
     if (routes[key]) { router.replace(routes[key] as any); return; }
     showToast(`${key.charAt(0).toUpperCase() + key.slice(1)} — coming soon`);
   };
@@ -225,6 +226,19 @@ export default function CalendarScreen() {
                           <WellnessSessionCard s={d.wellness} />
                         </DraggableSession>
                       ) : <EmptySlot onPress={() => showToast("Add recovery activity")} />}
+                    </View>
+                  ))}
+                </GridRow>
+
+                {/* rider-scheduled workouts row */}
+                <GridRow icon="add-circle-outline" label={"SCHEDULED\nBY YOU"} color={CC.greenyellow}>
+                  {days.map((d, i) => (
+                    <View key={d.date} style={[styles.col, i === selected && styles.colSel, { gap: 6 }]}>
+                      {(d.scheduled ?? []).length > 0
+                        ? (d.scheduled ?? []).map((w) => (
+                            <ScheduledSessionCard key={w.id} w={w} onRemove={async () => { await unscheduleWorkout(w.id); reload(); showToast(`Removed ${w.title}`); }} />
+                          ))
+                        : <EmptySlot onPress={() => router.push("/workouts")} />}
                     </View>
                   ))}
                 </GridRow>

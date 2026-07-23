@@ -1,0 +1,32 @@
+{
+  "summary": "Full backend + frontend regression for iteration 16 (side-nav audit, /help, live-HUD mirroring, favorites persistence, add-to-calendar persistence). Backend 4/4 pytest passed. Sidebar audit: all 11 rail-nav items (railnav-*) present on every AppScaffold/SideNavigation screen (/, /plan, /training, /calendar, /routes, /progress, /community, /wellness, /connections, /settings, /help) and all 11 wide-sidebar items (nav-*) on /workouts and /workout-list — every item navigates to a real screen. Workouts nav correctly opens /workouts catalog (header 'Workouts', 'ALL WORKOUT TYPES' grid) on click from /progress rail, NOT the old live-HUD. /help renders (Getting Started + FAQ accordion expands + Ask coach + Contact) and is reachable from both the rail (/progress) and the wide sidebar (/workouts). HUD /workout?workoutId=vo2-max-intervals correctly shows 'VO2 Max Intervals' in the WORKOUT card. Favorites persist (backend POST/GET verified + UI star round-trip after reload). Add-to-Calendar persists — POST /api/calendar/schedule creates the entry, GET /api/calendar/week attaches it to the 2025-05-13 day, and the /calendar screen shows a SCHEDULED BY YOU row with the workout in the Tue 13 column and a working scheduled-remove-* button. One minor issue found and fixed by the tester: /workout-list startWorkout was only passing 'title' (not workoutId), which meant the HUD's power-profile color did not follow the workout type. Fixed in /app/frontend/app/workout-list.tsx line 149 to also pass workoutId — re-verified: FTP Intervals 4x8 now renders in yellow (threshold) instead of the default color.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_16.json",
+    "/app/backend/tests/test_workout_prefs_calendar.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "None blocking. Optional: consider persisting the coach's plan-adaptation refresh trigger label from real workout metadata for consistency across screens (already correct on /workouts, /workout-list, /help)."
+  ],
+  "critical_code_review_comments": [
+    "workout-list.tsx: startWorkout previously passed only { title } to /workout; HUD selection needs { workoutId } to derive color/profile via getWorkout. Fixed by tester (line ~149) — now passes { title, workoutId }.",
+    "workout.tsx line 118-120 correctly falls back to params.title when workoutId missing, but workoutColor/workoutProfile only resolve from selected (workoutId). The fix above makes the two consistent."
+  ],
+  "updated_files": [
+    "/app/frontend/app/workout-list.tsx",
+    "/app/backend/tests/test_workout_prefs_calendar.py"
+  ],
+  "success_rate": { "backend": "100% (4/4)", "frontend": "100% of requested flows" },
+  "seed_data_creation": "Tester added one scheduled workout (VO2 Max Intervals on 2025-05-13) via UI to verify SCHEDULED BY YOU row; one removed via UI remove button. Pre-existing seed 'VO2 Max Intervals · 1h 10m · 85 TSS' on Tue 13 remains from previous iteration.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Sidebar testIDs: AppScaffold + plan/index/calendar/training screens use SideNavigation with 'railnav-{key}' (11 items: home, training, routes, workouts, calendar, progress, community, wellness, connections, settings, help). /workouts and /workout-list use WideSidebar with 'nav-{key}' (same 11 keys). Both sets navigate correctly to their target screens; 'workouts' opens /workouts (catalog hub), NOT /workout. On /workout-list, add-calendar posts to /api/calendar/schedule; the resulting entry is attached to /api/calendar/week days via server-side merge and rendered under the SCHEDULED BY YOU row of /calendar with a scheduled-remove-{id} button that DELETEs. Favorites are GLOBAL (no auth), stored in db.workout_prefs id='favorites'. Live HUD reads workoutId param and falls back to title; both must be passed for the profile color to match the type.",
+  "rca_of_issue": "Minor HUD color-mirror gap: startWorkout in workout-list.tsx dispatched only { title } to /workout, so the HUD's getWorkout(params.workoutId) returned undefined and workoutColor/workoutProfile fell back to defaults. Reproduction: /workout-list?workout=ftp-4x8 → Start Workout → HUD shows title 'FTP Intervals 4x8' but the profile bars use the default rouge color. Fix: also pass workoutId in the params. Verified: bars now render yellow (Threshold color)."
+}

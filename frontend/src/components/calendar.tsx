@@ -7,7 +7,7 @@ import Svg, { Rect, Circle } from "react-native-svg";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from "react-native-reanimated";
 import { CoachPersona } from "../lib/coach-persona";
-import { CalendarDay, CalendarSession, ZoneBar, STATUS_LABEL, Readiness } from "../lib/calendar";
+import { CalendarDay, CalendarSession, ZoneBar, STATUS_LABEL, Readiness, ScheduledWorkout } from "../lib/calendar";
 /* palette (extends the plan palette with recovery hues) */
 export const CC = {
   bg: "#050606", nav: "#080909", card: "#101211", cardHi: "#151716",
@@ -168,6 +168,27 @@ export function WellnessSessionCard({ s }: { s: CalendarSession }) {
     </View>
   );
 }
+
+/** A rider-scheduled catalog workout shown on its calendar day. */
+export function ScheduledSessionCard({ w, onRemove }: { w: ScheduledWorkout; onRemove?: () => void }) {
+  const col = w.color && w.color.startsWith("#") ? w.color : CC.yellow;
+  return (
+    <View style={[cs.card, { borderColor: col }]} testID={`scheduled-${w.id}`}>
+      <View style={cs.cardHead}>
+        <Ionicons name="bicycle" size={15} color={col} />
+        {onRemove ? (
+          <Pressable testID={`scheduled-remove-${w.id}`} onPress={onRemove} hitSlop={8}>
+            <Ionicons name="close" size={13} color={CC.dim} />
+          </Pressable>
+        ) : null}
+      </View>
+      <Text style={cs.cardTitle} numberOfLines={2}>{w.title}</Text>
+      <Text style={cs.cardMeta} numberOfLines={1}>{[w.duration, w.tss].filter(Boolean).join(" · ")}</Text>
+      <View style={cs.cardStatus}><SessionStatusIndicator status="scheduled" /></View>
+    </View>
+  );
+}
+
 
 /* ── readiness ring ─────────────────────────────────────────────────────── */
 export function ReadinessRing({ score, status }: { score: number; status: string }) {

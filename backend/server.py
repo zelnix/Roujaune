@@ -1133,10 +1133,83 @@ async def get_calendar_week(start: str = "2025-05-12"):
             await db.calendar_weeks.update_one({"start_date": start}, {"$set": CALENDAR_WEEK}, upsert=True)
             doc = dict(CALENDAR_WEEK)
         doc.pop("_id", None)
+        # Attach rider-scheduled catalog workouts to their matching day.
+        try:
+            sched = await db.scheduled_workouts.find().to_list(500)
+            by_date: dict = {}
+            for sdoc in sched:
+                sdoc.pop("_id", None)
+                by_date.setdefault(sdoc.get("date"), []).append(sdoc)
+            for day in doc.get("days", []):
+                day["scheduled"] = by_date.get(day["date"], [])
+        except Exception:
+            logging.warning("attach scheduled workouts failed")
         return doc
     except Exception:
         logging.exception("get_calendar_week failed")
         return CALENDAR_WEEK
+
+
+# ----------------------- Workout favorites & scheduling -----------------------
+class FavToggleRequest(BaseModel):
+    workout_id: str
+
+
+@api_router.get("/workout-favorites")
+async def get_workout_favorites():
+    doc = await db.workout_prefs.find_one({"id": "favorites"})
+    return {"favorites": (doc or {}).get("ids", [])}
+
+
+@api_router.post("/workout-favorites/toggle")
+async def toggle_workout_favorite(req: FavToggleRequest):
+    doc = await db.workout_prefs.find_one({"id": "favorites"})
+    ids = list((doc or {}).get("ids", []))
+    if req.workout_id in ids:
+        ids.remove(req.workout_id)
+        favorited = False
+    else:
+        ids.append(req.workout_id)
+        favorited = True
+    await db.workout_prefs.update_one({"id": "favorites"}, {"$set": {"ids": ids}}, upsert=True)
+    return {"favorites": ids, "favorited": favorited}
+
+
+class ScheduleRequest(BaseModel):
+    workout_id: str
+    workout_name: str
+    duration: str = ""
+    tss: str = ""
+    zone: str = ""
+    color: str = "rouge"
+    date: str = "2025-05-13"
+
+
+@api_router.get("/calendar/scheduled")
+async def get_scheduled_workouts():
+    docs = await db.scheduled_workouts.find().to_list(500)
+    for d in docs:
+        d.pop("_id", None)
+    return {"scheduled": docs}
+
+
+@api_router.post("/calendar/schedule")
+async def schedule_workout(req: ScheduleRequest):
+    entry = {
+        "id": uuid.uuid4().hex, "type": "cycling", "workout_id": req.workout_id,
+        "title": req.workout_name, "duration": req.duration, "tss": req.tss,
+        "zone": req.zone, "color": req.color, "date": req.date,
+        "status": "scheduled", "created_by": "You",
+    }
+    await db.scheduled_workouts.insert_one(dict(entry))
+    entry.pop("_id", None)
+    return {"ok": True, "entry": entry}
+
+
+@api_router.delete("/calendar/scheduled/{entry_id}")
+async def delete_scheduled_workout(entry_id: str):
+    await db.scheduled_workouts.delete_one({"id": entry_id})
+    return {"ok": True}
 
 
 class MoveSessionRequest(BaseModel):

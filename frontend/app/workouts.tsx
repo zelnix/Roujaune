@@ -14,6 +14,7 @@ import { WideSidebar } from "@/src/components/WideSidebar";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
 import { useCoach } from "@/src/lib/coach-persona";
 import { markPlanSeen } from "@/src/lib/plan-badge";
+import { fetchFavorites, toggleFavorite } from "@/src/lib/workout-prefs";
 import {
   WORKOUT_TABS, WorkoutTab, WORKOUT_CATEGORIES, POPULAR_THIS_WEEK, QUICK_ACTIONS,
   typesForTab, WorkoutType,
@@ -22,7 +23,7 @@ import {
 const ROUTE: Record<string, string> = {
   home: "/", training: "/plan", routes: "/routes", calendar: "/calendar",
   progress: "/progress", community: "/community", wellness: "/wellness",
-  connections: "/connections", settings: "/settings",
+  connections: "/connections", settings: "/settings", help: "/help",
 };
 
 /* ── mini power-profile graphic ─────────────────────────────────────────── */
@@ -109,6 +110,8 @@ export default function WorkoutsScreen() {
   const showToast = React.useCallback((t: string) => setToast({ id: Date.now(), text: t }), []);
   const openList = (params: Record<string, string>) => router.push({ pathname: "/workout-list", params } as any);
 
+  React.useEffect(() => { fetchFavorites().then((ids) => setFavs(new Set(ids))); }, []);
+
   const onSelectNav = (key: string) => {
     if (key === "workouts") return;
     if (key === "training") markPlanSeen();
@@ -116,11 +119,14 @@ export default function WorkoutsScreen() {
     if (to) router.replace(to as any);
   };
 
-  const toggleFav = (id: string) => setFavs((prev) => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
+  const toggleFav = (id: string) => {
+    setFavs((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+    toggleFavorite(id).catch(() => {});
+  };
 
   const onCategory = (id: string) => openList({ type: id });
 

@@ -181,7 +181,39 @@ export function CadenceCard({ cadence, connected = true }: { cadence: number; co
 }
 
 /* ============================ WORKOUT TIMELINE ============================ */
-export function IntervalProfile({ width, height = 92 }: { width: number; height?: number }) {
+export function IntervalProfile({ width, height = 92, profile, color }: { width: number; height?: number; profile?: number[]; color?: string }) {
+  // Dynamic mode: draw bars from a supplied power profile (mirrors the chosen
+  // workout's zones). The tallest block is highlighted as the "current" step.
+  if (profile && profile.length) {
+    const c = color || colors.red;
+    const n = profile.length;
+    const gap = 3;
+    const bw = (width - gap * (n - 1)) / n;
+    const activeIdx = profile.indexOf(Math.max(...profile));
+    let x = 0;
+    return (
+      <Svg width={width} height={height}>
+        {profile.map((v, i) => {
+          const bh = Math.max(4, v * (height - 6));
+          const rectX = x;
+          x += bw + gap;
+          const active = i === activeIdx;
+          return (
+            <React.Fragment key={i}>
+              <Rect x={rectX} y={height - bh} width={bw} height={bh} rx={3} fill={c} opacity={active ? 1 : 0.3 + v * 0.55} />
+              {active && (
+                <>
+                  <Rect x={rectX - 1} y={height - bh - 3} width={bw + 2} height={bh + 3} rx={4} fill="none" stroke={colors.yellow} strokeWidth={2} />
+                  <Line x1={rectX + bw / 2} y1={0} x2={rectX + bw / 2} y2={height} stroke={colors.yellow} strokeWidth={1.5} />
+                  <Circle cx={rectX + bw / 2} cy={height - bh - 3} r={4} fill={colors.yellow} />
+                </>
+              )}
+            </React.Fragment>
+          );
+        })}
+      </Svg>
+    );
+  }
   // blocks: [x0..x1 fraction, level 0..1, kind]
   const blocks = [
     { w: 0.1, h: 0.3, k: "warm" },
@@ -220,27 +252,26 @@ export function IntervalProfile({ width, height = 92 }: { width: number; height?
   );
 }
 
-export function WorkoutTimelineCard({ width, onPress }: { width: number; onPress: () => void }) {
+export function WorkoutTimelineCard({ width, onPress, title = "Threshold Climb", color, profile }: { width: number; onPress: () => void; title?: string; color?: string; profile?: number[] }) {
   return (
     <Touchable testID="workout-timeline-card" onPress={onPress} lift={false} scaleTo={0.995}>
       <View style={styles.timelineCard}>
         <View style={styles.timelineHead}>
-          <View>
+          <View style={{ flex: 1 }}>
             <SectionLabel color={colors.red}>WORKOUT</SectionLabel>
-            <Text style={styles.timelineTitle}>Threshold Climb</Text>
+            <Text style={styles.timelineTitle} numberOfLines={1}>{title}</Text>
           </View>
           <View style={styles.timelineStep}>
             <Text style={styles.microLabel}>STEP</Text>
             <Text style={styles.stepVal}>3 / 6</Text>
           </View>
-          <Text style={styles.currentInterval}>Threshold Block 2</Text>
           <View style={{ alignItems: "flex-end" }}>
             <Text style={styles.timeLeft}>3:12</Text>
             <Text style={styles.microLabel}>TIME LEFT</Text>
           </View>
         </View>
         <View style={{ marginTop: 10 }}>
-          <IntervalProfile width={width - spacing.lg * 2} />
+          <IntervalProfile width={width - spacing.lg * 2} profile={profile} color={color} />
         </View>
       </View>
     </Touchable>

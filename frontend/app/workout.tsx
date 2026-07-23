@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, ScrollView, Animated, useWindowDimensions, LayoutChangeEvent, Pressable, Platform } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -12,6 +12,8 @@ import { rideRecorder } from "@/src/lib/ride";
 import { getLastRouteId, setLastRouteId } from "@/src/lib/prefs";
 import { useSettings } from "@/src/lib/settings";
 import { routeVideos, nextInterval, currentWorkout } from "@/src/data";
+import { getWorkout } from "@/src/lib/workout-catalog";
+import { WORKOUT_TYPES } from "@/src/lib/workouts";
 import { RouteVideo } from "@/src/components/RouteVideo";
 import {
   WorkoutTopBar, PowerCard, HeartRateCard, CadenceCard, WorkoutTimelineCard,
@@ -109,6 +111,13 @@ function Toast({ message }: { message: { id: number; text: string } | null }) {
 export default function LiveWorkout() {
   const { height } = useWindowDimensions();
   const router = useRouter();
+  const params = useLocalSearchParams<{ title?: string; workoutId?: string }>();
+  // The workout the rider launched from the catalog (falls back to the default).
+  const selected = getWorkout(params.workoutId);
+  const selectedType = selected ? WORKOUT_TYPES.find((t) => t.id === selected.typeId) : undefined;
+  const workoutTitle = selected?.name ?? params.title ?? currentWorkout.title;
+  const workoutColor = selectedType?.color ?? selected?.color;
+  const workoutProfile = selectedType?.profile;
   const compact = height < 620;
   const leftW = compact ? 240 : 300;
   const rightW = compact ? 300 : 340;
@@ -234,11 +243,11 @@ export default function LiveWorkout() {
     power_target: POWER_TARGET,
     cadence_low: CAD_LOW,
     cadence_high: CAD_HIGH,
-    workout: currentWorkout.title,
+    workout: workoutTitle,
     route: activeRoute.title,
     coach_name: persona.name,
     coach_gender: persona.gender,
-  }), [activeRoute.title, persona.name, persona.gender]);
+  }), [activeRoute.title, persona.name, persona.gender, workoutTitle]);
 
   const cueBusy = React.useRef(false);
   const lastCueAt = React.useRef(0);
@@ -321,7 +330,7 @@ export default function LiveWorkout() {
               <CadenceCard cadence={telemetry.cadence} connected={settings.hasTrainer} />
             </View>
             <View style={styles.centerCol} onLayout={onCenterLayout}>
-              <WorkoutTimelineCard width={centerW} onPress={() => showToast("Workout timeline")} />
+              <WorkoutTimelineCard width={centerW} onPress={() => showToast("Workout timeline")} title={workoutTitle} color={workoutColor} profile={workoutProfile} />
               {expanded ? (
                 <VideoPlaceholder width={centerW} onRestore={() => setExpanded(false)} />
               ) : (

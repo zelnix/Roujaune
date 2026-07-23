@@ -12,6 +12,7 @@ import { WideSidebar } from "@/src/components/WideSidebar";
 import { useCoach } from "@/src/lib/coach-persona";
 import { markPlanSeen } from "@/src/lib/plan-badge";
 import { WORKOUT_TYPES } from "@/src/lib/workouts";
+import { fetchFavorites, toggleFavorite, scheduleWorkout } from "@/src/lib/workout-prefs";
 import {
   Workout, getWorkout, workoutsByType, sortWorkouts, SORTS, SortKey,
   DURATION_BANDS, DurationBand, inDurationBand, fmtDuration, DIFFICULTY_COLOR,
@@ -20,7 +21,7 @@ import {
 const ROUTE: Record<string, string> = {
   home: "/", training: "/plan", routes: "/routes", calendar: "/calendar",
   progress: "/progress", community: "/community", wellness: "/wellness",
-  connections: "/connections", settings: "/settings",
+  connections: "/connections", settings: "/settings", help: "/help",
 };
 
 const TYPE_FILTERS = [
@@ -88,6 +89,8 @@ export default function WorkoutListScreen() {
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
   const showToast = React.useCallback((t: string) => setToast({ id: Date.now(), text: t }), []);
 
+  React.useEffect(() => { fetchFavorites().then((ids) => setFavs(new Set(ids))); }, []);
+
   // If arriving with a specific workout, align the type filter to it.
   React.useEffect(() => {
     if (params.workout) {
@@ -118,9 +121,24 @@ export default function WorkoutListScreen() {
     if (to) router.replace(to as any);
   };
 
-  const toggleFav = (id: string) => setFavs((prev) => {
-    const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next;
-  });
+  const toggleFav = (id: string) => {
+    setFavs((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+    toggleFavorite(id).catch(() => {});
+  };
+
+  const addToCalendar = (w: Workout) => {
+    const mainZone = w.zones.reduce((a, b) => (b.pct > a.pct ? b : a), w.zones[0]);
+    scheduleWorkout({
+      workout_id: w.id, workout_name: w.name,
+      duration: fmtDuration(w.duration), tss: w.tss ? `${w.tss} TSS` : "",
+      zone: mainZone?.label ?? "", color: w.color,
+    }).then(() => showToast(`Added ${w.name} to your calendar`))
+      .catch(() => showToast("Couldn't add to calendar — try again"));
+  };
 
   const title = typeFilter === "all" ? "All Workouts"
     : typeFilter === "fb50" ? "FB50 Sessions"
@@ -128,7 +146,7 @@ export default function WorkoutListScreen() {
 
   const startWorkout = (w: Workout) => {
     if (w.duration <= 0) { showToast("Enjoy your rest day 💤"); return; }
-    router.push({ pathname: "/workout", params: { title: w.name } } as any);
+    router.push({ pathname: "/workout", params: { title: w.name, workoutId: w.id } } as any);
   };
 
   return (
@@ -253,7 +271,7 @@ export default function WorkoutListScreen() {
                       <Ionicons name={detail.duration > 0 ? "play" : "bed-outline"} size={18} color="#241B00" />
                       <Text style={s.startText}>{detail.duration > 0 ? "Start Workout" : "Rest Day"}</Text>
                     </Pressable>
-                    <Pressable testID="add-calendar" onPress={() => showToast(`Added ${detail.name} to your calendar`)}
+                    <Pressable testID="add-calendar" onPress={() => addToCalendar(detail)}
                       style={({ hovered }: any) => [s.secBtn, hovered && s.secHover]}>
                       <Ionicons name="calendar-outline" size={16} color={CC.white} />
                       <Text style={s.secText}>Add to Calendar</Text>

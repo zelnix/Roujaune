@@ -30,6 +30,18 @@ export type CalendarSession = {
 export type ReadinessMetric = { key: string; label: string; value: number; display: string };
 export type Readiness = { score: number; status: string; source?: string; metrics?: ReadinessMetric[] };
 
+export type ScheduledWorkout = {
+  id: string;
+  workout_id: string;
+  title: string;
+  duration?: string;
+  tss?: string;
+  zone?: string;
+  color?: string;
+  date: string;
+  status?: string;
+};
+
 export type CalendarDay = {
   date: string;
   day_name: string;
@@ -39,6 +51,7 @@ export type CalendarDay = {
   fb50: CalendarSession | null;
   wellness: CalendarSession | null;
   readiness: Readiness;
+  scheduled?: ScheduledWorkout[];
 };
 
 export type ZoneBar = { z: string; pct: number; time: string; color: string };
