@@ -15,6 +15,8 @@ export type RideRoute = {
 
 type RideRecord = {
   workout: string;
+  workoutId?: string;
+  ftp: number;
   route: RideRoute;
   elapsed: number;
   samples: RideSample[];
@@ -24,18 +26,23 @@ const DEFAULT_ROUTE: RideRoute = {
   id: "XlwjMjyU410", name: "Alpe d'Huez", place: "France", distance: "13.8 km", elevation: "1,120 m", tag: "Climb",
 };
 
-const store: RideRecord = { workout: "Threshold Climb", route: { ...DEFAULT_ROUTE }, elapsed: 0, samples: [] };
+const store: RideRecord = { workout: "Threshold Climb", workoutId: undefined, ftp: 287, route: { ...DEFAULT_ROUTE }, elapsed: 0, samples: [] };
 const MAX = 4000; // cap memory (~13 min at 5 Hz is plenty for aggregates)
 
 export const rideRecorder = {
-  reset(meta?: { workout?: string; route?: RideRoute }) {
+  reset(meta?: { workout?: string; workoutId?: string; ftp?: number; route?: RideRoute }) {
     store.samples = [];
     store.elapsed = 0;
     if (meta?.workout) store.workout = meta.workout;
+    if (meta && "workoutId" in meta) store.workoutId = meta.workoutId;
+    if (meta?.ftp) store.ftp = meta.ftp;
     if (meta?.route) store.route = meta.route;
   },
   setRoute(route: RideRoute) {
     store.route = route;
+  },
+  setFtp(ftp: number) {
+    if (ftp > 0) store.ftp = ftp;
   },
   push(sample: RideSample, elapsed: number) {
     store.elapsed = elapsed;

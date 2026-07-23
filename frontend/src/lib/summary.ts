@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { rideRecorder, RideRoute } from "./ride";
 import { getCoach, COACHES } from "./coach-persona";
+import { getWorkout, buildSegments, targetWatts } from "./workout-catalog";
 
 export type Zone = { z: string; time: string; pct: number; w: number };
 
@@ -101,6 +102,62 @@ function apiBase(): string {
   return (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
 }
 
+/* ============================ INTERVAL TARGET COMPLIANCE ============================ */
+// Scores the rider's actual power against each segment's target (built from the
+// same catalog segments + FTP that drove the live HUD).
+export type IntervalScore = {
+  label: string;
+  zoneLabel: string;
+  color: string;
+  targetW: number;
+  avgW: number | null;      // null when no telemetry was recorded for this segment
+  compliance: number | null; // % of segment time within ±8% of target
+  durationSec: number;
+};
+
+export type IntervalResult = { intervals: IntervalScore[]; overall: number | null; hasData: boolean };
+
+export function computeIntervals(): IntervalResult {
+  const rec = rideRecorder.snapshot();
+  const w = getWorkout(rec.workoutId) ?? getWorkout("threshold-climb");
+  if (!w) return { intervals: [], overall: null, hasData: false };
+  const segs = buildSegments(w);
+  const ftp = rec.ftp || 287;
+  const samples = rec.samples;
+  const total = segs.reduce((a, s) => a + s.durationSec, 0);
+  const hasData = samples.length > 5 && total > 0;
+
+  const intervals: IntervalScore[] = [];
+  let compAcc = 0;
+  let compN = 0;
+  let acc = 0;
+  for (const s of segs) {
+    const tW = targetWatts(s, ftp);
+    let avgW: number | null = null;
+    let compliance: number | null = null;
+    if (hasData && s.durationSec > 0 && tW > 0) {
+      const i0 = Math.floor((acc / total) * samples.length);
+      const i1 = Math.max(i0 + 1, Math.floor(((acc + s.durationSec) / total) * samples.length));
+      const slice = samples.slice(i0, i1);
+      if (slice.length) {
+        avgW = Math.round(slice.reduce((a, x) => a + x.power, 0) / slice.length);
+        const inBand = slice.filter((x) => Math.abs(x.power - tW) <= tW * 0.08).length;
+        compliance = Math.round((inBand / slice.length) * 100);
+        compAcc += compliance;
+        compN += 1;
+      }
+    }
+    intervals.push({ label: s.label, zoneLabel: s.zoneLabel, color: s.color, targetW: tW, avgW, compliance, durationSec: s.durationSec });
+    acc += s.durationSec;
+  }
+  return { intervals, overall: compN ? Math.round(compAcc / compN) : null, hasData };
+}
+
+/** Memoised interval scores for the summary screen. */
+export function useIntervals(): IntervalResult {
+  return useMemo(() => computeIntervals(), []);
+}
+
 /** Fetch computed ride aggregates from the backend, falling back to the
  * polished reference dataset on any error or when no ride was recorded. */
 export function useSummary() {
@@ -150,6 +207,12 @@ export function useCoachDebrief(stats: SummaryStats, route: RideRoute) {
     let alive = true;
     const rec = rideRecorder.snapshot();
     const persona = COACHES[getCoach()];
+    const { intervals, overall } = computeIntervals();
+    // Only send segments we actually measured, capped to keep the prompt tight.
+    const measured = intervals
+      .filter((i) => i.avgW != null && i.targetW > 0)
+      .slice(0, 10)
+      .map((i) => ({ label: i.label, targetW: i.targetW, avgW: i.avgW, compliance: i.compliance }));
     (async () => {
       try {
         const res = await fetch(`${apiBase()}/api/coach/debrief`, {
@@ -172,6 +235,8 @@ export function useCoachDebrief(stats: SummaryStats, route: RideRoute) {
             tss: stats.tss,
             intensity: stats.intensity,
             compliance: stats.compliance?.overall ?? 0,
+            interval_compliance: overall ?? 0,
+            intervals: measured,
             zones: stats.zones?.map((z) => ({ z: z.z, pct: z.pct })) ?? [],
             coach_name: persona.name,
             coach_gender: persona.gender,

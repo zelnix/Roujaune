@@ -197,8 +197,12 @@ export default function LiveWorkout() {
   }, [expanded, settings.hudEnabled]);
 
   React.useEffect(() => {
-    rideRecorder.reset({ workout: "Threshold Climb" });
+    rideRecorder.reset({ workout: workoutTitle, workoutId: selected?.id, ftp });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Keep the recorder's FTP current if it syncs from training progress mid-load.
+  React.useEffect(() => { rideRecorder.setFtp(ftp); }, [ftp]);
 
   // Keep the ride recorder's route in sync so the summary reflects the scenery ridden.
   React.useEffect(() => {

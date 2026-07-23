@@ -7,12 +7,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 import { colors, radius, spacing, shadow } from "@/src/theme";
-import { useSummary, useCoachDebrief } from "@/src/lib/summary";
+import { useSummary, useCoachDebrief, useIntervals } from "@/src/lib/summary";
 import { useCoach } from "@/src/lib/coach-persona";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
 import {
   SummaryHeader, SummarySidebar, HeroSummaryCard, MetricsGrid, ComplianceCard,
   ChartsRow, SyncExportRow, RouteSummaryCard, AchievementsCard, RecoveryCard, BottomActionBar,
+  IntervalTargetsCard,
 } from "@/src/components/summary";
 
 function Toast({ message }: { message: { id: number; text: string } | null }) {
@@ -43,6 +44,7 @@ export default function WorkoutComplete() {
 
   const { stats, route } = useSummary();
   const { debrief, loading: debriefLoading } = useCoachDebrief(stats, route);
+  const { intervals, overall: intervalOverall, hasData: intervalHasData } = useIntervals();
   const persona = useCoach();
   const [showChat, setShowChat] = React.useState(false);
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
@@ -87,6 +89,7 @@ export default function WorkoutComplete() {
                 <HeroSummaryCard compact={phone} recap={debrief} recapLoading={debriefLoading} onChat={() => setShowChat(true)} />
                 <MetricsGrid stats={stats} compact={compact} routeName={route.name} />
                 <ComplianceCard stats={stats} compact={phone} />
+                <IntervalTargetsCard intervals={intervals} overall={intervalOverall} hasData={intervalHasData} compact={phone} />
                 <ChartsRow stats={stats} width={mainW} vertical={phone} />
                 {phone && <RightColumn score={78} phone route={route} />}
                 <SyncExportRow onToast={showToast} compact={phone} />

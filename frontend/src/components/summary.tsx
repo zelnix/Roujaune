@@ -8,7 +8,7 @@ import Svg, {
 } from "react-native-svg";
 import { colors, radius, spacing, shadow } from "../theme";
 import { Touchable, SectionLabel } from "./ui";
-import { summaryContent as C, SummaryStats, fmtDuration } from "../lib/summary";
+import { summaryContent as C, SummaryStats, IntervalScore, fmtDuration } from "../lib/summary";
 import { useCoach } from "../lib/coach-persona";
 
 const glyph = require("../../assets/images/logo_glyph_t.png");
@@ -234,6 +234,76 @@ export function ComplianceCard({ stats, compact = false }: { stats: SummaryStats
       <ComplianceCol label={"CADENCE\nCOMPLIANCE"} value={String(cm.cadence)} pct={cm.cadence} color={g} />
       <ComplianceCol label={"TIME IN ZONE 4"} value={String(cm.zone4_min)} unit="min" pct={72} color={y} />
       <ComplianceCol label={"WORKOUT\nCOMPLETED"} value={String(cm.completed)} pct={cm.completed} color={g} />
+    </View>
+  );
+}
+
+/* ======================= INTERVAL TARGETS ======================= */
+function compColor(pct: number | null) {
+  if (pct == null) return colors.textDim;
+  if (pct >= 80) return colors.green;
+  if (pct >= 50) return colors.yellow;
+  return colors.red;
+}
+
+function segMins(sec: number) {
+  const m = Math.round(sec / 60);
+  return m >= 1 ? `${m} min` : `${sec}s`;
+}
+
+export function IntervalTargetsCard({ intervals, overall, hasData, compact = false }: { intervals: IntervalScore[]; overall: number | null; hasData: boolean; compact?: boolean }) {
+  // Show only real efforts (skip zero-length rest blocks) to keep it focused.
+  const rows = intervals.filter((i) => i.durationSec > 0 && i.targetW > 0);
+  if (rows.length === 0) return null;
+  return (
+    <View style={[styles.intervalCard, compact && { padding: spacing.md }]} testID="interval-targets-card">
+      <View style={styles.intervalHead}>
+        <View style={styles.mHead}>
+          <Ionicons name="flag" size={14} color={colors.yellow} />
+          <Text style={styles.chartTitle}>INTERVAL TARGETS</Text>
+        </View>
+        {overall != null && (
+          <View style={styles.accuracyPill}>
+            <Text style={[styles.accuracyVal, { color: compColor(overall) }]}>{overall}%</Text>
+            <Text style={styles.accuracyLbl}>TARGET ACCURACY</Text>
+          </View>
+        )}
+      </View>
+      <Text style={styles.intervalSub}>
+        {hasData ? "Your power vs each segment's target" : "Planned targets for this session — ride it to score your accuracy"}
+      </Text>
+      <View style={styles.intervalCols}>
+        <Text style={[styles.icLbl, { flex: 1 }]}>SEGMENT</Text>
+        <Text style={[styles.icLbl, styles.icNum]}>TARGET</Text>
+        <Text style={[styles.icLbl, styles.icNum]}>YOURS</Text>
+        <Text style={[styles.icLbl, styles.icBarCol]}>ACCURACY</Text>
+      </View>
+      <View style={{ gap: 6, marginTop: 6 }}>
+        {rows.map((it, i) => {
+          const c = compColor(it.compliance);
+          return (
+            <View key={`${it.label}-${i}`} style={styles.icRow}>
+              <View style={[styles.icDot, { backgroundColor: it.color }]} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.icName} numberOfLines={1}>{it.label}</Text>
+                <Text style={styles.icMeta}>{it.zoneLabel} · {segMins(it.durationSec)}</Text>
+              </View>
+              <Text style={[styles.icTarget, styles.icNum]}>{it.targetW} W</Text>
+              <Text style={[styles.icActual, styles.icNum, { color: it.avgW == null ? colors.textFaint : c }]}>{it.avgW == null ? "—" : `${it.avgW} W`}</Text>
+              <View style={styles.icBarCol}>
+                {it.compliance == null ? (
+                  <Text style={styles.icPending}>—</Text>
+                ) : (
+                  <View style={styles.icBarWrap}>
+                    <View style={styles.icBarTrack}><View style={{ width: `${Math.min(100, it.compliance)}%`, height: 6, borderRadius: 3, backgroundColor: c }} /></View>
+                    <Text style={[styles.icPct, { color: c }]}>{it.compliance}%</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -642,6 +712,28 @@ const styles = StyleSheet.create({
   compValue: { fontSize: 30, fontWeight: "900", marginTop: 6 },
   compUnit: { fontSize: 15, fontWeight: "800" },
   compTrack: { height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.08)", marginTop: 10, overflow: "hidden" },
+
+  /* interval targets */
+  intervalCard: { ...cardBase, padding: spacing.lg, gap: 2 },
+  intervalHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  intervalSub: { color: colors.textDim, fontSize: 12, marginTop: 3 },
+  accuracyPill: { alignItems: "flex-end" },
+  accuracyVal: { fontSize: 22, fontWeight: "900" },
+  accuracyLbl: { color: colors.textDim, fontSize: 8.5, fontWeight: "700", letterSpacing: 0.4 },
+  intervalCols: { flexDirection: "row", alignItems: "center", marginTop: 12, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
+  icLbl: { color: colors.textFaint, fontSize: 9.5, fontWeight: "800", letterSpacing: 0.5 },
+  icNum: { width: 62, textAlign: "right" },
+  icBarCol: { width: 118, textAlign: "right", alignItems: "flex-end" },
+  icRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  icDot: { width: 9, height: 9, borderRadius: 3 },
+  icName: { color: colors.white, fontSize: 13, fontWeight: "700" },
+  icMeta: { color: colors.textDim, fontSize: 10.5, marginTop: 1 },
+  icTarget: { color: colors.textDim, fontSize: 13, fontWeight: "700" },
+  icActual: { fontSize: 13, fontWeight: "800" },
+  icBarWrap: { flexDirection: "row", alignItems: "center", gap: 7, width: 118, justifyContent: "flex-end" },
+  icBarTrack: { flex: 1, height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.08)", overflow: "hidden" },
+  icPct: { fontSize: 12, fontWeight: "800", width: 38, textAlign: "right" },
+  icPending: { color: colors.textFaint, fontSize: 13, fontWeight: "700" },
 
   /* charts */
   chartsRow: { flexDirection: "row", gap: spacing.md },

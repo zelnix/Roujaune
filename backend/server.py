@@ -446,6 +446,8 @@ class CoachDebriefRequest(BaseModel):
     tss: int = 0
     intensity: float = 0
     compliance: int = 0
+    interval_compliance: int = 0
+    intervals: List[Dict[str, Any]] = Field(default_factory=list)
     zones: List[Dict[str, Any]] = Field(default_factory=list)
     coach_name: str = "Alberto"
     coach_gender: str = "male"
@@ -470,15 +472,26 @@ async def coach_debrief(req: CoachDebriefRequest):
 
     mins = req.duration_sec // 60
     zones_txt = ", ".join(f"{z.get('z')} {z.get('pct', 0)}%" for z in req.zones) if req.zones else "n/a"
+    intervals_txt = ""
+    if req.intervals:
+        parts = [
+            f"{i.get('label')} target {i.get('targetW')}W / rode {i.get('avgW')}W ({i.get('compliance')}% on target)"
+            for i in req.intervals
+        ]
+        intervals_txt = (
+            f"\nPer-interval accuracy (overall {req.interval_compliance}% on target): "
+            + "; ".join(parts) + "."
+        )
     prompt = (
         f"The rider just finished: {req.workout} on {req.route or 'the trainer'}.\n"
         f"Duration {mins} min, {req.distance_km} km, {req.elevation_m} m climbing.\n"
         f"Avg power {req.avg_power} W (normalised {req.norm_power} W, target {req.power_target} W), "
         f"avg cadence {req.avg_cadence} rpm, avg HR {req.avg_hr} bpm (max {req.max_hr}).\n"
         f"TSS {req.tss}, intensity {req.intensity}, calories {req.calories}, "
-        f"plan compliance {req.compliance}%. Time in zones: {zones_txt}.\n"
+        f"plan compliance {req.compliance}%. Time in zones: {zones_txt}.{intervals_txt}\n"
         "Give a warm, personal post-ride debrief: 2 to 3 short sentences. "
-        "Praise what went well, note one thing physiologically/tactically, and end with "
+        "Praise what went well, reference how well they held their interval power targets "
+        "(call out a specific strong or weak segment if notable), and end with "
         f"one concrete tip for next time. Speak as {req.coach_name}, first person, no lists, no emojis."
     )
 
