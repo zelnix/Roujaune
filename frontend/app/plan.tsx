@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Animated, useWindowDimensions } from "react-native";
+import { View, Text, StyleSheet, Animated, ScrollView, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
@@ -47,8 +47,6 @@ export default function TrainingPlanScreen() {
   const [planName, setPlanName] = React.useState<string | null>(null);
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
   const [availW, setAvailW] = React.useState(0);
-  const [availH, setAvailH] = React.useState(0);
-  const [contentH, setContentH] = React.useState(0);
 
   const showToast = React.useCallback((t: string) => setToast({ id: Date.now(), text: t }), []);
 
@@ -76,11 +74,12 @@ export default function TrainingPlanScreen() {
   const onPhase = (p: PlanPhase) => showToast(`${p.name} · ${p.weeks} · ${p.pct}% complete`);
   const onWorkout = (w: KeyWorkout) => showToast(`${w.title} · ${w.duration} · ${w.tss}`);
 
-  const fitScaleX = !compact && availW > 0 ? Math.max(0.4, Math.min(2, availW / DESIGN_W)) : 1;
-  const fitScaleY = !compact && contentH > 0 && availH > 0 ? Math.max(0.4, Math.min(2, availH / contentH)) : 1;
+  const fitScaleX = 1;
+  const fitScaleY = 1;
 
   const rightW = 336;
-  const fullW = DESIGN_W - 96 - 44; // rail + content padding
+  const contentW = availW > 0 ? availW : width - 96;
+  const fullW = Math.max(600, contentW - 44); // content minus horizontal padding
 
   const hero = (
     <View style={styles.rowGap}>
@@ -117,7 +116,7 @@ export default function TrainingPlanScreen() {
   }
 
   const Grid = (
-    <View style={styles.gridInner} onLayout={(e) => setContentH(e.nativeEvent.layout.height)}>
+    <View style={styles.gridInner}>
       <View style={styles.headerRow}>
         <View style={{ flex: 1 }}>
           <PlanHeader />
