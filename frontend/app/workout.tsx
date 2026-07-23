@@ -14,6 +14,7 @@ import { useSettings } from "@/src/lib/settings";
 import { routeVideos, nextInterval, currentWorkout } from "@/src/data";
 import { getWorkout, buildSegments, currentSegment, segmentProfile, mmss, targetWatts } from "@/src/lib/workout-catalog";
 import { fetchZoneBias, ZoneBias } from "@/src/lib/targets";
+import { getRiderProfile } from "@/src/lib/rider-profile";
 import { WORKOUT_TYPES } from "@/src/lib/workouts";
 import { RouteVideo } from "@/src/components/RouteVideo";
 import {
@@ -86,10 +87,25 @@ function fmt(sec: number) {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-// Pick the route that best matches the current workout type (falls back to first).
-function autoRouteIndex() {
-  const i = routeVideos.findIndex((r) => r.tag === currentWorkout.recommendedTag);
-  return i >= 0 ? i : 0;
+// Pick the route whose terrain best matches the chosen workout's type.
+const ROUTE_TAGS: Record<string, string[]> = {
+  endurance: ["Flat", "Easy", "Scenic", "Coastal", "Forest", "Rolling"],
+  recovery: ["Easy", "Flat", "Scenic"],
+  climbing: ["Climb", "Mountain", "Epic"],
+  threshold: ["Rolling", "Mountain", "Climb"],
+  vo2max: ["Rolling", "Mountain"],
+  sprints: ["Rolling", "Flat"],
+  tempo: ["Rolling", "Forest", "Flat"],
+  restday: ["Easy", "Scenic"],
+  fb50: ["Easy", "Scenic"],
+};
+function routeIndexForType(typeId?: string) {
+  const tags = (typeId && ROUTE_TAGS[typeId]) || ["Climb"];
+  for (const t of tags) {
+    const i = routeVideos.findIndex((r) => r.tag === t);
+    if (i >= 0) return i;
+  }
+  return 0;
 }
 
 function Toast({ message }: { message: { id: number; text: string } | null }) {
@@ -131,7 +147,7 @@ export default function LiveWorkout() {
   const [contentH, setContentH] = React.useState(0);
   const [paused, setPaused] = React.useState(false);
   const [expanded, setExpanded] = React.useState(false);
-  const [routeIdx, setRouteIdx] = React.useState(autoRouteIndex);
+  const [routeIdx, setRouteIdx] = React.useState(() => routeIndexForType(selected?.typeId));
   const [routeAuto, setRouteAuto] = React.useState(true);
   const [lastRouteId, setLastRouteIdState] = React.useState<string | null>(null);
   const [showRoutes, setShowRoutes] = React.useState(false);
@@ -276,6 +292,17 @@ export default function LiveWorkout() {
 
   const activeRoute = routeVideos[routeIdx];
 
+  // Derive real terrain figures from the active route so the Climb/Route/top-bar
+  // reflect the ride the rider actually chose (not a hardcoded Alpe d'Huez).
+  const routeInfo = React.useMemo(() => {
+    const km = parseFloat(activeRoute.distance) || 0;
+    const elev = parseInt(activeRoute.elevation.replace(/[^0-9-]/g, ""), 10) || 0;
+    const grade = km > 0 ? (elev / (km * 1000)) * 100 : 0;
+    const isClimb = elev >= 400 && Math.abs(grade) >= 2.5;
+    return { title: activeRoute.title, place: activeRoute.place, km, elev, grade, isClimb, tag: activeRoute.tag };
+  }, [activeRoute]);
+  const riddenKm = telemetry.distance;
+
   // ---- Alberto's live AI coaching cues ----
   // Prefers the AI-generated cue; falls back to the local rule-based line while
   // a call is pending or fails.
@@ -346,10 +373,10 @@ export default function LiveWorkout() {
     showToast(`Route: ${routeVideos[i].title}`);
   };
   const onAutoRoute = () => {
-    const i = autoRouteIndex();
+    const i = routeIndexForType(selected?.typeId);
     setRouteIdx(i); setRouteAuto(true); setShowRoutes(false);
     setLastRouteIdState(null); setLastRouteId(null);
-    showToast(`Auto-matched to your ${currentWorkout.type.toLowerCase()}: ${routeVideos[i].title}`);
+    showToast(`Auto-matched to your ${(selectedType?.name ?? selected?.typeName ?? "ride").toLowerCase()}: ${routeVideos[i].title}`);
   };
   const onShuffleRoute = () => {
     let i = routeIdx;
@@ -368,13 +395,13 @@ export default function LiveWorkout() {
 
   const body = (
     <>
-      <WorkoutTopBar elapsed={fmt(telemetry.elapsed)} connectionState={connectionState} stale={stale} onPress={(m) => (m === "Settings" ? setShowSettings(true) : showToast(m))} />
+      <WorkoutTopBar elapsed={fmt(telemetry.elapsed)} connectionState={connectionState} stale={stale} onPress={(m) => (m === "Settings" ? setShowSettings(true) : showToast(m))} routeName={routeInfo.title} riddenKm={riddenKm} totalKm={routeInfo.km} />
 
       <View style={styles.bodyRow}>
         <View style={styles.leftBlock}>
           <View style={styles.innerRow}>
             <View style={[styles.leftCol, { width: leftW }]}>
-              <PowerCard power={telemetry.power} wkg={(telemetry.power / 78).toFixed(1)} connected={settings.hasTrainer} target={targetW} zoneLabel={activeSeg?.segment.zoneLabel} zoneIdx={activeSeg?.segment.zoneIdx} />
+              <PowerCard power={telemetry.power} wkg={(telemetry.power / (getRiderProfile().weight_kg || 78)).toFixed(1)} connected={settings.hasTrainer} target={targetW} zoneLabel={activeSeg?.segment.zoneLabel} zoneIdx={activeSeg?.segment.zoneIdx} />
               <HeartRateCard hr={telemetry.hr} connected={settings.hasWearable} />
               <CadenceCard cadence={telemetry.cadence} connected={settings.hasTrainer} />
             </View>
@@ -397,8 +424,8 @@ export default function LiveWorkout() {
         </View>
 
         <View style={[styles.rightCol, { width: rightW }]}>
-          <ClimbCard />
-          <RouteMapCard />
+          <ClimbCard route={routeInfo} riddenKm={riddenKm} />
+          <RouteMapCard title={routeInfo.title} />
           <WearableDataCard connected={settings.hasWearable} />
         </View>
       </View>

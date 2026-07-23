@@ -27,7 +27,8 @@ export function BrandWordmark() {
   );
 }
 
-export function WorkoutTopBar({ elapsed, connectionState, stale, onPress }: { elapsed: string; connectionState: string; stale: boolean; onPress: (m: string) => void }) {
+export function WorkoutTopBar({ elapsed, connectionState, stale, onPress, routeName = "Alpe d'Huez", riddenKm = 0, totalKm = 0 }: { elapsed: string; connectionState: string; stale: boolean; onPress: (m: string) => void; routeName?: string; riddenKm?: number; totalKm?: number }) {
+  const pct = totalKm > 0 ? Math.max(0, Math.min(100, Math.round((riddenKm / totalKm) * 100))) : 0;
   const conn = connectionState === "connected" && !stale
     ? { c: colors.green, label: "LIVE", icon: "wifi" as const }
     : connectionState === "connected" && stale
@@ -43,15 +44,15 @@ export function WorkoutTopBar({ elapsed, connectionState, stale, onPress }: { el
         <Text style={styles.microLabel}>ELAPSED TIME</Text>
       </View>
       <View style={styles.topProgress}>
-        <Text style={styles.routeName}>Alpe d&apos;Huez</Text>
+        <Text style={styles.routeName} numberOfLines={1}>{routeName}</Text>
         <View style={styles.progressRow}>
-          <Text style={styles.progressEnd}>24.6 km</Text>
+          <Text style={styles.progressEnd}>{riddenKm.toFixed(1)} km</Text>
           <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: "60%" }]} />
+            <View style={[styles.progressFill, { width: `${pct}%` }]} />
           </View>
-          <Text style={styles.progressEnd}>16.0 km</Text>
+          <Text style={styles.progressEnd}>{totalKm.toFixed(1)} km</Text>
         </View>
-        <Text style={styles.progressPct}>60%</Text>
+        <Text style={styles.progressPct}>{pct}%</Text>
       </View>
       <View style={styles.topElapsed}>
         <Text style={styles.elapsedVal}>19:35</Text>
@@ -326,21 +327,33 @@ export function RiderRouteViewport({ width, height, onPress }: { width: number; 
 }
 
 /* ============================ RIGHT COLUMN ============================ */
-export function ClimbCard() {
+export type RouteInfo = { title: string; place: string; km: number; elev: number; grade: number; isClimb: boolean; tag: string };
+
+export function ClimbCard({ route, riddenKm = 0 }: { route?: RouteInfo; riddenKm?: number }) {
+  const km = route?.km ?? 16;
+  const elev = route?.elev ?? 1567;
+  const grade = route?.grade ?? 7.8;
+  const isClimb = route?.isClimb ?? true;
+  const descent = elev < 0;
+  const remaining = Math.max(0, km - riddenKm);
   return (
     <View style={styles.sideCard} testID="climb-card">
-      <View style={styles.metricHead}><MaterialCommunityIcons name="terrain" size={15} color={colors.yellow} /><SectionLabel color={colors.yellow}>CLIMB</SectionLabel></View>
-      <View style={styles.gradeRow}><Text style={styles.gradeVal}>7.8</Text><Text style={styles.gradePct}>%</Text><Text style={styles.gradeLabel}>GRADE</Text></View>
-      <View style={styles.climbStat}><Text style={styles.climbStatVal}>1,567 m</Text><Text style={styles.microLabel}>TO SUMMIT</Text></View>
-      <View style={styles.climbStat}><Text style={styles.climbStatVal}>10.2 km</Text><Text style={styles.microLabel}>CLIMB REMAINING</Text></View>
-      <ClimbMini width={250} />
-      <View style={styles.climbAxis}><Text style={styles.microLabel}>0</Text><Text style={styles.microLabel}>8.0</Text><Text style={styles.microLabel}>16.0</Text></View>
+      <View style={styles.metricHead}><MaterialCommunityIcons name="terrain" size={15} color={colors.yellow} /><SectionLabel color={colors.yellow}>{isClimb ? "CLIMB" : "TERRAIN"}</SectionLabel></View>
+      <View style={styles.gradeRow}><Text style={styles.gradeVal}>{Math.abs(grade).toFixed(1)}</Text><Text style={styles.gradePct}>%</Text><Text style={styles.gradeLabel}>{isClimb ? "GRADE" : "AVG GRADE"}</Text></View>
+      <View style={styles.climbStat}><Text style={styles.climbStatVal}>{Math.abs(elev).toLocaleString()} m</Text><Text style={styles.microLabel}>{descent ? "DESCENT" : isClimb ? "TO SUMMIT" : "ELEVATION GAIN"}</Text></View>
+      <View style={styles.climbStat}><Text style={styles.climbStatVal}>{remaining.toFixed(1)} km</Text><Text style={styles.microLabel}>{isClimb ? "CLIMB REMAINING" : "DISTANCE LEFT"}</Text></View>
+      <ClimbMini width={250} climb={isClimb} descent={descent} />
+      <View style={styles.climbAxis}><Text style={styles.microLabel}>0</Text><Text style={styles.microLabel}>{(km / 2).toFixed(0)}</Text><Text style={styles.microLabel}>{km.toFixed(0)}</Text></View>
     </View>
   );
 }
 
-function ClimbMini({ width, height = 64 }: { width: number; height?: number }) {
-  const pts = [0.15, 0.2, 0.28, 0.32, 0.4, 0.5, 0.58, 0.7, 0.82, 0.95];
+function ClimbMini({ width, height = 64, climb = true, descent = false }: { width: number; height?: number; climb?: boolean; descent?: boolean }) {
+  const pts = descent
+    ? [0.95, 0.82, 0.7, 0.6, 0.5, 0.42, 0.34, 0.28, 0.2, 0.12]
+    : climb
+    ? [0.15, 0.2, 0.28, 0.32, 0.4, 0.5, 0.58, 0.7, 0.82, 0.95]
+    : [0.4, 0.52, 0.44, 0.56, 0.46, 0.6, 0.48, 0.58, 0.5, 0.54];
   const stepX = width / (pts.length - 1);
   const coords = pts.map((v, i) => [i * stepX, height - 6 - v * (height - 12)]);
   const cur = 7;
@@ -353,11 +366,11 @@ function ClimbMini({ width, height = 64 }: { width: number; height?: number }) {
   );
 }
 
-export function RouteMapCard() {
+export function RouteMapCard({ title = "Alpe d'Huez" }: { title?: string }) {
   return (
     <View style={styles.sideCard} testID="route-map-card">
       <View style={styles.metricHead}><Ionicons name="location" size={15} color={colors.yellow} /><SectionLabel color={colors.yellow}>ROUTE</SectionLabel></View>
-      <Text style={styles.routeMapTitle}>Alpe d&apos;Huez</Text>
+      <Text style={styles.routeMapTitle} numberOfLines={1}>{title}</Text>
       <View style={styles.mapWrap}>
         <Svg width="100%" height="100%" viewBox="0 0 240 200" preserveAspectRatio="xMidYMid meet">
           <Path d="M40 185 C90 175 60 150 100 145 C140 140 90 120 120 110 C155 98 110 80 150 70 C185 62 150 45 175 35 C195 27 205 22 210 15" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth={3} strokeLinecap="round" />

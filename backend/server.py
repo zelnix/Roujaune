@@ -403,7 +403,9 @@ async def coach_cue(req: CoachCueRequest):
 
     minutes = req.elapsed // 60
     seg = f" Current segment: {req.segment} ({req.zone})." if req.segment else ""
+    rider = await _rider_line()
     prompt = (
+        f"{rider}\n"
         f"Workout: {req.workout}. Route: {req.route or 'indoor'}. "
         f"Elapsed: {minutes} minutes.{seg}\n"
         f"Live: power {req.power} W (target {req.power_target} W), "
@@ -483,6 +485,7 @@ async def coach_debrief(req: CoachDebriefRequest):
             + "; ".join(parts) + "."
         )
     prompt = (
+        f"{await _rider_line()}\n"
         f"The rider just finished: {req.workout} on {req.route or 'the trainer'}.\n"
         f"Duration {mins} min, {req.distance_km} km, {req.elevation_m} m climbing.\n"
         f"Avg power {req.avg_power} W (normalised {req.norm_power} W, target {req.power_target} W), "
@@ -526,11 +529,84 @@ def _chat_id(coach_name: str) -> str:
     return f"chat-{coach_name.lower()}"
 
 
+# ----------------------- Rider profile (feeds coach intelligence) -----------
+RIDER_DEFAULT = {"id": "me", "name": "Rider One", "weight_kg": 78.0, "age": 42, "gender": "male"}
+
+
+class RiderProfileUpdate(BaseModel):
+    name: Optional[str] = None
+    weight_kg: Optional[float] = None
+    age: Optional[int] = None
+    gender: Optional[str] = None
+
+
+async def _rider_doc() -> dict:
+    doc = await db.rider_profile.find_one({"id": "me"})
+    if not doc:
+        doc = dict(RIDER_DEFAULT)
+        await db.rider_profile.insert_one(dict(doc))
+    doc.pop("_id", None)
+    return doc
+
+
+async def _rider_line() -> str:
+    """One-line rider physical profile for coach prompts (best-effort)."""
+    try:
+        d = await _rider_doc()
+        g = str(d.get("gender") or "").strip()
+        gtxt = f", {g}" if g and g.lower() != "unspecified" else ""
+        return (
+            f"Rider: {d.get('name', 'Rider')}, {d.get('age')} years old, "
+            f"{d.get('weight_kg')} kg{gtxt}. Tailor effort, power-to-weight, recovery and tone accordingly."
+        )
+    except Exception:
+        return ""
+
+
+@api_router.get("/rider/profile")
+async def get_rider_profile():
+    return await _rider_doc()
+
+
+@api_router.put("/rider/profile")
+async def update_rider_profile(req: RiderProfileUpdate):
+    upd = {k: v for k, v in req.dict().items() if v is not None}
+    await db.rider_profile.update_one({"id": "me"}, {"$set": {**upd, "id": "me"}}, upsert=True)
+    return await _rider_doc()
+
+
+@api_router.get("/rider/season")
+async def get_rider_season():
+    """Aggregate the rider's real logged sessions for the Profile screen."""
+    rides = await db.ride_history.find().to_list(length=2000)
+    count = len(rides)
+    dist = sum((r.get("distance_km") or 0) for r in rides)
+    elev = sum((r.get("elevation_m") or 0) for r in rides)
+    secs = sum((r.get("duration_sec") or 0) for r in rides)
+    days = {str(r.get("created_at"))[:10] for r in rides if r.get("created_at")}
+    from datetime import date, timedelta
+    streak = 0
+    d = date.today()
+    while d.isoformat() in days:
+        streak += 1
+        d -= timedelta(days=1)
+    return {
+        "rides": count,
+        "distance_km": round(dist, 1),
+        "elevation_m": int(elev),
+        "hours": round(secs / 3600, 1),
+        "streak": streak,
+    }
+
+
 async def _build_rider_context(plan_id: str = "build-and-climb") -> str:
     """Assemble a compact, factual snapshot of the rider (latest ride, current
     plan phase/progress, readiness) so the coach can reference real numbers in
     chat. Best-effort — returns whatever is available, never raises."""
     lines: List[str] = []
+    rl = await _rider_line()
+    if rl:
+        lines.append(rl)
     try:
         plan = await db.training_plans.find_one({"id": plan_id})
         if not plan:

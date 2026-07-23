@@ -13,7 +13,11 @@
       "bundleIdentifier": "com.emergent.coachalbertodash.wsjvnf",
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "Find nearby TVs to cast your ride",
-        "NSBonjourServices": ["_googlecast._tcp", "_airplay._tcp"]
+        "NSBonjourServices": [
+          "_googlecast._tcp",
+          "_airplay._tcp"
+        ],
+        "NSPhotoLibraryUsageDescription": "Set your rider profile photo"
       }
     },
     "android": {
@@ -51,7 +55,15 @@
       [
         "expo-build-properties",
         {
-          "ios": { "useFrameworks": "static" }
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Set your rider profile photo"
         }
       ]
     ],

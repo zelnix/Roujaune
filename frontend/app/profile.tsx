@@ -1,15 +1,22 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, useWindowDimensions } from "react-native";
+import { View, Text, StyleSheet, Pressable, useWindowDimensions, Modal, TextInput, Alert, Linking, Platform } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
 
 import { AppScaffold, Card, SectionTitle } from "@/src/components/app-scaffold";
 import { CC } from "@/src/components/calendar";
 import { useSettings } from "@/src/lib/settings";
 import { useCoach } from "@/src/lib/coach-persona";
+import { useRiderProfile, useRiderSeason, RiderProfile } from "@/src/lib/rider-profile";
 
 const riderImg = require("../assets/images/hero_cyclist_b2.jpg");
+
+const GENDERS = [
+  { id: "male", label: "Male" },
+  { id: "female", label: "Female" },
+  { id: "other", label: "Other" },
+];
 
 function Stat({ v, l, accent }: { v: string; l: string; accent?: string }) {
   return (
@@ -41,11 +48,46 @@ const ACHIEVEMENTS = [
 ];
 
 export default function ProfileScreen() {
-  const router = useRouter();
   const { settings } = useSettings();
   const persona = useCoach();
+  const { profile, avatar, update, setAvatar } = useRiderProfile();
+  const season = useRiderSeason();
   const { width } = useWindowDimensions();
   const twoCol = width >= 900;
+
+  const [editing, setEditing] = React.useState(false);
+  const genderLabel = GENDERS.find((g) => g.id === profile.gender)?.label ?? "—";
+
+  const pickImage = async () => {
+    // Contextual permission handling for the photo library.
+    let perm = await ImagePicker.getMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      if (perm.canAskAgain) perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert(
+          "Photo access needed",
+          "Allow photo access so you can set your rider profile picture.",
+          perm.canAskAgain
+            ? [{ text: "OK" }]
+            : [
+                { text: "Not now", style: "cancel" },
+                { text: "Open Settings", onPress: () => Linking.openSettings() },
+              ],
+        );
+        return;
+      }
+    }
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.6,
+      base64: true,
+    });
+    if (!res.canceled && res.assets?.[0]?.base64) {
+      setAvatar(`data:image/jpeg;base64,${res.assets[0].base64}`);
+    }
+  };
 
   return (
     <AppScaffold active="profile" title="Profile" subtitle="Your rider identity, season progress and achievements.">
@@ -53,11 +95,14 @@ export default function ProfileScreen() {
         {/* Rider identity */}
         <Card testID="profile-identity" style={{ flex: 1 }}>
           <View style={s.identityRow}>
-            <View style={s.avatarWrap}>
-              <Image source={riderImg} style={s.avatar} contentFit="cover" contentPosition="top center" />
-            </View>
+            <Pressable testID="avatar-upload" onPress={pickImage} style={s.avatarWrap}>
+              <Image source={avatar ? { uri: avatar } : riderImg} style={s.avatar} contentFit="cover" contentPosition="top center" />
+              <View style={s.cameraBadge}>
+                <Ionicons name="camera" size={14} color="#241B00" />
+              </View>
+            </Pressable>
             <View style={{ flex: 1 }}>
-              <Text style={s.name}>Rider One</Text>
+              <Text style={s.name}>{profile.name}</Text>
               <Text style={s.org}>Roujaune · Harmony Wellness Group</Text>
               <View style={s.badgeRow}>
                 <View style={s.tierBadge}>
@@ -70,7 +115,7 @@ export default function ProfileScreen() {
                 </View>
               </View>
             </View>
-            <Pressable testID="edit-profile" onPress={() => router.push("/settings")} style={({ hovered }: any) => [s.editBtn, hovered && s.hover]}>
+            <Pressable testID="edit-profile" onPress={() => setEditing(true)} style={({ hovered }: any) => [s.editBtn, hovered && s.hover]}>
               <Ionicons name="create-outline" size={15} color={CC.white} />
               <Text style={s.editText}>Edit</Text>
             </Pressable>
@@ -78,20 +123,24 @@ export default function ProfileScreen() {
 
           <View style={s.statsRow}>
             <Stat v={`${settings.ftp} W`} l="FTP" accent={CC.yellow} />
-            <Stat v="78 kg" l="Weight" />
-            <Stat v={`${(settings.ftp / 78).toFixed(1)}`} l="W/kg" />
-            <Stat v="58" l="VO2 Max" />
+            <Stat v={`${Math.round(profile.weight_kg)} kg`} l="Weight" />
+            <Stat v={`${(settings.ftp / (profile.weight_kg || 78)).toFixed(1)}`} l="W/kg" />
+            <Stat v={`${profile.age}`} l="Age" />
+            <Stat v={genderLabel} l="Gender" />
           </View>
+          <Text style={s.feedNote}>
+            <Ionicons name="sparkles" size={11} color={CC.yellow} /> {persona.name} uses your weight, age and gender to personalise effort, power-to-weight and recovery guidance.
+          </Text>
         </Card>
 
-        {/* Season snapshot */}
+        {/* Season snapshot (real logged sessions) */}
         <Card testID="profile-season" style={twoCol ? { width: 360 } : undefined}>
           <SectionTitle label="THIS SEASON" color={CC.rouge} />
-          <SeasonRow icon="bicycle" label="Rides completed" value="86" color={CC.rouge} />
-          <SeasonRow icon="navigate" label="Distance" value="3,420 km" color={CC.yellow} />
-          <SeasonRow icon="trending-up" label="Elevation" value="48,600 m" color={CC.green} />
-          <SeasonRow icon="time" label="Time in the saddle" value="142 h" color="#40A9C6" />
-          <SeasonRow icon="flame" label="Current streak" value="12 days" color="#E8631C" />
+          <SeasonRow icon="bicycle" label="Rides completed" value={season ? `${season.rides}` : "—"} color={CC.rouge} />
+          <SeasonRow icon="navigate" label="Distance" value={season ? `${season.distance_km.toLocaleString()} km` : "—"} color={CC.yellow} />
+          <SeasonRow icon="trending-up" label="Elevation" value={season ? `${season.elevation_m.toLocaleString()} m` : "—"} color={CC.green} />
+          <SeasonRow icon="time" label="Time in the saddle" value={season ? `${season.hours} h` : "—"} color="#40A9C6" />
+          <SeasonRow icon="flame" label="Current streak" value={season ? `${season.streak} ${season.streak === 1 ? "day" : "days"}` : "—"} color="#E8631C" />
         </Card>
       </View>
 
@@ -110,7 +159,80 @@ export default function ProfileScreen() {
           ))}
         </View>
       </Card>
+
+      <EditModal visible={editing} profile={profile} onClose={() => setEditing(false)} onSave={(p) => { update(p); setEditing(false); }} />
     </AppScaffold>
+  );
+}
+
+function EditModal({ visible, profile, onClose, onSave }: { visible: boolean; profile: RiderProfile; onClose: () => void; onSave: (p: Partial<RiderProfile>) => void }) {
+  const [name, setName] = React.useState(profile.name);
+  const [weight, setWeight] = React.useState(String(Math.round(profile.weight_kg)));
+  const [age, setAge] = React.useState(String(profile.age));
+  const [gender, setGender] = React.useState(profile.gender);
+
+  React.useEffect(() => {
+    if (visible) {
+      setName(profile.name);
+      setWeight(String(Math.round(profile.weight_kg)));
+      setAge(String(profile.age));
+      setGender(profile.gender);
+    }
+  }, [visible, profile]);
+
+  const save = () => {
+    onSave({
+      name: name.trim() || "Rider One",
+      weight_kg: Math.max(30, Math.min(200, parseInt(weight, 10) || 78)),
+      age: Math.max(12, Math.min(100, parseInt(age, 10) || 42)),
+      gender,
+    });
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={s.modalBackdrop}>
+        <View style={s.modalCard} testID="edit-profile-modal">
+          <Text style={s.modalTitle}>Edit rider profile</Text>
+          <Text style={s.modalSub}>These details tune your coach&apos;s advice.</Text>
+
+          <Text style={s.fieldLabel}>Name</Text>
+          <TextInput testID="input-name" value={name} onChangeText={setName} placeholder="Your name" placeholderTextColor={CC.dim} style={s.input} />
+
+          <View style={s.fieldRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.fieldLabel}>Weight (kg)</Text>
+              <TextInput testID="input-weight" value={weight} onChangeText={setWeight} keyboardType="number-pad" maxLength={3} style={s.input} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.fieldLabel}>Age</Text>
+              <TextInput testID="input-age" value={age} onChangeText={setAge} keyboardType="number-pad" maxLength={3} style={s.input} />
+            </View>
+          </View>
+
+          <Text style={s.fieldLabel}>Gender</Text>
+          <View style={s.genderRow}>
+            {GENDERS.map((g) => {
+              const on = gender === g.id;
+              return (
+                <Pressable key={g.id} testID={`gender-${g.id}`} onPress={() => setGender(g.id)} style={[s.genderChip, on && s.genderChipOn]}>
+                  <Text style={[s.genderText, on && s.genderTextOn]}>{g.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <View style={s.modalActions}>
+            <Pressable testID="cancel-edit" onPress={onClose} style={[s.modalBtn, s.modalBtnGhost]}>
+              <Text style={s.modalBtnGhostText}>Cancel</Text>
+            </Pressable>
+            <Pressable testID="save-edit" onPress={save} style={[s.modalBtn, s.modalBtnPrimary]}>
+              <Text style={s.modalBtnPrimaryText}>Save</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -118,8 +240,9 @@ const s = StyleSheet.create({
   row: { flexDirection: "row", gap: 16 },
 
   identityRow: { flexDirection: "row", alignItems: "flex-start", gap: 16 },
-  avatarWrap: { width: 84, height: 84, borderRadius: 42, overflow: "hidden", borderWidth: 2, borderColor: CC.yellow },
-  avatar: { width: "100%", height: "100%" },
+  avatarWrap: { width: 84, height: 84, borderRadius: 42, borderWidth: 2, borderColor: CC.yellow },
+  avatar: { width: "100%", height: "100%", borderRadius: 42 },
+  cameraBadge: { position: "absolute", right: -2, bottom: -2, width: 28, height: 28, borderRadius: 14, backgroundColor: CC.yellow, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: CC.bg },
   name: { color: CC.white, fontSize: 24, fontWeight: "900" },
   org: { color: CC.dim, fontSize: 13, marginTop: 2 },
   badgeRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" },
@@ -137,6 +260,7 @@ const s = StyleSheet.create({
   stat: { flex: 1 },
   statVal: { color: CC.white, fontSize: 22, fontWeight: "900" },
   statLbl: { color: CC.dim, fontSize: 11, fontWeight: "700", letterSpacing: 0.4, marginTop: 3 },
+  feedNote: { color: CC.dim, fontSize: 11.5, lineHeight: 16, marginTop: 14 },
 
   seasonRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 9 },
   seasonIcon: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.03)" },
@@ -148,4 +272,24 @@ const s = StyleSheet.create({
   achIcon: { width: 40, height: 40, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center", marginBottom: 6 },
   achLabel: { color: CC.white, fontSize: 14, fontWeight: "800" },
   achSub: { color: CC.dim, fontSize: 12 },
+
+  // edit modal
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.72)", alignItems: "center", justifyContent: "center", padding: 24 },
+  modalCard: { width: "100%", maxWidth: 440, backgroundColor: CC.card, borderWidth: 1, borderColor: CC.border, borderRadius: 20, padding: 22 },
+  modalTitle: { color: CC.white, fontSize: 19, fontWeight: "900" },
+  modalSub: { color: CC.dim, fontSize: 12.5, marginTop: 3, marginBottom: 12 },
+  fieldLabel: { color: CC.dim, fontSize: 11, fontWeight: "800", letterSpacing: 0.4, marginTop: 12, marginBottom: 6 },
+  input: { backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: CC.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: Platform.OS === "ios" ? 12 : 9, color: CC.white, fontSize: 15, fontWeight: "600" },
+  fieldRow: { flexDirection: "row", gap: 12 },
+  genderRow: { flexDirection: "row", gap: 8 },
+  genderChip: { flex: 1, alignItems: "center", paddingVertical: 11, borderRadius: 10, borderWidth: 1, borderColor: CC.border, backgroundColor: "rgba(255,255,255,0.03)" },
+  genderChipOn: { backgroundColor: CC.rouge, borderColor: CC.rouge },
+  genderText: { color: CC.white, fontSize: 13, fontWeight: "700" },
+  genderTextOn: { color: "#fff" },
+  modalActions: { flexDirection: "row", gap: 12, marginTop: 22 },
+  modalBtn: { flex: 1, alignItems: "center", paddingVertical: 12, borderRadius: 12 },
+  modalBtnGhost: { borderWidth: 1, borderColor: CC.border },
+  modalBtnGhostText: { color: CC.white, fontSize: 14, fontWeight: "700" },
+  modalBtnPrimary: { backgroundColor: CC.yellow },
+  modalBtnPrimaryText: { color: "#241B00", fontSize: 14, fontWeight: "900" },
 });

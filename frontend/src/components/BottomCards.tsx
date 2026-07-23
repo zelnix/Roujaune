@@ -6,6 +6,7 @@ import Svg, { Circle, Path, Defs, LinearGradient as SvgGrad, Stop } from "react-
 import { colors, radius, spacing } from "./../theme";
 import { progressCard, community, wellness, achievement } from "../data";
 import { LineChart, SecondaryButton, SectionLabel } from "./ui";
+import { useSettings } from "../lib/settings";
 
 /* -------- PROGRESS -------- */
 export function ProgressCard() {
@@ -99,6 +100,7 @@ function SunsetBackdrop() {
 }
 
 export function WellnessCard() {
+  const { settings } = useSettings();
   return (
     <View style={styles.card} testID="wellness-card">
       <SunsetBackdrop />
@@ -112,10 +114,20 @@ export function WellnessCard() {
         <Ionicons name="leaf" size={13} color={colors.green} />
         <SectionLabel color={colors.green}>WELLNESS</SectionLabel>
       </View>
-      <Text style={styles.title}>{wellness.title}</Text>
-      <Text style={styles.score}>{wellness.score}</Text>
-      <Text style={styles.good}>{wellness.status}</Text>
-      <Text style={styles.note}>{wellness.note}</Text>
+      {settings.hasWearable ? (
+        <>
+          <Text style={styles.title}>{wellness.title}</Text>
+          <Text style={styles.score}>{wellness.score}</Text>
+          <Text style={styles.good}>{wellness.status}</Text>
+          <Text style={styles.note}>{wellness.note}</Text>
+        </>
+      ) : (
+        <View style={styles.wellnessNC} testID="wellness-not-connected">
+          <Ionicons name="watch-outline" size={26} color={colors.textDim} />
+          <Text style={styles.ncTitle}>No wearable connected</Text>
+          <Text style={styles.ncSub}>Connect a wearable to track readiness, HRV and recovery.</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -186,6 +198,9 @@ const styles = StyleSheet.create({
   score: { color: colors.white, fontSize: 34, fontWeight: "900", marginTop: 4 },
   good: { color: colors.greenText, fontSize: 13, fontWeight: "700" },
   note: { color: colors.textDim, fontSize: 11.5, marginTop: 6, maxWidth: "62%", lineHeight: 16 },
+  wellnessNC: { flex: 1, justifyContent: "center", alignItems: "flex-start", gap: 4, marginTop: 6 },
+  ncTitle: { color: colors.white, fontSize: 14, fontWeight: "800", marginTop: 4 },
+  ncSub: { color: colors.textDim, fontSize: 11.5, lineHeight: 16, maxWidth: "80%" },
   achRow: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 12 },
   badge: {
     width: 44,
