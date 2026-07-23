@@ -60,17 +60,35 @@ function numbersToWords(text: string): string {
   });
 }
 
-/** Choose the device voice for a coach persona: prefer the exact Spanish (English)
- * voice number, then a saved manual pick, then any matching-gender voice. */
-function pickVoiceForCoach(opts: VoiceOption[], coachId: CoachId, savedId?: string | null): VoiceOption | undefined {
+/** Choose the device voice for a coach persona. Priority: the rider's saved
+ * pick for THIS coach → the exact Spanish (English) voice number → a
+ * matching-gender voice → any voice. `avoidId` keeps the two coaches distinct
+ * so Alberto and Adriana never share the same device voice. */
+function pickVoiceForCoach(opts: VoiceOption[], coachId: CoachId, savedId?: string | null, avoidId?: string): VoiceOption | undefined {
+  if (!opts.length) return undefined;
   const persona = COACHES[coachId];
-  const byNum = opts.find((o) => o.accent === "Spanish (English)" && o.num === persona.voiceNum);
-  if (byNum) return byNum;
   if (savedId) { const s = opts.find((o) => o.id === savedId); if (s) return s; }
+  const notAvoid = (o: VoiceOption) => o.id !== avoidId;
+
+  const byNum = opts.find((o) => o.accent === "Spanish (English)" && o.num === persona.voiceNum && notAvoid(o));
+  if (byNum) return byNum;
+
   const es = opts.filter((o) => o.accent === "Spanish (English)");
   const pool = es.length ? es : opts;
-  return pool.find((o) => o.gender === persona.gender) || pool[0] || opts[0];
+  const byGender = pool.filter((o) => o.gender === persona.gender && notAvoid(o));
+  if (byGender.length) return byGender[0];
+
+  const anyDistinct = pool.filter(notAvoid);
+  if (anyDistinct.length) {
+    // Bias female coach toward the far end of the list to maximise timbre spread.
+    return persona.gender === "female" ? anyDistinct[anyDistinct.length - 1] : anyDistinct[0];
+  }
+  return pool[0] || opts[0];
 }
+
+// Per-coach speaking pitch — a clear separation so the two coaches sound
+// distinct even when the device exposes only one usable voice.
+const PITCH: Record<CoachId, number> = { alberto: 0.82, adriana: 1.22 };
 
 /** Cycling music + the coach's spoken cues.
  * Music softens (ducks) while a cue is spoken, then returns to full volume.
@@ -86,7 +104,8 @@ export function useWorkoutAudio() {
   const voiceReady = useRef(false);
   const [voiceOptions, setVoiceOptions] = useState<VoiceOption[]>([]);
   const [voiceId, setVoiceIdState] = useState<string | undefined>(undefined);
-  const savedVoice = useRef<string | null>(null);
+  const savedVoices = useRef<Partial<Record<CoachId, string>>>({});
+  const coachVoiceRef = useRef<Partial<Record<CoachId, { id?: string; lang: string }>>>({});
   const persona = useCoach();
   const coach = persona.id;
 
@@ -123,7 +142,19 @@ export function useWorkoutAudio() {
         const rank = (o: VoiceOption) => (o.gender === "male" ? 0 : o.gender === "neutral" ? 1 : 2);
         opts.sort((a, b) => rank(a) - rank(b) || a.label.localeCompare(b.label));
         setVoiceOptions(opts);
-        savedVoice.current = await getVoiceId();
+        // Load each coach's saved pick, then resolve a DISTINCT voice for both
+        // so Alberto and Adriana never end up on the same device voice.
+        const ids = Object.keys(COACHES) as CoachId[];
+        const saved: Partial<Record<CoachId, string>> = {};
+        for (const id of ids) { const v = await getVoiceId(id); if (v) saved[id] = v; }
+        savedVoices.current = saved;
+        const resolved: Partial<Record<CoachId, { id?: string; lang: string }>> = {};
+        let taken: string | undefined;
+        for (const id of ids) {
+          const chosen = pickVoiceForCoach(opts, id, saved[id], taken);
+          if (chosen) { resolved[id] = { id: chosen.id, lang: chosen.lang }; taken = chosen.id; }
+        }
+        coachVoiceRef.current = resolved;
       } catch {
         /* keep default es-ES */
       } finally {
@@ -132,14 +163,21 @@ export function useWorkoutAudio() {
     })();
   }, []);
 
-  // Pick the coach's voice once voices load, and whenever the coach changes
-  // (covers the persisted coach loading in asynchronously on a cold start).
+  // Apply the current coach's resolved voice + pitch whenever the coach changes
+  // (also covers the persisted coach loading in on a cold start).
   useEffect(() => {
     if (!voiceOptions.length) return;
-    const chosen = pickVoiceForCoach(voiceOptions, coach, savedVoice.current);
-    pitchRef.current = coach === "adriana" ? 1.02 : 0.9;
+    let chosen = coachVoiceRef.current[coach];
+    if (!chosen) {
+      const other = coach === "alberto" ? "adriana" : "alberto";
+      const picked = pickVoiceForCoach(voiceOptions, coach, savedVoices.current[coach], coachVoiceRef.current[other]?.id);
+      if (picked) { chosen = { id: picked.id, lang: picked.lang }; coachVoiceRef.current[coach] = chosen; }
+    }
+    pitchRef.current = PITCH[coach];
     if (chosen && chosen.id !== voice.current.id) {
       voice.current = { id: chosen.id, lang: chosen.lang };
+      setVoiceIdState(chosen.id);
+    } else if (chosen) {
       setVoiceIdState(chosen.id);
     }
   }, [coach, voiceOptions]);
@@ -185,7 +223,7 @@ export function useWorkoutAudio() {
     Speech.speak(numbersToWords(text), {
       voice: voice.current.id,
       language: voice.current.lang,
-      pitch: 0.9,
+      pitch: pitchRef.current,
       rate: 0.92,                     // clear, well-paced English
       onDone: () => duck(false),
       onStopped: () => duck(false),
@@ -193,37 +231,44 @@ export function useWorkoutAudio() {
     });
   }, [voiceOn, duck]);
 
-  /** Change Alberto's voice, persist it, and speak a short preview. */
+  /** Change the current coach's voice, persist it (per coach), and preview it. */
   const selectVoice = useCallback((id: string) => {
     const opt = voiceOptions.find((o) => o.id === id);
     if (!opt) return;
     voice.current = { id: opt.id, lang: opt.lang };
+    coachVoiceRef.current[coach] = { id: opt.id, lang: opt.lang };
+    savedVoices.current[coach] = opt.id;
     setVoiceIdState(opt.id);
-    setVoiceId(opt.id);
+    setVoiceId(coach, opt.id);
     Speech.stop();
     if (voiceOn) {
       duck(true);
       Speech.speak(PREVIEW, {
-        voice: opt.id, language: opt.lang, pitch: 0.9, rate: 0.92,
+        voice: opt.id, language: opt.lang, pitch: pitchRef.current, rate: 0.92,
         onDone: () => duck(false), onStopped: () => duck(false), onError: () => duck(false),
       });
     }
-  }, [voiceOptions, voiceOn, duck]);
+  }, [voiceOptions, voiceOn, duck, coach]);
 
   /** Switch coach persona (Alberto ↔ Adriana): updates the app-wide persona and
-   * selects that coach's voice (Alberto → Spanish/English 18, Adriana → 7). */
+   * applies that coach's own saved/resolved voice (kept distinct from the other). */
   const chooseCoach = useCallback((id: CoachId) => {
     persistCoach(id);
-    const chosen = pickVoiceForCoach(voiceOptions, id);
+    pitchRef.current = PITCH[id];
+    let chosen = coachVoiceRef.current[id];
+    if (!chosen) {
+      const other = id === "alberto" ? "adriana" : "alberto";
+      const picked = pickVoiceForCoach(voiceOptions, id, savedVoices.current[id], coachVoiceRef.current[other]?.id);
+      if (picked) { chosen = { id: picked.id, lang: picked.lang }; coachVoiceRef.current[id] = chosen; }
+    }
     if (chosen) {
       voice.current = { id: chosen.id, lang: chosen.lang };
       setVoiceIdState(chosen.id);
-      setVoiceId(chosen.id);
       Speech.stop();
       if (voiceOn) {
         duck(true);
         Speech.speak(PREVIEW, {
-          voice: chosen.id, language: chosen.lang, pitch: id === "adriana" ? 1.02 : 0.9, rate: 0.92,
+          voice: chosen.id, language: chosen.lang, pitch: PITCH[id], rate: 0.92,
           onDone: () => duck(false), onStopped: () => duck(false), onError: () => duck(false),
         });
       }

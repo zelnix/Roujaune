@@ -21,19 +21,19 @@ export async function setCoachId(id: string): Promise<void> {
   }
 }
 
-/** Persisted identifier of Alberto's chosen TTS voice (across sessions). */
-export async function getVoiceId(): Promise<string | null> {
+/** Persisted identifier of a coach's chosen TTS voice (per coach, across sessions). */
+export async function getVoiceId(coachId: string): Promise<string | null> {
   try {
-    return await AsyncStorage.getItem(VOICE_KEY);
+    return await AsyncStorage.getItem(`${VOICE_KEY}:${coachId}`);
   } catch {
     return null;
   }
 }
 
-export async function setVoiceId(id: string | null): Promise<void> {
+export async function setVoiceId(coachId: string, id: string | null): Promise<void> {
   try {
-    if (id) await AsyncStorage.setItem(VOICE_KEY, id);
-    else await AsyncStorage.removeItem(VOICE_KEY);
+    if (id) await AsyncStorage.setItem(`${VOICE_KEY}:${coachId}`, id);
+    else await AsyncStorage.removeItem(`${VOICE_KEY}:${coachId}`);
   } catch {
     /* noop */
   }
