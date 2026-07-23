@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, Switch } from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView, Switch, Platform } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -821,65 +821,58 @@ export function MusicButton({ musicOn, onPress }: { musicOn: boolean; onPress: (
   );
 }
 
-export function CastButton({ casting, onPress }: { casting: boolean; onPress: () => void }) {
+export function CastButton({ onPress }: { onPress: () => void }) {
   return (
-    <Pressable style={[styles.mediaPill, casting ? styles.mediaPillOn : styles.mediaPillOff]} onPress={onPress} testID="cast-button" hitSlop={8} accessibilityRole="button" accessibilityLabel="Cast to TV">
-      <Ionicons name="tv-outline" size={22} color={casting ? colors.bg : colors.white} />
-      <Text style={[styles.mediaPillLabel, { color: casting ? colors.bg : colors.white }]}>Cast</Text>
+    <Pressable style={[styles.mediaPill, styles.mediaPillOff]} onPress={onPress} testID="cast-button" hitSlop={8} accessibilityRole="button" accessibilityLabel="Mirror screen to TV">
+      <Ionicons name="tv-outline" size={22} color={colors.white} />
+      <Text style={[styles.mediaPillLabel, { color: colors.white }]}>Mirror</Text>
     </Pressable>
   );
 }
 
-export function RiderButton({ onPress }: { onPress: () => void }) {
-  return (
-    <Pressable style={[styles.mediaPill, styles.mediaPillOff]} onPress={onPress} testID="rider-button" hitSlop={8} accessibilityRole="button" accessibilityLabel="Choose and customise your rider">
-      <Ionicons name="bicycle" size={22} color={colors.white} />
-      <Text style={[styles.mediaPillLabel, { color: colors.white }]}>Rider</Text>
-    </Pressable>
-  );
-}
-
-const CAST_DEVICES = [
-  { id: "living", name: "Living Room TV", kind: "tv" as const },
-  { id: "studio", name: "Studio Display", kind: "monitor" as const },
-  { id: "chromecast", name: "Chromecast", kind: "cast" as const },
-];
-
-/** Cast-to-TV sheet. NOTE: device discovery/streaming is MOCKED — real casting
- * (Google Cast / AirPlay) needs a native build and won't work in Expo Go. */
-export function CastPanel({ castingTo, onCast, onStop, onClose }: { castingTo: string | null; onCast: (name: string) => void; onStop: () => void; onClose: () => void }) {
-  const icon = (k: string) => (k === "tv" ? "tv" : k === "monitor" ? "desktop-outline" : "wifi");
+/** "Mirror to TV" help sheet — the whole workout is shown on the TV via the
+ * device's built-in screen mirroring (AirPlay on iOS / Cast screen on Android).
+ * This is a system feature, so it only works on a real device, not Expo Go. */
+export function CastPanel({ onClose }: { onClose: () => void }) {
+  const ios = Platform.OS === "ios";
+  const heading = ios ? "AirPlay · Screen Mirroring" : "Google · Cast screen";
+  const steps = ios
+    ? [
+        "Open Control Centre (swipe down from the top-right corner).",
+        "Tap Screen Mirroring.",
+        "Pick your Apple TV or AirPlay-compatible TV.",
+        "Return here — your full ride now shows on the TV.",
+      ]
+    : [
+        "Swipe down to open Quick Settings.",
+        "Tap Screen Cast (or Google Home app → Cast my screen).",
+        "Pick your Chromecast or Android TV.",
+        "Return here — your full ride now shows on the TV.",
+      ];
   return (
     <Pressable style={styles.rpOverlay} onPress={onClose} testID="cast-panel">
       <Pressable style={styles.spPanel} onPress={() => { /* swallow */ }}>
         <View style={styles.rpHead}>
-          <View style={{ flex: 1 }}><Text style={styles.rpTitle}>Cast to TV</Text><Text style={styles.rpSub}>Mirror your ride to a nearby screen</Text></View>
+          <View style={{ flex: 1 }}><Text style={styles.rpTitle}>Mirror to TV</Text><Text style={styles.rpSub}>Show the whole workout on your TV</Text></View>
           <Pressable onPress={onClose} testID="cast-close" hitSlop={10}><Ionicons name="close" size={22} color={colors.white} /></Pressable>
         </View>
 
-        {castingTo && (
-          <View style={styles.castActive}>
-            <Ionicons name="tv" size={18} color={colors.bg} />
-            <Text style={styles.castActiveText}>Casting to {castingTo}</Text>
-            <Pressable onPress={onStop} testID="cast-stop" style={styles.castStop} hitSlop={8}><Text style={styles.castStopText}>Stop</Text></Pressable>
+        <View style={styles.mirrorHeadRow}>
+          <View style={styles.spIcon}><Ionicons name="tv" size={18} color={colors.yellow} /></View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.spLabel}>{heading}</Text>
+            <Text style={styles.spSub}>Same Wi-Fi on phone &amp; TV</Text>
           </View>
-        )}
+        </View>
 
-        <Text style={styles.voiceHint}>Available devices</Text>
-        {CAST_DEVICES.map((d) => {
-          const active = d.name === castingTo;
-          return (
-            <Pressable key={d.id} testID={`cast-${d.id}`} onPress={() => onCast(d.name)} style={[styles.voiceRow, active && styles.voiceRowActive]}>
-              <Ionicons name={icon(d.kind) as never} size={18} color={active ? colors.yellow : colors.textDim} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.voiceLabel, active && { color: colors.white }]}>{d.name}</Text>
-                <Text style={styles.voiceSub}>{active ? "Connected" : "Available"}</Text>
-              </View>
-              <Ionicons name={active ? "checkmark-circle" : "chevron-forward"} size={18} color={active ? colors.yellow : colors.textDim} />
-            </Pressable>
-          );
-        })}
-        <Text style={styles.castNote}>Because the ride uses a video + live HUD overlay, use your device&apos;s Screen Mirroring (iOS Control Centre / Android Quick Settings) to show the full workout on the TV. Real device discovery requires a native build.</Text>
+        {steps.map((s, i) => (
+          <View key={i} style={styles.mirrorStep}>
+            <View style={styles.mirrorNum}><Text style={styles.mirrorNumText}>{i + 1}</Text></View>
+            <Text style={styles.mirrorStepText}>{s}</Text>
+          </View>
+        ))}
+
+        <Text style={styles.castNote}>Screen mirroring is a system feature, so it runs from your phone&apos;s menu (not this button) and only works on a real device — not in Expo Go or the web preview. Tip: turn off auto-lock so the screen stays on during your ride.</Text>
       </Pressable>
     </Pressable>
   );
@@ -1098,4 +1091,9 @@ const styles = StyleSheet.create({
   castStop: { backgroundColor: "rgba(0,0,0,0.18)", borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 5 },
   castStopText: { color: colors.bg, fontWeight: "800", fontSize: 12.5 },
   castNote: { color: colors.textDim, fontSize: 11, marginTop: 10, lineHeight: 15 },
+  mirrorHeadRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 6 },
+  mirrorStep: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 7 },
+  mirrorNum: { width: 26, height: 26, borderRadius: 13, backgroundColor: "rgba(242,194,48,0.16)", borderWidth: 1, borderColor: colors.yellow, alignItems: "center", justifyContent: "center" },
+  mirrorNumText: { color: colors.yellow, fontSize: 13, fontWeight: "800" },
+  mirrorStepText: { flex: 1, color: colors.white, fontSize: 14, lineHeight: 19 },
 });

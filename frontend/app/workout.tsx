@@ -20,7 +20,6 @@ import {
   RoutesButton, RoutePicker, SettingsPanel, MusicPanel, MusicButton, CastButton, CastPanel,
 } from "@/src/components/workout";
 import { useWorkoutAudio } from "@/src/hooks/useWorkoutAudio";
-import { useCast } from "@/src/hooks/useCast";
 import { fetchCoachCue } from "@/src/lib/coach";
 import { useCoach } from "@/src/lib/coach-persona";
 
@@ -129,7 +128,6 @@ export default function LiveWorkout() {
   const [showSettings, setShowSettings] = React.useState(false);
   const [showMusic, setShowMusic] = React.useState(false);
   const [showCast, setShowCast] = React.useState(false);
-  const [castingTo, setCastingTo] = React.useState<string | null>(null);
 
   const [hudVisible, setHudVisible] = React.useState(true);
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
@@ -193,7 +191,6 @@ export default function LiveWorkout() {
 
   const { musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, speak, voiceOptions, voiceId, selectVoice, coach, chooseCoach, coachName } = useWorkoutAudio();
   const persona = useCoach();
-  const { castSupported, castDeviceName, showCastDialog } = useCast();
 
   // Keep the latest telemetry in a ref so cue timers read live values without
   // re-firing on every telemetry tick.
@@ -383,7 +380,7 @@ export default function LiveWorkout() {
 
         <View style={styles.mediaBar} pointerEvents="box-none">
           <MusicButton musicOn={musicOn} onPress={() => setShowMusic(true)} />
-          <CastButton casting={castSupported ? !!castDeviceName : !!castingTo} onPress={() => (castSupported ? showCastDialog() : setShowCast(true))} />
+          <CastButton onPress={() => setShowCast(true)} />
         </View>
 
         {showControls && (
@@ -464,14 +461,14 @@ export default function LiveWorkout() {
               <Ionicons name={hudVisible ? "eye" : "eye-off"} size={18} color="#fff" />
             </Pressable>
             <Pressable
-              style={[styles.hudCast, (castSupported ? !!castDeviceName : !!castingTo) && styles.hudCastOn]}
-              onPress={() => (castSupported ? showCastDialog() : setShowCast(true))}
+              style={styles.hudCast}
+              onPress={() => setShowCast(true)}
               testID="hud-cast"
               hitSlop={10}
               accessibilityRole="button"
-              accessibilityLabel="Cast to TV"
+              accessibilityLabel="Mirror screen to TV"
             >
-              <Ionicons name="tv-outline" size={18} color={(castSupported ? !!castDeviceName : !!castingTo) ? colors.bg : "#fff"} />
+              <Ionicons name="tv-outline" size={18} color="#fff" />
             </Pressable>
           </RouteVideo>
         </View>
@@ -514,12 +511,7 @@ export default function LiveWorkout() {
       )}
 
       {showCast && (
-        <CastPanel
-          castingTo={castingTo}
-          onCast={(name) => { setCastingTo(name); setShowCast(false); showToast(`Casting to ${name}`); }}
-          onStop={() => { setCastingTo(null); showToast("Casting stopped"); }}
-          onClose={() => setShowCast(false)}
-        />
+        <CastPanel onClose={() => setShowCast(false)} />
       )}
 
       <Toast message={toast} />
