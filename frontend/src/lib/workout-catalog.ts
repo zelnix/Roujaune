@@ -17,6 +17,8 @@ export type Workout = {
   description: string;
   focus: string;
   zones: Zone[];
+  level?: "Foundation" | "Development" | "Performance";
+  segmentSpec?: { label: string; zoneIdx: number; minutes: number; targetPct?: number }[];
 };
 
 const Z = {
@@ -38,7 +40,127 @@ const zones = (a: number, b: number, c: number, d: number, e: number, f: number)
   { label: "Z5", pct: e, color: Z.z5 }, { label: "Z6", pct: f, color: Z.z6 },
 ];
 
+export type Level = "Foundation" | "Development" | "Performance";
+export const LEVEL_META: Record<Level, { label: string; tier: string; color: string }> = {
+  Foundation: { label: "Foundation", tier: "Beginner", color: "#55C850" },
+  Development: { label: "Development", tier: "Intermediate", color: "#40A9C6" },
+  Performance: { label: "Performance", tier: "Advanced", color: "#FFC20A" },
+};
+
+// An explicit, ordered segment spec (minutes) that overrides the auto-builder.
+export type SegSpec = { label: string; zoneIdx: number; minutes: number; targetPct?: number };
+
+// Target %FTP presets for the structured endurance library.
+const T = { warm: 0.55, warmHi: 0.58, z2low: 0.62, z2: 0.66, z2steady: 0.68, z2up: 0.73, easy: 0.5, tempoLow: 0.78, tempo: 0.83, tempoCtrl: 0.8 };
+const wu = (m: number, t = T.warm): SegSpec => ({ label: "Warm-up", zoneIdx: 1, minutes: m, targetPct: t });
+const cd = (m: number): SegSpec => ({ label: "Cool-down", zoneIdx: 0, minutes: m, targetPct: T.easy });
+const easy = (m: number): SegSpec => ({ label: "Easy", zoneIdx: 0, minutes: m, targetPct: T.easy });
+
+function structured(o: {
+  id: string; name: string; typeId: string; typeName: string; color: string; icon: Ion;
+  level: Level; difficulty: Workout["difficulty"]; focus: string; description: string;
+  tss: number; if: number; zones: Zone[]; spec: SegSpec[];
+}): Workout {
+  const duration = o.spec.reduce((a, sp) => a + sp.minutes, 0);
+  return {
+    id: o.id, name: o.name, typeId: o.typeId, typeName: o.typeName, color: o.color, icon: o.icon,
+    duration, tss: o.tss, if: o.if, difficulty: o.difficulty, focus: o.focus, description: o.description,
+    zones: o.zones, level: o.level, segmentSpec: o.spec,
+  };
+}
+
+// ── Structured Indoor Endurance Library (level-based; durations kept within the
+// Foundation/Development/Performance limits — no 90-min+ standard indoor rides) ──
+const END_COLOR = "#55C850";
+const TEMPO_COLOR = "#E8631C";
+const STRUCTURED: Workout[] = [
+  // 1. Aerobic Base
+  structured({ id: "aerobic-base-foundation", name: "Aerobic Base", typeId: "endurance", typeName: "Endurance", color: END_COLOR, icon: "bicycle",
+    level: "Foundation", difficulty: "Easy", focus: "Aerobic base", tss: 18, if: 0.6, zones: zones(43, 57, 0, 0, 0, 0),
+    description: "A gentle, steady Zone 2 introduction to build your aerobic engine. Stay comfortable and conversational throughout.",
+    spec: [wu(8), { label: "Zone 2 Endurance", zoneIdx: 1, minutes: 17, targetPct: T.z2 }, cd(5)] }),
+  structured({ id: "aerobic-base-development", name: "Aerobic Base", typeId: "endurance", typeName: "Endurance", color: END_COLOR, icon: "bicycle",
+    level: "Development", difficulty: "Moderate", focus: "Aerobic base", tss: 29, if: 0.62, zones: zones(47, 53, 0, 0, 0, 0),
+    description: "Two solid Zone 2 blocks with an easy spin between. Builds aerobic efficiency without accumulating fatigue.",
+    spec: [wu(10), { label: "Zone 2 Block 1", zoneIdx: 1, minutes: 12, targetPct: T.z2 }, easy(3), { label: "Zone 2 Block 2", zoneIdx: 1, minutes: 12, targetPct: T.z2 }, cd(8)] }),
+  structured({ id: "aerobic-base-performance", name: "Aerobic Base", typeId: "endurance", typeName: "Endurance", color: END_COLOR, icon: "bicycle",
+    level: "Performance", difficulty: "Hard", focus: "Aerobic base", tss: 44, if: 0.66, zones: zones(40, 60, 0, 0, 0, 0),
+    description: "Three upper Zone 2 blocks to deepen aerobic durability. Hold a strong, even effort just below tempo.",
+    spec: [wu(12, T.warmHi), { label: "Upper Z2 Block 1", zoneIdx: 1, minutes: 12, targetPct: T.z2up }, easy(3), { label: "Upper Z2 Block 2", zoneIdx: 1, minutes: 12, targetPct: T.z2up }, easy(3), { label: "Upper Z2 Block 3", zoneIdx: 1, minutes: 12, targetPct: T.z2up }, cd(6)] }),
+
+  // 2. Endurance Progression
+  structured({ id: "endurance-progression-foundation", name: "Endurance Progression", typeId: "endurance", typeName: "Endurance", color: END_COLOR, icon: "trending-up-outline",
+    level: "Foundation", difficulty: "Easy", focus: "Progressive aerobic", tss: 19, if: 0.61, zones: zones(47, 53, 0, 0, 0, 0),
+    description: "A gradual build from easy to steady Zone 2. Finish strong — never let it drift into a threshold effort.",
+    spec: [{ label: "Easy", zoneIdx: 1, minutes: 8, targetPct: T.warm }, { label: "Lower Zone 2", zoneIdx: 1, minutes: 8, targetPct: T.z2low }, { label: "Steady Zone 2", zoneIdx: 1, minutes: 8, targetPct: T.z2steady }, easy(6)] }),
+  structured({ id: "endurance-progression-development", name: "Endurance Progression", typeId: "endurance", typeName: "Endurance", color: END_COLOR, icon: "trending-up-outline",
+    level: "Development", difficulty: "Moderate", focus: "Progressive aerobic", tss: 31, if: 0.64, zones: zones(38, 62, 0, 0, 0, 0),
+    description: "Step up through the Zone 2 range and finish in upper Zone 2. Keep the progression smooth and controlled.",
+    spec: [wu(10), { label: "Lower Zone 2", zoneIdx: 1, minutes: 10, targetPct: T.z2low }, { label: "Steady Zone 2", zoneIdx: 1, minutes: 10, targetPct: T.z2steady }, { label: "Upper Zone 2", zoneIdx: 1, minutes: 8, targetPct: T.z2up }, cd(7)] }),
+  structured({ id: "endurance-progression-performance", name: "Endurance Progression", typeId: "endurance", typeName: "Endurance", color: END_COLOR, icon: "trending-up-outline",
+    level: "Performance", difficulty: "Hard", focus: "Progressive aerobic", tss: 46, if: 0.68, zones: zones(32, 60, 8, 0, 0, 0),
+    description: "A full progression finishing with a short controlled tempo touch. Strong to the line, but never breathless.",
+    spec: [wu(12), { label: "Lower Zone 2", zoneIdx: 1, minutes: 12, targetPct: T.z2low }, { label: "Steady Zone 2", zoneIdx: 1, minutes: 12, targetPct: T.z2steady }, { label: "Upper Zone 2", zoneIdx: 1, minutes: 12, targetPct: T.z2up }, { label: "Controlled Tempo", zoneIdx: 2, minutes: 5, targetPct: T.tempoCtrl }, cd(7)] }),
+
+  // 3. Aerobic Endurance Intervals
+  structured({ id: "aerobic-intervals-foundation", name: "Aerobic Endurance Intervals", typeId: "endurance", typeName: "Endurance", color: END_COLOR, icon: "repeat-outline",
+    level: "Foundation", difficulty: "Easy", focus: "Aerobic intervals", tss: 22, if: 0.62, zones: zones(57, 43, 0, 0, 0, 0),
+    description: "Short, repeatable Zone 2 intervals with easy spins between. A friendly first step into structured endurance work.",
+    spec: [wu(10), { label: "Zone 2 · 1/3", zoneIdx: 1, minutes: 5, targetPct: T.z2 }, easy(2), { label: "Zone 2 · 2/3", zoneIdx: 1, minutes: 5, targetPct: T.z2 }, easy(2), { label: "Zone 2 · 3/3", zoneIdx: 1, minutes: 5, targetPct: T.z2 }, cd(6)] }),
+  structured({ id: "aerobic-intervals-development", name: "Aerobic Endurance Intervals", typeId: "endurance", typeName: "Endurance", color: END_COLOR, icon: "repeat-outline",
+    level: "Development", difficulty: "Moderate", focus: "Aerobic intervals", tss: 33, if: 0.66, zones: zones(47, 53, 0, 0, 0, 0),
+    description: "Three upper Zone 2 intervals to extend aerobic endurance. Hold each effort steady and even.",
+    spec: [wu(10), { label: "Upper Z2 · 1/3", zoneIdx: 1, minutes: 8, targetPct: T.z2up }, easy(2), { label: "Upper Z2 · 2/3", zoneIdx: 1, minutes: 8, targetPct: T.z2up }, easy(2), { label: "Upper Z2 · 3/3", zoneIdx: 1, minutes: 8, targetPct: T.z2up }, cd(7)] }),
+  structured({ id: "aerobic-intervals-performance", name: "Aerobic Endurance Intervals", typeId: "endurance", typeName: "Endurance", color: END_COLOR, icon: "repeat-outline",
+    level: "Performance", difficulty: "Hard", focus: "Aerobic intervals", tss: 48, if: 0.69, zones: zones(40, 60, 0, 0, 0, 0),
+    description: "Three long upper Zone 2 intervals for serious aerobic durability. Strong, sustainable and controlled.",
+    spec: [wu(12, T.warmHi), { label: "Upper Z2 · 1/3", zoneIdx: 1, minutes: 12, targetPct: T.z2up }, easy(3), { label: "Upper Z2 · 2/3", zoneIdx: 1, minutes: 12, targetPct: T.z2up }, easy(3), { label: "Upper Z2 · 3/3", zoneIdx: 1, minutes: 12, targetPct: T.z2up }, cd(6)] }),
+
+  // 4. Tempo Endurance Builder
+  structured({ id: "tempo-builder-foundation", name: "Tempo Endurance Builder", typeId: "tempo", typeName: "Tempo", color: TEMPO_COLOR, icon: "pulse",
+    level: "Foundation", difficulty: "Moderate", focus: "Muscular endurance", tss: 22, if: 0.66, zones: zones(45, 20, 35, 0, 0, 0),
+    description: "A first taste of tempo — two short low-tempo efforts. Strong but sustainable, never breathless or competitive.",
+    spec: [wu(10), { label: "Low Tempo · 1/2", zoneIdx: 2, minutes: 5, targetPct: T.tempoLow }, easy(3), { label: "Low Tempo · 2/2", zoneIdx: 2, minutes: 5, targetPct: T.tempoLow }, cd(7)] }),
+  structured({ id: "tempo-builder-development", name: "Tempo Endurance Builder", typeId: "tempo", typeName: "Tempo", color: TEMPO_COLOR, icon: "pulse",
+    level: "Development", difficulty: "Hard", focus: "Muscular endurance", tss: 39, if: 0.72, zones: zones(35, 20, 45, 0, 0, 0),
+    description: "Two ten-minute tempo blocks to build muscular endurance. Hold a strong, even effort — controlled, not competitive.",
+    spec: [wu(12), { label: "Tempo · 1/2", zoneIdx: 2, minutes: 10, targetPct: T.tempo }, easy(5), { label: "Tempo · 2/2", zoneIdx: 2, minutes: 10, targetPct: T.tempo }, cd(8)] }),
+  structured({ id: "tempo-builder-performance", name: "Tempo Endurance Builder", typeId: "tempo", typeName: "Tempo", color: TEMPO_COLOR, icon: "pulse",
+    level: "Performance", difficulty: "Hard", focus: "Muscular endurance", tss: 56, if: 0.75, zones: zones(30, 20, 50, 0, 0, 0),
+    description: "Three ten-minute tempo efforts for durable, sustainable power. Strong and steady — keep it well short of threshold.",
+    spec: [wu(15), { label: "Tempo · 1/3", zoneIdx: 2, minutes: 10, targetPct: T.tempo }, easy(4), { label: "Tempo · 2/3", zoneIdx: 2, minutes: 10, targetPct: T.tempo }, easy(4), { label: "Tempo · 3/3", zoneIdx: 2, minutes: 10, targetPct: T.tempo }, cd(7)] }),
+
+  // 5. Strength Endurance (low-cadence · muscular tension — careful for 50+ joints)
+  structured({ id: "strength-endurance-foundation", name: "Strength Endurance", typeId: "climbing", typeName: "Climbing", color: "#C91727", icon: "barbell-outline",
+    level: "Foundation", difficulty: "Moderate", focus: "Low-cadence strength", tss: 23, if: 0.68, zones: zones(73, 0, 27, 0, 0, 0),
+    description: "Short low-cadence efforts (70–75 rpm) to build muscular strength. 50+ tip: use a comfortable resistance — never heavy-gear grinding — and back off if your knees, hips or lower back complain. A seated version works well.",
+    spec: [wu(10), { label: "70–75 rpm · 1/4", zoneIdx: 2, minutes: 2, targetPct: 0.75 }, easy(2), { label: "70–75 rpm · 2/4", zoneIdx: 2, minutes: 2, targetPct: 0.75 }, easy(2), { label: "70–75 rpm · 3/4", zoneIdx: 2, minutes: 2, targetPct: 0.75 }, easy(2), { label: "70–75 rpm · 4/4", zoneIdx: 2, minutes: 2, targetPct: 0.75 }, cd(6)] }),
+  structured({ id: "strength-endurance-development", name: "Strength Endurance", typeId: "climbing", typeName: "Climbing", color: "#C91727", icon: "barbell-outline",
+    level: "Development", difficulty: "Hard", focus: "Low-cadence strength", tss: 37, if: 0.72, zones: zones(63, 0, 37, 0, 0, 0),
+    description: "Four-minute low-cadence blocks (65–75 rpm) for muscular endurance. 50+ tip: keep it smooth and controlled, not a grind — reduce resistance the moment a joint feels uncomfortable. Seated version optional.",
+    spec: [wu(12), { label: "65–75 rpm · 1/4", zoneIdx: 2, minutes: 4, targetPct: 0.75 }, easy(3), { label: "65–75 rpm · 2/4", zoneIdx: 2, minutes: 4, targetPct: 0.75 }, easy(3), { label: "65–75 rpm · 3/4", zoneIdx: 2, minutes: 4, targetPct: 0.75 }, easy(3), { label: "65–75 rpm · 4/4", zoneIdx: 2, minutes: 4, targetPct: 0.75 }, cd(6)] }),
+  structured({ id: "strength-endurance-performance", name: "Strength Endurance", typeId: "climbing", typeName: "Climbing", color: "#C91727", icon: "barbell-outline",
+    level: "Performance", difficulty: "Hard", focus: "Low-cadence strength", tss: 48, if: 0.74, zones: zones(62, 0, 38, 0, 0, 0),
+    description: "Five four-minute blocks at 60–70 rpm for real muscular durability. 50+ tip: this should never become heavy-gear grinding — protect your knees, hips and back with lighter resistance and a more natural cadence if needed.",
+    spec: [wu(15), { label: "60–70 rpm · 1/5", zoneIdx: 2, minutes: 4, targetPct: 0.75 }, easy(3), { label: "60–70 rpm · 2/5", zoneIdx: 2, minutes: 4, targetPct: 0.75 }, easy(3), { label: "60–70 rpm · 3/5", zoneIdx: 2, minutes: 4, targetPct: 0.75 }, easy(3), { label: "60–70 rpm · 4/5", zoneIdx: 2, minutes: 4, targetPct: 0.75 }, easy(3), { label: "60–70 rpm · 5/5", zoneIdx: 2, minutes: 4, targetPct: 0.75 }, cd(6)] }),
+
+  // 6. Indoor Endurance Durability (replaces long 2–5h formats — right stimulus in less time)
+  structured({ id: "endurance-durability-foundation", name: "Indoor Endurance Durability", typeId: "endurance", typeName: "Endurance", color: END_COLOR, icon: "infinite-outline",
+    level: "Foundation", difficulty: "Easy", focus: "Endurance durability", tss: 27, if: 0.64, zones: zones(48, 52, 0, 0, 0, 0),
+    description: "Steady Zone 2 blocks that build durability without the marathon time cost. 50+ tip: change hand position and posture regularly, and keep it comfortable throughout.",
+    spec: [{ label: "Easy", zoneIdx: 1, minutes: 10, targetPct: T.warm }, { label: "Steady Z2 · 1/3", zoneIdx: 1, minutes: 7, targetPct: T.z2steady }, easy(2), { label: "Steady Z2 · 2/3", zoneIdx: 1, minutes: 7, targetPct: T.z2steady }, easy(2), { label: "Steady Z2 · 3/3", zoneIdx: 1, minutes: 7, targetPct: T.z2steady }, cd(5)] }),
+  structured({ id: "endurance-durability-development", name: "Indoor Endurance Durability", typeId: "endurance", typeName: "Endurance", color: END_COLOR, icon: "infinite-outline",
+    level: "Development", difficulty: "Moderate", focus: "Endurance durability", tss: 40, if: 0.66, zones: zones(45, 55, 0, 0, 0, 0),
+    description: "Three ten-minute Zone 2 blocks, each with a one-minute higher-cadence lift to keep the legs lively. 50+ tip: shift hand position and cadence often, and ease resistance if anything feels uncomfortable.",
+    spec: [wu(12), { label: "Zone 2 · Block 1", zoneIdx: 1, minutes: 5, targetPct: T.z2 }, { label: "Cadence Lift", zoneIdx: 1, minutes: 1, targetPct: T.z2 }, { label: "Zone 2 · Block 1", zoneIdx: 1, minutes: 4, targetPct: T.z2 }, easy(3), { label: "Zone 2 · Block 2", zoneIdx: 1, minutes: 5, targetPct: T.z2 }, { label: "Cadence Lift", zoneIdx: 1, minutes: 1, targetPct: T.z2 }, { label: "Zone 2 · Block 2", zoneIdx: 1, minutes: 4, targetPct: T.z2 }, easy(3), { label: "Zone 2 · Block 3", zoneIdx: 1, minutes: 5, targetPct: T.z2 }, { label: "Cadence Lift", zoneIdx: 1, minutes: 1, targetPct: T.z2 }, { label: "Zone 2 · Block 3", zoneIdx: 1, minutes: 4, targetPct: T.z2 }, cd(7)] }),
+  structured({ id: "endurance-durability-performance", name: "Indoor Endurance Durability", typeId: "endurance", typeName: "Endurance", color: END_COLOR, icon: "infinite-outline",
+    level: "Performance", difficulty: "Hard", focus: "Endurance durability", tss: 54, if: 0.68, zones: zones(40, 60, 0, 0, 0, 0),
+    description: "Three long Zone 2 blocks that each finish in upper Zone 2 — durable endurance in 70 focused minutes. 50+ tip: keep the finishes controlled, vary your position, and reduce resistance any time joints feel it.",
+    spec: [wu(15), { label: "Zone 2 · Block 1", zoneIdx: 1, minutes: 11, targetPct: T.z2 }, { label: "Upper Z2 Finish", zoneIdx: 1, minutes: 3, targetPct: T.z2up }, easy(3), { label: "Zone 2 · Block 2", zoneIdx: 1, minutes: 11, targetPct: T.z2 }, { label: "Upper Z2 Finish", zoneIdx: 1, minutes: 3, targetPct: T.z2up }, easy(3), { label: "Zone 2 · Block 3", zoneIdx: 1, minutes: 11, targetPct: T.z2 }, { label: "Upper Z2 Finish", zoneIdx: 1, minutes: 3, targetPct: T.z2up }, cd(7)] }),
+];
+
 export const WORKOUTS: Workout[] = [
+  ...STRUCTURED,
   // ── Endurance ──
   { id: "endurance-ride", name: "Endurance Ride", typeId: "endurance", typeName: "Endurance", color: "#55C850", icon: "bicycle",
     duration: 105, tss: 70, if: 0.62, difficulty: "Easy", focus: "Aerobic base",
@@ -224,6 +346,16 @@ function mkSeg(w: Workout, idx: number, label: string, dur: number): Segment {
  * zone distribution and duration. Segment durations always sum to the total. */
 export function buildSegments(w: Workout): Segment[] {
   if (w.duration <= 0) return [mkSeg(w, 0, "Rest & Recover", 0)];
+
+  // Explicit, hand-authored timeline (structured library) takes precedence.
+  if (w.segmentSpec && w.segmentSpec.length) {
+    return w.segmentSpec.map((sp) => {
+      const seg = mkSeg(w, sp.zoneIdx, sp.label, Math.round(sp.minutes * 60));
+      if (sp.targetPct != null) seg.targetPct = sp.targetPct;
+      return seg;
+    });
+  }
+
   const total = Math.round(w.duration * 60);
   const warm = Math.max(120, Math.round(total * 0.12));
   const cool = Math.max(90, Math.round(total * 0.1));

@@ -15,6 +15,7 @@ import { fetchFavorites, toggleFavorite, scheduleWorkout } from "@/src/lib/worko
 import {
   Workout, getWorkout, workoutsByType, sortWorkouts, SORTS, SortKey,
   DURATION_BANDS, DurationBand, inDurationBand, fmtDuration, DIFFICULTY_COLOR,
+  LEVEL_META, buildSegments, mmss,
 } from "@/src/lib/workout-catalog";
 
 const ROUTE: Record<string, string> = {
@@ -223,7 +224,14 @@ export default function WorkoutListScreen() {
                         <Ionicons name={w.icon} size={17} color={w.color} />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={s.listName}>{w.name}</Text>
+                        <View style={s.nameRow}>
+                          <Text style={s.listName}>{w.name}</Text>
+                          {w.level ? (
+                            <View style={[s.lvlPill, { borderColor: `${LEVEL_META[w.level].color}66`, backgroundColor: `${LEVEL_META[w.level].color}1A` }]}>
+                              <Text style={[s.lvlText, { color: LEVEL_META[w.level].color }]}>{LEVEL_META[w.level].tier}</Text>
+                            </View>
+                          ) : null}
+                        </View>
                         <Text style={s.listMeta}>{fmtDuration(w.duration)} · {w.tss} TSS · IF {w.if.toFixed(2)}</Text>
                       </View>
                       <View style={[s.diffBadge, { borderColor: `${DIFFICULTY_COLOR[w.difficulty]}66` }]}>
@@ -253,10 +261,24 @@ export default function WorkoutListScreen() {
                     <Stat label="Duration" value={fmtDuration(detail.duration)} />
                     <Stat label="TSS" value={String(detail.tss)} color={CC.yellow} />
                     <Stat label="Intensity" value={detail.if ? detail.if.toFixed(2) : "—"} />
+                    {detail.level ? <Stat label="Level" value={LEVEL_META[detail.level].label} color={LEVEL_META[detail.level].color} /> : null}
                     <Stat label="Difficulty" value={detail.difficulty} color={DIFFICULTY_COLOR[detail.difficulty]} />
                   </View>
 
                   <Text style={s.detailDesc}>{detail.description}</Text>
+
+                  {detail.segmentSpec && detail.segmentSpec.length ? (
+                    <>
+                      <Text style={s.detailSection}>SESSION STRUCTURE</Text>
+                      {buildSegments(detail).map((seg, i) => (
+                        <View key={i} style={s.structRow}>
+                          <View style={[s.structDot, { backgroundColor: seg.color }]} />
+                          <Text style={s.structLabel} numberOfLines={1}>{seg.label}</Text>
+                          <Text style={s.structMeta}>{mmss(seg.durationSec)} · {seg.zoneLabel} · {Math.round(seg.targetPct * 100)}% FTP</Text>
+                        </View>
+                      ))}
+                    </>
+                  ) : null}
 
                   <Text style={s.detailSection}>{detail.typeId === "fb50" ? "SESSION FOCUS" : "TRAINING ZONES"}</Text>
                   {detail.typeId === "fb50" ? (
@@ -312,6 +334,13 @@ const s = StyleSheet.create({
   listItem: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: CC.card, borderRadius: 14, borderWidth: 1.5, borderColor: CC.border, padding: 12 },
   listIcon: { width: 36, height: 36, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   listName: { color: CC.white, fontSize: 14.5, fontWeight: "700" },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
+  lvlPill: { borderWidth: 1, borderRadius: 999, paddingVertical: 2, paddingHorizontal: 8 },
+  lvlText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.3 },
+  structRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 7, borderTopWidth: 1, borderTopColor: CC.borderSoft },
+  structDot: { width: 9, height: 9, borderRadius: 3 },
+  structLabel: { color: CC.white, fontSize: 13, fontWeight: "600", flex: 1 },
+  structMeta: { color: CC.dim, fontSize: 11.5, fontWeight: "600" },
   listMeta: { color: CC.dim, fontSize: 11.5, marginTop: 2 },
   diffBadge: { borderWidth: 1, borderRadius: 999, paddingVertical: 4, paddingHorizontal: 10 },
   diffText: { fontSize: 10.5, fontWeight: "800" },
