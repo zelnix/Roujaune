@@ -306,7 +306,9 @@ export function mmss(sec: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-/** Target watts for a segment given the rider's FTP. */
-export function targetWatts(seg: Segment, ftp: number): number {
-  return Math.round(ftp * seg.targetPct);
+/** Target watts for a segment given the rider's FTP and optional adaptive
+ * per-zone bias (e.g. { Z4: 0.04 } → +4% on Z4 targets). */
+export function targetWatts(seg: Segment, ftp: number, bias?: Record<string, number> | null): number {
+  const b = (bias && bias[seg.zoneLabel]) || 0;
+  return Math.round(ftp * seg.targetPct * (1 + b));
 }

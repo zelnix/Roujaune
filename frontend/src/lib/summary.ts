@@ -123,6 +123,7 @@ export function computeIntervals(): IntervalResult {
   if (!w) return { intervals: [], overall: null, hasData: false };
   const segs = buildSegments(w);
   const ftp = rec.ftp || 287;
+  const bias = rec.zoneBias || {};
   const samples = rec.samples;
   const total = segs.reduce((a, s) => a + s.durationSec, 0);
   const n = samples.length;
@@ -137,7 +138,7 @@ export function computeIntervals(): IntervalResult {
   let compN = 0;
   let acc = 0;
   for (const s of segs) {
-    const tW = targetWatts(s, ftp);
+    const tW = targetWatts(s, ftp, bias);
     let avgW: number | null = null;
     let compliance: number | null = null;
     const segStart = acc;
@@ -219,8 +220,8 @@ export function useCoachDebrief(stats: SummaryStats, route: RideRoute) {
     // Only send segments we actually measured, capped to keep the prompt tight.
     const measured = intervals
       .filter((i) => i.avgW != null && i.targetW > 0)
-      .slice(0, 10)
-      .map((i) => ({ label: i.label, targetW: i.targetW, avgW: i.avgW, compliance: i.compliance }));
+      .slice(0, 12)
+      .map((i) => ({ label: i.label, zone: i.zoneLabel, sec: i.durationSec, targetW: i.targetW, avgW: i.avgW, compliance: i.compliance }));
     (async () => {
       try {
         const res = await fetch(`${apiBase()}/api/coach/debrief`, {

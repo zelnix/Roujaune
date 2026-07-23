@@ -13,6 +13,7 @@ import { getLastRouteId, setLastRouteId } from "@/src/lib/prefs";
 import { useSettings } from "@/src/lib/settings";
 import { routeVideos, nextInterval, currentWorkout } from "@/src/data";
 import { getWorkout, buildSegments, currentSegment, segmentProfile, mmss, targetWatts } from "@/src/lib/workout-catalog";
+import { fetchZoneBias, ZoneBias } from "@/src/lib/targets";
 import { WORKOUT_TYPES } from "@/src/lib/workouts";
 import { RouteVideo } from "@/src/components/RouteVideo";
 import {
@@ -150,15 +151,18 @@ export default function LiveWorkout() {
 
   // ---- Live segment driven by the chosen workout ----
   const ftp = settings.ftp || 287;
+  // Adaptive per-zone target bias (set by the coach's adaptation engine).
+  const [zoneBias, setZoneBias] = React.useState<ZoneBias>({});
+  React.useEffect(() => { fetchZoneBias().then(setZoneBias).catch(() => {}); }, []);
   const activeSeg = React.useMemo(
     () => (segments.length ? currentSegment(segments, telemetry.elapsed) : null),
     [segments, telemetry.elapsed],
   );
-  const targetW = activeSeg ? targetWatts(activeSeg.segment, ftp) : 251;
+  const targetW = activeSeg ? targetWatts(activeSeg.segment, ftp, zoneBias) : 251;
   const stepLabel = activeSeg ? `${activeSeg.index + 1} / ${activeSeg.total}` : undefined;
   const timeLeftLabel = activeSeg ? mmss(activeSeg.remaining) : undefined;
   const nextSeg = activeSeg?.next
-    ? { label: activeSeg.next.label, time: mmss(activeSeg.next.durationSec), target: activeSeg.next.durationSec > 0 ? `${targetWatts(activeSeg.next, ftp)} W` : "—", rpe: `RPE ${activeSeg.next.rpe}` }
+    ? { label: activeSeg.next.label, time: mmss(activeSeg.next.durationSec), target: activeSeg.next.durationSec > 0 ? `${targetWatts(activeSeg.next, ftp, zoneBias)} W` : "—", rpe: `RPE ${activeSeg.next.rpe}` }
     : nextInterval;
 
   // Start the ride at the beginning of the chosen session and keep the trainer
@@ -201,8 +205,10 @@ export default function LiveWorkout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Keep the recorder's FTP current if it syncs from training progress mid-load.
+  // Keep the recorder's FTP + adaptive bias current (they may load after mount)
+  // so the summary scores against the exact targets ridden.
   React.useEffect(() => { rideRecorder.setFtp(ftp); }, [ftp]);
+  React.useEffect(() => { rideRecorder.setZoneBias(zoneBias); }, [zoneBias]);
 
   // Keep the ride recorder's route in sync so the summary reflects the scenery ridden.
   React.useEffect(() => {

@@ -669,6 +669,9 @@ async def _refresh_adaptation_after_ride(req: "CoachDebriefRequest", plan_id: st
         plan = await db.training_plans.find_one({"id": plan_id})
         if not plan:
             plan = dict(BUILD_AND_CLIMB)
+        # Feed interval execution into the adaptive-targets engine first so the
+        # coach's note can reference any target nudges it just made.
+        _bias, nudges = await _update_adaptive_targets(plan_id, req.intervals)
         recent_ride = {
             "workout": req.workout,
             "route": req.route,
@@ -676,6 +679,8 @@ async def _refresh_adaptation_after_ride(req: "CoachDebriefRequest", plan_id: st
             "avg_power": req.avg_power,
             "tss": req.tss,
             "compliance": req.compliance,
+            "interval_compliance": req.interval_compliance,
+            "target_nudges": nudges,
         }
         text = await _generate_adaptation(plan, req.coach_name, req.coach_gender, recent_ride)
         cache_key = f"adaptation_ai_{req.coach_name.lower()}"
@@ -708,6 +713,98 @@ async def _record_adaptation(plan_id: str, coach_name: str, text: str, trigger: 
         )
     except Exception:
         logging.warning("adaptation history write failed")
+
+
+# ----------------------- Adaptive zone targets engine -----------------------
+# Zones we allow to auto-nudge (recovery Z1 is left alone). A rider who
+# repeatedly overshoots a zone gets a slightly harder target next time; one who
+# fades gets an achievable target. Nudges are small, gradual and capped.
+NUDGE_ZONES = ["Z2", "Z3", "Z4", "Z5", "Z6"]
+NUDGE_STEP = 0.02          # move 2% per ride toward the rider's demonstrated level
+NUDGE_CAP = 0.08           # never drift more than ±8% from the plan's base target
+NUDGE_HI = 1.05            # >5% over target = overshoot
+NUDGE_LO = 0.95            # >5% under target = fade
+NUDGE_MIN_RIDES = 2        # require a repeated pattern before nudging
+
+
+def _aggregate_ride_zones(intervals: List[Dict[str, Any]]) -> Dict[str, Dict[str, float]]:
+    """Collapse a ride's measured intervals into per-zone target vs actual
+    (duration-weighted). Only segments with a recorded avg are counted."""
+    acc: Dict[str, Dict[str, float]] = {}
+    for it in intervals or []:
+        zone = it.get("zone")
+        avg = it.get("avgW")
+        tgt = it.get("targetW")
+        sec = float(it.get("sec") or 0)
+        if zone not in NUDGE_ZONES or avg is None or not tgt or sec <= 0:
+            continue
+        z = acc.setdefault(zone, {"tgt": 0.0, "act": 0.0, "sec": 0.0})
+        z["tgt"] += float(tgt) * sec
+        z["act"] += float(avg) * sec
+        z["sec"] += sec
+    out: Dict[str, Dict[str, float]] = {}
+    for zone, z in acc.items():
+        if z["sec"] > 0:
+            out[zone] = {"target": z["tgt"] / z["sec"], "actual": z["act"] / z["sec"]}
+    return out
+
+
+async def _update_adaptive_targets(plan_id: str, intervals: List[Dict[str, Any]]):
+    """Update rolling per-zone execution and nudge the plan's zone target bias.
+    Returns (zone_bias, notes) where notes describe any nudge made this ride."""
+    ride_zones = _aggregate_ride_zones(intervals)
+    if not ride_zones:
+        return {}, []
+    try:
+        plan = await db.training_plans.find_one({"id": plan_id}) or {}
+        zone_exec: Dict[str, List[float]] = dict(plan.get("zone_exec") or {})
+        zone_bias: Dict[str, float] = dict(plan.get("zone_bias") or {})
+        notes: List[str] = []
+
+        for zone, agg in ride_zones.items():
+            if agg["target"] <= 0:
+                continue
+            ratio = agg["actual"] / agg["target"]
+            hist = list(zone_exec.get(zone, []))
+            hist.append(round(ratio, 3))
+            hist = hist[-5:]  # keep the last 5 rides
+            zone_exec[zone] = hist
+
+            if len(hist) < NUDGE_MIN_RIDES:
+                continue
+            mean = sum(hist) / len(hist)
+            bias = float(zone_bias.get(zone, 0.0))
+            new_bias = bias
+            if mean > NUDGE_HI:
+                new_bias = min(NUDGE_CAP, round(bias + NUDGE_STEP, 3))
+            elif mean < NUDGE_LO:
+                new_bias = max(-NUDGE_CAP, round(bias - NUDGE_STEP, 3))
+
+            if abs(new_bias - bias) > 1e-6:
+                zone_bias[zone] = new_bias
+                pct = round(new_bias * 100)
+                if new_bias > bias:
+                    notes.append(f"raised your {zone} targets to +{pct}% (you've been overshooting)")
+                else:
+                    notes.append(f"eased your {zone} targets to {pct}% (to keep them achievable)")
+
+        await db.training_plans.update_one(
+            {"id": plan_id},
+            {"$set": {"zone_exec": zone_exec, "zone_bias": zone_bias}},
+            upsert=True,
+        )
+        return zone_bias, notes
+    except Exception:
+        logging.exception("adaptive targets update failed")
+        return {}, []
+
+
+@api_router.get("/plan/targets")
+async def get_plan_targets(plan_id: str = "build-and-climb"):
+    """Current adaptive per-zone target bias (fraction, e.g. Z4: 0.04 → +4%).
+    The live HUD applies this on top of FTP × zone% so targets track execution."""
+    plan = await db.training_plans.find_one({"id": plan_id}) or {}
+    return {"zone_bias": plan.get("zone_bias") or {}}
 
 
 # ----------------------- Trainer telemetry (BLE bridge stand-in) -----------------------
@@ -905,8 +1002,19 @@ async def _generate_adaptation(plan: dict, coach_name: str, coach_gender: str, r
             f"\nThey just finished a ride: {recent_ride.get('workout')} on "
             f"{recent_ride.get('route') or 'the trainer'}, {recent_ride.get('duration_min')} min, "
             f"avg power {recent_ride.get('avg_power')} W, TSS {recent_ride.get('tss')}, "
-            f"plan compliance {recent_ride.get('compliance')}%. Factor this session into your note."
+            f"plan compliance {recent_ride.get('compliance')}%"
         )
+        ic = recent_ride.get("interval_compliance")
+        if ic:
+            ride_txt += f", interval target accuracy {ic}%"
+        ride_txt += ". Factor this session into your note."
+        nudges = recent_ride.get("target_nudges") or []
+        if nudges:
+            ride_txt += (
+                " Based on how they executed their intervals you have automatically "
+                + "; ".join(nudges)
+                + ". Mention this target adjustment naturally in your note."
+            )
     prompt = (
         f"The rider is on the '{plan.get('title')}' plan: {plan.get('description')}\n"
         f"Current phase: {phase.get('name')} ({phase.get('weeks')}). "
