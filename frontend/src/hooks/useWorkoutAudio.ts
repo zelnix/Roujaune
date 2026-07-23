@@ -7,18 +7,19 @@ import { detectGender, COACH_PITCH } from "../lib/coach-voice";
 
 // 10 royalty-free upbeat instrumental tracks that rotate randomly during a
 // ride (admin-replaceable). When one finishes, a new random track plays; no
-// track repeats until the whole set has been played.
+// track repeats until the whole set has been played. Names are cycling-themed
+// friendly labels shown in the "now playing" pill.
 const MUSIC_TRACKS = [
-  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
-  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
-  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
-  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3",
-  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3",
-  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
-  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3",
-  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3",
-  "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3",
+  { name: "Tempo Drive", uri: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
+  { name: "Cadence", uri: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" },
+  { name: "Climb Anthem", uri: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" },
+  { name: "Sprint Finish", uri: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3" },
+  { name: "Rolling Hills", uri: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3" },
+  { name: "Breakaway", uri: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3" },
+  { name: "Peloton", uri: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3" },
+  { name: "Time Trial", uri: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3" },
+  { name: "Summit Push", uri: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3" },
+  { name: "Descent", uri: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-12.mp3" },
 ];
 
 // A fresh shuffled play order (Fisher–Yates) so tracks rotate without repeats.
@@ -115,7 +116,7 @@ export function useWorkoutAudio() {
   // the current track (surfaced for the UI's "now playing" label if needed).
   const orderRef = useRef<number[]>(shuffledOrder(MUSIC_TRACKS.length));
   const ptrRef = useRef(0);
-  const [firstUri] = useState(() => MUSIC_TRACKS[orderRef.current[0]]);
+  const [firstUri] = useState(() => MUSIC_TRACKS[orderRef.current[0]].uri);
   const [trackIdx, setTrackIdx] = useState(() => orderRef.current[0]);
   const player = useAudioPlayer({ uri: firstUri });
   const [musicOn, setMusicOn] = useState(true);
@@ -232,7 +233,7 @@ export function useWorkoutAudio() {
     const idx = orderRef.current[ptrRef.current];
     setTrackIdx(idx);
     try {
-      player.replace({ uri: MUSIC_TRACKS[idx] });
+      player.replace({ uri: MUSIC_TRACKS[idx].uri });
       player.loop = false;
       player.volume = musicOn ? volume * (speaking.current ? DUCK : 1) : 0;
       if (musicOn) player.play();
@@ -327,5 +328,5 @@ export function useWorkoutAudio() {
     }
   }, [voiceOptions, voiceOn, duck]);
 
-  return { musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, speak, voiceOptions, voiceId, selectVoice, coach, chooseCoach, coachName: COACHES[coach].name, trackIdx, trackCount: MUSIC_TRACKS.length };
+  return { musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, speak, voiceOptions, voiceId, selectVoice, coach, chooseCoach, coachName: COACHES[coach].name, trackIdx, trackName: MUSIC_TRACKS[trackIdx].name, trackCount: MUSIC_TRACKS.length, nextTrack: advanceTrack };
 }

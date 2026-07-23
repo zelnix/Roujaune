@@ -99,7 +99,7 @@ export function AppScaffold({
               </View>
               <View style={styles.headerRight}>
                 {headerRight}
-                <TopStatus persona={persona} onPress={showToast} minimal={minimalStatus} />
+                {!minimalStatus && <TopStatus persona={persona} onPress={showToast} />}
               </View>
             </View>
             {children}
