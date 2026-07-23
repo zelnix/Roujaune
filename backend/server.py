@@ -761,49 +761,77 @@ CALENDAR_WEEK = {
             "cycling": {"id": "c1", "type": "cycling", "title": "Endurance Ride", "duration": "1h 30m", "zone": "Z2", "tss": "65 TSS", "status": "completed", "color": "green", "created_by": "Alberto"},
             "fb50": {"id": "f1", "type": "fb50", "title": "Lower Body Strength", "duration": "20 min", "status": "completed", "category": "FB50"},
             "wellness": {"id": "r1", "type": "wellness", "title": "Evening Reflection", "brand": "My Peaceful Companion", "duration": "5 min", "status": "completed"},
-            "readiness": {"score": 82, "status": "Good"},
+            "readiness": {"score": 82, "status": "Good", "source": "Garmin Connect", "metrics": [
+                {"key": "energy", "label": "Energy", "value": 82, "display": "High"},
+                {"key": "soreness", "label": "Soreness", "value": 78, "display": "Low"},
+                {"key": "stress", "label": "Stress", "value": 80, "display": "Low"},
+                {"key": "sleep", "label": "Sleep", "value": 86, "display": "7h 45m"}]},
         },
         {
             "date": "2025-05-13", "day_name": "TUE", "day_num": "13 MAY", "focus": "Threshold Power",
             "cycling": {"id": "c2", "type": "cycling", "title": "Threshold Climb", "duration": "1h 00m", "zone": "Z4", "tss": "92 TSS", "status": "today", "color": "rouge", "target_power": 251, "created_by": "Alberto", "profile": [0.5, 0.7, 0.6, 0.85, 0.7, 0.95, 0.75, 0.9, 0.65, 0.88, 0.7, 0.5, 0.6, 0.8]},
             "fb50": {"id": "f2", "type": "fb50", "title": "Mobility Flow", "duration": "15 min", "status": "scheduled", "category": "FB50"},
             "wellness": {"id": "r2", "type": "wellness", "title": "Breathing Reset Session", "brand": "My Peaceful Companion", "duration": "6 min", "status": "scheduled"},
-            "readiness": {"score": 76, "status": "Good"},
+            "readiness": {"score": 76, "status": "Good", "source": "Garmin Connect", "metrics": [
+                {"key": "energy", "label": "Energy", "value": 74, "display": "Good"},
+                {"key": "soreness", "label": "Soreness", "value": 72, "display": "Low"},
+                {"key": "stress", "label": "Stress", "value": 62, "display": "Moderate"},
+                {"key": "sleep", "label": "Sleep", "value": 78, "display": "7h 10m"}]},
         },
         {
             "date": "2025-05-14", "day_name": "WED", "day_num": "14 MAY", "focus": "Recovery",
             "cycling": {"id": "c3", "type": "cycling", "title": "Recovery Ride", "duration": "1h 15m", "zone": "Z1", "tss": "45 TSS", "status": "completed", "color": "blue", "created_by": "Alberto"},
             "fb50": {"id": "f3", "type": "fb50", "title": "Core Stability", "duration": "20 min", "status": "planned", "category": "FB50"},
             "wellness": {"id": "r3", "type": "wellness", "title": "Body Scan Meditation", "brand": "My Peaceful Companion", "duration": "10 min", "status": "planned"},
-            "readiness": {"score": 68, "status": "Moderate"},
+            "readiness": {"score": 68, "status": "Moderate", "source": "Apple Health", "metrics": [
+                {"key": "energy", "label": "Energy", "value": 64, "display": "Moderate"},
+                {"key": "soreness", "label": "Soreness", "value": 58, "display": "Moderate"},
+                {"key": "stress", "label": "Stress", "value": 60, "display": "Moderate"},
+                {"key": "sleep", "label": "Sleep", "value": 66, "display": "6h 30m"}]},
         },
         {
             "date": "2025-05-15", "day_name": "THU", "day_num": "15 MAY", "focus": "Sweet Spot Power",
             "cycling": {"id": "c4", "type": "cycling", "title": "Sweet Spot", "duration": "1h 20m", "zone": "Z3", "tss": "75 TSS", "status": "planned", "color": "amber", "created_by": "Alberto"},
             "fb50": {"id": "f4", "type": "fb50", "title": "Hip Mobility", "duration": "15 min", "status": "planned", "category": "FB50"},
             "wellness": {"id": "r4", "type": "wellness", "title": "Gratitude Reflection", "brand": "My Peaceful Companion", "duration": "5 min", "status": "planned"},
-            "readiness": {"score": 78, "status": "Good"},
+            "readiness": {"score": 78, "status": "Good", "source": "Garmin Connect", "metrics": [
+                {"key": "energy", "label": "Energy", "value": 76, "display": "Good"},
+                {"key": "soreness", "label": "Soreness", "value": 75, "display": "Low"},
+                {"key": "stress", "label": "Stress", "value": 80, "display": "Low"},
+                {"key": "sleep", "label": "Sleep", "value": 82, "display": "7h 30m"}]},
         },
         {
             "date": "2025-05-16", "day_name": "FRI", "day_num": "16 MAY", "focus": "Endurance Base",
             "cycling": {"id": "c5", "type": "cycling", "title": "Endurance Ride", "duration": "1h 45m", "zone": "Z2", "tss": "70 TSS", "status": "planned", "color": "green", "created_by": "Alberto"},
             "fb50": {"id": "f5", "type": "fb50", "title": "Upper Body Strength", "duration": "20 min", "status": "planned", "category": "FB50"},
             "wellness": {"id": "r5", "type": "wellness", "title": "Mindful Visualization", "brand": "My Peaceful Companion", "duration": "8 min", "status": "planned"},
-            "readiness": {"score": 72, "status": "Good"},
+            "readiness": {"score": 72, "status": "Good", "source": "Garmin Connect", "metrics": [
+                {"key": "energy", "label": "Energy", "value": 70, "display": "Good"},
+                {"key": "soreness", "label": "Soreness", "value": 64, "display": "Moderate"},
+                {"key": "stress", "label": "Stress", "value": 76, "display": "Low"},
+                {"key": "sleep", "label": "Sleep", "value": 74, "display": "7h 00m"}]},
         },
         {
             "date": "2025-05-17", "day_name": "SAT", "day_num": "17 MAY", "focus": "Long Ride Endurance",
             "cycling": {"id": "c6", "type": "cycling", "title": "Long Ride", "duration": "3h 00m", "zone": "Z2", "tss": "120 TSS", "status": "planned", "color": "green", "created_by": "Alberto"},
             "fb50": {"id": "f6", "type": "fb50", "title": "Post-Ride Mobility", "duration": "20 min", "status": "planned", "category": "FB50"},
             "wellness": {"id": "r6", "type": "wellness", "title": "Recovery Reflection", "brand": "My Peaceful Companion", "duration": "5 min", "status": "planned"},
-            "readiness": {"score": 65, "status": "Moderate"},
+            "readiness": {"score": 65, "status": "Moderate", "source": "Apple Health", "metrics": [
+                {"key": "energy", "label": "Energy", "value": 62, "display": "Moderate"},
+                {"key": "soreness", "label": "Soreness", "value": 55, "display": "Moderate"},
+                {"key": "stress", "label": "Stress", "value": 58, "display": "Moderate"},
+                {"key": "sleep", "label": "Sleep", "value": 62, "display": "6h 15m"}]},
         },
         {
             "date": "2025-05-18", "day_name": "SUN", "day_num": "18 MAY", "focus": "Recovery",
             "cycling": {"id": "c7", "type": "cycling", "title": "Rest Day", "subtitle": "Wellness Focus", "duration": "", "zone": "", "tss": "", "status": "rest", "color": "purple", "created_by": "Alberto"},
             "fb50": {"id": "f7", "type": "fb50", "title": "Active Recovery Walk", "duration": "30 min", "status": "planned", "category": "Recovery"},
             "wellness": {"id": "r7", "type": "wellness", "title": "Weekly Check-In", "brand": "My Peaceful Companion", "duration": "10 min", "status": "planned", "checkin": True},
-            "readiness": {"score": 84, "status": "Good"},
+            "readiness": {"score": 84, "status": "Good", "source": "Garmin Connect", "metrics": [
+                {"key": "energy", "label": "Energy", "value": 85, "display": "High"},
+                {"key": "soreness", "label": "Soreness", "value": 82, "display": "Low"},
+                {"key": "stress", "label": "Stress", "value": 84, "display": "Low"},
+                {"key": "sleep", "label": "Sleep", "value": 90, "display": "8h 10m"}]},
         },
     ],
     "summary": {
@@ -817,6 +845,7 @@ CALENDAR_WEEK = {
         ],
     },
     "tip": "Great week ahead. The threshold session today will make a big difference on the climbs.",
+    "seed_version": 2,
 }
 
 
@@ -825,7 +854,7 @@ async def get_calendar_week(start: str = "2025-05-12"):
     """Return a scheduling week (seeded into Mongo on first read)."""
     try:
         doc = await db.calendar_weeks.find_one({"start_date": start})
-        if not doc:
+        if not doc or doc.get("seed_version") != CALENDAR_WEEK["seed_version"]:
             await db.calendar_weeks.update_one({"start_date": start}, {"$set": CALENDAR_WEEK}, upsert=True)
             doc = dict(CALENDAR_WEEK)
         doc.pop("_id", None)
@@ -908,6 +937,131 @@ async def review_calendar_change(req: ReviewRequest):
     except Exception:
         logging.exception("review_calendar_change failed")
         return {"message": fallback, "ok": True}
+
+
+# ----------------------- Hub screens (Progress, Routes, Wellness, Community, Connections) -----------------------
+PROGRESS_DATA = {
+    "headline": "You're getting stronger.",
+    "subhead": "Fitness up 8.4 CTL over the last 6 weeks.",
+    "fitness": {"ctl": 92, "atl": 84, "tsb": 8, "ctl_delta": "+8.4", "form_label": "Fresh"},
+    "trend": {
+        "ctl": [62, 66, 70, 73, 78, 82, 86, 88, 90, 91, 92, 92],
+        "atl": [70, 58, 74, 80, 66, 88, 92, 78, 84, 96, 88, 84],
+        "labels": ["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9", "W10", "W11", "W12"],
+    },
+    "metrics": [
+        {"label": "FTP", "value": "287 W", "delta": "+6 W", "up": True},
+        {"label": "Weekly TSS", "value": "612", "delta": "+42", "up": True},
+        {"label": "Resting HR", "value": "48 bpm", "delta": "-2", "up": True},
+        {"label": "VO2 Max", "value": "58", "delta": "+1", "up": True},
+    ],
+    "records": [
+        {"label": "5 sec", "value": "1180 W", "when": "This month"},
+        {"label": "1 min", "value": "642 W", "when": "2 weeks ago"},
+        {"label": "5 min", "value": "372 W", "when": "This week"},
+        {"label": "20 min", "value": "301 W", "when": "This week"},
+        {"label": "60 min", "value": "268 W", "when": "3 weeks ago"},
+    ],
+    "recent": [
+        {"title": "Threshold Climb", "date": "Today", "tss": 92, "distance": "23.7 km", "color": "rouge"},
+        {"title": "Recovery Ride", "date": "Yesterday", "tss": 45, "distance": "18.2 km", "color": "blue"},
+        {"title": "Sweet Spot", "date": "2 days ago", "tss": 75, "distance": "31.0 km", "color": "amber"},
+        {"title": "Endurance Ride", "date": "4 days ago", "tss": 70, "distance": "42.6 km", "color": "green"},
+    ],
+}
+
+ROUTES_DATA = {
+    "featured": {"id": "XlwjMjyU410", "name": "Alpe d'Huez", "place": "France", "distance": "13.8 km", "elevation": "1,120 m", "grade": "8.1%", "tag": "Legendary Climb", "difficulty": "Hard"},
+    "categories": ["All", "Climbs", "Flat", "Rolling", "Gravel"],
+    "routes": [
+        {"id": "r1", "name": "Alpe d'Huez", "place": "France", "distance": "13.8 km", "elevation": "1,120 m", "tag": "Climb", "difficulty": "Hard", "color": "rouge"},
+        {"id": "r2", "name": "Stelvio Pass", "place": "Italy", "distance": "24.3 km", "elevation": "1,808 m", "tag": "Climb", "difficulty": "Extreme", "color": "rouge"},
+        {"id": "r3", "name": "Mont Ventoux", "place": "France", "distance": "21.5 km", "elevation": "1,610 m", "tag": "Climb", "difficulty": "Hard", "color": "orange"},
+        {"id": "r4", "name": "Tuscan Rollers", "place": "Italy", "distance": "48.0 km", "elevation": "620 m", "tag": "Rolling", "difficulty": "Moderate", "color": "amber"},
+        {"id": "r5", "name": "Loire Valley", "place": "France", "distance": "62.0 km", "elevation": "240 m", "tag": "Flat", "difficulty": "Easy", "color": "green"},
+        {"id": "r6", "name": "Girona Gravel", "place": "Spain", "distance": "38.5 km", "elevation": "540 m", "tag": "Gravel", "difficulty": "Moderate", "color": "amber"},
+    ],
+}
+
+WELLNESS_DATA = {
+    "headline": "Well recovered.",
+    "subhead": "Your body is ready for a strong week.",
+    "readiness": {"score": 82, "status": "Good", "source": "Garmin Connect"},
+    "vitals": [
+        {"key": "sleep", "label": "Sleep", "value": "7h 45m", "sub": "Good quality", "pct": 86, "icon": "moon-outline", "color": "purple"},
+        {"key": "hrv", "label": "HRV", "value": "68 ms", "sub": "Balanced", "pct": 78, "icon": "pulse-outline", "color": "blue"},
+        {"key": "rhr", "label": "Resting HR", "value": "48 bpm", "sub": "Low & healthy", "pct": 82, "icon": "heart-outline", "color": "rouge"},
+        {"key": "stress", "label": "Stress", "value": "Low", "sub": "Well managed", "pct": 80, "icon": "leaf-outline", "color": "green"},
+    ],
+    "sleep_week": [7.6, 6.8, 7.9, 7.2, 6.5, 8.1, 7.75],
+    "companion": [
+        {"title": "Evening Reflection", "duration": "5 min", "tag": "Mindfulness", "done": True},
+        {"title": "Breathing Reset", "duration": "6 min", "tag": "Calm", "done": False},
+        {"title": "Body Scan Meditation", "duration": "10 min", "tag": "Recovery", "done": False},
+        {"title": "Gratitude Reflection", "duration": "5 min", "tag": "Mindset", "done": False},
+    ],
+    "fb50": {"completed": 12, "planned": 15, "streak": 4, "next": "Mobility Flow", "next_duration": "15 min"},
+}
+
+COMMUNITY_DATA = {
+    "challenges": [
+        {"id": "c1", "title": "May Climbing Challenge", "sub": "Climb 5,000 m this month", "progress": 68, "reward": "Climber Badge", "color": "rouge"},
+        {"id": "c2", "title": "Consistency Streak", "sub": "Ride 5 days a week", "progress": 80, "reward": "Iron Legs", "color": "yellow"},
+        {"id": "c3", "title": "Gran Fondo Prep", "sub": "Complete the 4-week block", "progress": 45, "reward": "Fondo Ready", "color": "green"},
+    ],
+    "leaderboard": [
+        {"rank": 1, "name": "Marco B.", "points": 1840, "you": False},
+        {"rank": 2, "name": "Sofia R.", "points": 1720, "you": False},
+        {"rank": 3, "name": "You", "points": 1685, "you": True},
+        {"rank": 4, "name": "Liam O.", "points": 1590, "you": False},
+        {"rank": 5, "name": "Emma T.", "points": 1510, "you": False},
+    ],
+    "feed": [
+        {"id": "p1", "name": "Sofia R.", "action": "completed", "title": "Stelvio Pass", "when": "12m ago", "kudos": 24, "color": "rouge"},
+        {"id": "p2", "name": "Marco B.", "action": "set a PR on", "title": "20-min Power", "when": "1h ago", "kudos": 41, "color": "yellow"},
+        {"id": "p3", "name": "Liam O.", "action": "finished", "title": "Long Ride Endurance", "when": "3h ago", "kudos": 18, "color": "green"},
+    ],
+}
+
+CONNECTIONS_DATA = {
+    "devices": [
+        {"id": "trainer", "name": "Wahoo KICKR", "type": "Smart Trainer", "status": "connected", "detail": "Battery 88%", "icon": "hardware-chip-outline", "color": "green"},
+        {"id": "hr", "name": "Polar H10", "type": "Heart Rate", "status": "connected", "detail": "Battery 72%", "icon": "heart-outline", "color": "green"},
+        {"id": "power", "name": "Favero Assioma", "type": "Power Meter", "status": "disconnected", "detail": "Last seen 2d ago", "icon": "flash-outline", "color": "dim"},
+    ],
+    "services": [
+        {"id": "strava", "name": "Strava", "detail": "Auto-sync activities", "connected": True, "icon": "logo-buffer", "color": "orange"},
+        {"id": "garmin", "name": "Garmin Connect", "detail": "Readiness & sleep", "connected": True, "icon": "watch-outline", "color": "blue"},
+        {"id": "apple", "name": "Apple Health", "detail": "HRV, resting HR", "connected": True, "icon": "heart-circle-outline", "color": "rouge"},
+        {"id": "wellness", "name": "Harmony Wellness", "detail": "FB50 & Peaceful Companion", "connected": True, "icon": "flower-outline", "color": "purple"},
+        {"id": "trainingpeaks", "name": "TrainingPeaks", "detail": "Export workouts", "connected": False, "icon": "trending-up-outline", "color": "dim"},
+    ],
+}
+
+
+@api_router.get("/progress")
+async def get_progress():
+    return PROGRESS_DATA
+
+
+@api_router.get("/routes")
+async def get_routes():
+    return ROUTES_DATA
+
+
+@api_router.get("/wellness")
+async def get_wellness():
+    return WELLNESS_DATA
+
+
+@api_router.get("/community")
+async def get_community():
+    return COMMUNITY_DATA
+
+
+@api_router.get("/connections")
+async def get_connections():
+    return CONNECTIONS_DATA
 
 
 app.include_router(api_router)

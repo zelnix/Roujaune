@@ -1,0 +1,51 @@
+{
+  "summary": "Iteration 9 verification of Phase-1 (enriched readiness on Calendar) + Phase-2 (six new hub screens: Progress, Virtual Routes, Wellness, Community, Connections, Settings). Backend: added /app/backend/tests/test_hub_screens.py — 7/7 pass. GET /api/progress, /api/routes, /api/wellness, /api/community, /api/connections all return 200 with the shapes the UI consumes (progress.metrics=4, progress.records=5, routes.categories includes All+Climbs, routes.routes=6, wellness.vitals=4 + sleep_week=7 + companion list + fb50 summary, community.challenges + leaderboard with You highlighted + feed with kudos, connections.devices has both connected and disconnected, connections.services has trainingpeaks/strava). GET /api/calendar/week now returns seed_version=2 with readiness.source and readiness.metrics (energy/soreness/stress/sleep, all values numeric) on every day; WED specifically returns score 68 / Moderate / Apple Health as spec'd. Combined with prior iteration_8 test_calendar.py (8/8) the backend is 15/15 across the full feature surface. Frontend (1440x900 landscape tablet): all six new screens render their testIDs — progress-hero + fitness-trend + power-records + recent-activities; featured-route + ride-featured + cat-All/Climbs + route-r1..r6; wellness-hero + fb50-summary + vitals + sleep-week + companion; challenges + leaderboard + feed + kudos-p1; devices + services + svc-trainingpeaks + svc-strava; profile + coach-select + coach-adriana + units-metric/imperial + tg-* toggles. Local interactions all work: tapping cat-Climbs filters the grid down to exactly r1/r2/r3 (the three Climb-tag routes); tapping kudos-p1 flips its icon+count from '\uf37724' to '\uf36a25' (24→25); tapping coach-adriana visually selects Adriana (green check + red border) and 'Your Coach' block in sidebar updates to Adriana; tapping units-imperial highlights Imperial in the segment. Calendar readiness popover: tapping readiness-2 opens readiness-detail containing 'WEDNESDAY, 14 MAY 68 Moderate Daily Readiness Apple Health' and all four metric rows (Energy/Soreness/Stress/Sleep 6h 30m); readiness-close correctly removes readiness-detail from the DOM. Direct URL navigation confirmed for all six new routes. One structural issue found: duplicate nav-* testIDs — see frontend_issues.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Sidebar (duplicate testIDs)",
+        "issue": "Two different sidebar components emit the same nav-* testIDs. /app/frontend/app/index.tsx and /app/frontend/app/training.tsx render <SideNavigation> (/src/components/SideNavigation.tsx line 15: testID={`nav-${item.key}`}), while all other screens (via AppScaffold or the plan/calendar pages) render <TrainingPlanSidebar> (/src/components/plan.tsx line 215: testID={`nav-${n.key}`}). On expo-router web the previous route can stay mounted in the tree, so after navigating home → any hub screen the DOM contains TWO nav-training / nav-calendar / nav-progress / etc. buttons. Only one is visible/interactive but Playwright strict-mode selectors fail (resolved to 2 elements). This will bite any automation and any future a11y sweep.",
+        "testID": "nav-* (home, training, calendar, progress, wellness, community, connections, settings, routes, workouts)",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {
+        "component": "Toggle / Pill (accessibilityState → ARIA on web)",
+        "issue": "The Toggle in /app/frontend/src/components/app-scaffold.tsx (line 139) uses accessibilityState={{ checked: on }} and the coach Pressable in settings.tsx uses accessibilityState={{ selected: on }}, but react-native-web is not emitting aria-checked / aria-selected on the rendered <button> for these elements — svc-trainingpeaks and coach-adriana both returned null for those ARIA attrs after tapping (visual state is correct). Non-blocking, but makes the on/off state invisible to screen readers and to Playwright."
+      },
+      {
+        "component": "theme / textShadow helper",
+        "issue": "Pre-existing web console warning still present: '\"textShadow*\" style props are deprecated. Use \"textShadow\".' Fires on every hub screen mount from the shared theme text-shadow helper. Non-blocking."
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_hub_screens.py",
+    "/app/backend/tests/test_calendar.py",
+    "/app/backend/tests/test_backend.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "De-duplicate the two sidebars: either migrate app/index.tsx and app/training.tsx to AppScaffold (preferred — matches the six new screens) so <TrainingPlanSidebar> is the single source of nav-* testIDs, OR rename SideNavigation's testIDs (e.g., home-nav-<key>) so they never collide. This will unblock strict-mode automation on nav-* and remove dead nav wiring on the two legacy screens.",
+    "Optional: forward accessibilityState.checked / .selected to actual aria-checked / aria-selected on web for the Toggle and Pill primitives (or move to role='switch' + checked prop on the underlying element) so screen readers and Playwright can observe on/off state.",
+    "Optional (still open from iter 8): silence the textShadow* / pointerEvents web warnings by updating the shared theme helper to the unified style props."
+  ],
+  "critical_code_review_comments": [
+    "server.py: PROGRESS/ROUTES/WELLNESS/COMMUNITY/CONNECTIONS_DATA are module-level dicts served directly — read-only, no _id leak, no persistence needed for MVP. Fine.",
+    "server.py: CALENDAR_WEEK seed_version=2 handling in get_calendar_week correctly overwrites older seeds via update_one({'start_date': start}, {'$set': CALENDAR_WEEK}, upsert=True) when the persisted doc's seed_version differs, so live tenants pick up the new readiness.metrics automatically on next fetch. Good.",
+    "app-scaffold.tsx: useApiData is a simple useEffect fetch; there is no retry, no cancellation error handling beyond a silent catch, and no loading state exposure — acceptable for these read-only screens because each hub page passes loading? through and renders a subtle placeholder, but be aware: if EXPO_PUBLIC_BACKEND_URL is unset at build time the fetch resolves to an absolute-relative /api/... URL which will still work on the preview but silently fail if the app is later served from a different origin. Consider surfacing an error state.",
+    "SideNavigation.tsx vs plan.tsx TrainingPlanSidebar: two full sidebar implementations exist in parallel — the new hub screens correctly consolidated on TrainingPlanSidebar via AppScaffold, but the legacy Home and Training screens still ship the older SideNavigation. This is the direct cause of the duplicate-testID issue above and is worth cleaning up while the sidebar surface is fresh.",
+    "routes.tsx: category filter is a plain useState('All') that .filter()s routes[].tag — verified working end-to-end (Climbs → r1/r2/r3). Note that 'Rolling'/'Flat'/'Gravel' categories will match single-tag routes only; if a route grows multiple tags this needs to become an includes()."
+  ],
+  "updated_files": ["/app/backend/tests/test_hub_screens.py (new)"],
+  "success_rate": { "backend": "100% (15/15 across calendar/coach/hub_screens)", "frontend": "95% — six new screens render, filters/toggles/coach-switch/units/kudos all work, readiness popover opens with correct WED data and closes cleanly; only issue is duplicate nav-* testIDs from the legacy SideNavigation coexisting on / and /training." },
+  "seed_data_creation": "None new. test_hub_screens.py is pure GET; no writes. test_calendar.py (from iter 8) still mutates db.calendar_weeks then restores. To force a fresh seed with seed_version=2 in an environment that already had v1: `await db.calendar_weeks.delete_many({'start_date':'2025-05-12'})` — next GET reseeds; the endpoint also auto-upgrades on version mismatch so this is usually not needed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Viewport used: 1440x900 landscape tablet. Public backend URL: https://coach-alberto-dash.preview.emergentagent.com. Verified testIDs (all live): progress-hero, fitness-trend, power-records, recent-activities; featured-route, ride-featured, cat-All, cat-Climbs, route-r1..r6; wellness-hero, fb50-summary, vitals, sleep-week, companion; challenges, leaderboard, feed, kudos-p1 (visible text before='\uf37724' i.e. icon+24, after='\uf36a25' i.e. icon+25); devices, services, svc-trainingpeaks (visual toggle only — aria-checked is not exposed), svc-strava; profile, coach-select, coach-alberto, coach-adriana (visual selection only — aria-selected is not exposed), units-metric, units-imperial, tg-coachAudio, tg-autoSync, tg-weeklyReport, tg-restReminders; readiness-2 opens readiness-detail (WED 14 MAY, 68 Moderate, Apple Health, Energy/Soreness/Stress/Sleep 6h 30m), readiness-close dismisses. Direct URL navigation works for all six new routes. If you need to click nav-* buttons after visiting / or /training, use locator(...).first (strict mode will otherwise fail because SideNavigation and TrainingPlanSidebar both emit the same nav-* testIDs on web — see ui_bugs).",
+  "rca_of_issue": "Duplicate nav-* testIDs on web: expo-router mounts <SideNavigation> (app/index.tsx, app/training.tsx) and later <TrainingPlanSidebar> (app-scaffold, plan.tsx, calendar.tsx) in the same DOM tree during client-side transitions. Both components independently render Pressables with testID=`nav-${key}` for the same 10 keys. Fix: consolidate on TrainingPlanSidebar (migrate the two legacy screens to AppScaffold) or namespace the SideNavigation testIDs. This surfaced as Playwright wait_for_selector strict-mode timeouts (\"resolved to 2 elements\") — user-visible behaviour is fine because only the current screen's sidebar is on top; the underlying issue is a testability/a11y hazard."
+}

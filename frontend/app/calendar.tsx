@@ -17,7 +17,7 @@ import { TrainingPlanSidebar, TopStatus } from "@/src/components/plan";
 import {
   CC, DateControls, RowLabel, DayHeader, FocusCell, TrainingSessionCard, FB50SessionCard,
   WellnessSessionCard, ReadinessRing, SelectedDayPanel, WeekSummaryCard, QuickActionsCard,
-  CalendarTipFooter, SyncStatusCard, DraggableSession,
+  CalendarTipFooter, SyncStatusCard, DraggableSession, ReadinessDetail,
 } from "@/src/components/calendar";
 
 const LABEL_W = 66;
@@ -55,6 +55,7 @@ export default function CalendarScreen() {
   const [filter, setFilter] = React.useState("All");
   const [showFilters, setShowFilters] = React.useState(false);
   const [review, setReview] = React.useState<null | { message: string; loading: boolean; confirm: () => void }>(null);
+  const [readyDay, setReadyDay] = React.useState<number | null>(null);
 
   const colCenters = React.useRef<number[]>([]);
   const showToast = React.useCallback((text: string, undo?: () => void) => setToast({ id: Date.now(), text, undo }), []);
@@ -64,6 +65,8 @@ export default function CalendarScreen() {
     if (key === "home") { router.replace("/"); return; }
     if (key === "training") { markPlanSeen(); router.push("/plan"); return; }
     if (key === "workouts") { router.push("/workout"); return; }
+    const routes: Record<string, string> = { routes: "/routes", progress: "/progress", wellness: "/wellness", community: "/community", connections: "/connections", settings: "/settings" };
+    if (routes[key]) { router.push(routes[key] as any); return; }
     showToast(`${key.charAt(0).toUpperCase() + key.slice(1)} — coming soon`);
   };
 
@@ -228,7 +231,7 @@ export default function CalendarScreen() {
                 {/* readiness row */}
                 <GridRow icon="heart" label={"DAY\nREADINESS"} color={CC.rouge}>
                   {days.map((d, i) => (
-                    <Pressable key={d.date} testID={`readiness-${i}`} onPress={() => setSelected(i)} style={[styles.col, i === selected && styles.colSel]}>
+                    <Pressable key={d.date} testID={`readiness-${i}`} onPress={() => { setSelected(i); setReadyDay(i); }} style={[styles.col, i === selected && styles.colSel]}>
                       <ReadinessRing score={d.readiness.score} status={d.readiness.status} />
                     </Pressable>
                   ))}
@@ -282,6 +285,20 @@ export default function CalendarScreen() {
                   <Text style={styles.reviewConfirmText}>Confirm move</Text>
                 </Pressable>
               </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        {/* readiness detail popover */}
+        <Modal visible={readyDay !== null} transparent animationType="fade" onRequestClose={() => setReadyDay(null)}>
+          <Pressable style={styles.modalBg} onPress={() => setReadyDay(null)}>
+            <Pressable style={styles.readySheet} onPress={() => {}}>
+              {readyDay !== null && days[readyDay] ? (
+                <ReadinessDetail dayLabel={`${dayName(days[readyDay].day_name).toUpperCase()}, ${days[readyDay].day_num}`} readiness={days[readyDay].readiness} />
+              ) : null}
+              <Pressable testID="readiness-close" onPress={() => setReadyDay(null)} style={({ hovered }: any) => [styles.readyClose, hovered && styles.hover]}>
+                <Text style={styles.reviewCancelText}>Close</Text>
+              </Pressable>
             </Pressable>
           </Pressable>
         </Modal>
@@ -350,6 +367,8 @@ const styles = StyleSheet.create({
   reviewCancelText: { color: CC.white, fontSize: 13, fontWeight: "700" },
   reviewConfirm: { backgroundColor: CC.rouge, borderRadius: 11, paddingVertical: 11, paddingHorizontal: 20, minHeight: 44, justifyContent: "center" },
   reviewConfirmText: { color: "#fff", fontSize: 13, fontWeight: "800" },
+  readySheet: { width: 380, maxWidth: "100%", backgroundColor: CC.cardHi, borderRadius: 18, borderWidth: 1, borderColor: CC.border, padding: 20 },
+  readyClose: { marginTop: 18, borderWidth: 1, borderColor: CC.border, borderRadius: 11, paddingVertical: 11, alignItems: "center", minHeight: 44, justifyContent: "center" },
   hover: { borderColor: "rgba(255,255,255,0.28)", backgroundColor: "rgba(255,255,255,0.06)" },
 
   toast: { position: "absolute", bottom: 30, alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 16, backgroundColor: "rgba(20,22,21,0.96)", borderWidth: 1, borderColor: CC.border, borderRadius: 12, paddingVertical: 11, paddingHorizontal: 18 },

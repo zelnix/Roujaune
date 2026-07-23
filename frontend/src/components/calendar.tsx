@@ -7,8 +7,7 @@ import Svg, { Rect, Circle } from "react-native-svg";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from "react-native-reanimated";
 import { CoachPersona } from "../lib/coach-persona";
-import { CalendarDay, CalendarSession, ZoneBar, STATUS_LABEL } from "../lib/calendar";
-
+import { CalendarDay, CalendarSession, ZoneBar, STATUS_LABEL, Readiness } from "../lib/calendar";
 /* palette (extends the plan palette with recovery hues) */
 export const CC = {
   bg: "#050606", nav: "#080909", card: "#101211", cardHi: "#151716",
@@ -189,6 +188,38 @@ export function ReadinessRing({ score, status }: { score: number; status: string
         </View>
       </View>
       {status === "Moderate" && <Text style={[cs.readyMod, { color: ringCol }]}>Moderate</Text>}
+    </View>
+  );
+}
+
+/* ── readiness detail (popover content) ─────────────────────────────────── */
+export function ReadinessDetail({ dayLabel, readiness }: { dayLabel: string; readiness: Readiness }) {
+  const ringCol = readiness.status === "Moderate" ? (readiness.score < 66 ? CC.yellow : CC.greenyellow) : CC.green;
+  const barCol = (v: number) => (v >= 75 ? CC.green : v >= 60 ? CC.greenyellow : v >= 45 ? CC.yellow : CC.orange);
+  return (
+    <View testID="readiness-detail">
+      <Text style={cs.rdDay}>{dayLabel}</Text>
+      <View style={cs.rdTop}>
+        <View style={[cs.rdScoreRing, { borderColor: ringCol }]}>
+          <Text style={cs.rdScore}>{readiness.score}</Text>
+          <Text style={[cs.rdStatus, { color: ringCol }]}>{readiness.status}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={cs.rdHeading}>Daily Readiness</Text>
+          <Text style={cs.rdSource}>
+            <Ionicons name="watch-outline" size={11} color={CC.dim} /> {readiness.source ?? "Wearable"}
+          </Text>
+        </View>
+      </View>
+      <View style={cs.rdMetrics}>
+        {(readiness.metrics ?? []).map((m) => (
+          <View key={m.key} style={cs.rdRow}>
+            <Text style={cs.rdLabel}>{m.label}</Text>
+            <View style={cs.rdTrack}><View style={[cs.rdFill, { width: `${m.value}%`, backgroundColor: barCol(m.value) }]} /></View>
+            <Text style={cs.rdValue}>{m.display}</Text>
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
@@ -441,6 +472,21 @@ const cs = StyleSheet.create({
   readyScore: { color: CC.white, fontSize: 15, fontWeight: "800" },
   readyStatus: { color: CC.dim, fontSize: 8.5, marginTop: -1 },
   readyMod: { fontSize: 9, fontWeight: "700", marginTop: 1 },
+
+  // readiness detail
+  rdDay: { color: CC.rouge, fontSize: 12, fontWeight: "800", letterSpacing: 0.5, marginBottom: 12 },
+  rdTop: { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 16 },
+  rdScoreRing: { width: 64, height: 64, borderRadius: 32, borderWidth: 3, alignItems: "center", justifyContent: "center" },
+  rdScore: { color: CC.white, fontSize: 20, fontWeight: "800" },
+  rdStatus: { fontSize: 9, fontWeight: "700", marginTop: -2 },
+  rdHeading: { color: CC.white, fontSize: 16, fontWeight: "800" },
+  rdSource: { color: CC.dim, fontSize: 11.5, marginTop: 3 },
+  rdMetrics: { gap: 12 },
+  rdRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  rdLabel: { color: CC.white, fontSize: 12.5, fontWeight: "600", width: 68 },
+  rdTrack: { flex: 1, height: 7, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.08)", overflow: "hidden" },
+  rdFill: { height: 7, borderRadius: 4 },
+  rdValue: { color: CC.dim, fontSize: 11.5, fontWeight: "600", width: 62, textAlign: "right" },
 
   // selected day panel
   panel: { backgroundColor: CC.card, borderRadius: 16, borderWidth: 1, borderColor: CC.border, padding: 15 },

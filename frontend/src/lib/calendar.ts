@@ -27,7 +27,8 @@ export type CalendarSession = {
   checkin?: boolean;
 };
 
-export type Readiness = { score: number; status: string };
+export type ReadinessMetric = { key: string; label: string; value: number; display: string };
+export type Readiness = { score: number; status: string; source?: string; metrics?: ReadinessMetric[] };
 
 export type CalendarDay = {
   date: string;
