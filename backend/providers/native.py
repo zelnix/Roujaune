@@ -31,12 +31,4 @@ class AppleHealthProvider(_NativeProvider):
     }
 
 
-class HealthConnectProvider(_NativeProvider):
-    meta: ProviderMeta = {
-        "id": "health_connect", "name": "Android Health Connect", "kind": "device_native",
-        "requires_native_build": True, "icon": "logo-android",
-    }
-
-
 apple = register(AppleHealthProvider())
-health_connect = register(HealthConnectProvider())

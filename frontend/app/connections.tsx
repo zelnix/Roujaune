@@ -31,7 +31,10 @@ function ProviderRow({ p, onChanged, showToast }: { p: Provider; onChanged: () =
     try {
       const r: any = await startConnect(p.id);
       if (r?.setup_required) {
-        Alert.alert(`Connect ${p.name}`, `${r.message}\n\nTo enable: get approved in the Garmin Health Developer Program, then add GARMIN_CLIENT_ID and GARMIN_CLIENT_SECRET to the backend and register this app's redirect URL.`);
+        const steps = p.id === "google_fit"
+          ? "To enable: create an OAuth client in Google Cloud Console, enable the Fitness API, then add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to the backend and register this app's redirect URL."
+          : "To enable: get approved in the Garmin Developer Program, then add GARMIN_CLIENT_ID and GARMIN_CLIENT_SECRET to the backend and register this app's redirect URL.";
+        Alert.alert(`Connect ${p.name}`, `${r.message}\n\n${steps}`);
       } else if (r?.connected) {
         showToast(`${p.name} connected — imported ${r.sync?.imported ?? 0} rides`);
       } else if (r?.error) {
@@ -102,7 +105,7 @@ function ProviderRow({ p, onChanged, showToast }: { p: Provider; onChanged: () =
             {busy === "connect" ? <ActivityIndicator size="small" color="#04210F" /> : <Ionicons name="link" size={14} color="#04210F" />}
             <Text style={[s.btnText, { color: "#04210F" }]}>{p.configured ? "Connect" : "Set up"}</Text>
           </Pressable>
-          {!p.configured ? <Text style={[s.metaLine, { flex: 1 }]}>Requires Garmin developer credentials</Text> : null}
+          {!p.configured ? <Text style={[s.metaLine, { flex: 1 }]}>Requires {p.name} credentials</Text> : null}
         </View>
       )}
     </View>
