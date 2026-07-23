@@ -9,9 +9,9 @@ export type NavItem = { key: string; label: string; icon: Ion };
 
 export const navItems: NavItem[] = [
   { key: "home", label: "Home", icon: "home" },
+  { key: "workouts", label: "Workouts", icon: "fitness-outline" },
   { key: "routes", label: "Virtual Routes", icon: "git-network-outline" },
   { key: "training", label: "Training Plan", icon: "clipboard-outline" },
-  { key: "workouts", label: "Workouts", icon: "fitness-outline" },
   { key: "progress", label: "Progress", icon: "stats-chart-outline" },
   { key: "community", label: "Community", icon: "people-outline" },
   { key: "wellness", label: "Wellness", icon: "heart-outline" },
