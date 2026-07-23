@@ -58,6 +58,13 @@ export const PLAN = {
 export const PLAN_TABS = ["Overview", "Phases", "Key Workouts", "Load & Progress", "Adaptations"];
 export const PLAN_OPTIONS = ["Build & Climb", "Base Endurance", "FTP Booster", "Gran Fondo Prep"];
 
+/** Full plan shape (matches the FastAPI /api/plan response after normalisation). */
+export type TrainingPlan = typeof PLAN;
+
+const PlanCtx = React.createContext<TrainingPlan>(PLAN);
+export const PlanProvider = PlanCtx.Provider;
+const useP = () => React.useContext(PlanCtx);
+
 /* ── small building blocks ──────────────────────────────────────────────── */
 export function SecondaryButton({ label, onPress, testID }: { label: string; onPress?: () => void; testID?: string }) {
   return (
@@ -293,6 +300,7 @@ export function PlanTabs({ active, onChange }: { active: string; onChange: (t: s
 
 /* ── hero + goals ───────────────────────────────────────────────────────── */
 export function PlanHeroCard() {
+  const PLAN = useP();
   return (
     <View style={[s.card, s.hero]} testID="plan-hero">
       <View style={s.heroLeft}>
@@ -319,6 +327,7 @@ export function PlanHeroCard() {
 }
 
 export function PlanGoalsCard({ onEdit }: { onEdit: () => void }) {
+  const PLAN = useP();
   return (
     <View style={[s.card, s.goalsCard]} testID="plan-goals">
       <View style={s.cardHead}>
@@ -366,6 +375,7 @@ export function PhaseCard({ phase, onPress }: { phase: PlanPhase; onPress: () =>
 }
 
 export function CurrentPhaseRoadmap({ onPhase }: { onPhase: (p: PlanPhase) => void }) {
+  const PLAN = useP();
   return (
     <View style={[s.card, s.roadmap]} testID="phase-roadmap">
       <View style={s.roadmapLeft}>
@@ -384,6 +394,7 @@ export function CurrentPhaseRoadmap({ onPhase }: { onPhase: (p: PlanPhase) => vo
 
 /* ── weekly load ────────────────────────────────────────────────────────── */
 export function WeeklyLoadCard({ onFilter, width = 430 }: { onFilter: () => void; width?: number }) {
+  const PLAN = useP();
   const chartW = Math.max(300, width - 44);
   const legend = [["Build", C.yellow], ["Build More", C.orange], ["Climb", C.rouge], ["Peak", "#4A4C4A"]] as const;
   return (
@@ -427,6 +438,7 @@ export function KeyWorkoutCard({ w, onPress }: { w: KeyWorkout; onPress: () => v
 }
 
 export function KeyWorkoutsCard({ onView, onWorkout, onNext }: { onView: () => void; onWorkout: (w: KeyWorkout) => void; onNext: () => void }) {
+  const PLAN = useP();
   return (
     <View style={[s.card, { flex: 1 }]} testID="key-workouts">
       <View style={s.cardHeadRow}>
@@ -449,6 +461,7 @@ export function KeyWorkoutsCard({ onView, onWorkout, onNext }: { onView: () => v
 
 /* ── adaptations ────────────────────────────────────────────────────────── */
 export function AlbertoAdaptationsCard({ persona, onViewAll, width = 430 }: { persona: CoachPersona; onViewAll: () => void; width?: number }) {
+  const PLAN = useP();
   return (
     <View style={[s.card, { flex: 1 }]} testID="adaptations">
       <View style={s.cardHeadRow}>
@@ -481,6 +494,7 @@ function Metric({ value, label, color }: { value: string; label: string; color?:
 }
 
 export function PlanProgressStrip({ onProgress }: { onProgress: () => void }) {
+  const PLAN = useP();
   const p = PLAN.progress;
   return (
     <View style={[s.card, s.strip]} testID="plan-progress">
@@ -511,6 +525,7 @@ export function PlanProgressStrip({ onProgress }: { onProgress: () => void }) {
 }
 
 export function AlbertoTipFooter() {
+  const PLAN = useP();
   return (
     <View style={s.tip} testID="alberto-tip">
       <Ionicons name="star" size={17} color={C.yellow} />

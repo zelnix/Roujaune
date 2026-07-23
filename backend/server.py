@@ -572,6 +572,67 @@ async def telemetry_ws(websocket: WebSocket):
         recv_task.cancel()
 
 
+# ----------------------- Training Plan -----------------------
+BUILD_AND_CLIMB = {
+    "id": "build-and-climb",
+    "title": "Build & Climb",
+    "label": "BUILD & CLIMB",
+    "description": "A 12-week plan to build sustainable power, climbing strength and endurance so you can conquer long climbs with confidence.",
+    "duration_weeks": 12,
+    "average_days_per_week": 5,
+    "current_week": 4,
+    "duration_label": "12 Weeks",
+    "average_label": "5 Days/Week",
+    "phase": {
+        "name": "Build Phase",
+        "weeks": "Weeks 1\u20134",
+        "description": "Build your aerobic base and muscular endurance while introducing sustained threshold work.",
+    },
+    "goals": [
+        {"id": "g1", "title": "Improved Climbing Strength", "description": "Stronger on long climbs", "status": "complete"},
+        {"id": "g2", "title": "Raise FTP", "description": "Increase sustainable power", "status": "complete"},
+        {"id": "g3", "title": "Build Endurance", "description": "Ride longer with confidence", "status": "complete"},
+        {"id": "g4", "title": "Consistent Training", "description": "Stay on track all season", "status": "incomplete"},
+    ],
+    "phases": [
+        {"id": "p1", "number": 1, "name": "Build", "weeks": "Weeks 1\u20134", "pct": 75, "active": True, "points": [0.15, 0.3, 0.42, 0.55, 0.68, 0.82, 0.75, 0.95]},
+        {"id": "p2", "number": 2, "name": "Build More", "weeks": "Weeks 5\u20138", "pct": 0, "active": False, "points": [0.1, 0.25, 0.2, 0.4, 0.35, 0.55, 0.5, 0.7]},
+        {"id": "p3", "number": 3, "name": "Climb", "weeks": "Weeks 9\u201312", "pct": 0, "active": False, "points": [0.2, 0.3, 0.45, 0.4, 0.6, 0.72, 0.68, 0.9]},
+        {"id": "p4", "number": 4, "name": "Peak & Perform", "weeks": "Week 13", "pct": 0, "active": False, "points": [0.3, 0.4, 0.35, 0.5, 0.62, 0.55, 0.7, 0.6]},
+    ],
+    "weekly_load": [180, 240, 300, 210, 320, 380, 430, 300, 420, 500, 560, 380, 260],
+    "you_are_here": 4,
+    "workouts": [
+        {"id": "w1", "title": "Threshold Climb", "icon": "bicycle", "duration": "1h 00m", "zone": "Z4", "tss": "92 TSS", "footer": "Week 3 \u2022 Tue", "color": "#C91727", "profile": [0.5, 0.7, 0.6, 0.85, 0.7, 0.95, 0.75, 0.9, 0.65, 0.88, 0.7, 0.5]},
+        {"id": "w2", "title": "Sweet Spot", "icon": "bicycle", "duration": "1h 20m", "zone": "Z3", "tss": "75 TSS", "footer": "Week 3 \u2022 Thu", "color": "#F0A500", "profile": [0.4, 0.55, 0.7, 0.72, 0.68, 0.75, 0.7, 0.74, 0.66, 0.72, 0.6, 0.45]},
+        {"id": "w3", "title": "Endurance Ride", "icon": "bicycle", "duration": "1h 45m", "zone": "Z2", "tss": "70 TSS", "footer": "Week 3 \u2022 Fri", "color": "#55C850", "profile": [0.45, 0.5, 0.55, 0.52, 0.58, 0.55, 0.6, 0.56, 0.58, 0.54, 0.5, 0.46]},
+        {"id": "w4", "title": "Long Ride", "icon": "bicycle", "duration": "3h 00m", "zone": "Z2", "tss": "120 TSS", "footer": "Week 4 \u2022 Sat", "color": "#55C850", "profile": [0.4, 0.45, 0.48, 0.5, 0.52, 0.5, 0.53, 0.5, 0.52, 0.49, 0.47, 0.44]},
+    ],
+    "adaptation": "Great consistency and strong threshold work. I've slightly increased your time in Zone 4 and added more endurance volume to build your climbing engine.",
+    "adaptation_status": "Plan is adapting as you improve",
+    "progress_pct": 25,
+    "progress": {"weeks": "3 / 12", "workouts": "15", "time": "10.2 h", "tss": "1,420", "ctl": "+8.4", "atl": "92", "tsb": "+6"},
+    "tip": "Consistency compounds. Focus on the process this phase and the results will come.",
+    "created_by": "Alberto",
+}
+
+
+@api_router.get("/plan")
+async def get_plan(id: str = "build-and-climb"):
+    """Return the rider's current training plan (seeded into Mongo on first read)."""
+    try:
+        doc = await db.training_plans.find_one({"id": id})
+        if not doc:
+            await db.training_plans.update_one({"id": id}, {"$set": BUILD_AND_CLIMB}, upsert=True)
+            doc = dict(BUILD_AND_CLIMB)
+        doc.pop("_id", None)
+        return doc
+    except Exception:
+        logging.exception("get_plan failed")
+        return BUILD_AND_CLIMB
+
+
+
 app.include_router(api_router)
 
 app.add_middleware(
