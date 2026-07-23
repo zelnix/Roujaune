@@ -9,10 +9,11 @@ import { usePlan, useAdaptation } from "@/src/lib/plan";
 import { markPlanSeen } from "@/src/lib/plan-badge";
 import {
   C, PLAN_OPTIONS, PlanPhase, KeyWorkout, PlanProvider,
-  TrainingPlanSidebar, PlanHeader, TopStatus, PlanSelector, PlanTabs,
+  PlanHeader, TopStatus, PlanSelector, PlanTabs,
   PlanHeroCard, PlanGoalsCard, CurrentPhaseRoadmap, WeeklyLoadCard,
   KeyWorkoutsCard, AlbertoAdaptationsCard, PlanProgressStrip, AlbertoTipFooter,
 } from "@/src/components/plan";
+import { SideNavigation } from "@/src/components/SideNavigation";
 
 const DESIGN_W = 1420; // sidebar + content design canvas (scaled to fill the tablet)
 
@@ -146,7 +147,7 @@ export default function TrainingPlanScreen() {
         >
           <PlanProvider value={plan}>
             <View style={[styles.canvas, { width: DESIGN_W, transform: [{ scaleX: fitScaleX }, { scaleY: fitScaleY }] }]}>
-              <TrainingPlanSidebar active="training" onSelect={onSelectNav} persona={persona} onMessage={() => showToast(`Message ${persona.name}`)} />
+              <SideNavigation active="training" onSelect={onSelectNav} width={96} />
               <View style={styles.content}>{Grid}</View>
             </View>
           </PlanProvider>

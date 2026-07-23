@@ -8,8 +8,9 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { useCoach } from "../lib/coach-persona";
 import { markPlanSeen } from "../lib/plan-badge";
-import { TrainingPlanSidebar, TopStatus } from "./plan";
-import { CC, SyncStatusCard } from "./calendar";
+import { TopStatus } from "./plan";
+import { SideNavigation } from "./SideNavigation";
+import { CC } from "./calendar";
 
 const ROUTE: Record<string, string> = {
   home: "/", training: "/plan", calendar: "/calendar", workouts: "/workout",
@@ -83,8 +84,7 @@ export function AppScaffold({
       <SafeAreaView style={{ flex: 1, backgroundColor: CC.bg }} edges={["top", "bottom", "left"]}>
         <View style={styles.canvas}>
           {!compact && (
-            <TrainingPlanSidebar active={active} onSelect={onSelect} persona={persona}
-              onMessage={() => showToast(`Message ${persona.name}`)} sync={<SyncStatusCard />} />
+            <SideNavigation active={active} onSelect={onSelect} width={96} />
           )}
           <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             <View style={styles.headerRow}>

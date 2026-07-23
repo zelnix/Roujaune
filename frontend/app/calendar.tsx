@@ -13,11 +13,12 @@ import { markPlanSeen } from "@/src/lib/plan-badge";
 import {
   useCalendarWeek, moveSession, requestAlbertoReview, CalendarDay, SessionType, FILTERS,
 } from "@/src/lib/calendar";
-import { TrainingPlanSidebar, TopStatus } from "@/src/components/plan";
+import { TopStatus } from "@/src/components/plan";
+import { SideNavigation } from "@/src/components/SideNavigation";
 import {
   CC, DateControls, RowLabel, DayHeader, FocusCell, TrainingSessionCard, FB50SessionCard,
   WellnessSessionCard, ReadinessRing, SelectedDayPanel, WeekSummaryCard, QuickActionsCard,
-  CalendarTipFooter, SyncStatusCard, DraggableSession, ReadinessDetail,
+  CalendarTipFooter, DraggableSession, ReadinessDetail,
 } from "@/src/components/calendar";
 
 const LABEL_W = 66;
@@ -143,7 +144,7 @@ export default function CalendarScreen() {
       <StatusBar hidden />
       <SafeAreaView style={{ flex: 1, backgroundColor: CC.bg }} edges={["top", "bottom", "left"]}>
         <View style={styles.canvas}>
-          <TrainingPlanSidebar active="calendar" onSelect={onSelectNav} persona={persona} onMessage={() => showToast(`Message ${persona.name}`)} sync={<SyncStatusCard />} />
+          <SideNavigation active="calendar" onSelect={onSelectNav} width={96} />
 
           <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             {/* header */}

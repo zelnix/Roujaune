@@ -16,6 +16,7 @@ export const navItems: NavItem[] = [
   { key: "progress", label: "Progress", icon: "stats-chart-outline" },
   { key: "community", label: "Community", icon: "people-outline" },
   { key: "wellness", label: "Wellness", icon: "heart-outline" },
+  { key: "connections", label: "Connections", icon: "link-outline" },
 ];
 
 export const navFooter: NavItem[] = [

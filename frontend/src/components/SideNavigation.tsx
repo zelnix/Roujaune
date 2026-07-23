@@ -6,10 +6,11 @@ import { LinearGradient } from "expo-linear-gradient";
 import { colors, radius, spacing, shadow } from "../theme";
 import { navItems, navFooter, NavItem } from "../data";
 import { Touchable } from "./ui";
+import { usePlanBadge } from "../lib/plan-badge";
 
 const logoIcon = require("../../assets/images/logo_glyph_t.png");
 
-function NavRow({ item, active, onPress }: { item: NavItem; active: boolean; onPress: () => void }) {
+function NavRow({ item, active, onPress, badge }: { item: NavItem; active: boolean; onPress: () => void; badge?: boolean }) {
   return (
     <Touchable
       testID={`railnav-${item.key}`}
@@ -42,6 +43,7 @@ function NavRow({ item, active, onPress }: { item: NavItem; active: boolean; onP
           <Text style={styles.label} numberOfLines={1}>
             {item.label}
           </Text>
+          {badge ? <View style={styles.badge} /> : null}
         </View>
       )}
     </Touchable>
@@ -59,6 +61,7 @@ export function SideNavigation({
   width: number;
   compact?: boolean;
 }) {
+  const planBadge = usePlanBadge();
   return (
     <View style={[styles.nav, { width }]} testID="side-navigation">
       <View style={[styles.logoWrap, compact && { width: 42, height: 42, marginBottom: spacing.sm }]}>
@@ -72,7 +75,7 @@ export function SideNavigation({
       >
         <View style={styles.items}>
           {navItems.map((item) => (
-            <NavRow key={item.key} item={item} active={active === item.key} onPress={() => onSelect(item.key)} />
+            <NavRow key={item.key} item={item} active={active === item.key} onPress={() => onSelect(item.key)} badge={item.key === "training" && planBadge && active !== "training"} />
           ))}
         </View>
 
@@ -126,5 +129,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 4,
     borderBottomRightRadius: 4,
   },
+  badge: { position: "absolute", top: 8, right: 14, width: 9, height: 9, borderRadius: 5, backgroundColor: colors.red, borderWidth: 1.5, borderColor: colors.nav },
   label: { color: colors.textDim, fontSize: 10.5, fontWeight: "600", textAlign: "center" },
 });
