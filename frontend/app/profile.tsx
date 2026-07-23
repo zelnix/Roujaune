@@ -40,12 +40,7 @@ function SeasonRow({ icon, label, value, color }: { icon: any; label: string; va
   );
 }
 
-const ACHIEVEMENTS = [
-  { icon: "trophy", label: "Everest Challenge", sub: "8,848 m in a week", color: CC.yellow },
-  { icon: "flame", label: "12-Day Streak", sub: "Longest this season", color: CC.rouge },
-  { icon: "flash", label: "New FTP PR", sub: "+6 W this block", color: CC.green },
-  { icon: "medal", label: "Century Club", sub: "First 100 km ride", color: "#40A9C6" },
-];
+const ACHIEVEMENTS: { icon: any; label: string; sub: string; color: string }[] = [];
 
 export default function ProfileScreen() {
   const { settings } = useSettings();
@@ -154,17 +149,25 @@ export default function ProfileScreen() {
       {/* Achievements */}
       <Card testID="profile-achievements">
         <SectionTitle label="ACHIEVEMENTS" />
-        <View style={s.achGrid}>
-          {ACHIEVEMENTS.map((a) => (
-            <View key={a.label} style={s.achCard}>
-              <View style={[s.achIcon, { backgroundColor: a.color + "22", borderColor: a.color }]}>
-                <Ionicons name={a.icon} size={20} color={a.color} />
+        {ACHIEVEMENTS.length === 0 ? (
+          <View style={s.achEmpty}>
+            <Ionicons name="trophy-outline" size={24} color={CC.dim} />
+            <Text style={s.achEmptyTitle}>No achievements yet</Text>
+            <Text style={s.achEmptySub}>Complete rides to start earning badges.</Text>
+          </View>
+        ) : (
+          <View style={s.achGrid}>
+            {ACHIEVEMENTS.map((a) => (
+              <View key={a.label} style={s.achCard}>
+                <View style={[s.achIcon, { backgroundColor: a.color + "22", borderColor: a.color }]}>
+                  <Ionicons name={a.icon} size={20} color={a.color} />
+                </View>
+                <Text style={s.achLabel}>{a.label}</Text>
+                <Text style={s.achSub}>{a.sub}</Text>
               </View>
-              <Text style={s.achLabel}>{a.label}</Text>
-              <Text style={s.achSub}>{a.sub}</Text>
-            </View>
-          ))}
-        </View>
+            ))}
+          </View>
+        )}
       </Card>
 
       <EditModal visible={editing} profile={profile} onClose={() => setEditing(false)} onSave={(p) => { update(p); setEditing(false); }} />
@@ -300,6 +303,9 @@ const s = StyleSheet.create({
   seasonValue: { color: CC.white, fontSize: 15, fontWeight: "800" },
 
   achGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  achEmpty: { alignItems: "center", justifyContent: "center", paddingVertical: 22, gap: 6 },
+  achEmptyTitle: { color: CC.white, fontSize: 15, fontWeight: "800", marginTop: 4 },
+  achEmptySub: { color: CC.dim, fontSize: 12.5 },
   achCard: { flexGrow: 1, flexBasis: 150, minWidth: 140, backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: CC.border, borderRadius: 14, padding: 14, alignItems: "flex-start", gap: 4 },
   achIcon: { width: 40, height: 40, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center", marginBottom: 6 },
   achLabel: { color: CC.white, fontSize: 14, fontWeight: "800" },
