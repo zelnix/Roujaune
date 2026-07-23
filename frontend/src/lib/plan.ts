@@ -92,3 +92,39 @@ export function useAdaptation(coachName: string, coachGender: string, planId = "
 
   return { text, loading, refresh: () => load(true) };
 }
+
+/* ── Training Plan action-button data (Edit Goals / View Progress / View All Adaptations) ── */
+export type AdaptationEntry = { id: string; coach: string; text: string; trigger: string; at: string };
+
+export async function fetchAdaptations(coachName: string, planId = "build-and-climb"): Promise<AdaptationEntry[]> {
+  const res = await fetch(`${apiBase()}/api/plan/adaptations?plan_id=${planId}&coach_name=${encodeURIComponent(coachName)}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  return data?.adaptations ?? [];
+}
+
+export type PlanProgressDetail = {
+  progress_pct: number;
+  summary: Record<string, string>;
+  fitness: { ctl: number; atl: number; tsb: number; ctl_delta: string; form_label: string };
+  trend: { ctl: number[]; atl: number[]; labels: string[] };
+  metrics: { label: string; value: string; delta: string; up: boolean }[];
+  weeks: { label: string; tss: number; done: boolean; current: boolean }[];
+};
+
+export async function fetchPlanProgress(planId = "build-and-climb"): Promise<PlanProgressDetail> {
+  const res = await fetch(`${apiBase()}/api/plan/progress?plan_id=${planId}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export type EditableGoal = { id: string; title: string; description: string; status: "complete" | "incomplete" };
+
+export async function savePlanGoals(goals: EditableGoal[], planId = "build-and-climb"): Promise<void> {
+  const res = await fetch(`${apiBase()}/api/plan/goals`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ plan_id: planId, goals }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+}

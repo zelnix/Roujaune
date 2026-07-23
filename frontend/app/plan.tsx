@@ -14,6 +14,8 @@ import {
   KeyWorkoutsCard, AlbertoAdaptationsCard, PlanProgressStrip, AlbertoTipFooter,
 } from "@/src/components/plan";
 import { SideNavigation } from "@/src/components/SideNavigation";
+import { EditGoalsModal, ProgressModal, AdaptationsModal } from "@/src/components/plan-modals";
+import type { EditableGoal } from "@/src/lib/plan";
 
 function Toast({ message }: { message: { id: number; text: string } | null }) {
   const op = React.useRef(new Animated.Value(0)).current;
@@ -45,6 +47,17 @@ export default function TrainingPlanScreen() {
   const [planName, setPlanName] = React.useState<string | null>(null);
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
   const [availW, setAvailW] = React.useState(0);
+
+  // Action-button modals
+  const [showGoals, setShowGoals] = React.useState(false);
+  const [showProgress, setShowProgress] = React.useState(false);
+  const [showAdaptations, setShowAdaptations] = React.useState(false);
+  const [goalsOverride, setGoalsOverride] = React.useState<EditableGoal[] | null>(null);
+
+  const displayPlan = React.useMemo(
+    () => (goalsOverride ? { ...plan, goals: goalsOverride as any } : plan),
+    [plan, goalsOverride]
+  );
 
   const showToast = React.useCallback((t: string) => setToast({ id: Date.now(), text: t }), []);
 
@@ -79,7 +92,7 @@ export default function TrainingPlanScreen() {
   const hero = (
     <View style={styles.rowGap}>
       <View style={{ flex: 1 }}><PlanHeroCard /></View>
-      <View style={{ width: rightW }}><PlanGoalsCard onEdit={() => showToast("Edit goals")} /></View>
+      <View style={{ width: rightW }}><PlanGoalsCard onEdit={() => setShowGoals(true)} /></View>
     </View>
   );
   const roadmapRow = (
@@ -91,21 +104,21 @@ export default function TrainingPlanScreen() {
   const workoutsRow = (
     <View style={styles.rowGap}>
       <KeyWorkoutsCard onView={() => showToast("View all workouts")} onWorkout={onWorkout} onNext={() => showToast("More workouts")} />
-      <View style={{ width: 440 }}><AlbertoAdaptationsCard persona={persona} width={440} onViewAll={() => showToast("All adaptations")} text={adaptation.text} loading={adaptation.loading} onRefresh={adaptation.refresh} /></View>
+      <View style={{ width: 440 }}><AlbertoAdaptationsCard persona={persona} width={440} onViewAll={() => setShowAdaptations(true)} text={adaptation.text} loading={adaptation.loading} onRefresh={adaptation.refresh} /></View>
     </View>
   );
-  const progress = <PlanProgressStrip onProgress={() => showToast("Opening Progress")} />;
+  const progress = <PlanProgressStrip onProgress={() => setShowProgress(true)} />;
   const tip = <AlbertoTipFooter />;
 
   let body: React.ReactNode;
   if (tab === "Phases") {
     body = (<>{hero}<CurrentPhaseRoadmap onPhase={onPhase} /><KeyWorkoutsCard onView={() => showToast("View all workouts")} onWorkout={onWorkout} onNext={() => showToast("More workouts")} />{tip}</>);
   } else if (tab === "Key Workouts") {
-    body = (<><KeyWorkoutsCard onView={() => showToast("View all workouts")} onWorkout={onWorkout} onNext={() => showToast("More workouts")} /><View style={styles.rowGap}><WeeklyLoadCard width={fullW - 460} onFilter={() => showToast("Filter: This Plan")} /><View style={{ width: 440 }}><AlbertoAdaptationsCard persona={persona} width={440} onViewAll={() => showToast("All adaptations")} text={adaptation.text} loading={adaptation.loading} onRefresh={adaptation.refresh} /></View></View>{tip}</>);
+    body = (<><KeyWorkoutsCard onView={() => showToast("View all workouts")} onWorkout={onWorkout} onNext={() => showToast("More workouts")} /><View style={styles.rowGap}><WeeklyLoadCard width={fullW - 460} onFilter={() => showToast("Filter: This Plan")} /><View style={{ width: 440 }}><AlbertoAdaptationsCard persona={persona} width={440} onViewAll={() => setShowAdaptations(true)} text={adaptation.text} loading={adaptation.loading} onRefresh={adaptation.refresh} /></View></View>{tip}</>);
   } else if (tab === "Load & Progress") {
     body = (<><WeeklyLoadCard width={fullW} onFilter={() => showToast("Filter: This Plan")} />{progress}{tip}</>);
   } else if (tab === "Adaptations") {
-    body = (<><AlbertoAdaptationsCard persona={persona} width={fullW} onViewAll={() => showToast("All adaptations")} text={adaptation.text} loading={adaptation.loading} onRefresh={adaptation.refresh} />{progress}{tip}</>);
+    body = (<><AlbertoAdaptationsCard persona={persona} width={fullW} onViewAll={() => setShowAdaptations(true)} text={adaptation.text} loading={adaptation.loading} onRefresh={adaptation.refresh} />{progress}{tip}</>);
   } else {
     body = (<>{hero}{roadmapRow}{workoutsRow}{progress}{tip}</>);
   }
@@ -135,7 +148,7 @@ export default function TrainingPlanScreen() {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: C.bg }}>
       <StatusBar hidden />
       <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={["top", "bottom", "left"]}>
-        <PlanProvider value={plan}>
+        <PlanProvider value={displayPlan}>
           <View style={styles.canvas}>
             {!compact && <SideNavigation active="training" onSelect={onSelectNav} width={96} />}
             <ScrollView
@@ -149,6 +162,14 @@ export default function TrainingPlanScreen() {
           </View>
         </PlanProvider>
         <Toast message={toast} />
+        <EditGoalsModal
+          visible={showGoals}
+          onClose={() => setShowGoals(false)}
+          goals={displayPlan.goals as EditableGoal[]}
+          onSaved={(g) => { setGoalsOverride(g); showToast("Goals updated"); }}
+        />
+        <ProgressModal visible={showProgress} onClose={() => setShowProgress(false)} />
+        <AdaptationsModal visible={showAdaptations} onClose={() => setShowAdaptations(false)} persona={persona} />
       </SafeAreaView>
     </GestureHandlerRootView>
   );

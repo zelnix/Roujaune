@@ -1,0 +1,35 @@
+{
+  "summary": "Tested the Training Plan action-button feature end-to-end. Backend: 7/7 pytest cases pass covering GET /api/plan/progress (shape + per-week done/current flags relative to you_are_here=4), GET /api/plan/adaptations (seed entry + coach filter), PUT /api/plan/goals (persistence verified via subsequent GET /api/plan), and POST /api/coach/adaptation with refresh=true (ONE LLM call — returned cached=false and appended a new 'Manual refresh' entry visible via /api/plan/adaptations). Frontend: at /plan on tablet-landscape (1366x900), EditGoalsModal opens on 'Edit Goals' tap, supports goal-toggle, goal-title / goal-desc edit, goal-add (5 goals) and goal-delete (back to 4); Save (testID goals-save) closed the modal and the Goals card immediately reflected the edits (TEST_UI_Goal_Edited and TEST_UI_Added shown). ProgressModal (testID view-progress) opens with progress ring, CTL/ATL chart, KEY METRICS grid and WEEKLY COMPLETION bars; close via testID modal-close works. AdaptationsModal (testID view-adaptations) opens showing the timeline including the 'Manual refresh' entry generated during backend refresh test; backdrop dismiss works. Original 4 goals restored via API after UI test as required.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "Toast (plan.tsx)", "issue": "Uses deprecated prop `pointerEvents=\"none\"` on Animated.View. RN warns: 'props.pointerEvents is deprecated. Use style.pointerEvents'. Reference: /app/frontend/app/plan.tsx:32"},
+      {"component": "textShadow* usage", "issue": "Console warning: '\"textShadow*\" style props are deprecated. Use \"textShadow\".' Grep for textShadowColor/textShadowOffset/textShadowRadius in /app/frontend/src/components/plan.tsx (or related) and migrate to the new single `textShadow` shorthand."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_plan_actions.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Optional: migrate `<Animated.View pointerEvents=\"none\" ...>` in plan.tsx Toast to `style={{ pointerEvents: 'none' }}` (or wrap with an outer View) to silence the RN deprecation warning.",
+    "Optional: replace deprecated `textShadowColor/Offset/Radius` style props with the new `textShadow` shorthand in plan components."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now ~1190 lines and mixes plan/calendar/hub/telemetry/coach concerns — consider splitting into routers (plan.py, calendar.py, coach.py, hub.py) for maintainability.",
+    "_record_adaptation upserts with $push on a missing doc will fail on some Mongo versions if no matching doc exists (it currently upserts, but the training_plans doc is always seeded first via /api/plan or coach_adaptation flow, so fine). Worth an explicit seed in _record_adaptation for defensive coverage.",
+    "PlanGoal model does not restrict `status` to an enum; malformed values (e.g. 'done') would be persisted. Consider Literal['complete','incomplete']."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_plan_actions.py (new)"
+  ],
+  "success_rate": { "backend": "100%", "frontend": "100%" },
+  "seed_data_creation": "None. During tests I mutated /api/plan/goals but restored the original 4 goals both after the backend test (test_restore_original_goals) and after the UI test via a direct PUT — verified via GET /api/plan.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Feature is fully functional. When re-testing, remember: POST /api/coach/adaptation with refresh:true consumes LLM credits — call at most once. testIDs to use: view-progress, view-adaptations, goals-save, goals-cancel, goal-toggle-<id>, goal-title-<id>, goal-desc-<id>, goal-delete-<id>, goal-add, modal-close.",
+  "rca_of_issue": "N/A — no bug found."
+}

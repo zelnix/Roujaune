@@ -498,8 +498,30 @@ async def _refresh_adaptation_after_ride(req: "CoachDebriefRequest", plan_id: st
             {"$set": {cache_key: text, f"{cache_key}_at": now_iso()}},
             upsert=True,
         )
+        trigger = f"After your {req.workout} ride" if req.workout else "After your last ride"
+        await _record_adaptation(plan_id, req.coach_name, text, trigger)
     except Exception:
         logging.warning("post-ride adaptation refresh failed")
+
+
+async def _record_adaptation(plan_id: str, coach_name: str, text: str, trigger: str):
+    """Append a coach adaptation note to the plan's history (newest first, capped
+    at 20). Best-effort so it never blocks the main flow."""
+    try:
+        entry = {
+            "id": uuid.uuid4().hex,
+            "coach": coach_name,
+            "text": text,
+            "trigger": trigger,
+            "at": now_iso(),
+        }
+        await db.training_plans.update_one(
+            {"id": plan_id},
+            {"$push": {"adaptation_history": {"$each": [entry], "$position": 0, "$slice": 20}}},
+            upsert=True,
+        )
+    except Exception:
+        logging.warning("adaptation history write failed")
 
 
 # ----------------------- Trainer telemetry (BLE bridge stand-in) -----------------------
@@ -739,12 +761,95 @@ async def coach_adaptation(req: AdaptationRequest):
                 {"id": req.plan_id},
                 {"$set": {cache_key: text, f"{cache_key}_at": now_iso()}},
             )
+            await _record_adaptation(req.plan_id, req.coach_name, text, "Manual refresh")
         except Exception:
             logging.warning("adaptation cache write failed")
         return {"adaptation": text, "cached": False}
     except Exception as e:
         logging.exception("coach_adaptation failed")
         raise HTTPException(status_code=502, detail=f"Adaptation generation failed: {e}")
+
+
+@api_router.get("/plan/adaptations")
+async def get_plan_adaptations(plan_id: str = "build-and-climb", coach_name: Optional[str] = None):
+    """Return the coach's adaptation history (newest first). Seeds a first entry
+    from the plan's current cached/static adaptation if the history is empty."""
+    plan = await db.training_plans.find_one({"id": plan_id})
+    if not plan:
+        await db.training_plans.update_one({"id": plan_id}, {"$set": BUILD_AND_CLIMB}, upsert=True)
+        plan = dict(BUILD_AND_CLIMB)
+
+    history = plan.get("adaptation_history") or []
+    if not history:
+        coach = coach_name or plan.get("created_by") or "Alberto"
+        seed_text = plan.get(f"adaptation_ai_{coach.lower()}") or plan.get("adaptation")
+        history = [{
+            "id": "seed",
+            "coach": coach,
+            "text": seed_text,
+            "trigger": "Plan start",
+            "at": plan.get(f"adaptation_ai_{coach.lower()}_at") or now_iso(),
+        }]
+
+    if coach_name:
+        history = [h for h in history if str(h.get("coach", "")).lower() == coach_name.lower()] or history
+
+    return {"adaptations": history, "status": plan.get("adaptation_status", "Plan is adapting as you improve")}
+
+
+class PlanGoal(BaseModel):
+    id: str
+    title: str
+    description: str = ""
+    status: str = "incomplete"
+
+
+class GoalsUpdateRequest(BaseModel):
+    plan_id: str = "build-and-climb"
+    goals: List[PlanGoal]
+
+
+@api_router.put("/plan/goals")
+async def update_plan_goals(req: GoalsUpdateRequest):
+    """Persist the rider's edited plan goals and return the updated plan."""
+    plan = await db.training_plans.find_one({"id": req.plan_id})
+    if not plan:
+        await db.training_plans.update_one({"id": req.plan_id}, {"$set": BUILD_AND_CLIMB}, upsert=True)
+
+    goals = [g.dict() for g in req.goals]
+    await db.training_plans.update_one(
+        {"id": req.plan_id},
+        {"$set": {"goals": goals, "goals_updated_at": now_iso()}},
+    )
+    doc = await db.training_plans.find_one({"id": req.plan_id})
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.get("/plan/progress")
+async def get_plan_progress(plan_id: str = "build-and-climb"):
+    """Detailed plan progress for the "View Progress" modal: headline metrics,
+    fitness trend series and a per-week completion breakdown."""
+    plan = await db.training_plans.find_one({"id": plan_id})
+    if not plan:
+        await db.training_plans.update_one({"id": plan_id}, {"$set": BUILD_AND_CLIMB}, upsert=True)
+        plan = dict(BUILD_AND_CLIMB)
+    plan.pop("_id", None)
+
+    weekly = plan.get("weekly_load", [])
+    here = plan.get("you_are_here", 1)
+    weeks = [
+        {"label": f"Week {i + 1}", "tss": v, "done": (i + 1) < here, "current": (i + 1) == here}
+        for i, v in enumerate(weekly)
+    ]
+    return {
+        "progress_pct": plan.get("progress_pct", 0),
+        "summary": plan.get("progress", {}),
+        "fitness": PROGRESS_DATA["fitness"],
+        "trend": PROGRESS_DATA["trend"],
+        "metrics": PROGRESS_DATA["metrics"],
+        "weeks": weeks,
+    }
 
 
 
