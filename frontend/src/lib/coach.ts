@@ -6,6 +6,8 @@ export type CoachContext = {
   cadence_low: number;
   cadence_high: number;
   workout: string;
+  segment?: string | null;
+  zone?: string | null;
   route?: string | null;
   coach_name?: string;
   coach_gender?: string;

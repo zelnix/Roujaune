@@ -99,7 +99,10 @@ function NotConnectedBody({ kind }: { kind: "trainer" | "wearable" }) {
   );
 }
 
-export function PowerCard({ power, wkg, connected = true }: { power: number; wkg: string; connected?: boolean }) {
+export function PowerCard({ power, wkg, connected = true, target, zoneLabel, zoneIdx }: { power: number; wkg: string; connected?: boolean; target?: number; zoneLabel?: string; zoneIdx?: number }) {
+  // Map training zone (Z1..Z6, idx 0..5) onto the 7-block zone bar.
+  const blockMap = [6, 5, 4, 3, 1, 0];
+  const activeBlock = zoneIdx == null ? 3 : blockMap[Math.max(0, Math.min(5, zoneIdx))];
   return (
     <View style={styles.metricCard} testID="power-card">
       <View style={styles.metricHead}><Ionicons name="flash" size={15} color={colors.yellow} /><SectionLabel color={colors.yellow}>POWER</SectionLabel></View>
@@ -114,12 +117,12 @@ export function PowerCard({ power, wkg, connected = true }: { power: number; wkg
           <View style={styles.metricDivider} />
           <View style={styles.tgtRow}>
             <Text style={styles.microLabel}>TARGET</Text>
-            <Text style={styles.tgtVal}>251 W</Text>
+            <Text style={styles.tgtVal}>{target ?? 251} W</Text>
           </View>
           <View style={styles.tgtRow}>
             <Text style={styles.microLabel}>ZONE</Text>
-            <ZoneBlocks active={3} />
-            <Text style={styles.zoneTag}>Z4</Text>
+            <ZoneBlocks active={activeBlock} />
+            <Text style={styles.zoneTag}>{zoneLabel ?? "Z4"}</Text>
           </View>
         </>
       ) : <NotConnectedBody kind="trainer" />}
@@ -181,15 +184,16 @@ export function CadenceCard({ cadence, connected = true }: { cadence: number; co
 }
 
 /* ============================ WORKOUT TIMELINE ============================ */
-export function IntervalProfile({ width, height = 92, profile, color }: { width: number; height?: number; profile?: number[]; color?: string }) {
+export function IntervalProfile({ width, height = 92, profile, color, activeIndex }: { width: number; height?: number; profile?: number[]; color?: string; activeIndex?: number }) {
   // Dynamic mode: draw bars from a supplied power profile (mirrors the chosen
-  // workout's zones). The tallest block is highlighted as the "current" step.
+  // workout's segments). The current segment is highlighted (falls back to the
+  // tallest block when no active index is supplied).
   if (profile && profile.length) {
     const c = color || colors.red;
     const n = profile.length;
     const gap = 3;
     const bw = (width - gap * (n - 1)) / n;
-    const activeIdx = profile.indexOf(Math.max(...profile));
+    const activeIdx = activeIndex != null ? Math.max(0, Math.min(n - 1, activeIndex)) : profile.indexOf(Math.max(...profile));
     let x = 0;
     return (
       <Svg width={width} height={height}>
@@ -252,7 +256,7 @@ export function IntervalProfile({ width, height = 92, profile, color }: { width:
   );
 }
 
-export function WorkoutTimelineCard({ width, onPress, title = "Threshold Climb", color, profile }: { width: number; onPress: () => void; title?: string; color?: string; profile?: number[] }) {
+export function WorkoutTimelineCard({ width, onPress, title = "Threshold Climb", color, profile, step, timeLeft, activeIndex }: { width: number; onPress: () => void; title?: string; color?: string; profile?: number[]; step?: string; timeLeft?: string; activeIndex?: number }) {
   return (
     <Touchable testID="workout-timeline-card" onPress={onPress} lift={false} scaleTo={0.995}>
       <View style={styles.timelineCard}>
@@ -263,15 +267,15 @@ export function WorkoutTimelineCard({ width, onPress, title = "Threshold Climb",
           </View>
           <View style={styles.timelineStep}>
             <Text style={styles.microLabel}>STEP</Text>
-            <Text style={styles.stepVal}>3 / 6</Text>
+            <Text style={styles.stepVal}>{step ?? "3 / 6"}</Text>
           </View>
           <View style={{ alignItems: "flex-end" }}>
-            <Text style={styles.timeLeft}>3:12</Text>
+            <Text style={styles.timeLeft}>{timeLeft ?? "3:12"}</Text>
             <Text style={styles.microLabel}>TIME LEFT</Text>
           </View>
         </View>
         <View style={{ marginTop: 10 }}>
-          <IntervalProfile width={width - spacing.lg * 2} profile={profile} color={color} />
+          <IntervalProfile width={width - spacing.lg * 2} profile={profile} color={color} activeIndex={activeIndex} />
         </View>
       </View>
     </Touchable>

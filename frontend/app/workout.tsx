@@ -12,7 +12,7 @@ import { rideRecorder } from "@/src/lib/ride";
 import { getLastRouteId, setLastRouteId } from "@/src/lib/prefs";
 import { useSettings } from "@/src/lib/settings";
 import { routeVideos, nextInterval, currentWorkout } from "@/src/data";
-import { getWorkout } from "@/src/lib/workout-catalog";
+import { getWorkout, buildSegments, currentSegment, segmentProfile, mmss, targetWatts } from "@/src/lib/workout-catalog";
 import { WORKOUT_TYPES } from "@/src/lib/workouts";
 import { RouteVideo } from "@/src/components/RouteVideo";
 import {
@@ -26,16 +26,16 @@ import { fetchCoachCue } from "@/src/lib/coach";
 import { useCoach } from "@/src/lib/coach-persona";
 
 // Alberto's cues are generated live from the rider's real telemetry so the
-// coaching reflects what's actually happening on the bike.
-const POWER_TARGET = 251;   // watts (matches the on-screen power target)
+// coaching reflects what's actually happening on the bike. The power target is
+// driven by the current segment of the chosen workout (see LiveWorkout).
 const CAD_LOW = 90;         // rpm cadence window
 const CAD_HIGH = 100;
 
-function buildCue(t: { power: number; hr: number; cadence: number; speed: number; elapsed: number }, idx: number): string {
+function buildCue(t: { power: number; hr: number; cadence: number; speed: number; elapsed: number }, idx: number, target: number): string {
   const cat = idx % 4;
   if (cat === 0) {
-    const d = t.power - POWER_TARGET;
-    if (d < -12) return `You're at ${t.power} watts — lift it toward ${POWER_TARGET}.`;
+    const d = t.power - target;
+    if (d < -12) return `You're at ${t.power} watts — lift it toward ${target}.`;
     if (d > 12) return `Ease off a touch, you're ${Math.round(d)} watts over target.`;
     return `Nicely done — holding ${t.power} watts right on target.`;
   }
@@ -113,11 +113,13 @@ export default function LiveWorkout() {
   const router = useRouter();
   const params = useLocalSearchParams<{ title?: string; workoutId?: string }>();
   // The workout the rider launched from the catalog (falls back to the default).
-  const selected = getWorkout(params.workoutId);
+  const selected = getWorkout(params.workoutId) ?? getWorkout("threshold-climb");
   const selectedType = selected ? WORKOUT_TYPES.find((t) => t.id === selected.typeId) : undefined;
   const workoutTitle = selected?.name ?? params.title ?? currentWorkout.title;
   const workoutColor = selectedType?.color ?? selected?.color;
-  const workoutProfile = selectedType?.profile;
+  // Real interval timeline built from the chosen workout's segments.
+  const segments = React.useMemo(() => (selected ? buildSegments(selected) : []), [selected]);
+  const workoutProfile = React.useMemo(() => (segments.length ? segmentProfile(segments) : selectedType?.profile), [segments, selectedType]);
   const compact = height < 620;
   const leftW = compact ? 240 : 300;
   const rightW = compact ? 300 : 340;
@@ -142,9 +144,40 @@ export default function LiveWorkout() {
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
   const [cueIdx] = React.useState(0);
 
-  const { telemetry, connectionState, stale, sendErg, pause, resume, simulateDropout } = useTelemetry();
+  const { telemetry, connectionState, stale, sendErg, sendTarget, sendInit, pause, resume, simulateDropout } = useTelemetry();
   const { settings, setSetting, loaded } = useSettings();
   const erg = telemetry.erg;
+
+  // ---- Live segment driven by the chosen workout ----
+  const ftp = settings.ftp || 287;
+  const activeSeg = React.useMemo(
+    () => (segments.length ? currentSegment(segments, telemetry.elapsed) : null),
+    [segments, telemetry.elapsed],
+  );
+  const targetW = activeSeg ? targetWatts(activeSeg.segment, ftp) : 251;
+  const stepLabel = activeSeg ? `${activeSeg.index + 1} / ${activeSeg.total}` : undefined;
+  const timeLeftLabel = activeSeg ? mmss(activeSeg.remaining) : undefined;
+  const nextSeg = activeSeg?.next
+    ? { label: activeSeg.next.label, time: mmss(activeSeg.next.durationSec), target: activeSeg.next.durationSec > 0 ? `${targetWatts(activeSeg.next, ftp)} W` : "—", rpe: `RPE ${activeSeg.next.rpe}` }
+    : nextInterval;
+
+  // Start the ride at the beginning of the chosen session and keep the trainer
+  // sim tracking the current segment's target watts (true end-to-end execution).
+  const initSent = React.useRef(false);
+  const lastTargetSent = React.useRef<number>(-1);
+  React.useEffect(() => {
+    if (connectionState !== "connected") return;
+    if (!initSent.current) {
+      initSent.current = true;
+      sendInit({ elapsed: 0, distance: 0, watts: targetW });
+      lastTargetSent.current = targetW;
+      return;
+    }
+    if (targetW !== lastTargetSent.current) {
+      lastTargetSent.current = targetW;
+      sendTarget(targetW);
+    }
+  }, [connectionState, targetW, sendInit, sendTarget]);
 
   const showToast = React.useCallback((text: string) => setToast({ id: Date.now(), text }), []);
 
@@ -237,17 +270,23 @@ export default function LiveWorkout() {
   // Prefers the AI-generated cue; falls back to the local rule-based line while
   // a call is pending or fails.
   const [coachCue, setCoachCue] = React.useState<string | null>(null);
-  const liveCue = paused ? "Workout paused — take a breath." : (coachCue ?? buildCue(telemetry, cueIdx));
+  const liveCue = paused ? "Workout paused — take a breath." : (coachCue ?? buildCue(telemetry, cueIdx, targetW));
+
+  // Keep the current target watts in a ref so cue timers read the live value.
+  const targetRef = React.useRef(targetW);
+  React.useEffect(() => { targetRef.current = targetW; }, [targetW]);
 
   const coachCtx = React.useMemo(() => ({
-    power_target: POWER_TARGET,
+    power_target: targetW,
+    segment: activeSeg?.segment.label,
+    zone: activeSeg?.segment.zoneLabel,
     cadence_low: CAD_LOW,
     cadence_high: CAD_HIGH,
     workout: workoutTitle,
     route: activeRoute.title,
     coach_name: persona.name,
     coach_gender: persona.gender,
-  }), [activeRoute.title, persona.name, persona.gender, workoutTitle]);
+  }), [activeRoute.title, persona.name, persona.gender, workoutTitle, targetW, activeSeg]);
 
   const cueBusy = React.useRef(false);
   const lastCueAt = React.useRef(0);
@@ -262,7 +301,7 @@ export default function LiveWorkout() {
       setCoachCue(cue);
       speak(cue);
     } catch {
-      const fallback = buildCue(t, Math.floor(Date.now() / 1000) % 4);
+      const fallback = buildCue(t, Math.floor(Date.now() / 1000) % 4, targetRef.current);
       setCoachCue(fallback);
       speak(fallback);
     } finally {
@@ -279,7 +318,7 @@ export default function LiveWorkout() {
   // An extra cue when the rider drifts meaningfully off target (debounced ~25s).
   React.useEffect(() => {
     if (paused) return;
-    const offPower = Math.abs(telemetry.power - POWER_TARGET) > 35;
+    const offPower = Math.abs(telemetry.power - targetRef.current) > 35;
     const offCadence = telemetry.cadence < CAD_LOW - 8 || telemetry.cadence > CAD_HIGH + 8;
     if ((offPower || offCadence) && Date.now() - lastCueAt.current > 25000) generateCue();
   }, [telemetry.power, telemetry.cadence, paused, generateCue]);
@@ -325,12 +364,12 @@ export default function LiveWorkout() {
         <View style={styles.leftBlock}>
           <View style={styles.innerRow}>
             <View style={[styles.leftCol, { width: leftW }]}>
-              <PowerCard power={telemetry.power} wkg={(telemetry.power / 78).toFixed(1)} connected={settings.hasTrainer} />
+              <PowerCard power={telemetry.power} wkg={(telemetry.power / 78).toFixed(1)} connected={settings.hasTrainer} target={targetW} zoneLabel={activeSeg?.segment.zoneLabel} zoneIdx={activeSeg?.segment.zoneIdx} />
               <HeartRateCard hr={telemetry.hr} connected={settings.hasWearable} />
               <CadenceCard cadence={telemetry.cadence} connected={settings.hasTrainer} />
             </View>
             <View style={styles.centerCol} onLayout={onCenterLayout}>
-              <WorkoutTimelineCard width={centerW} onPress={() => showToast("Workout timeline")} title={workoutTitle} color={workoutColor} profile={workoutProfile} />
+              <WorkoutTimelineCard width={centerW} onPress={() => showToast("Workout timeline")} title={workoutTitle} color={workoutColor} profile={workoutProfile} step={stepLabel} timeLeft={timeLeftLabel} activeIndex={activeSeg?.index} />
               {expanded ? (
                 <VideoPlaceholder width={centerW} onRestore={() => setExpanded(false)} />
               ) : (
@@ -340,7 +379,7 @@ export default function LiveWorkout() {
                   </View>
                 </RouteVideo>
               )}
-              <NextUpStrip next={nextInterval} />
+              <NextUpStrip next={nextSeg} />
               <SafetyNote />
             </View>
           </View>

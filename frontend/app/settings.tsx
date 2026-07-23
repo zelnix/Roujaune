@@ -8,11 +8,13 @@ import { CC } from "@/src/components/calendar";
 import { useCoach, setCoach, COACHES, CoachId, COACH_STYLES, VOICE_GUIDANCE_OPTS, useCoachStyle, setCoachStyle, useVoiceGuidance, setVoiceGuidance, CoachStyle, VoiceGuidance, SPEECH_RATES, useCoachRate, setCoachRate } from "@/src/lib/coach-persona";
 import { resolveBothCoachVoices, ResolvedVoice, COACH_PITCH, loadSpanishVoices, CoachVoiceOption } from "@/src/lib/coach-voice";
 import { getVoiceId, setVoiceId } from "@/src/lib/prefs";
+import { useSettings } from "@/src/lib/settings";
 
 const PREVIEW_LINE = "Alright, let's ride. Hold steady and breathe — you've got this.";
 
 export default function SettingsScreen() {
   const persona = useCoach();
+  const { settings, setSetting } = useSettings();
   const coachStyle = useCoachStyle();
   const voiceGuidance = useVoiceGuidance();
   const speechRate = useCoachRate();
@@ -75,9 +77,9 @@ export default function SettingsScreen() {
             </Pressable>
           </View>
           <View style={s.statsRow}>
-            <Stat v="287 W" l="FTP" />
+            <Stat v={`${settings.ftp} W`} l="FTP" />
             <Stat v="78 kg" l="Weight" />
-            <Stat v="4.4" l="W/kg" />
+            <Stat v={`${(settings.ftp / 78).toFixed(1)}`} l="W/kg" />
             <Stat v="58" l="VO2 Max" />
           </View>
         </Card>
@@ -184,6 +186,37 @@ export default function SettingsScreen() {
         <Text style={s.coachHint}>Pick which installed Spanish voice {persona.name} uses. Tapping a voice previews it. Switch coaches above to tune the other.</Text>
       </Card>
 
+      <Card testID="power-profile">
+        <SectionTitle label="POWER PROFILE" color={CC.rouge} />
+        <View style={s.ftpRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.prefTitle}>Functional Threshold Power</Text>
+            <Text style={s.prefSub}>Sets your live ERG target power across every workout segment.</Text>
+          </View>
+          <View style={s.ftpStepper}>
+            <Pressable testID="ftp-minus" disabled={settings.ftpAuto} onPress={() => setSetting("ftp", Math.max(80, settings.ftp - 1))}
+              style={[s.ftpBtn, settings.ftpAuto && s.ftpBtnOff]}>
+              <Ionicons name="remove" size={18} color={settings.ftpAuto ? CC.dim : CC.white} />
+            </Pressable>
+            <View style={s.ftpValueWrap}>
+              <Text style={s.ftpValue}>{settings.ftp}</Text>
+              <Text style={s.ftpUnit}>W</Text>
+            </View>
+            <Pressable testID="ftp-plus" disabled={settings.ftpAuto} onPress={() => setSetting("ftp", Math.min(600, settings.ftp + 1))}
+              style={[s.ftpBtn, settings.ftpAuto && s.ftpBtnOff]}>
+              <Ionicons name="add" size={18} color={settings.ftpAuto ? CC.dim : CC.white} />
+            </Pressable>
+          </View>
+        </View>
+        <View style={[s.prefRow, { borderTopWidth: 1, borderTopColor: CC.borderSoft, marginTop: 6 }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.prefTitle}>Auto-update from training progress</Text>
+            <Text style={s.prefSub}>Keep FTP in sync with your measured fitness gains.</Text>
+          </View>
+          <Toggle testID="tg-ftpAuto" on={settings.ftpAuto} onToggle={() => setSetting("ftpAuto", !settings.ftpAuto)} />
+        </View>
+      </Card>
+
       <Card testID="preferences">
         <SectionTitle label="TRAINING PREFERENCES" />
         <View style={[s.prefRow, s.divider]}>
@@ -273,6 +306,13 @@ const s = StyleSheet.create({
   voiceChipOn: { borderColor: CC.rouge, backgroundColor: "rgba(201,23,39,0.08)" },
   voiceChipText: { color: CC.dim, fontSize: 12.5, fontWeight: "700" },
   prefRow: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 14 },
+  ftpRow: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 6 },
+  ftpStepper: { flexDirection: "row", alignItems: "center", gap: 10 },
+  ftpBtn: { width: 40, height: 40, borderRadius: 12, borderWidth: 1.5, borderColor: CC.border, backgroundColor: "rgba(255,255,255,0.04)", alignItems: "center", justifyContent: "center" },
+  ftpBtnOff: { opacity: 0.4 },
+  ftpValueWrap: { flexDirection: "row", alignItems: "flex-end", minWidth: 66, justifyContent: "center" },
+  ftpValue: { color: CC.white, fontSize: 24, fontWeight: "900" },
+  ftpUnit: { color: CC.dim, fontSize: 13, fontWeight: "700", marginBottom: 3, marginLeft: 2 },
   divider: { borderBottomWidth: 1, borderBottomColor: CC.borderSoft },
   prefTitle: { color: CC.white, fontSize: 14, fontWeight: "700" },
   prefSub: { color: CC.dim, fontSize: 12, marginTop: 1 },

@@ -387,6 +387,8 @@ class CoachCueRequest(BaseModel):
     cadence_low: int = 90
     cadence_high: int = 100
     workout: str = "Threshold Climb"
+    segment: Optional[str] = None
+    zone: Optional[str] = None
     route: Optional[str] = None
     coach_name: str = "Alberto"
     coach_gender: str = "male"
@@ -400,9 +402,10 @@ async def coach_cue(req: CoachCueRequest):
         raise HTTPException(status_code=503, detail="Coaching model not configured")
 
     minutes = req.elapsed // 60
+    seg = f" Current segment: {req.segment} ({req.zone})." if req.segment else ""
     prompt = (
         f"Workout: {req.workout}. Route: {req.route or 'indoor'}. "
-        f"Elapsed: {minutes} minutes.\n"
+        f"Elapsed: {minutes} minutes.{seg}\n"
         f"Live: power {req.power} W (target {req.power_target} W), "
         f"cadence {req.cadence} rpm (aim {req.cadence_low}-{req.cadence_high}), "
         f"heart rate {req.hr} bpm, speed {req.speed} km/h.\n"
@@ -709,6 +712,7 @@ class TrainerSim:
         self.dropout_until = 0.0
         self.elapsed = 1477.0  # 00:24:37
         self.distance = 24.6
+        self.base_target = 251.0  # target watts driven by the chosen workout's segment
         self.power = 251.0
         self.cadence = 88.0
         self.hr = 162.0
@@ -721,7 +725,7 @@ class TrainerSim:
     def step(self, dt: float):
         if self.paused:
             return
-        target_power = 251.0 * (self.erg / 100.0)
+        target_power = self.base_target * (self.erg / 100.0)
         self.power = max(0.0, target_power + random.uniform(-8, 8))
         self.cadence = max(0.0, 88.0 + random.uniform(-4, 4))
         target_hr = 118 + (self.power - 150) * 0.34
@@ -766,6 +770,15 @@ async def telemetry_ws(websocket: WebSocket):
                 t = msg.get("type")
                 if t == "erg":
                     sim.erg = max(50, min(150, int(msg.get("intensity", sim.erg))))
+                elif t == "target":
+                    sim.base_target = max(0.0, float(msg.get("watts", sim.base_target)))
+                elif t == "init":
+                    if "elapsed" in msg:
+                        sim.elapsed = float(msg.get("elapsed", sim.elapsed))
+                    if "distance" in msg:
+                        sim.distance = float(msg.get("distance", sim.distance))
+                    if "watts" in msg:
+                        sim.base_target = max(0.0, float(msg.get("watts", sim.base_target)))
                 elif t == "pause":
                     sim.paused = True
                 elif t == "resume":

@@ -187,3 +187,126 @@ export function fmtDuration(min: number): string {
   if (h) return `${h}h 00m`;
   return `${m} min`;
 }
+
+/* ============================ LIVE INTERVAL SEGMENTS ============================ */
+// Each catalog workout is turned into a real, ordered interval timeline so the
+// Live HUD can drive its target power, step counter, interval countdown and the
+// "next up" preview from the actual session the rider chose (no hardcoded mock).
+
+// Midpoint %FTP and RPE per training zone (Z1..Z6).
+const ZONE_FTP = [0.5, 0.65, 0.8, 0.95, 1.12, 1.4];
+const ZONE_RPE = [2, 4, 5, 7, 8, 10];
+const ZLAB = ["Z1", "Z2", "Z3", "Z4", "Z5", "Z6"];
+
+export type Segment = {
+  label: string;
+  zoneLabel: string;
+  zoneIdx: number;   // 0..5 (Z1..Z6)
+  color: string;
+  durationSec: number;
+  targetPct: number; // fraction of FTP
+  rpe: number;
+};
+
+function mkSeg(w: Workout, idx: number, label: string, dur: number): Segment {
+  return {
+    label,
+    zoneLabel: ZLAB[idx],
+    zoneIdx: idx,
+    color: w.zones[idx].color,
+    durationSec: dur,
+    targetPct: ZONE_FTP[idx],
+    rpe: ZONE_RPE[idx],
+  };
+}
+
+/** Build a structured warm-up → main-set → cool-down timeline from a workout's
+ * zone distribution and duration. Segment durations always sum to the total. */
+export function buildSegments(w: Workout): Segment[] {
+  if (w.duration <= 0) return [mkSeg(w, 0, "Rest & Recover", 0)];
+  const total = Math.round(w.duration * 60);
+  const warm = Math.max(120, Math.round(total * 0.12));
+  const cool = Math.max(90, Math.round(total * 0.1));
+  const mid = Math.max(60, total - warm - cool);
+
+  const working = [2, 3, 4, 5].filter((i) => w.zones[i].pct > 0);
+  const pool = working.length ? working : [1];
+  const sumPct = pool.reduce((a, i) => a + (w.zones[i].pct || (i === 1 ? 100 : 0)), 0) || 1;
+
+  const segs: Segment[] = [mkSeg(w, 1, "Warm-up", warm)];
+  let used = 0;
+  pool.forEach((idx, k) => {
+    const share = k === pool.length - 1 ? mid - used : Math.round((mid * (w.zones[idx].pct || 100)) / sumPct);
+    used += share;
+    if (idx >= 3) {
+      // Hard zones become repeats separated by short recoveries.
+      const reps = Math.min(4, Math.max(2, Math.round(share / 360)));
+      const cycle = Math.floor(share / reps);
+      const work = Math.max(30, Math.round(cycle * 0.7));
+      const rec = Math.max(20, cycle - work);
+      let consumed = 0;
+      for (let r = 0; r < reps; r++) {
+        segs.push(mkSeg(w, idx, `${ZLAB[idx]} Effort ${r + 1}/${reps}`, work));
+        consumed += work;
+        if (r < reps - 1) {
+          segs.push(mkSeg(w, 0, "Recovery", rec));
+          consumed += rec;
+        }
+      }
+      const leftover = share - consumed;
+      if (leftover !== 0) segs[segs.length - 1].durationSec += leftover;
+    } else {
+      segs.push(mkSeg(w, idx, idx === 2 ? "Tempo Block" : "Endurance", share));
+    }
+  });
+  segs.push(mkSeg(w, 0, "Cool-down", cool));
+  return segs;
+}
+
+export type ActiveSegment = {
+  index: number;
+  total: number;
+  segment: Segment;
+  elapsedInSeg: number;
+  remaining: number;
+  next: Segment | null;
+};
+
+/** Map the ride's elapsed time onto the segment timeline. */
+export function currentSegment(segs: Segment[], elapsedSec: number): ActiveSegment {
+  let acc = 0;
+  for (let i = 0; i < segs.length; i++) {
+    const s = segs[i];
+    const end = acc + s.durationSec;
+    if (elapsedSec < end || i === segs.length - 1) {
+      const elapsedInSeg = Math.max(0, Math.min(s.durationSec, elapsedSec - acc));
+      return {
+        index: i,
+        total: segs.length,
+        segment: s,
+        elapsedInSeg,
+        remaining: Math.max(0, s.durationSec - elapsedInSeg),
+        next: segs[i + 1] ?? null,
+      };
+    }
+    acc = end;
+  }
+  const last = segs[segs.length - 1];
+  return { index: segs.length - 1, total: segs.length, segment: last, elapsedInSeg: 0, remaining: 0, next: null };
+}
+
+/** Normalised bar heights (0..1) for the interval profile chart. */
+export function segmentProfile(segs: Segment[]): number[] {
+  return segs.map((s) => Math.max(0.12, Math.min(1, s.targetPct / 1.4)));
+}
+
+export function mmss(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+/** Target watts for a segment given the rider's FTP. */
+export function targetWatts(seg: Segment, ftp: number): number {
+  return Math.round(ftp * seg.targetPct);
+}

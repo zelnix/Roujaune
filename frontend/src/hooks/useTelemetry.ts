@@ -110,9 +110,11 @@ export function useTelemetry() {
   }, []);
 
   const sendErg = useCallback((intensity: number) => send({ type: "erg", intensity }), [send]);
+  const sendTarget = useCallback((watts: number) => send({ type: "target", watts }), [send]);
+  const sendInit = useCallback((opts: { elapsed?: number; distance?: number; watts?: number }) => send({ type: "init", ...opts }), [send]);
   const pause = useCallback(() => send({ type: "pause" }), [send]);
   const resume = useCallback(() => send({ type: "resume" }), [send]);
   const simulateDropout = useCallback(() => send({ type: "dropout", seconds: 4 }), [send]);
 
-  return { telemetry, connectionState, stale, sendErg, pause, resume, simulateDropout };
+  return { telemetry, connectionState, stale, sendErg, sendTarget, sendInit, pause, resume, simulateDropout };
 }
