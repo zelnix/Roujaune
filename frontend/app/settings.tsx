@@ -64,7 +64,7 @@ export default function SettingsScreen() {
   return (
     <AppScaffold active="settings" title="Settings" subtitle="Your profile, coach and training preferences.">
       <View style={s.row}>
-        <Card testID="profile" style={{ flex: 1 }}>
+        <Card testID="rider-profile" style={{ flex: 1 }}>
           <SectionTitle label="RIDER PROFILE" />
           <View style={s.profRow}>
             <View style={s.avatar}><Ionicons name="person" size={26} color={CC.dim} /></View>
