@@ -467,10 +467,39 @@ async def coach_debrief(req: CoachDebriefRequest):
                 await db.ride_history.update_one({"id": req.ride_id}, {"$set": {cache_key: text}})
             except Exception:
                 logging.warning("debrief cache write failed")
+        # A completed ride makes the plan react: refresh the coach's adaptation
+        # note in the background so it reflects this session on the next plan load.
+        asyncio.create_task(_refresh_adaptation_after_ride(req))
         return {"debrief": text, "cached": False}
     except Exception as e:
         logging.exception("coach_debrief failed")
         raise HTTPException(status_code=502, detail=f"Debrief generation failed: {e}")
+
+
+async def _refresh_adaptation_after_ride(req: "CoachDebriefRequest", plan_id: str = "build-and-climb"):
+    """Regenerate and cache the coach's plan-adaptation note after a completed
+    ride, so the Training Plan reflects the latest session. Best-effort."""
+    try:
+        plan = await db.training_plans.find_one({"id": plan_id})
+        if not plan:
+            plan = dict(BUILD_AND_CLIMB)
+        recent_ride = {
+            "workout": req.workout,
+            "route": req.route,
+            "duration_min": req.duration_sec // 60,
+            "avg_power": req.avg_power,
+            "tss": req.tss,
+            "compliance": req.compliance,
+        }
+        text = await _generate_adaptation(plan, req.coach_name, req.coach_gender, recent_ride)
+        cache_key = f"adaptation_ai_{req.coach_name.lower()}"
+        await db.training_plans.update_one(
+            {"id": plan_id},
+            {"$set": {cache_key: text, f"{cache_key}_at": now_iso()}},
+            upsert=True,
+        )
+    except Exception:
+        logging.warning("post-ride adaptation refresh failed")
 
 
 # ----------------------- Trainer telemetry (BLE bridge stand-in) -----------------------
@@ -639,12 +668,58 @@ class AdaptationRequest(BaseModel):
     refresh: bool = False
 
 
+async def _generate_adaptation(plan: dict, coach_name: str, coach_gender: str, recent_ride: Optional[dict] = None) -> str:
+    """Generate the coach's plan-adaptation insight via the LLM. When a recent
+    ride is supplied, the note reacts to that just-completed session."""
+    key = os.environ.get("EMERGENT_LLM_KEY")
+    if not key:
+        raise RuntimeError("Coaching model not configured")
+
+    prog = plan.get("progress", {})
+    goals_txt = ", ".join(
+        f"{g.get('title')} ({'done' if g.get('status') == 'complete' else 'in progress'})"
+        for g in plan.get("goals", [])
+    ) or "n/a"
+    phase = plan.get("phase", {})
+    ride_txt = ""
+    if recent_ride:
+        ride_txt = (
+            f"\nThey just finished a ride: {recent_ride.get('workout')} on "
+            f"{recent_ride.get('route') or 'the trainer'}, {recent_ride.get('duration_min')} min, "
+            f"avg power {recent_ride.get('avg_power')} W, TSS {recent_ride.get('tss')}, "
+            f"plan compliance {recent_ride.get('compliance')}%. Factor this session into your note."
+        )
+    prompt = (
+        f"The rider is on the '{plan.get('title')}' plan: {plan.get('description')}\n"
+        f"Current phase: {phase.get('name')} ({phase.get('weeks')}). "
+        f"Week {plan.get('current_week')} of {plan.get('duration_weeks')}.\n"
+        f"Progress so far: {prog.get('workouts')} workouts, {prog.get('time')} ridden, "
+        f"{prog.get('tss')} TSS, fitness CTL {prog.get('ctl')}, fatigue ATL {prog.get('atl')}, "
+        f"form TSB {prog.get('tsb')}. Goals: {goals_txt}.{ride_txt}\n"
+        "As the rider's coach, write a short, warm adaptation note (2 to 3 sentences) explaining "
+        "how you are adjusting their upcoming training based on this progress. Be specific about "
+        "training zones and volume. First person, no lists, no emojis, no quotation marks. "
+        "Reply with the note only, no preamble, greeting or heading."
+    )
+
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    chat = LlmChat(
+        api_key=key,
+        session_id=f"{coach_name.lower()}-adaptation",
+        system_message=coach_system(coach_name, coach_gender),
+    ).with_model("anthropic", "claude-sonnet-4-6")
+    reply = await chat.send_message(UserMessage(text=prompt))
+    text = (reply or "").strip().strip('"')
+    if not text:
+        raise ValueError("empty adaptation")
+    return text
+
+
 @api_router.post("/coach/adaptation")
 async def coach_adaptation(req: AdaptationRequest):
     """Generate the coach's plan-adaptation insight, based on the rider's plan and
     progress. Cached per plan+coach so it only regenerates when refresh=True."""
-    key = os.environ.get("EMERGENT_LLM_KEY")
-    if not key:
+    if not os.environ.get("EMERGENT_LLM_KEY"):
         raise HTTPException(status_code=503, detail="Coaching model not configured")
 
     # Load the plan (seed if needed) so the insight is grounded in real data.
@@ -657,36 +732,8 @@ async def coach_adaptation(req: AdaptationRequest):
     if not req.refresh and plan.get(cache_key):
         return {"adaptation": plan[cache_key], "cached": True}
 
-    prog = plan.get("progress", {})
-    goals_txt = ", ".join(
-        f"{g.get('title')} ({'done' if g.get('status') == 'complete' else 'in progress'})"
-        for g in plan.get("goals", [])
-    ) or "n/a"
-    phase = plan.get("phase", {})
-    prompt = (
-        f"The rider is on the '{plan.get('title')}' plan: {plan.get('description')}\n"
-        f"Current phase: {phase.get('name')} ({phase.get('weeks')}). "
-        f"Week {plan.get('current_week')} of {plan.get('duration_weeks')}.\n"
-        f"Progress so far: {prog.get('workouts')} workouts, {prog.get('time')} ridden, "
-        f"{prog.get('tss')} TSS, fitness CTL {prog.get('ctl')}, fatigue ATL {prog.get('atl')}, "
-        f"form TSB {prog.get('tsb')}. Goals: {goals_txt}.\n"
-        "As the rider's coach, write a short, warm adaptation note (2 to 3 sentences) explaining "
-        "how you are adjusting their upcoming training based on this progress. Be specific about "
-        "training zones and volume. First person, no lists, no emojis, no quotation marks. "
-        "Reply with the note only, no preamble, greeting or heading."
-    )
-
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        chat = LlmChat(
-            api_key=key,
-            session_id=f"{req.coach_name.lower()}-adaptation",
-            system_message=coach_system(req.coach_name, req.coach_gender),
-        ).with_model("anthropic", "claude-sonnet-4-6")
-        reply = await chat.send_message(UserMessage(text=prompt))
-        text = (reply or "").strip().strip('"')
-        if not text:
-            raise ValueError("empty adaptation")
+        text = await _generate_adaptation(plan, req.coach_name, req.coach_gender)
         try:
             await db.training_plans.update_one(
                 {"id": req.plan_id},
