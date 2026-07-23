@@ -81,7 +81,7 @@ export function HeroRoute({
       {/* right: Alberto signature + coach */}
       <View style={[styles.signatureArea, compact && { top: "26%" }]}>
         <Text style={[styles.signature, compact && { fontSize: 26 }]}>{persona.name}</Text>
-        <Text style={styles.signatureSub}>Your Coach</Text>
+        <Text style={styles.signatureSub}>Your Companion Coach</Text>
       </View>
 
       {/* right-lower weather */}

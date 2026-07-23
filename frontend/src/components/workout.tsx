@@ -739,11 +739,11 @@ export function MusicPanel({ musicOn, toggleMusic, volume, setVolume, voiceOn, t
     <Pressable style={styles.rpOverlay} onPress={onClose} testID="music-panel">
       <Pressable style={styles.spPanel} onPress={() => { /* swallow */ }}>
         <View style={styles.rpHead}>
-          <View style={{ flex: 1 }}><Text style={styles.rpTitle}>Music & audio</Text><Text style={styles.rpSub}>Ride soundtrack & your coach&apos;s voice</Text></View>
+          <View style={{ flex: 1 }}><Text style={styles.rpTitle}>Music & audio</Text><Text style={styles.rpSub}>Ride soundtrack & your companion coach&apos;s voice</Text></View>
           <Pressable onPress={onClose} testID="music-close" hitSlop={10}><Ionicons name="close" size={22} color={colors.white} /></Pressable>
         </View>
 
-        <Text style={styles.coachPickHint}>Your coach</Text>
+        <Text style={styles.coachPickHint}>Your companion coach</Text>
         <View style={styles.coachPickRow}>
           {(["alberto", "adriana"] as CoachId[]).map((id) => {
             const c = COACHES[id];

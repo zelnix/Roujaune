@@ -40,7 +40,7 @@ export const heroRoute = {
 
 export const coach = {
   name: "Alberto",
-  role: "Your Coach",
+  role: "Your Companion Coach",
   quote: "Ready for\ntoday's climb?",
   support: "You've trained well.\nLet's keep building.",
   cta: "Start Today's Ride",

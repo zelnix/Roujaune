@@ -109,3 +109,7 @@ Home Alberto "Start Today's Ride" & sidebar Workouts → `/training`. Training "
 
 ## Chat empty-state latest-ride chip (2026-06-23)
 - CoachChatModal empty state now fetches `GET /api/rides/history?limit=1` (`fetchLatestRide`) and shows a highlighted yellow chip "Review my {route.name or workout} ride" that seeds a contextual message, surfacing the coach's ride-awareness immediately. Verified: chip reads "Review my Alpe d'Huez ride".
+
+## Wording + post-ride chat invite (2026-06-23)
+- Renamed all "Your Coach"/"your coach" → "Your Companion Coach"/"your companion coach" across the app (coach-persona role, data.ts, plan.tsx, plan-modals, workout, HeroRoute, training, settings label + hint).
+- Post-ride debrief invite: `/summary` recap card now shows a "Talk to {coach} about this ride" pill (HeroSummaryCard `onChat`) that opens the reusable CoachChatModal — inviting the rider to debrief with their companion coach while it's fresh. Verified via screenshot.

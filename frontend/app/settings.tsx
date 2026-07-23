@@ -80,7 +80,7 @@ export default function SettingsScreen() {
         </Card>
 
         <Card testID="coach-select" style={{ flex: 1 }}>
-          <SectionTitle label="YOUR COACH" color={CC.rouge} />
+          <SectionTitle label="YOUR COMPANION COACH" color={CC.rouge} />
           <View style={s.coachRow}>
             {(Object.keys(COACHES) as CoachId[]).map((id) => {
               const c = COACHES[id]; const on = persona.id === id;
@@ -101,7 +101,7 @@ export default function SettingsScreen() {
               );
             })}
           </View>
-          <Text style={s.coachHint}>Your coach gives live audio cues, post-ride debriefs and adapts your plan.</Text>
+          <Text style={s.coachHint}>Your companion coach gives live audio cues, post-ride debriefs and adapts your plan.</Text>
         </Card>
       </View>
 

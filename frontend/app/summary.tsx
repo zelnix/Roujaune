@@ -8,6 +8,8 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { colors, radius, spacing, shadow } from "@/src/theme";
 import { useSummary, useCoachDebrief } from "@/src/lib/summary";
+import { useCoach } from "@/src/lib/coach-persona";
+import { CoachChatModal } from "@/src/components/CoachChatModal";
 import {
   SummaryHeader, SummarySidebar, HeroSummaryCard, MetricsGrid, ComplianceCard,
   ChartsRow, SyncExportRow, RouteSummaryCard, AchievementsCard, RecoveryCard, BottomActionBar,
@@ -41,6 +43,8 @@ export default function WorkoutComplete() {
 
   const { stats, route } = useSummary();
   const { debrief, loading: debriefLoading } = useCoachDebrief(stats, route);
+  const persona = useCoach();
+  const [showChat, setShowChat] = React.useState(false);
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
   const [mainW, setMainW] = React.useState(600);
   const showToast = React.useCallback((text: string) => setToast({ id: Date.now(), text }), []);
@@ -74,7 +78,7 @@ export default function WorkoutComplete() {
           >
             <View style={[styles.contentRow, phone && styles.contentCol]}>
               <View style={styles.mainCol} onLayout={onMainLayout}>
-                <HeroSummaryCard compact={phone} recap={debrief} recapLoading={debriefLoading} />
+                <HeroSummaryCard compact={phone} recap={debrief} recapLoading={debriefLoading} onChat={() => setShowChat(true)} />
                 <MetricsGrid stats={stats} compact={compact} routeName={route.name} />
                 <ComplianceCard stats={stats} compact={phone} />
                 <ChartsRow stats={stats} width={mainW} vertical={phone} />
@@ -105,6 +109,7 @@ export default function WorkoutComplete() {
       </SafeAreaView>
 
       <Toast message={toast} />
+      <CoachChatModal visible={showChat} onClose={() => setShowChat(false)} persona={persona} />
     </GestureHandlerRootView>
   );
 }

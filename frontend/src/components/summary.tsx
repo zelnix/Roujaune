@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, Pressable } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -122,7 +122,7 @@ export function SummarySidebar({ active, onSelect, width, iconOnly = false }: { 
 }
 
 /* ======================= HERO SUMMARY ======================= */
-export function HeroSummaryCard({ compact = false, recap, recapLoading = false }: { compact?: boolean; recap?: string; recapLoading?: boolean }) {
+export function HeroSummaryCard({ compact = false, recap, recapLoading = false, onChat }: { compact?: boolean; recap?: string; recapLoading?: boolean; onChat?: () => void }) {
   const persona = useCoach();
   const recapText = recap ?? C.recap;
   return (
@@ -145,6 +145,14 @@ export function HeroSummaryCard({ compact = false, recap, recapLoading = false }
               {recapLoading && <ActivityIndicator size="small" color={colors.yellow} />}
             </View>
             <Text style={styles.recapText} numberOfLines={compact ? 3 : undefined}>{recapLoading ? `${persona.name} is reviewing your ride…` : recapText}</Text>
+            {onChat ? (
+              <Pressable testID="summary-chat-coach" onPress={onChat} accessibilityRole="button" accessibilityLabel={`Talk to ${persona.name} about this ride`}
+                style={({ hovered }: any) => [styles.recapChatBtn, hovered && styles.recapChatBtnHover]}>
+                <Ionicons name="chatbubble-ellipses" size={14} color={colors.yellow} />
+                <Text style={styles.recapChatText}>Talk to {persona.name} about this ride</Text>
+                <Ionicons name="chevron-forward" size={13} color={colors.yellow} />
+              </Pressable>
+            ) : null}
           </View>
         </View>
       </View>
@@ -609,6 +617,9 @@ const styles = StyleSheet.create({
   recapTitleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
   recapTitle: { color: colors.yellow, fontSize: 13, fontWeight: "800" },
   recapText: { color: colors.textDim, fontSize: 13, marginTop: 3, lineHeight: 18 },
+  recapChatBtn: { flexDirection: "row", alignItems: "center", gap: 7, alignSelf: "flex-start", marginTop: 10, borderWidth: 1, borderColor: "rgba(255,194,10,0.4)", borderRadius: 999, paddingVertical: 7, paddingHorizontal: 12, backgroundColor: "rgba(255,194,10,0.08)" },
+  recapChatBtnHover: { backgroundColor: "rgba(255,194,10,0.16)" },
+  recapChatText: { color: colors.yellow, fontSize: 12, fontWeight: "700" },
 
   /* metrics */
   metricsCard: { ...cardBase, paddingVertical: spacing.md },

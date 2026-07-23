@@ -263,13 +263,13 @@ export function AdaptationsModal({ visible, onClose, persona }: { visible: boole
   }, [visible, persona.name]);
 
   return (
-    <ModalShell visible={visible} onClose={onClose} title={`${persona.name}'s Adaptations`} subtitle="How your coach has adjusted the plan over time." icon="git-branch-outline" iconColor={C.rouge} maxWidth={680}>
+    <ModalShell visible={visible} onClose={onClose} title={`${persona.name}'s Adaptations`} subtitle="How your companion coach has adjusted the plan over time." icon="git-branch-outline" iconColor={C.rouge} maxWidth={680}>
       {loading ? (
         <View style={m.center}><ActivityIndicator color={C.yellow} /><Text style={m.centerText}>Loading history…</Text></View>
       ) : err ? (
         <View style={m.center}><Ionicons name="cloud-offline-outline" size={26} color={C.dim} /><Text style={m.centerText}>Could not load adaptations.</Text></View>
       ) : items.length === 0 ? (
-        <View style={m.center}><Ionicons name="sparkles-outline" size={26} color={C.dim} /><Text style={m.centerText}>No adaptations yet. Finish a ride and your coach will adjust the plan.</Text></View>
+        <View style={m.center}><Ionicons name="sparkles-outline" size={26} color={C.dim} /><Text style={m.centerText}>No adaptations yet. Finish a ride and your companion coach will adjust the plan.</Text></View>
       ) : (
         items.map((it, i) => (
           <View key={it.id} style={m.timelineRow}>

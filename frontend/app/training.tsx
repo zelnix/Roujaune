@@ -65,7 +65,7 @@ function TopStatus({ onPress }: { onPress: (m: string) => void }) {
       </View>
       <View style={styles.scriptWrap}>
         <Text style={styles.script}>{persona.name}</Text>
-        <Text style={styles.scriptSub}>Your Coach</Text>
+        <Text style={styles.scriptSub}>Your Companion Coach</Text>
       </View>
     </View>
   );
