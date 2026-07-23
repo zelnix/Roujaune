@@ -2,15 +2,33 @@ import React from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
+import * as Speech from "expo-speech";
 import { AppScaffold, Card, SectionTitle, Toggle } from "@/src/components/app-scaffold";
 import { CC } from "@/src/components/calendar";
 import { useCoach, setCoach, COACHES, CoachId } from "@/src/lib/coach-persona";
 
+const PITCH: Record<CoachId, number> = { alberto: 0.82, adriana: 1.22 };
+const PREVIEW_LINE = "Alright, let's ride. Hold steady and breathe — you've got this.";
+
 export default function SettingsScreen() {
   const persona = useCoach();
   const [units, setUnits] = React.useState<"metric" | "imperial">("metric");
+  const [previewing, setPreviewing] = React.useState<CoachId | null>(null);
   const [toggles, setToggles] = React.useState({ coachAudio: true, autoSync: true, weeklyReport: true, restReminders: false });
   const set = (k: keyof typeof toggles) => setToggles((t) => ({ ...t, [k]: !t[k] }));
+
+  const previewVoice = (id: CoachId) => {
+    Speech.stop();
+    setPreviewing(id);
+    Speech.speak(PREVIEW_LINE, {
+      pitch: PITCH[id],
+      rate: 0.92,
+      onDone: () => setPreviewing(null),
+      onStopped: () => setPreviewing(null),
+      onError: () => setPreviewing(null),
+    });
+  };
+  React.useEffect(() => () => { Speech.stop(); }, []);
 
   return (
     <AppScaffold active="settings" title="Settings" subtitle="Your profile, coach and training preferences.">
@@ -47,6 +65,12 @@ export default function SettingsScreen() {
                   <Text style={[s.coachName, on && { color: CC.white }]}>{c.name}</Text>
                   <Text style={s.coachRole}>Voice {c.voiceNum}</Text>
                   {on && <View style={s.coachCheck}><Ionicons name="checkmark" size={13} color="#04210F" /></View>}
+                  <Pressable testID={`preview-${id}`} onPress={() => previewVoice(id)} hitSlop={8}
+                    accessibilityRole="button" accessibilityLabel={`Preview ${c.name}'s voice`}
+                    style={({ hovered }: any) => [s.previewBtn, hovered && s.previewHover]}>
+                    <Ionicons name={previewing === id ? "volume-high" : "play"} size={13} color={CC.white} />
+                    <Text style={s.previewText}>{previewing === id ? "Playing…" : "Preview voice"}</Text>
+                  </Pressable>
                 </Pressable>
               );
             })}
@@ -121,6 +145,9 @@ const s = StyleSheet.create({
   coachName: { color: CC.dim, fontSize: 15, fontWeight: "800", marginTop: 8 },
   coachRole: { color: CC.dim, fontSize: 11, marginTop: 1 },
   coachCheck: { position: "absolute", top: 10, right: 10, width: 22, height: 22, borderRadius: 11, backgroundColor: CC.green, alignItems: "center", justifyContent: "center" },
+  previewBtn: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12, borderWidth: 1, borderColor: CC.border, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 14, backgroundColor: "rgba(255,255,255,0.03)", minHeight: 38, justifyContent: "center" },
+  previewHover: { borderColor: "rgba(255,255,255,0.28)", backgroundColor: "rgba(255,255,255,0.06)" },
+  previewText: { color: CC.white, fontSize: 12, fontWeight: "700" },
   coachHint: { color: CC.dim, fontSize: 11.5, marginTop: 12, lineHeight: 16 },
   prefRow: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 14 },
   divider: { borderBottomWidth: 1, borderBottomColor: CC.borderSoft },

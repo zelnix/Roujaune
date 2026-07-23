@@ -15,7 +15,7 @@ import {
 } from "@/src/components/plan";
 import { SideNavigation } from "@/src/components/SideNavigation";
 
-const DESIGN_W = 1420; // sidebar + content design canvas (scaled to fill the tablet)
+const DESIGN_W = 1280; // 96px rail + 1184px content (content geometry the cards are authored for)
 
 function Toast({ message }: { message: { id: number; text: string } | null }) {
   const op = React.useRef(new Animated.Value(0)).current;
@@ -80,7 +80,7 @@ export default function TrainingPlanScreen() {
   const fitScaleY = !compact && contentH > 0 && availH > 0 ? Math.max(0.4, Math.min(2, availH / contentH)) : 1;
 
   const rightW = 336;
-  const fullW = DESIGN_W - 236 - 44; // sidebar + content padding
+  const fullW = DESIGN_W - 96 - 44; // rail + content padding
 
   const hero = (
     <View style={styles.rowGap}>
