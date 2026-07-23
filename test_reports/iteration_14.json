@@ -1,0 +1,33 @@
+{
+  "summary": "ROUJAUNE /workouts hub verified end-to-end on tablet (1280x900). All 15 requested behaviours passed: route renders with no red screen; all 7 tabs present and switch content (All/By* → 8-card grid, FB50 Sessions → FB50 panel with view-fb50, My Workouts → empty-cta, Favorites → empty until favorited); all 8 workout-type cards (type-card-endurance…restday) render with icon, purpose, mini profile, Best-for text and view-<id> button (toast on click); favoriting endurance via fav-endurance surfaces it in tab-Favorites; right-column categories (cat-all…cat-restday, cat-fb50) filter the grid correctly, cat-fb50 switches to FB50 panel, cat-all restores; Popular rows (popular-p1..p4) + view-all-popular + Quick Actions (quick-create/builder/import) + compare-types all present and produce toasts; ask-coach opens the CoachChatModal (chat-input visible) — modal opened only, no chat message sent (LLM cost preserved), then closed via chat-close; sidebar order verified strictly monotonic top-to-bottom: home, training, routes, workouts, calendar, progress, community, wellness, connections, then settings, help; Workouts is the active item on /workouts. Dynamic coach identity verified: default state showed 'Ask Alberto'; after selecting coach-adriana in /settings and returning to /workouts, 'Ask Adriana' visible, body text contains 'Adriana' and NO stale 'Alberto' text leaks. Rail navigation from /progress via railnav-workouts routes to /workouts. Coach reset to Alberto at end for clean state.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "Animated (Toast)", "issue": "Console warning: 'Animated: useNativeDriver is not supported because the native animated module is missing. Falling back to JS-based animation.' — cosmetic, only affects web preview; useNativeDriver: true in workouts.tsx:89-91 Toast component. Consider gating with Platform.OS !== 'web' or accept as expected on web. Reference: /app/frontend/app/workouts.tsx:89"},
+      {"component": "textShadow style prop", "issue": "Console warning: '\"textShadow*\" style props are deprecated. Use \"textShadow\".' Not emitted from /workouts directly (originates from another component in the shared layout, e.g. TopStatus / sidebar) but surfaces on this route. Non-blocking."}
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_14.json"
+  ],
+  "action_items": [
+    "(Optional, non-blocking) Silence useNativeDriver warning on web for Toast in workouts.tsx by setting useNativeDriver: Platform.OS !== 'web' or leaving as-is if acceptable.",
+    "(Optional, non-blocking) Migrate deprecated textShadow* style props to the new consolidated textShadow shorthand in whichever shared component emits it (surfaces on /workouts via header/sidebar)."
+  ],
+  "critical_code_review_comments": [
+    "workouts.tsx correctly uses useCoach() everywhere (Ask {name}, portrait, signature on rec panel and footer tip) — no hardcoded Alberto strings; confirmed via body-text scan after switching to Adriana.",
+    "Grid filtering logic (activeCat + tab combinations) is coherent: category-specific filter is bypassed for My Workouts/Favorites/FB50 tabs so state can't get into an empty-grid trap.",
+    "typesForTab in /app/frontend/src/lib/workouts.ts returns a fresh sorted copy for By Duration/Intensity/Goal — no in-place mutation of WORKOUT_TYPES.",
+    "All interactive elements have testID and stable IDs; sidebar renders locked navItems order matching the spec (home→connections, then settings+help in the footer)."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "N/A (skipped per request)", "frontend": "100%" },
+  "seed_data_creation": "None. Coach preference toggled to Adriana during dynamic-identity verification then reset to Alberto at end.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "For /workouts on tablet: use viewport 1280x900. TestIDs on this screen: wide-sidebar; tab-<Name>; type-card-<id>; view-<id>; fav-<id>; empty-cta; view-fb50; cat-<id>; popular-p1..p4; view-all-popular; quick-create/builder/import; compare-types; ask-coach; nav-<key> (sidebar). Rail navigation on /progress uses railnav-<key>. Coach persistence uses AsyncStorage per browser context — set coach via /settings coach-adriana|coach-alberto then navigate to /workouts within the same session; body-text scan for 'Alberto'/'Adriana' is a fast leak check. Do NOT send actual chat messages via ask-coach — just verify chat-input becomes visible and close via chat-close (LLM cost).",
+  "rca_of_issue": "N/A — no defects found."
+}

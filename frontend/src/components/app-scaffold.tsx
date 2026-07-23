@@ -13,7 +13,7 @@ import { SideNavigation } from "./SideNavigation";
 import { CC } from "./calendar";
 
 const ROUTE: Record<string, string> = {
-  home: "/", training: "/plan", calendar: "/calendar", workouts: "/workout",
+  home: "/", training: "/plan", calendar: "/calendar", workouts: "/workouts",
   routes: "/routes", progress: "/progress", wellness: "/wellness",
   community: "/community", connections: "/connections", settings: "/settings",
 };
@@ -72,7 +72,6 @@ export function AppScaffold({
   const onSelect = (key: string) => {
     if (key === active) return;
     if (key === "training") markPlanSeen();
-    if (key === "workouts") { router.push("/workout"); return; }
     const to = ROUTE[key];
     if (to) router.replace(to as any);
     else showToast(`${key} — coming soon`);

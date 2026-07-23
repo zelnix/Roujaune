@@ -53,7 +53,7 @@ export default function WorkoutComplete() {
 
   const onSideSelect = (key: string) => {
     if (key === "overview") return;
-    if (key === "workouts") { router.replace("/training"); return; }
+    if (key === "workouts") { router.replace("/workouts"); return; }
     showToast(key.charAt(0).toUpperCase() + key.slice(1));
   };
 
