@@ -530,7 +530,7 @@ def _chat_id(coach_name: str) -> str:
 
 
 # ----------------------- Rider profile (feeds coach intelligence) -----------
-RIDER_DEFAULT = {"id": "me", "name": "Rider One", "weight_kg": 78.0, "age": 42, "gender": "male"}
+RIDER_DEFAULT = {"id": "me", "name": "Rider One", "weight_kg": 78.0, "age": 42, "gender": "male", "city": "", "region": "", "country": ""}
 
 
 class RiderProfileUpdate(BaseModel):
@@ -538,6 +538,9 @@ class RiderProfileUpdate(BaseModel):
     weight_kg: Optional[float] = None
     age: Optional[int] = None
     gender: Optional[str] = None
+    city: Optional[str] = None
+    region: Optional[str] = None
+    country: Optional[str] = None
 
 
 async def _rider_doc() -> dict:
@@ -573,6 +576,45 @@ async def update_rider_profile(req: RiderProfileUpdate):
     upd = {k: v for k, v in req.dict().items() if v is not None}
     await db.rider_profile.update_one({"id": "me"}, {"$set": {**upd, "id": "me"}}, upsert=True)
     return await _rider_doc()
+
+
+def _http_get_json(url: str):
+    import urllib.request
+    with urllib.request.urlopen(url, timeout=6) as r:
+        return json.loads(r.read().decode())
+
+
+@api_router.get("/weather")
+async def get_weather(city: str = "", region: str = "", country: str = ""):
+    """Current temperature for the rider's location via Open-Meteo (keyless)."""
+    query = ", ".join([p for p in [city, region, country] if p]).strip()
+    if not query:
+        return {"available": False}
+    try:
+        import urllib.parse
+        geo = await asyncio.to_thread(
+            _http_get_json,
+            f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(city or query)}&count=1&language=en&format=json",
+        )
+        res = (geo.get("results") or [None])[0]
+        if not res:
+            return {"available": False}
+        lat, lon = res["latitude"], res["longitude"]
+        place = res.get("name", city)
+        wx = await asyncio.to_thread(
+            _http_get_json,
+            f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,apparent_temperature",
+        )
+        cur = wx.get("current", {})
+        return {
+            "available": True,
+            "temp_c": round(cur.get("temperature_2m", 0)),
+            "feels_c": round(cur.get("apparent_temperature", cur.get("temperature_2m", 0))),
+            "place": place,
+        }
+    except Exception:
+        logging.warning("weather lookup failed")
+        return {"available": False}
 
 
 @api_router.get("/rider/season")

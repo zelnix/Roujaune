@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export type RiderProfile = { name: string; weight_kg: number; age: number; gender: string };
+export type RiderProfile = { name: string; weight_kg: number; age: number; gender: string; city: string; region: string; country: string };
 
-const DEFAULT: RiderProfile = { name: "Rider One", weight_kg: 78, age: 42, gender: "male" };
+const DEFAULT: RiderProfile = { name: "Rider One", weight_kg: 78, age: 42, gender: "male", city: "", region: "", country: "" };
 const AVATAR_KEY = "roujaune:riderAvatar";
 
 // Module-level snapshot so non-React code (coach context builders) can read it.
@@ -29,7 +29,7 @@ export function useRiderProfile() {
         const res = await fetch(`${base()}/api/rider/profile`);
         if (res.ok) {
           const d = await res.json();
-          const p: RiderProfile = { name: d.name, weight_kg: d.weight_kg, age: d.age, gender: d.gender };
+          const p: RiderProfile = { name: d.name, weight_kg: d.weight_kg, age: d.age, gender: d.gender, city: d.city ?? "", region: d.region ?? "", country: d.country ?? "" };
           _snap = p;
           setProfile(p);
         }
@@ -74,6 +74,35 @@ export function useRiderProfile() {
 }
 
 export type SeasonStats = { rides: number; distance_km: number; elevation_m: number; hours: number; streak: number };
+
+export type Weather = { value: string; sub: string } | null;
+
+export function useWeather() {
+  const [weather, setWeather] = useState<Weather>(null);
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      const p = _snap;
+      if (!p.city && !p.region) {
+        if (alive) setWeather(null);
+        return;
+      }
+      try {
+        const q = new URLSearchParams({ city: p.city, region: p.region, country: p.country }).toString();
+        const res = await fetch(`${base()}/api/weather?${q}`);
+        const d = await res.json();
+        if (alive && d?.available) setWeather({ value: `${d.temp_c}`, sub: `${d.place} · feels ${d.feels_c}°C` });
+        else if (alive) setWeather(null);
+      } catch {
+        if (alive) setWeather(null);
+      }
+    };
+    load();
+    const t = setInterval(load, 5 * 60 * 1000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
+  return weather;
+}
 
 export function useRiderSeason() {
   const [season, setSeason] = useState<SeasonStats | null>(null);

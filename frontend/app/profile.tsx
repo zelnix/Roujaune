@@ -170,6 +170,9 @@ function EditModal({ visible, profile, onClose, onSave }: { visible: boolean; pr
   const [weight, setWeight] = React.useState(String(Math.round(profile.weight_kg)));
   const [age, setAge] = React.useState(String(profile.age));
   const [gender, setGender] = React.useState(profile.gender);
+  const [city, setCity] = React.useState(profile.city);
+  const [region, setRegion] = React.useState(profile.region);
+  const [country, setCountry] = React.useState(profile.country);
 
   React.useEffect(() => {
     if (visible) {
@@ -177,6 +180,9 @@ function EditModal({ visible, profile, onClose, onSave }: { visible: boolean; pr
       setWeight(String(Math.round(profile.weight_kg)));
       setAge(String(profile.age));
       setGender(profile.gender);
+      setCity(profile.city);
+      setRegion(profile.region);
+      setCountry(profile.country);
     }
   }, [visible, profile]);
 
@@ -186,6 +192,9 @@ function EditModal({ visible, profile, onClose, onSave }: { visible: boolean; pr
       weight_kg: Math.max(30, Math.min(200, parseInt(weight, 10) || 78)),
       age: Math.max(12, Math.min(100, parseInt(age, 10) || 42)),
       gender,
+      city: city.trim(),
+      region: region.trim(),
+      country: country.trim(),
     });
   };
 
@@ -221,6 +230,20 @@ function EditModal({ visible, profile, onClose, onSave }: { visible: boolean; pr
               );
             })}
           </View>
+
+          <Text style={s.fieldLabel}>City / Suburb</Text>
+          <TextInput testID="input-city" value={city} onChangeText={setCity} placeholder="e.g. Melbourne" placeholderTextColor={CC.dim} style={s.input} />
+          <View style={s.fieldRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.fieldLabel}>State / Region</Text>
+              <TextInput testID="input-region" value={region} onChangeText={setRegion} placeholder="e.g. Victoria" placeholderTextColor={CC.dim} style={s.input} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.fieldLabel}>Country</Text>
+              <TextInput testID="input-country" value={country} onChangeText={setCountry} placeholder="e.g. Australia" placeholderTextColor={CC.dim} style={s.input} />
+            </View>
+          </View>
+          <Text style={s.locHint}>Used for live temperature on your ride screen.</Text>
 
           <View style={s.modalActions}>
             <Pressable testID="cancel-edit" onPress={onClose} style={[s.modalBtn, s.modalBtnGhost]}>
@@ -286,6 +309,7 @@ const s = StyleSheet.create({
   genderChipOn: { backgroundColor: CC.rouge, borderColor: CC.rouge },
   genderText: { color: CC.white, fontSize: 13, fontWeight: "700" },
   genderTextOn: { color: "#fff" },
+  locHint: { color: CC.dim, fontSize: 11, marginTop: 8 },
   modalActions: { flexDirection: "row", gap: 12, marginTop: 22 },
   modalBtn: { flex: 1, alignItems: "center", paddingVertical: 12, borderRadius: 12 },
   modalBtnGhost: { borderWidth: 1, borderColor: CC.border },

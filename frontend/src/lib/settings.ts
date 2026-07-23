@@ -4,12 +4,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 export type Settings = {
   hasTrainer: boolean;   // rider has a smart trainer (power / cadence / speed)
   hasWearable: boolean;  // rider has a wearable (heart rate / wellness)
+  demoMode: boolean;     // preview the connected experience with simulated data
   hudEnabled: boolean;   // show the on-screen HUD overlay in immersive mode
   ftp: number;           // rider FTP (watts) — drives live ERG target power
   ftpAuto: boolean;      // keep FTP in sync with training-progress FTP
 };
 
-const DEFAULTS: Settings = { hasTrainer: true, hasWearable: true, hudEnabled: true, ftp: 287, ftpAuto: true };
+const DEFAULTS: Settings = { hasTrainer: false, hasWearable: false, demoMode: false, hudEnabled: true, ftp: 287, ftpAuto: true };
 const KEY = "roujaune:settings";
 
 // Pull the current FTP from the backend training-progress metrics (e.g. "287 W").

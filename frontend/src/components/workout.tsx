@@ -27,7 +27,7 @@ export function BrandWordmark() {
   );
 }
 
-export function WorkoutTopBar({ elapsed, connectionState, stale, onPress, routeName = "Alpe d'Huez", riddenKm = 0, totalKm = 0 }: { elapsed: string; connectionState: string; stale: boolean; onPress: (m: string) => void; routeName?: string; riddenKm?: number; totalKm?: number }) {
+export function WorkoutTopBar({ elapsed, connectionState, stale, onPress, routeName = "Alpe d'Huez", riddenKm = 0, totalKm = 0, demoMode = false, onToggleDemo }: { elapsed: string; connectionState: string; stale: boolean; onPress: (m: string) => void; routeName?: string; riddenKm?: number; totalKm?: number; demoMode?: boolean; onToggleDemo?: () => void }) {
   const pct = totalKm > 0 ? Math.max(0, Math.min(100, Math.round((riddenKm / totalKm) * 100))) : 0;
   const conn = connectionState === "connected" && !stale
     ? { c: colors.green, label: "LIVE", icon: "wifi" as const }
@@ -66,6 +66,12 @@ export function WorkoutTopBar({ elapsed, connectionState, stale, onPress, routeN
             <View style={[styles.connDot, { backgroundColor: conn.c }]} />
             <Ionicons name={conn.icon} size={14} color={conn.c} />
             <Text style={[styles.connText, { color: conn.c }]}>{conn.label}</Text>
+          </View>
+        </Touchable>
+        <Touchable testID="demo-toggle" scaleTo={0.9} onPress={() => onToggleDemo?.()}>
+          <View style={[styles.demoPill, demoMode && styles.demoPillOn]}>
+            <Ionicons name="flask" size={13} color={demoMode ? "#241B00" : colors.yellow} />
+            <Text style={[styles.demoText, demoMode && styles.demoTextOn]}>{demoMode ? "DEMO ON" : "DEMO DATA"}</Text>
           </View>
         </Touchable>
         <Touchable testID="settings-icon" scaleTo={0.9} onPress={() => onPress("Settings")}><Ionicons name="settings-outline" size={20} color={colors.white} /></Touchable>
@@ -329,7 +335,7 @@ export function RiderRouteViewport({ width, height, onPress }: { width: number; 
 /* ============================ RIGHT COLUMN ============================ */
 export type RouteInfo = { title: string; place: string; km: number; elev: number; grade: number; isClimb: boolean; tag: string };
 
-export function ClimbCard({ route, riddenKm = 0 }: { route?: RouteInfo; riddenKm?: number }) {
+export function ClimbCard({ route, riddenKm = 0, progress = 0 }: { route?: RouteInfo; riddenKm?: number; progress?: number }) {
   const km = route?.km ?? 16;
   const elev = route?.elev ?? 1567;
   const grade = route?.grade ?? 7.8;
@@ -342,13 +348,13 @@ export function ClimbCard({ route, riddenKm = 0 }: { route?: RouteInfo; riddenKm
       <View style={styles.gradeRow}><Text style={styles.gradeVal}>{Math.abs(grade).toFixed(1)}</Text><Text style={styles.gradePct}>%</Text><Text style={styles.gradeLabel}>{isClimb ? "GRADE" : "AVG GRADE"}</Text></View>
       <View style={styles.climbStat}><Text style={styles.climbStatVal}>{Math.abs(elev).toLocaleString()} m</Text><Text style={styles.microLabel}>{descent ? "DESCENT" : isClimb ? "TO SUMMIT" : "ELEVATION GAIN"}</Text></View>
       <View style={styles.climbStat}><Text style={styles.climbStatVal}>{remaining.toFixed(1)} km</Text><Text style={styles.microLabel}>{isClimb ? "CLIMB REMAINING" : "DISTANCE LEFT"}</Text></View>
-      <ClimbMini width={250} climb={isClimb} descent={descent} />
+      <ClimbMini width={250} climb={isClimb} descent={descent} progress={progress} />
       <View style={styles.climbAxis}><Text style={styles.microLabel}>0</Text><Text style={styles.microLabel}>{(km / 2).toFixed(0)}</Text><Text style={styles.microLabel}>{km.toFixed(0)}</Text></View>
     </View>
   );
 }
 
-function ClimbMini({ width, height = 64, climb = true, descent = false }: { width: number; height?: number; climb?: boolean; descent?: boolean }) {
+function ClimbMini({ width, height = 64, climb = true, descent = false, progress = 0 }: { width: number; height?: number; climb?: boolean; descent?: boolean; progress?: number }) {
   const pts = descent
     ? [0.95, 0.82, 0.7, 0.6, 0.5, 0.42, 0.34, 0.28, 0.2, 0.12]
     : climb
@@ -356,7 +362,7 @@ function ClimbMini({ width, height = 64, climb = true, descent = false }: { widt
     : [0.4, 0.52, 0.44, 0.56, 0.46, 0.6, 0.48, 0.58, 0.5, 0.54];
   const stepX = width / (pts.length - 1);
   const coords = pts.map((v, i) => [i * stepX, height - 6 - v * (height - 12)]);
-  const cur = 7;
+  const cur = Math.max(0, Math.min(pts.length - 1, Math.round(progress * (pts.length - 1))));
   return (
     <Svg width={width} height={height} style={{ marginTop: 8 }}>
       <Polyline points={coords.slice(0, cur + 1).map((c) => c.join(",")).join(" ")} fill="none" stroke={colors.yellow} strokeWidth={2.5} />
@@ -366,11 +372,17 @@ function ClimbMini({ width, height = 64, climb = true, descent = false }: { widt
   );
 }
 
-export function RouteMapCard({ title = "Alpe d'Huez" }: { title?: string }) {
+export function RouteMapCard({ title = "Alpe d'Huez", progress = 0, riddenKm = 0, totalKm = 0, timeBased = false }: { title?: string; progress?: number; riddenKm?: number; totalKm?: number; timeBased?: boolean }) {
+  const pct = Math.round(progress * 100);
   return (
     <View style={styles.sideCard} testID="route-map-card">
       <View style={styles.metricHead}><Ionicons name="location" size={15} color={colors.yellow} /><SectionLabel color={colors.yellow}>ROUTE</SectionLabel></View>
       <Text style={styles.routeMapTitle} numberOfLines={1}>{title}</Text>
+      <View style={styles.routeTrack}>
+        <View style={[styles.routeFill, { width: `${pct}%` }]} />
+        <View style={[styles.routeDot, { left: `${pct}%` }]} />
+      </View>
+      <Text style={styles.routeProg}>{riddenKm.toFixed(1)} / {totalKm.toFixed(1)} km · {pct}%{timeBased ? " · time-based" : ""}</Text>
       <View style={styles.mapWrap}>
         <Svg width="100%" height="100%" viewBox="0 0 240 200" preserveAspectRatio="xMidYMid meet">
           <Path d="M40 185 C90 175 60 150 100 145 C140 140 90 120 120 110 C155 98 110 80 150 70 C185 62 150 45 175 35 C195 27 205 22 210 15" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth={3} strokeLinecap="round" />
@@ -428,34 +440,40 @@ function SumMetric({ icon, iconColor, value, unit, label, sub }: { icon: React.R
   );
 }
 
-export function RideSummaryStrip({ speed, trainerConnected = true, withZones = true }: { speed: string; trainerConnected?: boolean; withZones?: boolean }) {
+export function RideSummaryStrip({ speed, trainerConnected = true, withZones = true, riddenKm = 0, totalKm = 0, elevM = 0, progress = 0, temp = null }: { speed: string; trainerConnected?: boolean; withZones?: boolean; riddenKm?: number; totalKm?: number; elevM?: number; progress?: number; temp?: { value: string; sub: string } | null }) {
+  const NA = "—";
+  const gainedM = Math.round(elevM * progress);
   return (
     <View style={styles.summaryStrip} testID="ride-summary-strip">
-      <SumMetric icon={<Ionicons name="speedometer-outline" size={14} color={colors.yellow} />} iconColor={colors.yellow} value={trainerConnected ? speed : "—"} unit="km/h" label="SPEED" sub={trainerConnected ? "Avg 24.6" : "Not connected"} />
+      <SumMetric icon={<Ionicons name="speedometer-outline" size={14} color={colors.yellow} />} iconColor={colors.yellow} value={trainerConnected ? speed : NA} unit="km/h" label="SPEED" sub={trainerConnected ? "Live" : "Not connected"} />
       <View style={styles.sumDiv} />
-      <SumMetric icon={<MaterialCommunityIcons name="map-marker-distance" size={14} color={colors.yellow} />} iconColor={colors.yellow} value="23.7" unit="km" label="DISTANCE" sub="16.0 km to go" />
+      <SumMetric icon={<MaterialCommunityIcons name="map-marker-distance" size={14} color={colors.yellow} />} iconColor={colors.yellow} value={trainerConnected ? riddenKm.toFixed(1) : NA} unit="km" label="DISTANCE" sub={trainerConnected ? `${Math.max(0, totalKm - riddenKm).toFixed(1)} km to go` : "Not connected"} />
       <View style={styles.sumDiv} />
-      <SumMetric icon={<MaterialCommunityIcons name="terrain" size={14} color={colors.yellow} />} iconColor={colors.yellow} value="1,050" unit="m" label="ELEVATION" sub="Gain 1,050 m" />
+      <SumMetric icon={<MaterialCommunityIcons name="terrain" size={14} color={colors.yellow} />} iconColor={colors.yellow} value={trainerConnected ? gainedM.toLocaleString() : NA} unit="m" label="ELEVATION" sub={trainerConnected ? `${elevM.toLocaleString()} m total` : "Not connected"} />
       <View style={styles.sumDiv} />
-      <SumMetric icon={<MaterialCommunityIcons name="speedometer" size={14} color={colors.red} />} iconColor={colors.red} value="48" unit="TSS" label="TSS" sub="92 TSS (Total)" />
+      <SumMetric icon={<MaterialCommunityIcons name="speedometer" size={14} color={colors.red} />} iconColor={colors.red} value={trainerConnected ? "48" : NA} unit="TSS" label="TSS" sub={trainerConnected ? "92 TSS (Total)" : "Not connected"} />
       <View style={styles.sumDiv} />
-      <SumMetric icon={<Ionicons name="flame" size={14} color={colors.red} />} iconColor={colors.red} value="512" unit="kcal" label="CALORIES" sub="622 kcal (Total)" />
+      <SumMetric icon={<Ionicons name="flame" size={14} color={colors.red} />} iconColor={colors.red} value={trainerConnected ? "512" : NA} unit="kcal" label="CALORIES" sub={trainerConnected ? "622 kcal (Total)" : "Not connected"} />
       <View style={styles.sumDiv} />
-      <SumMetric icon={<Ionicons name="thermometer-outline" size={14} color={colors.yellow} />} iconColor={colors.yellow} value="18" unit="°C" label="TEMP" sub="Feels like 18°C" />
+      <SumMetric icon={<Ionicons name="thermometer-outline" size={14} color={colors.yellow} />} iconColor={colors.yellow} value={temp ? temp.value : NA} unit="°C" label="TEMP" sub={temp ? temp.sub : "Set your location"} />
       {withZones && (
         <>
           <View style={styles.sumDiv} />
           <View style={styles.zoneCell}>
             <SectionLabel color={colors.textDim}>TIME IN ZONES</SectionLabel>
-            <View style={{ marginTop: 4, gap: 3 }}>
-              {ZONE_TIMES.map((z) => (
-                <View key={z.z} style={styles.zoneLine}>
-                  <Text style={styles.zoneLbl}>{z.z}</Text>
-                  <View style={styles.zoneBarTrack}><View style={{ height: 5, borderRadius: 3, backgroundColor: z.c, width: `${z.w * 100}%` }} /></View>
-                  <Text style={styles.zoneTime}>{z.t}</Text>
-                </View>
-              ))}
-            </View>
+            {trainerConnected ? (
+              <View style={{ marginTop: 4, gap: 3 }}>
+                {ZONE_TIMES.map((z) => (
+                  <View key={z.z} style={styles.zoneLine}>
+                    <Text style={styles.zoneLbl}>{z.z}</Text>
+                    <View style={styles.zoneBarTrack}><View style={{ height: 5, borderRadius: 3, backgroundColor: z.c, width: `${z.w * 100}%` }} /></View>
+                    <Text style={styles.zoneTime}>{z.t}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={[styles.microLabel, { marginTop: 6 }]}>Not connected</Text>
+            )}
           </View>
         </>
       )}
@@ -663,11 +681,11 @@ export function VideoPlaceholder({ width, onRestore }: { width: number; onRestor
 }
 
 /* ============================ ROUTE PICKER ============================ */
-export function RoutesButton({ onPress, testID = "routes-button" }: { onPress: () => void; testID?: string }) {
+export function RoutesButton({ onPress, testID = "routes-button", label = "ROUTES", icon = "map" }: { onPress: () => void; testID?: string; label?: string; icon?: any }) {
   return (
-    <Pressable onPress={onPress} style={styles.routesBtn} testID={testID} hitSlop={8} accessibilityRole="button" accessibilityLabel="Choose route">
-      <Ionicons name="map" size={14} color="#fff" />
-      <Text style={styles.routesBtnText}>ROUTES</Text>
+    <Pressable onPress={onPress} style={styles.routesBtn} testID={testID} hitSlop={8} accessibilityRole="button" accessibilityLabel={label}>
+      <Ionicons name={icon} size={14} color="#fff" />
+      <Text style={styles.routesBtnText}>{label.toUpperCase()}</Text>
     </Pressable>
   );
 }
@@ -928,6 +946,10 @@ const styles = StyleSheet.create({
   topBar: { flexDirection: "row", alignItems: "center", gap: spacing.lg, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.lg, paddingVertical: 10, ...shadow.card },
   brandRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   brandMark: { width: 168, height: 26 },
+  demoPill: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderColor: colors.yellow, borderRadius: 999, paddingVertical: 5, paddingHorizontal: 10, backgroundColor: "rgba(255,255,255,0.03)" },
+  demoPillOn: { backgroundColor: colors.yellow, borderColor: colors.yellow },
+  demoText: { color: colors.yellow, fontSize: 10.5, fontWeight: "800", letterSpacing: 0.5 },
+  demoTextOn: { color: "#241B00" },
   topElapsed: { alignItems: "flex-start" },
   elapsedVal: { color: colors.white, fontSize: 26, fontWeight: "800", letterSpacing: 0.5 },
   microLabel: { color: colors.textDim, fontSize: 10, fontWeight: "700", letterSpacing: 0.6 },
@@ -988,6 +1010,10 @@ const styles = StyleSheet.create({
   climbStatVal: { color: colors.white, fontSize: 17, fontWeight: "800" },
   climbAxis: { flexDirection: "row", justifyContent: "space-between", marginTop: 2 },
   routeMapTitle: { color: colors.white, fontSize: 18, fontWeight: "800", marginTop: 6 },
+  routeTrack: { height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.1)", marginTop: 10, justifyContent: "center" },
+  routeFill: { height: 6, borderRadius: 3, backgroundColor: colors.yellow },
+  routeDot: { position: "absolute", width: 12, height: 12, borderRadius: 6, backgroundColor: "#fff", marginLeft: -6, borderWidth: 2, borderColor: colors.red },
+  routeProg: { color: colors.textDim, fontSize: 11, fontWeight: "600", marginTop: 8 },
   mapWrap: { height: 200, marginTop: 8, borderRadius: radius.md, backgroundColor: "#0C0E0D", borderWidth: 1, borderColor: colors.borderSoft, overflow: "hidden" },
   wGridRow: { flexDirection: "row", marginTop: 10 },
   wCell: { flex: 1 },
@@ -1022,7 +1048,7 @@ const styles = StyleSheet.create({
   endText: { color: "#fff", fontSize: 16, fontWeight: "900" },
 
   /* cue */
-  cue: { position: "absolute", top: 10, alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(12,10,9,0.9)", borderWidth: 1, borderColor: "rgba(233,180,76,0.4)", borderRadius: radius.pill, paddingHorizontal: 16, paddingVertical: 8 },
+  cue: { alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(12,10,9,0.9)", borderWidth: 1, borderColor: "rgba(233,180,76,0.4)", borderRadius: radius.pill, paddingHorizontal: 16, paddingVertical: 8, marginBottom: 10 },
   cueText: { color: colors.white, fontSize: 13, fontWeight: "600" },
 
   /* next-up + safety */

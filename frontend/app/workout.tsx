@@ -14,9 +14,10 @@ import { useSettings } from "@/src/lib/settings";
 import { routeVideos, nextInterval, currentWorkout } from "@/src/data";
 import { getWorkout, buildSegments, currentSegment, segmentProfile, mmss, targetWatts } from "@/src/lib/workout-catalog";
 import { fetchZoneBias, ZoneBias } from "@/src/lib/targets";
-import { getRiderProfile } from "@/src/lib/rider-profile";
+import { getRiderProfile, useWeather } from "@/src/lib/rider-profile";
 import { WORKOUT_TYPES } from "@/src/lib/workouts";
 import { RouteVideo } from "@/src/components/RouteVideo";
+import { VirtualRoute } from "@/src/components/VirtualRoute";
 import {
   WorkoutTopBar, PowerCard, HeartRateCard, CadenceCard, WorkoutTimelineCard,
   ClimbCard, RouteMapCard, WearableDataCard, RideSummaryStrip,
@@ -108,6 +109,11 @@ function routeIndexForType(typeId?: string) {
   return 0;
 }
 
+// Estimate terrain + route length from the chosen workout (used when the route
+// can't be derived from a video). Avg speed & typical grade per workout type.
+const TYPE_SPEED: Record<string, number> = { climbing: 20, threshold: 27, endurance: 30, tempo: 29, vo2max: 30, sprints: 31, recovery: 25, restday: 22, fb50: 24 };
+const TYPE_GRADE: Record<string, number> = { climbing: 7.2, threshold: 4, endurance: 1.5, tempo: 2.2, vo2max: 2.6, sprints: 1.8, recovery: 0.6, restday: 0.4, fb50: 1 };
+
 function Toast({ message }: { message: { id: number; text: string } | null }) {
   const anim = React.useRef(new Animated.Value(0)).current;
   React.useEffect(() => {
@@ -147,6 +153,7 @@ export default function LiveWorkout() {
   const [contentH, setContentH] = React.useState(0);
   const [paused, setPaused] = React.useState(false);
   const [expanded, setExpanded] = React.useState(false);
+  const [virtualMode, setVirtualMode] = React.useState(false);
   const [routeIdx, setRouteIdx] = React.useState(() => routeIndexForType(selected?.typeId));
   const [routeAuto, setRouteAuto] = React.useState(true);
   const [lastRouteId, setLastRouteIdState] = React.useState<string | null>(null);
@@ -292,16 +299,30 @@ export default function LiveWorkout() {
 
   const activeRoute = routeVideos[routeIdx];
 
-  // Derive real terrain figures from the active route so the Climb/Route/top-bar
-  // reflect the ride the rider actually chose (not a hardcoded Alpe d'Huez).
-  const routeInfo = React.useMemo(() => {
-    const km = parseFloat(activeRoute.distance) || 0;
-    const elev = parseInt(activeRoute.elevation.replace(/[^0-9-]/g, ""), 10) || 0;
-    const grade = km > 0 ? (elev / (km * 1000)) * 100 : 0;
-    const isClimb = elev >= 400 && Math.abs(grade) >= 2.5;
-    return { title: activeRoute.title, place: activeRoute.place, km, elev, grade, isClimb, tag: activeRoute.tag };
-  }, [activeRoute]);
-  const riddenKm = telemetry.distance;
+  // Live data is only shown for connected devices. "Demo mode" simulates both so
+  // the rider can preview the connected experience.
+  const trainerOn = settings.hasTrainer || settings.demoMode;
+  const wearableOn = settings.hasWearable || settings.demoMode;
+
+  // Terrain + route length derived from the chosen workout (not the video).
+  const terrain = React.useMemo(() => {
+    const type = selected?.typeId ?? "endurance";
+    const dur = selected?.duration ?? 60;
+    const kmh = TYPE_SPEED[type] ?? 28;
+    const grade = TYPE_GRADE[type] ?? 2;
+    const km = Math.max(2, +((dur / 60) * kmh).toFixed(1));
+    const elev = Math.round((km * 1000 * grade) / 100);
+    return { km, grade, elev, isClimb: grade >= 3 };
+  }, [selected]);
+  // Progress along the route: from the trainer's distance when connected, else
+  // estimated on a time basis (elapsed / workout duration) so the terrain & route
+  // cards still advance through the session.
+  const totalSec = Math.max(60, (selected?.duration ?? 60) * 60);
+  const timeProgress = Math.min(1, telemetry.elapsed / totalSec);
+  const progress = trainerOn ? (terrain.km > 0 ? Math.min(1, telemetry.distance / terrain.km) : 0) : timeProgress;
+  const riddenKm = trainerOn ? Math.min(terrain.km, telemetry.distance) : +(timeProgress * terrain.km).toFixed(1);
+  const weather = useWeather();
+  const routeInfo = { title: activeRoute.title, place: activeRoute.place, km: terrain.km, elev: terrain.elev, grade: terrain.grade, isClimb: terrain.isClimb, tag: activeRoute.tag };
 
   // ---- Alberto's live AI coaching cues ----
   // Prefers the AI-generated cue; falls back to the local rule-based line while
@@ -395,24 +416,33 @@ export default function LiveWorkout() {
 
   const body = (
     <>
-      <WorkoutTopBar elapsed={fmt(telemetry.elapsed)} connectionState={connectionState} stale={stale} onPress={(m) => (m === "Settings" ? setShowSettings(true) : showToast(m))} routeName={routeInfo.title} riddenKm={riddenKm} totalKm={routeInfo.km} />
+      <AlbertoLiveCue message={liveCue} />
+      <WorkoutTopBar elapsed={fmt(telemetry.elapsed)} connectionState={connectionState} stale={stale} onPress={(m) => (m === "Settings" ? setShowSettings(true) : showToast(m))} routeName={routeInfo.title} riddenKm={riddenKm} totalKm={routeInfo.km} demoMode={settings.demoMode} onToggleDemo={() => setSetting("demoMode", !settings.demoMode)} />
 
       <View style={styles.bodyRow}>
         <View style={styles.leftBlock}>
           <View style={styles.innerRow}>
             <View style={[styles.leftCol, { width: leftW }]}>
-              <PowerCard power={telemetry.power} wkg={(telemetry.power / (getRiderProfile().weight_kg || 78)).toFixed(1)} connected={settings.hasTrainer} target={targetW} zoneLabel={activeSeg?.segment.zoneLabel} zoneIdx={activeSeg?.segment.zoneIdx} />
-              <HeartRateCard hr={telemetry.hr} connected={settings.hasWearable} />
-              <CadenceCard cadence={telemetry.cadence} connected={settings.hasTrainer} />
+              <PowerCard power={telemetry.power} wkg={(telemetry.power / (getRiderProfile().weight_kg || 78)).toFixed(1)} connected={trainerOn} target={targetW} zoneLabel={activeSeg?.segment.zoneLabel} zoneIdx={activeSeg?.segment.zoneIdx} />
+              <HeartRateCard hr={telemetry.hr} connected={wearableOn} />
+              <CadenceCard cadence={telemetry.cadence} connected={trainerOn} />
             </View>
             <View style={styles.centerCol} onLayout={onCenterLayout}>
               <WorkoutTimelineCard width={centerW} onPress={() => showToast("Workout timeline")} title={workoutTitle} color={workoutColor} profile={workoutProfile} step={stepLabel} timeLeft={timeLeftLabel} activeIndex={activeSeg?.index} />
               {expanded ? (
                 <VideoPlaceholder width={centerW} onRestore={() => setExpanded(false)} />
+              ) : virtualMode ? (
+                <View style={{ position: "relative" }}>
+                  <VirtualRoute width={centerW} height={Math.round(centerW * 0.5625)} speed={trainerOn ? telemetry.speed : 0} cadence={trainerOn ? telemetry.cadence : 88} gender={getRiderProfile().gender} paused={paused || !trainerOn} />
+                  <View style={styles.inlineRoutes} pointerEvents="box-none">
+                    <RoutesButton onPress={() => setVirtualMode(false)} testID="switch-video" label="Video" icon="videocam" />
+                  </View>
+                </View>
               ) : (
                 <RouteVideo source={activeRoute.url} title={`${activeRoute.title}${routeAuto ? " · Auto-matched" : activeRoute.id === lastRouteId ? " · Last ride" : ""}`} playing={!paused} muted width={centerW} onToggleExpand={() => setExpanded(true)} expanded={false}>
                   <View style={styles.inlineRoutes} pointerEvents="box-none">
                     <RoutesButton onPress={() => setShowRoutes(true)} testID="inline-routes" />
+                    <RoutesButton onPress={() => setVirtualMode(true)} testID="switch-virtual" label="Virtual" icon="bicycle" />
                   </View>
                 </RouteVideo>
               )}
@@ -420,13 +450,13 @@ export default function LiveWorkout() {
               <SafetyNote />
             </View>
           </View>
-          <RideSummaryStrip speed={String(telemetry.speed)} trainerConnected={settings.hasTrainer} />
+          <RideSummaryStrip speed={String(Math.round(telemetry.speed))} trainerConnected={trainerOn} riddenKm={riddenKm} totalKm={routeInfo.km} elevM={routeInfo.elev} progress={progress} temp={weather} />
         </View>
 
         <View style={[styles.rightCol, { width: rightW }]}>
-          <ClimbCard route={routeInfo} riddenKm={riddenKm} />
-          <RouteMapCard title={routeInfo.title} />
-          <WearableDataCard connected={settings.hasWearable} />
+          <ClimbCard route={routeInfo} riddenKm={riddenKm} progress={progress} />
+          <RouteMapCard title={routeInfo.title} progress={progress} riddenKm={riddenKm} totalKm={routeInfo.km} timeBased={!trainerOn} />
+          <WearableDataCard connected={wearableOn} />
         </View>
       </View>
 
@@ -460,8 +490,6 @@ export default function LiveWorkout() {
             {body}
           </ScrollView>
         )}
-
-        <AlbertoLiveCue message={liveCue} />
 
         <View style={styles.mediaBar} pointerEvents="box-none">
           <MusicButton musicOn={musicOn} onPress={() => setShowMusic(true)} />
@@ -528,8 +556,8 @@ export default function LiveWorkout() {
                 stale={stale}
                 paused={paused}
                 cue={liveCue}
-                trainerConnected={settings.hasTrainer}
-                wearableConnected={settings.hasWearable}
+                trainerConnected={trainerOn}
+                wearableConnected={wearableOn}
                 onPause={onPauseToggle}
                 onEnd={() => { setExpanded(false); router.replace("/summary"); }}
                 onOpenRoutes={() => setShowRoutes(true)}
