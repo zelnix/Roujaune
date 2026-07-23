@@ -70,6 +70,11 @@ export default function Dashboard() {
       router.push("/training");
       return;
     }
+    const routes: Record<string, string> = { calendar: "/calendar", routes: "/routes", progress: "/progress", wellness: "/wellness", community: "/community", connections: "/connections", settings: "/settings" };
+    if (routes[key]) {
+      router.push(routes[key] as any);
+      return;
+    }
     setActive(key);
     if (key !== "home") {
       const item = [...navItems, ...navFooter].find((n) => n.key === key);

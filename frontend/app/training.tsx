@@ -96,6 +96,11 @@ export default function TodaysTraining() {
       return;
     }
     if (key === "workouts") return; // already here
+    const routes: Record<string, string> = { calendar: "/calendar", routes: "/routes", progress: "/progress", wellness: "/wellness", community: "/community", connections: "/connections", settings: "/settings" };
+    if (routes[key]) {
+      router.push(routes[key] as any);
+      return;
+    }
     const item = [...navItems, ...navFooter].find((n) => n.key === key);
     showToast(`${item?.label ?? key}`);
   };

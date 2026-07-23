@@ -12,7 +12,7 @@ const logoIcon = require("../../assets/images/logo_glyph_t.png");
 function NavRow({ item, active, onPress }: { item: NavItem; active: boolean; onPress: () => void }) {
   return (
     <Touchable
-      testID={`nav-${item.key}`}
+      testID={`railnav-${item.key}`}
       onPress={onPress}
       scaleTo={0.94}
       lift={false}

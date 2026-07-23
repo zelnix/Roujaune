@@ -71,8 +71,9 @@ export function AppScaffold({
   const onSelect = (key: string) => {
     if (key === active) return;
     if (key === "training") markPlanSeen();
+    if (key === "workouts") { router.push("/workout"); return; }
     const to = ROUTE[key];
-    if (to) router.push(to as any);
+    if (to) router.replace(to as any);
     else showToast(`${key} — coming soon`);
   };
 

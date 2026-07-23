@@ -57,10 +57,10 @@ export default function TrainingPlanScreen() {
   const onSelectNav = (key: string) => {
     if (key === "home") { router.replace("/"); return; }
     if (key === "training") return;
-    if (key === "calendar") { router.push("/calendar"); return; }
+    if (key === "calendar") { router.replace("/calendar"); return; }
     if (key === "workouts") { router.push("/workout"); return; }
     const routes: Record<string, string> = { routes: "/routes", progress: "/progress", wellness: "/wellness", community: "/community", connections: "/connections", settings: "/settings" };
-    if (routes[key]) { router.push(routes[key] as any); return; }
+    if (routes[key]) { router.replace(routes[key] as any); return; }
     showToast(`${key.charAt(0).toUpperCase() + key.slice(1)} — coming soon`);
   };
 
