@@ -62,6 +62,8 @@ export default function TodaysTraining() {
   const nextPlanRide = (plan.workouts?.find((w) => !w.completed) ?? plan.workouts?.[0]) as any;
   const activeId = (paramId || nextPlanRide?.id) as string | undefined;
   const activeWorkout = getWorkout(activeId);
+  const activePlanRide = (plan.workouts?.find((w: any) => w.id === activeId)) as any;
+  const dateLabel = activePlanRide?.footer ?? (activeWorkout ? `${plan.title ?? "Training"} · ${activeWorkout.focus}` : "Today");
   const startRide = () => router.push(activeId ? ({ pathname: "/workout", params: { workoutId: activeId } } as any) : "/workout");
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
   const [leftW, setLeftW] = React.useState(560);
@@ -112,7 +114,7 @@ export default function TodaysTraining() {
                 <Text style={[styles.pageTitle, { fontSize: 30, marginTop: 2 }]}>Today&apos;s Training</Text>
                 <View style={styles.dateRow}>
                   <Ionicons name="calendar-outline" size={15} color={colors.textDim} />
-                  <Text style={styles.dateText}>Wednesday, 12 May 2025</Text>
+                  <Text style={styles.dateText}>{dateLabel}</Text>
                 </View>
                 <AlbertoTrainingCard width={mainWidth} onPress={() => showToast(`Message from ${persona.name}`)} />
               </View>
@@ -123,7 +125,7 @@ export default function TodaysTraining() {
                   <Text style={styles.pageTitle}>Today&apos;s Training</Text>
                   <View style={styles.dateRow}>
                     <Ionicons name="calendar-outline" size={15} color={colors.textDim} />
-                    <Text style={styles.dateText}>Wednesday, 12 May 2025</Text>
+                    <Text style={styles.dateText}>{dateLabel}</Text>
                   </View>
                 </View>
 

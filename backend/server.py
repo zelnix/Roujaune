@@ -1623,9 +1623,9 @@ def _ctr_calendar_week() -> dict:
             "day_name": spec["day_name"],
             "day_num": d.strftime("%-d %b").upper(),
             "focus": spec["focus"],
-            "cycling": spec.get("cycling"),
-            "fb50": spec.get("fb50"),
-            "wellness": spec.get("wellness"),
+            "cycling": dict(spec["cycling"]) if spec.get("cycling") else None,
+            "fb50": dict(spec["fb50"]) if spec.get("fb50") else None,
+            "wellness": dict(spec["wellness"]) if spec.get("wellness") else None,
             "readiness": {"score": 80, "status": "Good", "source": "Daily check-in", "metrics": [
                 {"key": "energy", "label": "Energy", "value": 80, "display": "Good"},
                 {"key": "soreness", "label": "Soreness", "value": 82, "display": "Low"},
