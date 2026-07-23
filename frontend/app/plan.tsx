@@ -96,10 +96,10 @@ export default function TrainingPlanScreen() {
 
   const hero = (
     <View style={styles.rowGap}>
-      <View style={{ flex: 1 }}><PlanHeroCard /></View>
-      <View style={styles.heroRight}>
+      <View style={styles.heroCard}><PlanHeroCard /></View>
+      <View style={styles.heroGoals}><PlanGoalsCard onEdit={() => setShowGoals(true)} /></View>
+      <View style={styles.heroCalendar}>
         <CalendarCard onToast={showToast} onOpenCalendar={() => router.push("/calendar")} />
-        <PlanGoalsCard onEdit={() => setShowGoals(true)} />
       </View>
     </View>
   );
@@ -220,7 +220,9 @@ const styles = StyleSheet.create({
   syncText: { color: C.dim, fontSize: 11, fontWeight: "600" },
   liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.green },
   rowGap: { flexDirection: "row", gap: 14, alignItems: "stretch" },
-  heroRight: { width: 440, gap: 14 },
+  heroCard: { flex: 1, minWidth: 200 },
+  heroGoals: { width: 286 },
+  heroCalendar: { width: 404 },
   toast: { position: "absolute", bottom: 30, alignSelf: "center", backgroundColor: "rgba(20,22,21,0.96)", borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 18 },
   toastText: { color: C.white, fontSize: 13, fontWeight: "600" },
 });
