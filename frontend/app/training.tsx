@@ -5,14 +5,12 @@ import { useRouter } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { Image } from "expo-image";
 
 import { colors, radius, spacing, shadow } from "@/src/theme";
 import { SideNavigation } from "@/src/components/SideNavigation";
 import { BrandHeader } from "@/src/components/BrandHeader";
-import { navItems, navFooter, brand } from "@/src/data";
+import { navItems, navFooter } from "@/src/data";
 import { useCoach } from "@/src/lib/coach-persona";
-import { GlassPill } from "@/src/components/ui";
 import {
   AlbertoTrainingCard,
   MainWorkoutCard,
@@ -43,31 +41,6 @@ function Toast({ message }: { message: { id: number; text: string } | null }) {
       <Ionicons name="checkmark-circle" size={18} color={colors.yellow} />
       <Text style={styles.toastText}>{message.text}</Text>
     </Animated.View>
-  );
-}
-
-function TopStatus({ onPress }: { onPress: (m: string) => void }) {
-  const persona = useCoach();
-  return (
-    <View style={styles.statusWrap}>
-      <View style={styles.statusRow}>
-        <GlassPill testID="flame-pill" onPress={() => onPress("12 day streak 🔥")}>
-          <Ionicons name="flame" size={16} color={colors.yellow} />
-          <Text style={styles.pillText}>{brand.flame}</Text>
-        </GlassPill>
-        <GlassPill testID="bell-pill" onPress={() => onPress("You have 3 notifications")}>
-          <Ionicons name="notifications" size={16} color="#fff" />
-          <View style={styles.badge}><Text style={styles.badgeText}>{brand.notifications}</Text></View>
-        </GlassPill>
-        <GlassPill testID="profile-pill" style={styles.avatar} onPress={() => onPress("Profile")}>
-          <Image source={persona.image} style={styles.avatarImg} contentFit="cover" contentPosition="top center" />
-        </GlassPill>
-      </View>
-      <View style={styles.scriptWrap}>
-        <Text style={styles.script}>{persona.name}</Text>
-        <Text style={styles.scriptSub}>Your Companion Coach</Text>
-      </View>
-    </View>
   );
 }
 
@@ -126,7 +99,6 @@ export default function TodaysTraining() {
               <View style={{ gap: spacing.sm }}>
                 <View style={styles.compactTopRow}>
                   <BrandHeader compact showDescriptor={false} />
-                  <TopStatus onPress={showToast} />
                 </View>
                 <Text style={[styles.pageTitle, { fontSize: 30, marginTop: 2 }]}>Today&apos;s Training</Text>
                 <View style={styles.dateRow}>
@@ -147,10 +119,6 @@ export default function TodaysTraining() {
                 </View>
 
                 <AlbertoTrainingCard width={400} onPress={() => showToast(`Message from ${persona.name}`)} />
-
-                <View style={{ width: rightColW, alignItems: "flex-end" }}>
-                  <TopStatus onPress={showToast} />
-                </View>
               </View>
             )}
 

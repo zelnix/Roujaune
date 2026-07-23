@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 19 — Profile/Home/Connections/Settings enhancements verified end-to-end. Backend 9/9 pytest PASSED (/app/backend/tests/test_iter19_profile_progress.py): GET /api/rider/season with days=0/7/30/90/365 returns {rides,distance_km,elevation_m,hours,streak} all zeros (no 500s); GET /api/rider/achievements returns {achievements: []}; GET /api/connections lists Strava, Garmin Connect, Apple Health, Google Fit, Samsung Health, Harmony Wellness AND does NOT include TrainingPeaks; GET/PUT /api/rider/profile round-trips city/region/country. Frontend (landscape tablet 1280x800): Home shows metric strip WEEKLY RIDES 0 / TRAINING TIME 0h 0m / DISTANCE 0 km / ELEVATION 0 m / FTP 287 W / READINESS 82% (matches spec, zeros expected). Top-right of hero card has flame(12), bell(3), avatar cluster — flame opens 'Your Progress' modal with 7d/30d/90d/12mo pills (zeros), bell opens Notifications modal (4 unread), tapping a row opens a detail view with 'Mark as unread'. Profile screen: NO avatar/flame/bell in the header top-right; identity card shows FTP W accent, location 'Melbourne, Victoria, Australia'; YOUR PROGRESS card has 7 days/30 days/90 days/12 months pills that re-fetch on tap (verified 30 days pill selected); Achievements shows the empty state 'No achievements yet' as expected. Edit modal: has FTP (W) field alongside Weight and Age (testID input-ftp confirmed present) — modal opens with fields prefilled from the persisted rider profile. Connections screen: DEVICES & SENSORS shows Smart Trainer + Heart Rate Monitor, both with Connect button (state 'Not connected' honoured); CONNECTED SERVICES lists Strava/Garmin/Apple/Google Fit/Samsung Health/Harmony Wellness — TrainingPeaks not present. Settings screen: 'RIDER PROFILE' card removed (0 occurrences); coach-select + COACH PREFERENCE + VOICE FINE-TUNING + POWER PROFILE + TRAINING PREFERENCES render cleanly. Other screens (/calendar, /workouts, /workout-list, /training, /plan) render without red screens and do NOT have any hero-flame/hero-bell/hero-avatar cluster in the top-right.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "workout deprecated style warnings (carry-over)", "issue": "Non-blocking console warnings: 'textShadow*' style props are deprecated (use 'textShadow' object). Emitted from workout module. Reference: /app/frontend/app/workout.tsx / /app/frontend/src/components/workout.tsx"}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter19_profile_progress.py",
+    "/app/test_reports/pytest/pytest_results.xml",
+    "/app/test_reports/iteration_19.json"
+  ],
+  "action_items": [
+    "None blocking. Optional carry-over: migrate deprecated 'textShadow*' props on /workout to silence RN Web console warnings.",
+    "Observation (not a bug per spec): Profile → Edit modal → changing FTP and Save updates the FTP shown in the identity card immediately (screenshot pre-edit already showed 255 W from a prior test run — the value is persisted in local settings across reloads). This is correct behaviour given the spec ('saving persists (FTP shows in identity stats)')."
+  ],
+  "critical_code_review_comments": [
+    "server.py get_rider_season: uses ISO string comparison for created_at cutoff — works because ride_history stores now_iso() UTC ISO strings. Safe for the currently-empty history.",
+    "server.py get_connections: services list matches the spec exactly (Strava/Garmin Connect/Apple Health/Google Fit/Samsung Health/Harmony Wellness); TrainingPeaks is not present. Icons use ionicons names — 'logo-buffer' for Strava is a placeholder; consider a Strava-branded asset later.",
+    "frontend/app/profile.tsx renders locationText from profile.city/region/country with a location icon and shows an FTP W accent stat using settings.ftp; achievements list uses the hook return, defaults to [] which renders the empty state. testIDs edit-profile, input-ftp, period-{days} are all present as expected by the spec.",
+    "frontend/app/connections.tsx: devices are driven by useSettings().hasTrainer / hasWearable and update via setSetting on tap — local-state-only as documented in the mocked_apis list. Toggles for connected services use svc local state and don't call any auth backend.",
+    "frontend/src/components/ProgressPanel.tsx: pill highlight uses idx state; useRiderSeason(days) refetches on change. Renders zero values gracefully when season is undefined by showing '—'."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter19_profile_progress.py",
+    "/app/test_reports/iteration_19.json",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "success_rate": {"backend": "100% (9/9 pytest)", "frontend": "100% of requested flows (home metrics, flame→progress modal, bell→notifications→detail with Mark as unread, profile FTP edit + location, achievements empty state, connections devices+services contract, settings without RIDER PROFILE, other screens clean)"},
+  "seed_data_creation": "PUT /api/rider/profile called with TEST_ prefixed name + Melbourne/Victoria/Australia during backend test; this persists into the rider_profile collection (id='me'). Non-destructive to any other data. ride_history remains empty as designed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend tests for the profile/progress/connections contract live in /app/backend/tests/test_iter19_profile_progress.py — reuse for regression. Frontend flows confirmed at landscape tablet viewport 1280x800. Top-right cluster (flame=streak, bell=notifications, avatar) is now ONLY on the home hero card; all other screens should keep their header clear. Notifications modal testIDs: notifications-modal, notifications-close, notification-{1..4}. Profile edit modal testIDs: edit-profile, input-name/weight/age/ftp, gender-{male,female,other}, input-city/region/country, save-edit, cancel-edit. Progress pills: period-7/30/90/365. Ride history was intentionally reset, so ANY new session inserted by /workouts/summarize will make season / achievements start reporting non-zero — worth remembering if flake appears.",
+  "rca_of_issue": "N/A — no bugs found."
+}

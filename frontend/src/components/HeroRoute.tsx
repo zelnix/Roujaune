@@ -6,29 +6,34 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing } from "../theme";
 import { brand, heroRoute } from "../data";
 import { useCoach } from "../lib/coach-persona";
+import { useRiderProfile } from "../lib/rider-profile";
 import { BrandHeader } from "./BrandHeader";
 import { AlbertoCoachCard } from "./AlbertoCoachCard";
 import { GlassPill } from "./ui";
 
 const heroImg = require("../../assets/images/hero_cyclist_b2.jpg");
 
-function StatusBar({ onPress, onProfile }: { onPress: (m: string) => void; onProfile?: () => void }) {
+function StatusBar({ onFlame, onNotifications, onProfile, avatar }: { onFlame: () => void; onNotifications: () => void; onProfile?: () => void; avatar?: string | null }) {
   return (
     <View style={styles.statusRow}>
-      <GlassPill testID="flame-pill" onPress={() => onPress("12 day streak 🔥")}>
+      <GlassPill testID="flame-pill" onPress={onFlame}>
         <Ionicons name="flame" size={16} color={colors.yellow} />
         <Text style={styles.pillText}>{brand.flame}</Text>
       </GlassPill>
 
-      <GlassPill testID="bell-pill" onPress={() => onPress("You have 3 notifications")}>
+      <GlassPill testID="bell-pill" onPress={onNotifications}>
         <Ionicons name="notifications" size={16} color="#fff" />
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{brand.notifications}</Text>
         </View>
       </GlassPill>
 
-      <GlassPill testID="profile-pill" style={styles.avatar} onPress={() => (onProfile ? onProfile() : onPress("Profile"))}>
-        <Ionicons name="person" size={18} color="#fff" />
+      <GlassPill testID="profile-pill" style={styles.avatar} onPress={onProfile}>
+        {avatar ? (
+          <Image source={{ uri: avatar }} style={styles.avatarImg} contentFit="cover" contentPosition="top center" />
+        ) : (
+          <Ionicons name="person" size={18} color="#fff" />
+        )}
       </GlassPill>
     </View>
   );
@@ -38,20 +43,23 @@ export function HeroRoute({
   width,
   height,
   onStart,
-  onToast,
   onMessage,
   onProfile,
+  onFlame,
+  onNotifications,
   compact = false,
 }: {
   width: number;
   height: number;
   onStart: () => void;
-  onToast: (m: string) => void;
   onMessage?: () => void;
   onProfile?: () => void;
+  onFlame: () => void;
+  onNotifications: () => void;
   compact?: boolean;
 }) {
   const persona = useCoach();
+  const { avatar } = useRiderProfile();
   return (
     <View style={[styles.wrap, { height }]} testID="hero-route">
       <Image
@@ -80,7 +88,7 @@ export function HeroRoute({
       </View>
 
       {/* top-right status */}
-      <StatusBar onPress={onToast} onProfile={onProfile} />
+      <StatusBar onFlame={onFlame} onNotifications={onNotifications} onProfile={onProfile} avatar={avatar} />
 
       {/* right: Alberto signature + coach */}
       <View style={[styles.signatureArea, compact && { top: "26%" }]}>

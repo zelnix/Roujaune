@@ -104,19 +104,37 @@ export function useWeather() {
   return weather;
 }
 
-export function useRiderSeason() {
-  const [season, setSeason] = useState<SeasonStats | null>(null);
+export type Achievement = { icon: string; label: string; sub: string; color: string };
+
+export function useRiderAchievements() {
+  const [list, setList] = useState<Achievement[] | null>(null);
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
-        const res = await fetch(`${base()}/api/rider/season`);
+        const res = await fetch(`${base()}/api/rider/achievements`);
+        if (res.ok && alive) { const j = await res.json(); setList(j.achievements ?? []); }
+      } catch { /* leave null */ }
+    })();
+    return () => { alive = false; };
+  }, []);
+  return list;
+}
+
+export function useRiderSeason(days = 0) {
+  const [season, setSeason] = useState<SeasonStats | null>(null);
+  useEffect(() => {
+    let alive = true;
+    setSeason(null);
+    (async () => {
+      try {
+        const res = await fetch(`${base()}/api/rider/season?days=${days}`);
         if (res.ok && alive) setSeason(await res.json());
       } catch {
         /* leave null → screen shows placeholders */
       }
     })();
     return () => { alive = false; };
-  }, []);
+  }, [days]);
   return season;
 }

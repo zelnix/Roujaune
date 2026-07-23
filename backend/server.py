@@ -618,18 +618,23 @@ async def get_weather(city: str = "", region: str = "", country: str = ""):
 
 
 @api_router.get("/rider/season")
-async def get_rider_season():
-    """Aggregate the rider's real logged sessions for the Profile screen."""
-    rides = await db.ride_history.find().to_list(length=2000)
+async def get_rider_season(days: int = 0):
+    """Aggregate the rider's real logged sessions for the Profile screen.
+    Optional `days` limits to rides within the last N days (0 = all-time)."""
+    from datetime import date, timedelta, datetime, timezone
+    query: dict = {}
+    if days and days > 0:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        query = {"created_at": {"$gte": cutoff}}
+    rides = await db.ride_history.find(query).to_list(length=5000)
     count = len(rides)
     dist = sum((r.get("distance_km") or 0) for r in rides)
     elev = sum((r.get("elevation_m") or 0) for r in rides)
     secs = sum((r.get("duration_sec") or 0) for r in rides)
-    days = {str(r.get("created_at"))[:10] for r in rides if r.get("created_at")}
-    from datetime import date, timedelta
+    ride_days = {str(r.get("created_at"))[:10] for r in rides if r.get("created_at")}
     streak = 0
     d = date.today()
-    while d.isoformat() in days:
+    while d.isoformat() in ride_days:
         streak += 1
         d -= timedelta(days=1)
     return {
@@ -639,6 +644,43 @@ async def get_rider_season():
         "hours": round(secs / 3600, 1),
         "streak": streak,
     }
+
+
+@api_router.get("/rider/achievements")
+async def get_rider_achievements():
+    """Compute unlocked achievement badges from the rider's real ride history."""
+    rides = await db.ride_history.find().to_list(length=5000)
+    if not rides:
+        return {"achievements": []}
+    total_dist = sum((r.get("distance_km") or 0) for r in rides)
+    total_elev = sum((r.get("elevation_m") or 0) for r in rides)
+    max_dist = max((r.get("distance_km") or 0) for r in rides)
+    max_elev = max((r.get("elevation_m") or 0) for r in rides)
+    count = len(rides)
+    from datetime import date, timedelta
+    ride_days = {str(r.get("created_at"))[:10] for r in rides if r.get("created_at")}
+    streak = 0
+    d = date.today()
+    while d.isoformat() in ride_days:
+        streak += 1
+        d -= timedelta(days=1)
+
+    unlocked = []
+
+    def add(cond, icon, label, sub, color):
+        if cond:
+            unlocked.append({"icon": icon, "label": label, "sub": sub, "color": color})
+
+    add(count >= 1, "bicycle", "First Ride", "Your journey begins", "#40A9C6")
+    add(max_dist >= 100, "medal", "Century Club", "100 km in a single ride", "#40A9C6")
+    add(max_elev >= 1000, "trending-up", "Big Climber", "1,000 m in a single ride", "#9BD84B")
+    add(total_dist >= 500, "navigate", "500 km Logged", f"{round(total_dist)} km total", "#E8A33C")
+    add(total_dist >= 1000, "trophy", "1,000 km Club", f"{round(total_dist)} km total", "#FFC20A")
+    add(streak >= 3, "flame", "3-Day Streak", "Consistency building", "#E8631C")
+    add(streak >= 7, "flame", "7-Day Streak", "On fire this week", "#C91727")
+    add(total_elev >= 8848, "flag", "Everest Challenge", "8,848 m climbed", "#FFC20A")
+    return {"achievements": unlocked}
+
 
 
 async def _build_rider_context(plan_id: str = "build-and-climb") -> str:
@@ -1638,8 +1680,9 @@ CONNECTIONS_DATA = {
         {"id": "strava", "name": "Strava", "detail": "Auto-sync activities", "connected": True, "icon": "logo-buffer", "color": "orange"},
         {"id": "garmin", "name": "Garmin Connect", "detail": "Readiness & sleep", "connected": True, "icon": "watch-outline", "color": "blue"},
         {"id": "apple", "name": "Apple Health", "detail": "HRV, resting HR", "connected": True, "icon": "heart-circle-outline", "color": "rouge"},
+        {"id": "googlefit", "name": "Google Fit", "detail": "Steps, heart points & activity", "connected": False, "icon": "fitness-outline", "color": "green"},
+        {"id": "samsung", "name": "Samsung Health", "detail": "Heart rate, sleep & steps", "connected": False, "icon": "watch-outline", "color": "blue"},
         {"id": "wellness", "name": "Harmony Wellness", "detail": "FB50 & Peaceful Companion", "connected": True, "icon": "flower-outline", "color": "purple"},
-        {"id": "trainingpeaks", "name": "TrainingPeaks", "detail": "Export workouts", "connected": False, "icon": "trending-up-outline", "color": "dim"},
     ],
 }
 

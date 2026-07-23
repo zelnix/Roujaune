@@ -9,7 +9,6 @@ import { Image } from "expo-image";
 import Svg, { Rect } from "react-native-svg";
 
 import { CC } from "@/src/components/calendar";
-import { TopStatus } from "@/src/components/plan";
 import { SideNavigation } from "@/src/components/SideNavigation";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
 import { useCoach } from "@/src/lib/coach-persona";
@@ -195,7 +194,6 @@ export default function WorkoutsScreen() {
                 <Text style={s.title}>Workouts</Text>
                 <Text style={s.subtitle}>Choose your workout. Train with purpose. Ride stronger.</Text>
               </View>
-              <TopStatus persona={persona} onPress={showToast} />
             </View>
 
             {/* tabs */}

@@ -101,3 +101,153 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "ROUJAUNE cycling app — fork session: multiple profile/home/audio/connections enhancements."
+
+backend:
+  - task: "GET /api/rider/season?days=N — period-filtered aggregates"
+    implemented: true
+    working: "NA"
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Added optional days query param filtering ride_history by created_at within last N days. days=0 = all-time. ride_history was cleared (reset), so expect zeros currently."
+  - task: "GET /api/rider/achievements — auto-unlock badges from ride history"
+    implemented: true
+    working: "NA"
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Computes unlocked badges (First Ride, Century Club, Big Climber, 500/1000 km, 3/7-day streak, Everest) from ride_history aggregates. Returns [] when no rides."
+  - task: "GET /api/connections — services updated (Google Fit + Samsung Health added, TrainingPeaks removed)"
+    implemented: true
+    working: "NA"
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Services list now: Strava, Garmin, Apple Health, Google Fit, Samsung Health, Harmony Wellness. TrainingPeaks removed. devices no longer served (frontend uses settings)."
+
+frontend:
+  - task: "Profile: YOUR PROGRESS card with period pills (7/30/90/365) + reusable ProgressPanel"
+    implemented: true
+    working: "NA"
+    file: "frontend/app/profile.tsx, frontend/src/components/ProgressPanel.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Renamed THIS SEASON -> YOUR PROGRESS; horizontally scrollable period pills; stats refetch per period."
+  - task: "Profile: edit FTP + show regional details; avatar/flame/bell removed from top"
+    implemented: true
+    working: "NA"
+    file: "frontend/app/profile.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "FTP field added to edit modal (persists to settings.ftp, disables ftpAuto). Location line shown. TopStatus fully removed on profile."
+  - task: "Profile: achievements auto-unlock from backend"
+    implemented: true
+    working: "NA"
+    file: "frontend/app/profile.tsx, frontend/src/lib/rider-profile.ts"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "useRiderAchievements() fetches /api/rider/achievements; empty state shown when none."
+  - task: "Home: metric strip real weekly data (rides/time/distance/elevation) + FTP"
+    implemented: true
+    working: "NA"
+    file: "frontend/src/components/MetricSummaryStrip.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Fetches /api/rider/season?days=7 + settings.ftp. Verified rendering (all 0 after reset)."
+  - task: "Home: flame->progress modal, bell->notifications (tap-to-read, mark read/unread), avatar shows user avatar"
+    implemented: true
+    working: "NA"
+    file: "frontend/app/index.tsx, frontend/src/components/HeroRoute.tsx, frontend/src/components/NotificationsModal.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Smoke-tested via screenshot script: all 3 flows opened. Avatar falls back to person icon when none uploaded."
+  - task: "Workout: track control moved to Audio panel; now-playing pills removed from media bar + HUD; music random rotation"
+    implemented: true
+    working: "NA"
+    file: "frontend/src/hooks/useWorkoutAudio.ts, frontend/src/components/workout.tsx, frontend/app/workout.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "10 named tracks, random shuffle; Skip control now in MusicPanel only. Audio playback itself only verifiable on device/Expo Go."
+  - task: "TopStatus (avatar/flame/bell) removed from all non-home screens"
+    implemented: true
+    working: "NA"
+    file: "frontend/src/components/app-scaffold.tsx, plan.tsx, calendar.tsx, workouts.tsx, workout-list.tsx, training.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Removed from AppScaffold + all custom-header screens. Home retains it."
+  - task: "Settings: Rider profile card removed; Connections: real device state from settings"
+    implemented: true
+    working: "NA"
+    file: "frontend/app/settings.tsx, frontend/app/connections.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Settings rider profile card removed. Connections devices now reflect settings.hasTrainer/hasWearable with Connect/Disconnect."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.1"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "GET /api/rider/season?days=N — period-filtered aggregates"
+    - "GET /api/rider/achievements — auto-unlock badges from ride history"
+    - "Profile: YOUR PROGRESS card with period pills + reusable ProgressPanel"
+    - "Home: flame->progress modal, bell->notifications, avatar"
+    - "Profile: edit FTP + regional details"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+    -agent: "main"
+    -comment: "Large fork batch complete. Please test backend endpoints (season with days param incl 7/30/90/365, achievements, connections services) and frontend flows (profile YOUR PROGRESS pills switch period + refetch, FTP edit persists, home flame/bell/avatar, notifications read/unread, connections connect/disconnect reflecting live-ride state). ride_history was intentionally reset to empty so season/achievements return zeros/[]. Do NOT test actual OAuth linking for services (needs keys + native build)."
+
+#====================================================================================================

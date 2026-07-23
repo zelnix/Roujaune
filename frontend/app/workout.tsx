@@ -493,22 +493,6 @@ export default function LiveWorkout() {
 
         <View style={styles.mediaBar} pointerEvents="box-none">
           <MusicButton musicOn={musicOn} onPress={() => setShowMusic(true)} />
-          {musicOn && (
-            <View style={styles.nowPlaying} testID="now-playing">
-              <Ionicons name="musical-notes" size={14} color={colors.yellow} />
-              <Text style={styles.nowPlayingText} numberOfLines={1}>{trackName}</Text>
-              <Pressable
-                testID="skip-track"
-                onPress={() => { nextTrack(); showToast("Skipped to next track"); }}
-                hitSlop={10}
-                accessibilityRole="button"
-                accessibilityLabel="Skip to next track"
-                style={styles.skipBtn}
-              >
-                <Ionicons name="play-skip-forward" size={16} color={colors.white} />
-              </Pressable>
-            </View>
-          )}
           <CastButton onPress={() => setShowCast(true)} />
         </View>
 
@@ -577,9 +561,6 @@ export default function LiveWorkout() {
                 onPause={onPauseToggle}
                 onEnd={() => { setExpanded(false); router.replace("/summary"); }}
                 onOpenRoutes={() => setShowRoutes(true)}
-                musicOn={musicOn}
-                trackName={trackName}
-                onSkip={() => { nextTrack(); showToast("Skipped to next track"); }}
               />
             )}
             <Pressable
@@ -638,6 +619,8 @@ export default function LiveWorkout() {
           coach={coach}
           chooseCoach={chooseCoach}
           coachName={coachName}
+          trackName={trackName}
+          onSkip={() => { nextTrack(); showToast("Skipped to next track"); }}
           onClose={() => setShowMusic(false)}
         />
       )}
@@ -657,9 +640,6 @@ const styles = StyleSheet.create({
   fitOuter: { flex: 1, alignItems: "center", justifyContent: "center" },
   fitInner: { width: DESIGN_W },
   mediaBar: { position: "absolute", bottom: 24, left: 20, flexDirection: "row", alignItems: "center", gap: 10, zIndex: 20 },
-  nowPlaying: { flexDirection: "row", alignItems: "center", gap: 8, maxWidth: 200, backgroundColor: "rgba(20,18,16,0.92)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingLeft: 12, paddingRight: 6, paddingVertical: 6 },
-  nowPlayingText: { color: colors.white, fontSize: 12.5, fontWeight: "700", flexShrink: 1 },
-  skipBtn: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.06)" },
   immersive: { ...StyleSheet.absoluteFillObject, backgroundColor: "#000", zIndex: 50 },
   hudEye: { position: "absolute", top: 12, left: 12, width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center", zIndex: 5 },
   hudCast: { position: "absolute", top: 56, left: 12, width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center", zIndex: 5 },

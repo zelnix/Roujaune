@@ -11,7 +11,7 @@ import { usePlan, useAdaptation, useAdaptiveTargets } from "@/src/lib/plan";
 import { markPlanSeen } from "@/src/lib/plan-badge";
 import {
   C, PLAN_OPTIONS, PlanPhase, KeyWorkout, PlanProvider,
-  PlanHeader, TopStatus, PlanSelector, PlanTabs,
+  PlanHeader, PlanSelector, PlanTabs,
   PlanHeroCard, PlanGoalsCard, CurrentPhaseRoadmap, WeeklyLoadCard,
   KeyWorkoutsCard, AlbertoAdaptationsCard, AdaptiveTargetsCard, PlanProgressStrip, AlbertoTipFooter,
 } from "@/src/components/plan";
@@ -136,7 +136,6 @@ export default function TrainingPlanScreen() {
           <PlanTabs active={tab} onChange={setTab} />
         </View>
         <View style={styles.headerRight}>
-          <TopStatus persona={persona} onPress={showToast} />
           <Pressable
             testID="message-coach"
             onPress={() => setShowChat(true)}

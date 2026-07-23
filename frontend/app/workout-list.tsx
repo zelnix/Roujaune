@@ -7,7 +7,6 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import { CC } from "@/src/components/calendar";
-import { TopStatus } from "@/src/components/plan";
 import { SideNavigation } from "@/src/components/SideNavigation";
 import { useCoach } from "@/src/lib/coach-persona";
 import { markPlanSeen } from "@/src/lib/plan-badge";
@@ -169,7 +168,6 @@ export default function WorkoutListScreen() {
                 <Text style={s.title}>{title}</Text>
                 <Text style={s.subtitle}>{filtered.length} session{filtered.length === 1 ? "" : "s"} · pick one and launch it straight away.</Text>
               </View>
-              <TopStatus persona={persona} onPress={showToast} />
             </View>
 
             {/* filter bar */}

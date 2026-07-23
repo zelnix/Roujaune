@@ -6,9 +6,10 @@ import * as ImagePicker from "expo-image-picker";
 
 import { AppScaffold, Card, SectionTitle } from "@/src/components/app-scaffold";
 import { CC } from "@/src/components/calendar";
+import { ProgressPanel } from "@/src/components/ProgressPanel";
 import { useSettings } from "@/src/lib/settings";
 import { useCoach } from "@/src/lib/coach-persona";
-import { useRiderProfile, useRiderSeason, RiderProfile } from "@/src/lib/rider-profile";
+import { useRiderProfile, useRiderAchievements, RiderProfile } from "@/src/lib/rider-profile";
 
 const riderImg = require("../assets/images/hero_cyclist_b2.jpg");
 
@@ -27,26 +28,13 @@ function Stat({ v, l, accent }: { v: string; l: string; accent?: string }) {
   );
 }
 
-function SeasonRow({ icon, label, value, color }: { icon: any; label: string; value: string; color: string }) {
-  return (
-    <View style={s.seasonRow}>
-      <View style={[s.seasonIcon, { borderColor: color }]}>
-        <Ionicons name={icon} size={16} color={color} />
-      </View>
-      <Text style={s.seasonLabel}>{label}</Text>
-      <View style={{ flex: 1 }} />
-      <Text style={s.seasonValue}>{value}</Text>
-    </View>
-  );
-}
-
 const ACHIEVEMENTS: { icon: any; label: string; sub: string; color: string }[] = [];
 
 export default function ProfileScreen() {
-  const { settings } = useSettings();
+  const { settings, setSetting } = useSettings();
   const persona = useCoach();
   const { profile, avatar, update, setAvatar } = useRiderProfile();
-  const season = useRiderSeason();
+  const achievements = useRiderAchievements() ?? ACHIEVEMENTS;
   const { width } = useWindowDimensions();
   const twoCol = width >= 900;
 
@@ -86,7 +74,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <AppScaffold active="profile" title="Profile" subtitle="Your rider identity, season progress and achievements." minimalStatus>
+    <AppScaffold active="profile" title="Profile" subtitle="Your rider identity, season progress and achievements.">
       <View style={[s.row, !twoCol && { flexDirection: "column" }]}>
         {/* Rider identity */}
         <Card testID="profile-identity" style={{ flex: 1 }}>
@@ -135,21 +123,17 @@ export default function ProfileScreen() {
           </Text>
         </Card>
 
-        {/* Season snapshot (real logged sessions) */}
+        {/* Progress snapshot (real logged sessions) */}
         <Card testID="profile-season" style={twoCol ? { width: 360 } : undefined}>
-          <SectionTitle label="THIS SEASON" color={CC.rouge} />
-          <SeasonRow icon="bicycle" label="Rides completed" value={season ? `${season.rides}` : "—"} color={CC.rouge} />
-          <SeasonRow icon="navigate" label="Distance" value={season ? `${season.distance_km.toLocaleString()} km` : "—"} color={CC.yellow} />
-          <SeasonRow icon="trending-up" label="Elevation" value={season ? `${season.elevation_m.toLocaleString()} m` : "—"} color={CC.green} />
-          <SeasonRow icon="time" label="Time in the saddle" value={season ? `${season.hours} h` : "—"} color="#40A9C6" />
-          <SeasonRow icon="flame" label="Current streak" value={season ? `${season.streak} ${season.streak === 1 ? "day" : "days"}` : "—"} color="#E8631C" />
+          <SectionTitle label="YOUR PROGRESS" color={CC.rouge} />
+          <ProgressPanel />
         </Card>
       </View>
 
       {/* Achievements */}
       <Card testID="profile-achievements">
         <SectionTitle label="ACHIEVEMENTS" />
-        {ACHIEVEMENTS.length === 0 ? (
+        {achievements.length === 0 ? (
           <View style={s.achEmpty}>
             <Ionicons name="trophy-outline" size={24} color={CC.dim} />
             <Text style={s.achEmptyTitle}>No achievements yet</Text>
@@ -157,7 +141,7 @@ export default function ProfileScreen() {
           </View>
         ) : (
           <View style={s.achGrid}>
-            {ACHIEVEMENTS.map((a) => (
+            {achievements.map((a) => (
               <View key={a.label} style={s.achCard}>
                 <View style={[s.achIcon, { backgroundColor: a.color + "22", borderColor: a.color }]}>
                   <Ionicons name={a.icon} size={20} color={a.color} />
@@ -170,15 +154,16 @@ export default function ProfileScreen() {
         )}
       </Card>
 
-      <EditModal visible={editing} profile={profile} onClose={() => setEditing(false)} onSave={(p) => { update(p); setEditing(false); }} />
+      <EditModal visible={editing} profile={profile} ftp={settings.ftp} onClose={() => setEditing(false)} onSave={(p, ftp) => { update(p); setSetting("ftp", ftp); setSetting("ftpAuto", false); setEditing(false); }} />
     </AppScaffold>
   );
 }
 
-function EditModal({ visible, profile, onClose, onSave }: { visible: boolean; profile: RiderProfile; onClose: () => void; onSave: (p: Partial<RiderProfile>) => void }) {
+function EditModal({ visible, profile, ftp: ftpInit, onClose, onSave }: { visible: boolean; profile: RiderProfile; ftp: number; onClose: () => void; onSave: (p: Partial<RiderProfile>, ftp: number) => void }) {
   const [name, setName] = React.useState(profile.name);
   const [weight, setWeight] = React.useState(String(Math.round(profile.weight_kg)));
   const [age, setAge] = React.useState(String(profile.age));
+  const [ftp, setFtp] = React.useState(String(ftpInit));
   const [gender, setGender] = React.useState(profile.gender);
   const [city, setCity] = React.useState(profile.city);
   const [region, setRegion] = React.useState(profile.region);
@@ -189,12 +174,13 @@ function EditModal({ visible, profile, onClose, onSave }: { visible: boolean; pr
       setName(profile.name);
       setWeight(String(Math.round(profile.weight_kg)));
       setAge(String(profile.age));
+      setFtp(String(ftpInit));
       setGender(profile.gender);
       setCity(profile.city);
       setRegion(profile.region);
       setCountry(profile.country);
     }
-  }, [visible, profile]);
+  }, [visible, profile, ftpInit]);
 
   const save = () => {
     onSave({
@@ -205,7 +191,7 @@ function EditModal({ visible, profile, onClose, onSave }: { visible: boolean; pr
       city: city.trim(),
       region: region.trim(),
       country: country.trim(),
-    });
+    }, Math.max(50, Math.min(600, parseInt(ftp, 10) || 200)));
   };
 
   return (
@@ -227,7 +213,12 @@ function EditModal({ visible, profile, onClose, onSave }: { visible: boolean; pr
               <Text style={s.fieldLabel}>Age</Text>
               <TextInput testID="input-age" value={age} onChangeText={setAge} keyboardType="number-pad" maxLength={3} style={s.input} />
             </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.fieldLabel}>FTP (W)</Text>
+              <TextInput testID="input-ftp" value={ftp} onChangeText={setFtp} keyboardType="number-pad" maxLength={3} style={s.input} />
+            </View>
           </View>
+          <Text style={s.locHint}>Editing FTP turns off auto-sync so your value sticks.</Text>
 
           <Text style={s.fieldLabel}>Gender</Text>
           <View style={s.genderRow}>
@@ -299,6 +290,11 @@ const s = StyleSheet.create({
 
   seasonRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 9 },
   seasonIcon: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.03)" },
+  periodRow: { gap: 8, paddingBottom: 12 },
+  periodPill: { borderWidth: 1, borderColor: CC.border, borderRadius: 999, paddingVertical: 7, paddingHorizontal: 14, backgroundColor: "rgba(255,255,255,0.03)", justifyContent: "center" },
+  periodPillOn: { backgroundColor: CC.rouge, borderColor: CC.rouge },
+  periodText: { color: CC.white, fontSize: 12.5, fontWeight: "700" },
+  periodTextOn: { color: "#fff" },
   seasonLabel: { color: CC.white, fontSize: 14, fontWeight: "600" },
   seasonValue: { color: CC.white, fontSize: 15, fontWeight: "800" },
 

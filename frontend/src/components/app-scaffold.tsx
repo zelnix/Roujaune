@@ -6,9 +6,7 @@ import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
-import { useCoach } from "../lib/coach-persona";
 import { markPlanSeen } from "../lib/plan-badge";
-import { TopStatus } from "./plan";
 import { SideNavigation } from "./SideNavigation";
 import { CC } from "./calendar";
 
@@ -57,13 +55,12 @@ function Toast({ message }: { message: { id: number; text: string } | null }) {
 }
 
 export function AppScaffold({
-  active, title, subtitle, headerRight, minimalStatus, children,
+  active, title, subtitle, headerRight, children,
 }: {
   active: string; title: string; subtitle: string;
-  headerRight?: React.ReactNode; minimalStatus?: boolean; children: React.ReactNode;
+  headerRight?: React.ReactNode; children: React.ReactNode;
 }) {
   const router = useRouter();
-  const persona = useCoach();
   const { width } = useWindowDimensions();
   const compact = width < 720;
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
@@ -99,7 +96,6 @@ export function AppScaffold({
               </View>
               <View style={styles.headerRight}>
                 {headerRight}
-                {!minimalStatus && <TopStatus persona={persona} onPress={showToast} />}
               </View>
             </View>
             {children}

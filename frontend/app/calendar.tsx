@@ -13,7 +13,6 @@ import { markPlanSeen } from "@/src/lib/plan-badge";
 import {
   useCalendarWeek, moveSession, requestAlbertoReview, CalendarDay, SessionType, FILTERS,
 } from "@/src/lib/calendar";
-import { TopStatus } from "@/src/components/plan";
 import { SideNavigation } from "@/src/components/SideNavigation";
 import {
   CC, DateControls, RowLabel, DayHeader, FocusCell, TrainingSessionCard, FB50SessionCard,
@@ -154,7 +153,6 @@ export default function CalendarScreen() {
                 <Text style={styles.title}>Calendar</Text>
                 <Text style={styles.subtitle}>Plan your week. Execute your day.</Text>
               </View>
-              <TopStatus persona={persona} onPress={showToast} />
             </View>
 
             <DateControls

@@ -64,26 +64,6 @@ export default function SettingsScreen() {
   return (
     <AppScaffold active="settings" title="Settings" subtitle="Your profile, coach and training preferences.">
       <View style={s.row}>
-        <Card testID="rider-profile" style={{ flex: 1 }}>
-          <SectionTitle label="RIDER PROFILE" />
-          <View style={s.profRow}>
-            <View style={s.avatar}><Ionicons name="person" size={26} color={CC.dim} /></View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.profName}>Rider One</Text>
-              <Text style={s.profSub}>Roujaune · Harmony Wellness Group</Text>
-            </View>
-            <Pressable testID="edit-profile" style={({ hovered }: any) => [s.editBtn, hovered && s.hover]}>
-              <Text style={s.editText}>Edit</Text>
-            </Pressable>
-          </View>
-          <View style={s.statsRow}>
-            <Stat v={`${settings.ftp} W`} l="FTP" />
-            <Stat v="78 kg" l="Weight" />
-            <Stat v={`${(settings.ftp / 78).toFixed(1)}`} l="W/kg" />
-            <Stat v="58" l="VO2 Max" />
-          </View>
-        </Card>
-
         <Card testID="coach-select" style={{ flex: 1 }}>
           <SectionTitle label="YOUR COMPANION COACH" color={CC.rouge} />
           <View style={s.coachRow}>
@@ -251,9 +231,6 @@ export default function SettingsScreen() {
   );
 }
 
-function Stat({ v, l }: { v: string; l: string }) {
-  return <View style={s.stat}><Text style={s.statV}>{v}</Text><Text style={s.statL}>{l}</Text></View>;
-}
 function PrefToggle({ label, sub, on, onToggle, testID, divider }: { label: string; sub: string; on: boolean; onToggle: () => void; testID: string; divider?: boolean }) {
   return (
     <View style={[s.prefRow, divider && s.divider]}>
