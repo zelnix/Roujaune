@@ -106,3 +106,6 @@ Home Alberto "Start Today's Ride" & sidebar Workouts → `/training`. Training "
 
 ## Coach chat context-awareness (2026-06-23)
 - `POST /api/coach/chat` now prepends a `_build_rider_context()` snapshot to the prompt: current plan phase + week X/Y, progress (workouts/time/TSS/CTL/ATL/TSB), open goals, most recent ride (workout/route/duration/distance/avg power/TSS from `ride_history`), and readiness (score/status/sleep/HRV/stress from WELLNESS_DATA). Coach references real numbers naturally; verified (e.g. "Week 4 of your Build Phase… TSB +6… last climb on Alpe d'Huez"). Best-effort, never blocks the reply.
+
+## Chat empty-state latest-ride chip (2026-06-23)
+- CoachChatModal empty state now fetches `GET /api/rides/history?limit=1` (`fetchLatestRide`) and shows a highlighted yellow chip "Review my {route.name or workout} ride" that seeds a contextual message, surfacing the coach's ride-awareness immediately. Verified: chip reads "Review my Alpe d'Huez ride".

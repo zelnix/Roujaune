@@ -7,7 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { C } from "./plan";
 import { CoachPersona, useCoachStyle } from "../lib/coach-persona";
-import { ChatMessage, fetchChatHistory, sendChatMessage, clearChatHistory, CHAT_SUGGESTIONS } from "../lib/coach-chat";
+import { ChatMessage, fetchChatHistory, sendChatMessage, clearChatHistory, CHAT_SUGGESTIONS, fetchLatestRide, LatestRide } from "../lib/coach-chat";
 import { useCoachSpeech } from "../hooks/useCoachSpeech";
 
 function TypingDots() {
@@ -25,6 +25,7 @@ export function CoachChatModal({ visible, onClose, persona }: { visible: boolean
   const [input, setInput] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [sending, setSending] = React.useState(false);
+  const [latestRide, setLatestRide] = React.useState<LatestRide | null>(null);
   const scrollRef = React.useRef<ScrollView>(null);
 
   const scrollToEnd = React.useCallback(() => {
@@ -36,6 +37,7 @@ export function CoachChatModal({ visible, onClose, persona }: { visible: boolean
     if (!visible) { stop(); return; }
     let alive = true;
     setLoading(true);
+    fetchLatestRide().then((r) => { if (alive) setLatestRide(r); });
     fetchChatHistory(persona.name)
       .then((m) => { if (alive) { setMessages(m); scrollToEnd(); } })
       .catch(() => { if (alive) setMessages([]); })
@@ -112,6 +114,17 @@ export function CoachChatModal({ visible, onClose, persona }: { visible: boolean
                   <Image source={persona.image} style={s.emptyAvatar} contentFit="cover" contentPosition="top center" />
                   <Text style={s.emptyHi}>Ciao, I&apos;m {persona.name}.</Text>
                   <Text style={s.emptySub}>Ask me about your training, a workout, recovery, FB50 strength, or how you&apos;re feeling today.</Text>
+                  {latestRide ? (
+                    <Pressable
+                      testID="chat-latest-ride"
+                      onPress={() => send(`Can you review my ${latestRide.routeName || latestRide.workout} ride?`)}
+                      style={({ hovered }: any) => [s.latestChip, hovered && s.latestChipHover]}
+                    >
+                      <Ionicons name="bicycle" size={15} color={C.yellow} />
+                      <Text style={s.latestText}>Review my {latestRide.routeName || latestRide.workout} ride</Text>
+                      <Ionicons name="chevron-forward" size={14} color={C.yellow} />
+                    </Pressable>
+                  ) : null}
                   <View style={s.suggestWrap}>
                     {CHAT_SUGGESTIONS.map((q) => (
                       <Pressable key={q} testID="chat-suggestion" onPress={() => send(q)} style={({ hovered }: any) => [s.suggestChip, hovered && s.suggestChipHover]}>
@@ -197,6 +210,9 @@ const s = StyleSheet.create({
   emptyAvatar: { width: 72, height: 72, borderRadius: 36, backgroundColor: "rgba(255,255,255,0.08)", marginBottom: 4 },
   emptyHi: { color: C.white, fontSize: 19, fontWeight: "800" },
   emptySub: { color: C.dim, fontSize: 13.5, textAlign: "center", lineHeight: 20, maxWidth: 360 },
+  latestChip: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12, borderWidth: 1, borderColor: "rgba(255,194,10,0.4)", borderRadius: 999, paddingVertical: 10, paddingHorizontal: 16, backgroundColor: "rgba(255,194,10,0.08)" },
+  latestChipHover: { backgroundColor: "rgba(255,194,10,0.14)" },
+  latestText: { color: C.yellow, fontSize: 13, fontWeight: "700" },
   suggestWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8, justifyContent: "center", marginTop: 10 },
   suggestChip: { borderWidth: 1, borderColor: C.border, borderRadius: 999, paddingVertical: 9, paddingHorizontal: 14, backgroundColor: "rgba(255,255,255,0.03)" },
   suggestChipHover: { borderColor: "rgba(255,255,255,0.28)", backgroundColor: "rgba(255,255,255,0.06)" },

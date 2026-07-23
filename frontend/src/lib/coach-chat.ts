@@ -43,3 +43,20 @@ export const CHAT_SUGGESTIONS = [
   "Any FB50 exercises to help my climbing?",
   "Help me stay motivated this week.",
 ];
+
+export type LatestRide = { workout: string; routeName?: string };
+
+/** The rider's most recent ride, used to offer a contextual chat starter. */
+export async function fetchLatestRide(): Promise<LatestRide | null> {
+  try {
+    const res = await fetch(`${apiBase()}/api/rides/history?limit=1`);
+    if (!res.ok) return null;
+    const rides = await res.json();
+    const r = Array.isArray(rides) ? rides[0] : null;
+    if (!r) return null;
+    const routeName = r.route && typeof r.route === "object" ? r.route.name : (typeof r.route === "string" ? r.route : undefined);
+    return { workout: r.workout ?? "your last ride", routeName };
+  } catch {
+    return null;
+  }
+}
