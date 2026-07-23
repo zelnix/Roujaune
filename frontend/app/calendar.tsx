@@ -9,11 +9,9 @@ import * as Haptics from "expo-haptics";
 import { Platform } from "react-native";
 
 import { useCoach } from "@/src/lib/coach-persona";
-import { markPlanSeen } from "@/src/lib/plan-badge";
 import {
   useCalendarWeek, moveSession, requestAlbertoReview, CalendarDay, SessionType, FILTERS,
 } from "@/src/lib/calendar";
-import { SideNavigation } from "@/src/components/SideNavigation";
 import {
   CC, DateControls, RowLabel, DayHeader, FocusCell, TrainingSessionCard, FB50SessionCard,
   WellnessSessionCard, ReadinessRing, SelectedDayPanel, WeekSummaryCard, QuickActionsCard,
@@ -60,16 +58,6 @@ export default function CalendarScreen() {
 
   const colCenters = React.useRef<number[]>([]);
   const showToast = React.useCallback((text: string, undo?: () => void) => setToast({ id: Date.now(), text, undo }), []);
-
-  const onSelectNav = (key: string) => {
-    if (key === "calendar") return;
-    if (key === "home") { router.replace("/"); return; }
-    if (key === "training") { markPlanSeen(); router.replace("/plan"); return; }
-    if (key === "workouts") { router.push("/workouts"); return; }
-    const routes: Record<string, string> = { routes: "/routes", progress: "/progress", wellness: "/wellness", community: "/community", connections: "/connections", settings: "/settings", help: "/help" };
-    if (routes[key]) { router.replace(routes[key] as any); return; }
-    showToast(`${key.charAt(0).toUpperCase() + key.slice(1)} — coming soon`);
-  };
 
   const days = week?.days ?? [];
   const selDay: CalendarDay | undefined = days[selected];
@@ -127,8 +115,15 @@ export default function CalendarScreen() {
         <StatusBar hidden />
         <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
           <ScrollView contentContainerStyle={{ padding: 14, gap: 14 }}>
-            <Text style={styles.title}>Calendar</Text>
-            <Text style={styles.subtitle}>Plan your week. Execute your day.</Text>
+            <View style={styles.headerRow}>
+              <Pressable testID="calendar-back" onPress={() => router.back()} accessibilityLabel="Go back" hitSlop={10} style={styles.backBtn}>
+                <Ionicons name="chevron-back" size={22} color={CC.white} />
+              </Pressable>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.title}>Calendar</Text>
+                <Text style={styles.subtitle}>Plan your week. Execute your day.</Text>
+              </View>
+            </View>
             {selDay ? <SelectedDayPanel day={selDay} onPrev={() => setSelected((s) => (s + 6) % 7)} onMenu={() => showToast("Session options")} onViewWorkout={() => router.push("/workout")} /> : null}
             {week ? <WeekSummaryCard summary={week.summary} /> : null}
             <QuickActionsCard onAction={onQuickAction} />
@@ -144,11 +139,19 @@ export default function CalendarScreen() {
       <StatusBar hidden />
       <SafeAreaView style={{ flex: 1, backgroundColor: CC.bg }} edges={["top", "bottom", "left"]}>
         <View style={styles.canvas}>
-          <SideNavigation active="calendar" onSelect={onSelectNav} width={96} />
-
           <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             {/* header */}
             <View style={styles.headerRow}>
+              <Pressable
+                testID="calendar-back"
+                onPress={() => router.back()}
+                accessibilityRole="button"
+                accessibilityLabel="Go back"
+                hitSlop={10}
+                style={({ hovered }: any) => [styles.backBtn, hovered && styles.hover]}
+              >
+                <Ionicons name="chevron-back" size={22} color={CC.white} />
+              </Pressable>
               <View style={{ flex: 1 }}>
                 <Text style={styles.title}>Calendar</Text>
                 <Text style={styles.subtitle}>Plan your week. Execute your day.</Text>
@@ -346,7 +349,8 @@ const dayName = (abbr: string) => (
 const styles = StyleSheet.create({
   canvas: { flex: 1, flexDirection: "row", backgroundColor: CC.bg },
   content: { paddingHorizontal: 20, paddingVertical: 16, gap: 6 },
-  headerRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 16 },
+  headerRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "flex-start", gap: 14 },
+  backBtn: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: CC.card, borderWidth: 1, borderColor: CC.border },
   title: { color: CC.white, fontSize: 30, fontWeight: "800" },
   subtitle: { color: CC.dim, fontSize: 13, marginTop: 4 },
 

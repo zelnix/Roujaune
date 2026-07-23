@@ -43,7 +43,7 @@ function TodayRow({ label, time, state, active, onPress, testID }: {
   );
 }
 
-export function CalendarCard({ onToast }: { onToast: (m: string) => void }) {
+export function CalendarCard({ onToast, onOpenCalendar }: { onToast: (m: string) => void; onOpenCalendar?: () => void }) {
   const [month, setMonth] = React.useState(dayjs("2025-05-01"));
   const [selected, setSelected] = React.useState(12);
   const [activeWorkout, setActiveWorkout] = React.useState("climb");
@@ -125,7 +125,7 @@ export function CalendarCard({ onToast }: { onToast: (m: string) => void }) {
         <SecondaryButton
           testID="view-calendar-button"
           label="View Full Calendar"
-          onPress={() => onToast("Opening full calendar")}
+          onPress={() => (onOpenCalendar ? onOpenCalendar() : onToast("Opening full calendar"))}
         />
       </View>
     </View>

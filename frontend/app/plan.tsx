@@ -16,6 +16,7 @@ import {
   KeyWorkoutsCard, AlbertoAdaptationsCard, AdaptiveTargetsCard, PlanProgressStrip, AlbertoTipFooter,
 } from "@/src/components/plan";
 import { SideNavigation } from "@/src/components/SideNavigation";
+import { CalendarCard } from "@/src/components/CalendarCard";
 import { EditGoalsModal, ProgressModal, AdaptationsModal } from "@/src/components/plan-modals";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
 import type { EditableGoal } from "@/src/lib/plan";
@@ -90,14 +91,16 @@ export default function TrainingPlanScreen() {
   const onPhase = (p: PlanPhase) => showToast(`${p.name} · ${p.weeks} · ${p.pct}% complete`);
   const onWorkout = (w: KeyWorkout) => showToast(`${w.title} · ${w.duration} · ${w.tss}`);
 
-  const rightW = 336;
   const contentW = availW > 0 ? availW : width - 96;
   const fullW = Math.max(600, contentW - 44); // content minus horizontal padding
 
   const hero = (
     <View style={styles.rowGap}>
       <View style={{ flex: 1 }}><PlanHeroCard /></View>
-      <View style={{ width: rightW }}><PlanGoalsCard onEdit={() => setShowGoals(true)} /></View>
+      <View style={styles.heroRight}>
+        <CalendarCard onToast={showToast} onOpenCalendar={() => router.push("/calendar")} />
+        <PlanGoalsCard onEdit={() => setShowGoals(true)} />
+      </View>
     </View>
   );
   const roadmapRow = (
@@ -217,6 +220,7 @@ const styles = StyleSheet.create({
   syncText: { color: C.dim, fontSize: 11, fontWeight: "600" },
   liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.green },
   rowGap: { flexDirection: "row", gap: 14, alignItems: "stretch" },
+  heroRight: { width: 440, gap: 14 },
   toast: { position: "absolute", bottom: 30, alignSelf: "center", backgroundColor: "rgba(20,22,21,0.96)", borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 18 },
   toastText: { color: C.white, fontSize: 13, fontWeight: "600" },
 });
