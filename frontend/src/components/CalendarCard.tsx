@@ -3,7 +3,8 @@ import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import dayjs from "dayjs";
 import { colors, radius, spacing } from "../theme";
-import { calendarDots, todayPlan } from "../data";
+import { todayPlan } from "../data";
+import { useCalendarWeek } from "../lib/calendar";
 import { ActivityDots, SecondaryButton, SectionLabel, Touchable } from "./ui";
 
 const WEEK = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
@@ -44,11 +45,40 @@ function TodayRow({ label, time, state, active, onPress, testID }: {
 }
 
 export function CalendarCard({ onToast, onOpenCalendar }: { onToast: (m: string) => void; onOpenCalendar?: () => void }) {
-  const [month, setMonth] = React.useState(dayjs("2025-05-01"));
-  const [selected, setSelected] = React.useState(12);
-  const [activeWorkout, setActiveWorkout] = React.useState("climb");
+  const { week } = useCalendarWeek();
+  const [month, setMonth] = React.useState(dayjs("2025-05-13").startOf("month"));
+  const [selected, setSelected] = React.useState(13);
   const grid = buildGrid(month);
-  const isMay2025 = month.year() === 2025 && month.month() === 4;
+
+  // Sync the visible month + selected day to the live "today" from the backend.
+  React.useEffect(() => {
+    if (!week?.selected_date) return;
+    const d = dayjs(week.selected_date);
+    setSelected(d.date());
+    setMonth(d.startOf("month"));
+  }, [week?.selected_date]);
+
+  // Activity dots derived from each day's main (cycling) session status.
+  const dotByDate = React.useMemo(() => {
+    const m: Record<string, string[]> = {};
+    (week?.days ?? []).forEach((d) => {
+      const c = d.cycling;
+      if (!c || c.status === "rest") return;
+      m[d.date] = [c.status === "completed" ? "green" : c.status === "today" ? "yellow" : "red"];
+    });
+    return m;
+  }, [week]);
+
+  // Today's plan rows = the real sessions scheduled for the live "today".
+  const planRows = React.useMemo(() => {
+    const today = (week?.days ?? []).find((d) => d.date === week?.selected_date);
+    if (!today) return todayPlan;
+    const state = (s?: string): "done" | "active" | "todo" =>
+      s === "completed" ? "done" : s === "today" ? "active" : "todo";
+    return [today.cycling, today.fb50, today.wellness]
+      .filter((s): s is NonNullable<typeof s> => !!s)
+      .map((s) => ({ key: s.id, label: s.title, time: s.duration || "—", state: state(s.status) }));
+  }, [week]);
 
   return (
     <View style={styles.card} testID="calendar-card">
@@ -78,7 +108,7 @@ export function CalendarCard({ onToast, onOpenCalendar }: { onToast: (m: string)
             const inMonth = d.month() === month.month();
             const num = d.date();
             const isSel = inMonth && num === selected;
-            const dots = isMay2025 && inMonth ? calendarDots[num] : undefined;
+            const dots = inMonth ? dotByDate[d.format("YYYY-MM-DD")] : undefined;
             return (
               <Touchable
                 key={i}
@@ -106,18 +136,15 @@ export function CalendarCard({ onToast, onOpenCalendar }: { onToast: (m: string)
       <View style={styles.planSide}>
         <SectionLabel color={colors.textDim}>TODAY&apos;S PLAN</SectionLabel>
         <View style={{ marginTop: spacing.sm, gap: 6 }}>
-          {todayPlan.map((w) => (
+          {planRows.map((w) => (
             <TodayRow
               key={w.key}
               testID={`today-${w.key}`}
               label={w.label}
               time={w.time}
               state={w.state}
-              active={activeWorkout === w.key}
-              onPress={() => {
-                setActiveWorkout(w.key);
-                onToast(`${w.label} selected`);
-              }}
+              active={w.state === "active"}
+              onPress={() => onToast(`${w.label} selected`)}
             />
           ))}
         </View>
