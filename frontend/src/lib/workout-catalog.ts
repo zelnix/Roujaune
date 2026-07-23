@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { COUCH_TO_ROAD, ctrRideId, type Interval, type Session } from "./programs/couch-to-road";
 
 type Ion = keyof typeof Ionicons.glyphMap;
 
@@ -232,7 +233,66 @@ const STRUCTURED: Workout[] = [
     spec: [rep("Easy Spin", 0, 15, 0.5), rep("Light Lift", 1, 3, 0.62), rep("Easy Spin", 0, 12, 0.5), rep("Light Lift", 1, 3, 0.62), rep("Easy Spin", 0, 10, 0.5)] }),
 ];
 
+/* ============ From Couch to Road (beginner plan) → catalog workouts ============ */
+// The plan is authored in RPE + cadence. Map the low bound of each interval's RPE
+// onto a training zone + %FTP so the Live Workout HUD can drive real targets.
+function rpeToZone(rpe: string): { zoneIdx: number; targetPct: number } {
+  const low = parseInt((rpe.match(/\d+/) || ["3"])[0], 10);
+  switch (low) {
+    case 1: return { zoneIdx: 0, targetPct: 0.48 };
+    case 2: return { zoneIdx: 0, targetPct: 0.55 };
+    case 3: return { zoneIdx: 1, targetPct: 0.64 };
+    case 4: return { zoneIdx: 1, targetPct: 0.72 };
+    case 5: return { zoneIdx: 2, targetPct: 0.80 };
+    default: return { zoneIdx: 2, targetPct: 0.86 };
+  }
+}
+
+function ctrSessionToWorkout(s: Session): Workout {
+  const intervals: Interval[] = s.intervals ?? [];
+  const spec: SegSpec[] = intervals.map((iv) => {
+    const { zoneIdx, targetPct } = rpeToZone(iv.rpe);
+    return { label: iv.name, zoneIdx, minutes: iv.minutes, targetPct };
+  });
+  const duration = spec.reduce((a, sp) => a + sp.minutes, 0);
+  const isRecovery = /recovery|confidence|easy/i.test(s.category || s.title || "");
+  return {
+    id: ctrRideId(s),
+    name: s.title,
+    typeId: isRecovery ? "recovery" : "endurance",
+    typeName: isRecovery ? "Recovery" : "Endurance",
+    color: isRecovery ? "#3FBFAE" : END_COLOR,
+    icon: "bicycle",
+    duration,
+    tss: Math.round(duration * 0.6),
+    if: 0.6,
+    difficulty: "Easy",
+    focus: s.category || "Beginner endurance",
+    description: s.goal || s.notes || "A From Couch to Road beginner session.",
+    zones: zones(30, 50, 20, 0, 0, 0),
+    level: "Foundation",
+    segmentSpec: spec.length ? spec : [wu(5), easy(10), cd(5)],
+  };
+}
+
+export const CTR_WORKOUTS: Workout[] = (() => {
+  const out: Workout[] = [];
+  const seen = new Set<string>();
+  for (const phase of COUCH_TO_ROAD.phases) {
+    for (const week of phase.weeks) {
+      for (const day of week.days) {
+        if (day.type === "cycling") {
+          const w = ctrSessionToWorkout(day);
+          if (!seen.has(w.id)) { seen.add(w.id); out.push(w); }
+        }
+      }
+    }
+  }
+  return out;
+})();
+
 export const WORKOUTS: Workout[] = [
+  ...CTR_WORKOUTS,
   ...STRUCTURED,
   // ── Endurance ──
   { id: "endurance-ride", name: "Endurance Ride", typeId: "endurance", typeName: "Endurance", color: "#55C850", icon: "bicycle",

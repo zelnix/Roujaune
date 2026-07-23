@@ -1455,10 +1455,126 @@ BUILD_AND_CLIMB = {
 }
 
 
+# From Couch to Road — beginner 16-week plan (assigned to Green Lantern).
+# Ride ids match the frontend `ctrRideId` scheme (ctr-ride-N) so a session opened
+# from the plan or calendar resolves to the same Live Workout timeline.
+COUCH_TO_ROAD_PLAN = {
+    "id": "couch-to-road",
+    "title": "From Couch to Road",
+    "label": "FROM COUCH TO ROAD",
+    "description": "A 16-week beginner plan to build endurance, confidence and cycling skills from your very first ride to a 90-minute achievement ride.",
+    "duration_weeks": 16,
+    "average_days_per_week": 3,
+    "current_week": 1,
+    "start_date": "2026-07-27",
+    "duration_label": "16 Weeks",
+    "average_label": "3 Rides/Week",
+    "phase": {
+        "name": "Get Moving",
+        "weeks": "Weeks 1\u20134",
+        "description": "Become comfortable on the bike, establish a weekly routine and learn safe, controlled endurance cycling.",
+    },
+    "goals": [
+        {"id": "g1", "title": "Ride Three Times a Week", "description": "Build a consistent routine", "status": "incomplete"},
+        {"id": "g2", "title": "Ride 40 Minutes Continuously", "description": "Grow your endurance base", "status": "incomplete"},
+        {"id": "g3", "title": "Smooth Cadence & Pacing", "description": "Control your effort", "status": "incomplete"},
+    ],
+    "phases": [
+        {"id": "p1", "number": 1, "name": "Get Moving", "weeks": "Weeks 1\u20134", "pct": 10, "active": True, "points": [0.12, 0.2, 0.28, 0.35, 0.3, 0.4, 0.45, 0.5]},
+        {"id": "p2", "number": 2, "name": "Build the Foundation", "weeks": "Weeks 5\u20138", "pct": 0, "active": False, "points": [0.2, 0.3, 0.28, 0.42, 0.4, 0.55, 0.5, 0.62]},
+        {"id": "p3", "number": 3, "name": "Extend Your Endurance", "weeks": "Weeks 9\u201312", "pct": 0, "active": False, "points": [0.3, 0.4, 0.5, 0.48, 0.6, 0.65, 0.7, 0.78]},
+        {"id": "p4", "number": 4, "name": "Road Ready", "weeks": "Weeks 13\u201316", "pct": 0, "active": False, "points": [0.4, 0.55, 0.6, 0.7, 0.75, 0.82, 0.9, 1.0]},
+    ],
+    "weekly_load": [55, 70, 90, 65, 100, 115, 130, 90, 120, 140, 160, 110, 150, 170, 195, 120],
+    "you_are_here": 1,
+    "workouts": [
+        {"id": "ctr-ride-1", "title": "Welcome Ride", "icon": "bicycle", "duration": "20 min", "zone": "RPE 2\u20133", "tss": "12 TSS", "footer": "Week 1 \u2022 Tue", "color": "#55C850", "profile": [0.4, 0.5, 0.55, 0.55, 0.5, 0.45]},
+        {"id": "ctr-ride-2", "title": "Pedal Smoothly", "icon": "bicycle", "duration": "25 min", "zone": "RPE 3\u20134", "tss": "15 TSS", "footer": "Week 1 \u2022 Thu", "color": "#40A9C6", "profile": [0.4, 0.5, 0.55, 0.65, 0.5, 0.65, 0.5, 0.45]},
+        {"id": "ctr-ride-3", "title": "First Endurance Ride", "icon": "bicycle", "duration": "30 min", "zone": "RPE 3", "tss": "18 TSS", "footer": "Week 1 \u2022 Sat", "color": "#55C850", "profile": [0.4, 0.5, 0.6, 0.6, 0.6, 0.6, 0.5, 0.45]},
+    ],
+    "adaptation": "Welcome to From Couch to Road. This first week is all about getting comfortable on the bike and finding a calm, repeatable rhythm. Keep every ride easy and conversational \u2014 your endurance will build itself from here.",
+    "adaptation_status": "Beginner plan \u2014 starts 27 July",
+    "progress_pct": 2,
+    "progress": {"weeks": "1 / 16", "workouts": "0", "time": "0.0 h", "tss": "0", "ctl": "\u2014", "atl": "\u2014", "tsb": "\u2014"},
+    "tip": "Your smoothest controllable cadence is more important than matching an exact number.",
+    "created_by": "Alberto",
+}
+
+
+# Map a couch-to-road session (by day type) onto the calendar's day slots.
+_CTR_WEEK1 = [
+    {"day_name": "MON", "focus": "Cycling Strength",
+     "fb50": {"type": "fb50", "title": "Beginner Cycling Strength", "duration": "~15 min", "status": "scheduled", "category": "Strength"}},
+    {"day_name": "TUE", "focus": "Beginner Endurance",
+     "cycling": {"type": "cycling", "title": "Welcome Ride", "workout_id": "ctr-ride-1", "duration": "20 min", "zone": "RPE 2\u20133", "tss": "12 TSS", "status": "today", "color": "green", "created_by": "Alberto"}},
+    {"day_name": "WED", "focus": "Recovery",
+     "wellness": {"type": "wellness", "title": "Recovery and Mobility", "brand": "My Peaceful Companion", "duration": "10 min", "status": "scheduled"}},
+    {"day_name": "THU", "focus": "Cadence Skills",
+     "cycling": {"type": "cycling", "title": "Pedal Smoothly", "workout_id": "ctr-ride-2", "duration": "25 min", "zone": "RPE 3\u20134", "tss": "15 TSS", "status": "planned", "color": "blue", "created_by": "Alberto"}},
+    {"day_name": "FRI", "focus": "Balance & Support",
+     "fb50": {"type": "fb50", "title": "Balance and Cycling Support", "duration": "~15 min", "status": "planned", "category": "Balance"}},
+    {"day_name": "SAT", "focus": "Endurance",
+     "cycling": {"type": "cycling", "title": "First Endurance Ride", "workout_id": "ctr-ride-3", "duration": "30 min", "zone": "RPE 3", "tss": "18 TSS", "status": "planned", "color": "green", "created_by": "Alberto"}},
+    {"day_name": "SUN", "focus": "Rest",
+     "cycling": {"type": "cycling", "title": "Complete Rest", "subtitle": "Recovery Focus", "duration": "", "zone": "", "tss": "", "status": "rest", "color": "purple", "created_by": "Alberto"}},
+]
+
+
+def _ctr_calendar_week() -> dict:
+    """Build a calendar week for the current couch-to-road week (Week 1, starting
+    27 July 2026) mapped onto the calendar's day/slot structure."""
+    from datetime import date, timedelta
+    start = date(2026, 7, 27)
+    days = []
+    for i, spec in enumerate(_CTR_WEEK1):
+        d = start + timedelta(days=i)
+        day = {
+            "date": d.isoformat(),
+            "day_name": spec["day_name"],
+            "day_num": d.strftime("%-d %b").upper(),
+            "focus": spec["focus"],
+            "cycling": spec.get("cycling"),
+            "fb50": spec.get("fb50"),
+            "wellness": spec.get("wellness"),
+            "readiness": {"score": 80, "status": "Good", "source": "Daily check-in", "metrics": [
+                {"key": "energy", "label": "Energy", "value": 80, "display": "Good"},
+                {"key": "soreness", "label": "Soreness", "value": 82, "display": "Low"},
+                {"key": "stress", "label": "Stress", "value": 80, "display": "Low"},
+                {"key": "sleep", "label": "Sleep", "value": 84, "display": "7h 50m"}]},
+        }
+        if i == 1:
+            day["readiness"] = {"score": 78, "status": "Good", "source": "Daily check-in", "metrics": [
+                {"key": "energy", "label": "Energy", "value": 78, "display": "Good"},
+                {"key": "soreness", "label": "Soreness", "value": 80, "display": "Low"},
+                {"key": "stress", "label": "Stress", "value": 76, "display": "Low"},
+                {"key": "sleep", "label": "Sleep", "value": 82, "display": "7h 40m"}]}
+        days.append(day)
+    end = start + timedelta(days=6)
+    return {
+        "id": "ctr-week-1",
+        "start_date": start.isoformat(),
+        "end_date": end.isoformat(),
+        "range_label": f"{start.strftime('%-d')} \u2013 {end.strftime('%-d %b %Y')}",
+        "selected_date": (start + timedelta(days=1)).isoformat(),
+        "days": days,
+        "summary": {"workouts_completed": 0, "workouts_planned": 3, "duration": "1h 15m", "tss": "45", "zones": [
+            {"z": "Z1", "pct": 30, "time": "00:22:00", "color": "green"},
+            {"z": "Z2", "pct": 55, "time": "00:41:00", "color": "greenyellow"},
+            {"z": "Z3", "pct": 15, "time": "00:12:00", "color": "yellow"}]},
+        "tip": "Week 1 is about getting comfortable on the bike. Keep every ride easy and conversational.",
+        "seed_version": 1,
+    }
+
+
 @api_router.get("/plan")
 async def get_plan(id: str = "build-and-climb"):
-    """Return the rider's current training plan (seeded into Mongo on first read)."""
+    """Return the rider's current training plan (seeded into Mongo on first read).
+    Green Lantern is on the beginner 'From Couch to Road' plan; every other rider
+    stays on 'Build & Climb'."""
     try:
+        rider = await _rider_doc()
+        if (rider.get("name") or "").strip().lower() == "green lantern" or id == COUCH_TO_ROAD_PLAN["id"]:
+            return dict(COUCH_TO_ROAD_PLAN)
         doc = await db.training_plans.find_one({"id": id})
         if not doc:
             await db.training_plans.update_one({"id": id}, {"$set": BUILD_AND_CLIMB}, upsert=True)
@@ -1756,10 +1872,15 @@ CALENDAR_WEEK = {
 async def get_calendar_week(start: str = "2025-05-12"):
     """Return a scheduling week (seeded into Mongo on first read)."""
     try:
-        doc = await db.calendar_weeks.find_one({"start_date": start})
-        if not doc or doc.get("seed_version") != CALENDAR_WEEK["seed_version"]:
-            await db.calendar_weeks.update_one({"start_date": start}, {"$set": CALENDAR_WEEK}, upsert=True)
-            doc = dict(CALENDAR_WEEK)
+        rider = await _rider_doc()
+        is_ctr = (rider.get("name") or "").strip().lower() == "green lantern"
+        if is_ctr:
+            doc = _ctr_calendar_week()
+        else:
+            doc = await db.calendar_weeks.find_one({"start_date": start})
+            if not doc or doc.get("seed_version") != CALENDAR_WEEK["seed_version"]:
+                await db.calendar_weeks.update_one({"start_date": start}, {"$set": CALENDAR_WEEK}, upsert=True)
+                doc = dict(CALENDAR_WEEK)
         doc.pop("_id", None)
         # Attach rider-scheduled catalog workouts to their matching day.
         try:

@@ -81,7 +81,7 @@ export default function TrainingPlanScreen() {
   };
 
   const onPhase = (p: PlanPhase) => showToast(`${p.name} · ${p.weeks} · ${p.pct}% complete`);
-  const onWorkout = (w: KeyWorkout) => showToast(`${w.title} · ${w.duration} · ${w.tss}`);
+  const onWorkout = (w: KeyWorkout) => router.push({ pathname: "/workout", params: { workoutId: w.id, title: w.title } } as any);
 
   const contentW = availW > 0 ? availW : width - 96;
   const fullW = Math.max(600, contentW - 44); // content minus horizontal padding

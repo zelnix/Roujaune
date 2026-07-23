@@ -77,6 +77,7 @@ export type Program = {
   frequency: string;
   outcome: string;
   assignedTo?: string;
+  startDate: string;
   weeklyRhythm: { day: string; session: string }[];
   phaseTitles: { number: number; name: string; weeks: string }[];
   phases: Phase[];
@@ -930,6 +931,318 @@ const phase3: Phase = {
   },
 };
 
+// ================================================================ PHASE 4
+const week13: Week = {
+  number: 13, title: "Build Beyond an Hour",
+  objective: "Become comfortable riding beyond 60 minutes while maintaining controlled pacing and good cycling form.",
+  days: [
+    { day: "Monday", type: "strength", title: "Cycling Strength and Stability", duration: "~25 min",
+      notes: "Intensity: Easy to moderate. Equipment: chair, wall, mat, low step. Rest 45–60s between sets.",
+      warmup: ["Easy marching — 60s", "Shoulder rolls — 30s", "Ankle circles — 30s each side", "Hip hinges — 8 reps", "Supported shallow squats — 8 reps"],
+      exercises: [
+        { name: "Sit-to-Stand", detail: "2 × 12 · rest 45–60s", technique: "Press through the whole foot and stand tall without locking the knees.", easier: "Use the hands lightly on the chair." },
+        { name: "Supported Step-Up", detail: "2 × 8 each side · rest 60s", technique: "Use a low step; keep the knee aligned over the foot.", easier: "March in place holding a chair." },
+        { name: "Glute Bridge", detail: "2 × 12 · rest 45s", technique: "Lift through the hips; avoid arching the lower back." },
+        { name: "Wall Push-Up", detail: "2 × 12 · rest 45s" },
+        { name: "Supported Calf Raise", detail: "2 × 15 · rest 45s" },
+        { name: "Bird Dog", detail: "2 × 8 each side", easier: "Move one arm or one leg at a time." },
+      ],
+      cooldown: ["Calf stretch", "Hip-flexor stretch", "Chest opening", "Relaxed breathing"] },
+    { day: "Tuesday", type: "cycling", title: "Steady Foundation Ride", duration: "45 min",
+      rideLabel: "Ride 37 · 1 of 3", category: "Steady Endurance", environment: "Indoor or outdoor",
+      goal: "Reinforce steady aerobic control before the longer weekend ride — finish with energy for the rest of the week.",
+      intervals: [
+        { name: "Settle In", minutes: 4, phase: "Warm-up", rpe: "2", cadence: "60–70 rpm", resistance: "Very light", position: "Seated", coach: "Begin gently and allow the legs to settle.", technique: "Relax the shoulders and keep the hands soft.", breathing: "Breathe slowly enough to speak in full sentences.", prep: "Let cadence increase gradually near the end.", motivation: "A patient start supports a strong finish." },
+        { name: "Warm-Up Build", minutes: 5, phase: "Warm-up", rpe: "2–3", cadence: "65–75 rpm", resistance: "Light", coach: "Increase cadence gradually while keeping the effort easy.", technique: "Keep the hips quiet and knees moving naturally forward.", breathing: "Maintain calm, even breathing.", prep: "Find a comfortable endurance gear.", motivation: "Smooth movement is doing the work." },
+        { name: "Aerobic Block", minutes: 8, phase: "Main set", rpe: "3", cadence: "68–82 rpm", resistance: "Light", coach: "Hold a pace you could comfortably continue.", technique: "Keep the chest open and elbows relaxed.", breathing: "Breathing should remain conversational.", prep: "Check posture and hydration before the next block.", motivation: "This calm work builds durable endurance." },
+        { name: "Steady Block 1", minutes: 8, phase: "Main set", rpe: "4", cadence: "70–84 rpm", resistance: "Light to moderate", coach: "Lift the effort one controlled step.", technique: "Avoid tightening the upper body as the effort increases.", breathing: "You should still speak in short sentences.", prep: "Prepare to reduce resistance during the recovery.", motivation: "Strong and controlled is enough." },
+        { name: "Easy Reset", minutes: 4, phase: "Main set", rpe: "2–3", cadence: "62–75 rpm", resistance: "Light", coach: "Reduce resistance and allow breathing to settle.", technique: "Relax the jaw, hands and shoulders.", breathing: "Use a longer exhale to release tension.", prep: "Select the correct gear before the next steady block.", motivation: "Recovery helps you repeat quality work." },
+        { name: "Steady Block 2", minutes: 8, phase: "Main set", rpe: "4", cadence: "72–85 rpm", resistance: "Light to moderate", coach: "Match the first steady block without increasing strain.", technique: "Keep pressure smooth through both pedals.", breathing: "Maintain controlled, rhythmic breathing.", prep: "Begin easing the effort during the final 30 seconds.", motivation: "Repeatable effort is a sign of growing fitness." },
+        { name: "Cool-Down", minutes: 8, phase: "Cool-down", rpe: "1–2", cadence: "60–70 rpm", resistance: "Minimal", coach: "Reduce resistance gradually and let the legs slow.", technique: "Relax the upper body completely.", breathing: "Allow breathing to return to normal.", prep: "Continue gentle movement before stopping.", motivation: "You completed the work without draining your reserves." },
+      ],
+      easierOption: "Complete 36 minutes: warm-up 9m, Aerobic Block 8m, Steady Block 1 8m, Easy Reset 4m, cool-down 7m. Remove Steady Block 2.",
+      indoor: "Use small resistance changes and remain seated. Avoid resistance that slows cadence below a smooth range.",
+      outdoor: "Choose a flat or gently rolling route. Shift early and avoid chasing average speed.",
+      completionMessage: "You completed the first ride of the Road Ready phase with control. Your ability to repeat steady work without losing form will support the longer rides ahead." },
+    { day: "Wednesday", type: "recovery", title: "Recovery and Mobility", duration: "10–15 min", optional: true,
+      exercises: [ { name: "Easy walking", detail: "5 minutes" }, { name: "Calf stretch", detail: "30s each side" }, { name: "Hip-flexor stretch", detail: "30s each side" }, { name: "Thoracic rotation", detail: "6 each side" }, { name: "Ankle mobility", detail: "8 circles each direction" }, { name: "Relaxed breathing", detail: "2 minutes" } ],
+      notes: "Complete rest is equally acceptable." },
+    { day: "Thursday", type: "cycling", title: "Cadence and Gentle Hills", duration: "45 min",
+      rideLabel: "Ride 38 · 2 of 3", category: "Cadence and Seated Climbing",
+      goal: "Combine smooth cadence with gentle resistance and hill management — move between flat cadence work and controlled seated climbing without abrupt changes.",
+      intervals: [
+        { name: "Easy Start", minutes: 4, rpe: "2", cadence: "60–70 rpm" },
+        { name: "Warm-Up Build", minutes: 5, rpe: "2–3", cadence: "65–75 rpm" },
+        { name: "Smooth Cadence", minutes: 5, rpe: "3–4", cadence: "76–86 rpm", resistance: "Light", coaching: "Shift lighter before increasing leg speed. Keep the hips quiet." },
+        { name: "Easy Reset", minutes: 3, rpe: "2", cadence: "62–75 rpm" },
+        { name: "Gentle Hill 1", minutes: 4, rpe: "4–5", cadence: "60–72 rpm", resistance: "Moderate", position: "Seated", coach: "Add enough resistance to feel the rise without grinding.", technique: "Keep the hips stable and press smoothly through the pedals.", breathing: "Let breathing deepen while remaining controlled.", prep: "Shift easier before the recovery begins.", motivation: "Meet the hill with preparation, not force." },
+        { name: "Recovery 1", minutes: 3, rpe: "2–3", cadence: "62–75 rpm" },
+        { name: "Cadence Lift", minutes: 4, rpe: "4", cadence: "78–88 rpm", resistance: "Light", coaching: "Let the legs turn quicker without increasing pedal pressure significantly." },
+        { name: "Recovery 2", minutes: 3, rpe: "2–3" },
+        { name: "Gentle Hill 2", minutes: 4, rpe: "4–5", cadence: "58–72 rpm", resistance: "Moderate", position: "Seated", coaching: "Shift before cadence becomes heavy and maintain smooth pressure." },
+        { name: "Controlled Endurance Finish", minutes: 4, rpe: "3–4", cadence: "70–84 rpm", resistance: "Light" },
+        { name: "Cool-Down", minutes: 6, rpe: "1–2" },
+      ],
+      easierOption: "Complete only one hill interval. Replace Gentle Hill 2 with four minutes of easy flat riding.",
+      indoor: "Simulate hills with small resistance increases. Remain seated throughout.",
+      outdoor: "Choose short, gentle rises with safe visibility. Shift early and avoid steep gradients.",
+      completionMessage: "You combined cadence and climbing skills without allowing either to become uncontrolled. That ability will help you manage varied terrain during longer rides." },
+    { day: "Friday", type: "balance", title: "Balance, Core and Cycling Support", duration: "~20 min",
+      notes: "Keep the effort controlled so the legs remain fresh for Saturday.",
+      exercises: [ { name: "Supported step-up", detail: "2 × 8 each side" }, { name: "Standing hip abduction", detail: "2 × 10 each side" }, { name: "Supported split-stance hold", detail: "2 × 30s each side" }, { name: "Wall plank", detail: "2 × 35s" }, { name: "Calf raise", detail: "2 × 15" }, { name: "Seated ankle mobility", detail: "2 minutes" } ] },
+    { day: "Saturday", type: "cycling", title: "Long Endurance Ride", duration: "75 min",
+      rideLabel: "Ride 39 · 3 of 3", category: "Long Endurance",
+      goal: "Become comfortable riding beyond one hour. Do not exceed RPE 3 during the first 42 minutes.",
+      notes: "Hydration: take small drinks regularly — don't wait until strongly thirsty. Fuelling: a small familiar carbohydrate snack may be used before or during the ride when appropriate.",
+      intervals: [
+        { name: "Settle In", minutes: 5, rpe: "2" },
+        { name: "Warm-Up Build", minutes: 7, rpe: "2–3" },
+        { name: "Endurance Block 1", minutes: 10, rpe: "3" },
+        { name: "Endurance Block 2", minutes: 10, rpe: "3" },
+        { name: "Endurance Block 3", minutes: 10, rpe: "3" },
+        { name: "Endurance Block 4", minutes: 10, rpe: "3–4" },
+        { name: "Steady Finish", minutes: 13, rpe: "4" },
+        { name: "Cool-Down", minutes: 10, rpe: "1–2" },
+      ],
+      easierOption: "Complete 60 minutes: warm-up 12m, three 10-minute endurance blocks, Steady Finish 8m, cool-down 10m.",
+      completionMessage: "You rode beyond one hour by protecting your energy early and staying composed later. Seventy-five minutes is now part of what you can do." },
+    rest(),
+  ],
+};
+
+const week14: Week = {
+  number: 14, title: "Endurance Confidence",
+  objective: "Hold sustainable effort as ride duration increases and complete controlled endurance intervals.",
+  days: [
+    { day: "Monday", type: "strength", title: "Strength for Endurance", duration: "~25–28 min", notes: "Rest 45–60s between exercises.",
+      exercises: [ { name: "Sit-to-stand", detail: "2 × 12" }, { name: "Glute bridge", detail: "2 × 15" }, { name: "Supported step-up", detail: "2 × 10 each side" }, { name: "Wall push-up", detail: "2 × 12" }, { name: "Bird dog", detail: "2 × 10 each side" }, { name: "Supported calf raise", detail: "2 × 15" }, { name: "Supported split-stance hold", detail: "2 × 30s each side" } ] },
+    { day: "Tuesday", type: "cycling", title: "Aerobic Endurance Ride", duration: "50 min",
+      rideLabel: "Ride 40 · 1 of 3", category: "Aerobic Endurance",
+      goal: "Maintain continuous aerobic work with a controlled progressive finish. Build the effort gradually rather than jumping straight to the finish.",
+      intervals: [
+        { name: "Settle In", minutes: 4, rpe: "2", cadence: "60–70 rpm" },
+        { name: "Warm-Up Build", minutes: 6, rpe: "2–3", cadence: "65–75 rpm" },
+        { name: "Aerobic Block 1", minutes: 10, rpe: "3", cadence: "68–82 rpm" },
+        { name: "Aerobic Block 2", minutes: 10, rpe: "3", cadence: "70–84 rpm" },
+        { name: "Steady Aerobic Block", minutes: 10, rpe: "4", cadence: "72–85 rpm" },
+        { name: "Controlled Finish", minutes: 4, rpe: "4–5", cadence: "74–86 rpm" },
+        { name: "Cool-Down", minutes: 6, rpe: "1–2" },
+      ],
+      easierOption: "Complete the Controlled Finish at RPE 3–4 or begin the cool-down four minutes early.",
+      completionMessage: "You built the ride gradually and finished with purpose. The strongest part of the session was the control you maintained throughout." },
+    { day: "Wednesday", type: "recovery", title: "Recovery or Rest", duration: "10–15 min", optional: true, notes: "Choose one: easy walk 10m · gentle mobility 10–15m · complete rest." },
+    { day: "Thursday", type: "cycling", title: "Controlled Endurance Intervals", duration: "45 min",
+      rideLabel: "Ride 41 · 2 of 3", category: "Endurance Intervals",
+      goal: "Complete longer controlled efforts without drifting into high intensity — sustain moderate effort, recover and repeat while maintaining posture and breathing control.",
+      intervals: [
+        { name: "Easy Start", minutes: 4, rpe: "2" },
+        { name: "Warm-Up Build", minutes: 5, rpe: "2–3" },
+        { name: "Endurance Interval 1", minutes: 6, rpe: "4–5", cadence: "72–85 rpm", coach: "Hold a purposeful effort that remains sustainable.", technique: "Keep the upper body quiet and pedal pressure smooth.", breathing: "Breathing should be deeper but controlled.", prep: "Prepare to reduce resistance during the final 20 seconds.", motivation: "Sustainable strength is the goal." },
+        { name: "Recovery 1", minutes: 3, rpe: "2" },
+        { name: "Endurance Interval 2", minutes: 6, rpe: "4–5", cadence: "72–85 rpm" },
+        { name: "Recovery 2", minutes: 3, rpe: "2" },
+        { name: "Endurance Interval 3", minutes: 6, rpe: "4–5", cadence: "72–85 rpm" },
+        { name: "Easy Aerobic Finish", minutes: 5, rpe: "3" },
+        { name: "Cool-Down", minutes: 7, rpe: "1–2" },
+      ],
+      easierOption: "Complete two endurance intervals rather than three. Use the removed six minutes as easy aerobic riding.",
+      completionMessage: "You repeated controlled endurance work without turning the session into a high-intensity test. That is exactly the type of strength needed for longer riding." },
+    { day: "Friday", type: "balance", title: "Balance, Core and Posture", duration: "~20–22 min",
+      exercises: [ { name: "Supported step-up", detail: "2 × 10 each side" }, { name: "Standing hip abduction", detail: "2 × 12 each side" }, { name: "Supported single-leg balance", detail: "2 × 30s each side" }, { name: "Wall plank", detail: "2 × 40s" }, { name: "Seated knee extension", detail: "2 × 12 each side" }, { name: "Calf raise", detail: "2 × 15" }, { name: "Gentle mobility", detail: "3 minutes" } ] },
+    { day: "Saturday", type: "cycling", title: "Long Endurance Ride", duration: "80 min",
+      rideLabel: "Ride 42 · 3 of 3", category: "Long Endurance",
+      goal: "Complete 80 minutes while maintaining sustainable pacing and good technique. Feel deliberately restrained during the first 30 minutes.",
+      notes: "Technique check every 10 minutes: relax the hands, drop the shoulders, check saddle comfort, drink water, confirm cadence remains smooth, change gear before fatigue causes grinding.",
+      intervals: [
+        { name: "Settle In", minutes: 5, rpe: "2" },
+        { name: "Warm-Up Build", minutes: 7, rpe: "2–3" },
+        { name: "Endurance Block 1", minutes: 10, rpe: "3" },
+        { name: "Endurance Block 2", minutes: 10, rpe: "3" },
+        { name: "Endurance Block 3", minutes: 10, rpe: "3" },
+        { name: "Endurance Block 4", minutes: 10, rpe: "3–4" },
+        { name: "Endurance Block 5", minutes: 10, rpe: "3–4" },
+        { name: "Controlled Finish", minutes: 8, rpe: "4" },
+        { name: "Cool-Down", minutes: 10, rpe: "1–2" },
+      ],
+      easierOption: "Complete 65 minutes by removing Endurance Block 5 and shortening the Controlled Finish to three minutes.",
+      completionMessage: "You completed eighty minutes by staying patient and checking your technique throughout. Endurance confidence grows when you know how to manage the whole ride." },
+    rest(),
+  ],
+};
+
+const week15: Week = {
+  number: 15, title: "Your Strongest Training Week", weekType: "Highest-volume week — not highest-intensity",
+  objective: "Complete the highest-volume training week while keeping intensity controlled and beginner appropriate. No maximal efforts, sprinting, threshold testing, standing attacks, exhaustion-based training or aggressive climbing.",
+  days: [
+    { day: "Monday", type: "strength", title: "Controlled Cycling Strength", duration: "~25 min",
+      notes: "Do not add extra sets. The priority is supporting the cycling week, not creating soreness.",
+      warmup: ["Easy marching", "Shoulder rolls", "Hip hinges", "Ankle mobility"],
+      exercises: [ { name: "Sit-to-stand", detail: "2 × 12" }, { name: "Glute bridge", detail: "2 × 15" }, { name: "Supported step-up", detail: "2 × 10 each side" }, { name: "Wall push-up", detail: "2 × 12" }, { name: "Bird dog", detail: "2 × 10 each side" }, { name: "Calf raise", detail: "2 × 15" } ] },
+    { day: "Tuesday", type: "cycling", title: "Steady and Strong", duration: "50 min",
+      rideLabel: "Ride 43 · 1 of 3", category: "Progressive Endurance",
+      goal: "Begin conservatively and finish with controlled strength. The final four minutes should feel strong but never desperate.",
+      intervals: [
+        { name: "Settle In", minutes: 4, rpe: "2" },
+        { name: "Warm-Up Build", minutes: 6, rpe: "2–3" },
+        { name: "Easy Start", minutes: 10, rpe: "3", cadence: "68–82 rpm" },
+        { name: "Steady Middle", minutes: 10, rpe: "4", cadence: "70–85 rpm" },
+        { name: "Controlled Strong Block", minutes: 10, rpe: "4–5", cadence: "72–86 rpm" },
+        { name: "Progressive Finish", minutes: 4, rpe: "5", cadence: "74–86 rpm" },
+        { name: "Cool-Down", minutes: 6, rpe: "1–2" },
+      ],
+      easierOption: "Keep the final 14 minutes at RPE 4 or begin the cool-down four minutes early.",
+      completionMessage: "You finished with controlled strength without turning the ride into a test. That balance is exactly what Road Ready riding should feel like." },
+    { day: "Wednesday", type: "recovery", title: "Recovery and Mobility", duration: "10–15 min", optional: true,
+      exercises: [ { name: "Easy walking", detail: "" }, { name: "Calf stretch", detail: "" }, { name: "Hip-flexor stretch", detail: "" }, { name: "Thoracic rotation", detail: "" }, { name: "Ankle mobility", detail: "" }, { name: "Relaxed breathing", detail: "" } ],
+      notes: "Complete rest is acceptable when fatigue is elevated." },
+    { day: "Thursday", type: "cycling", title: "Pacing, Cadence and Hills", duration: "50 min",
+      rideLabel: "Ride 44 · 2 of 3", category: "Combined Cycling Skills",
+      goal: "Combine easy endurance, cadence control, gentle seated climbing and pacing. Transition smoothly between each type of effort.",
+      intervals: [
+        { name: "Easy Start", minutes: 4, rpe: "2" },
+        { name: "Warm-Up Build", minutes: 6, rpe: "2–3" },
+        { name: "Endurance Block", minutes: 6, rpe: "3", cadence: "68–82 rpm" },
+        { name: "Cadence Lift", minutes: 4, rpe: "4", cadence: "78–90 rpm" },
+        { name: "Recovery", minutes: 3, rpe: "2" },
+        { name: "Gentle Hill 1", minutes: 4, rpe: "4–5", cadence: "58–72 rpm", position: "Seated" },
+        { name: "Recovery", minutes: 3, rpe: "2" },
+        { name: "Steady Pacing Block", minutes: 6, rpe: "4", cadence: "72–85 rpm" },
+        { name: "Gentle Hill 2", minutes: 4, rpe: "5", cadence: "58–72 rpm", position: "Seated" },
+        { name: "Easy Aerobic Finish", minutes: 4, rpe: "3" },
+        { name: "Cool-Down", minutes: 6, rpe: "1–2" },
+      ],
+      easierOption: "Replace Gentle Hill 2 with easy flat riding and keep the Cadence Lift below 84 rpm.",
+      completionMessage: "You brought together pacing, cadence and hill skills without losing control. This session showed how much more capable and adaptable your riding has become." },
+    { day: "Friday", type: "balance", title: "Light Activation and Mobility", duration: "~15 min",
+      notes: "This session must not fatigue the rider before the longest training ride. Keep all movement easy.",
+      exercises: [ { name: "Sit-to-stand", detail: "1 × 8" }, { name: "Glute bridge", detail: "1 × 10" }, { name: "Standing hip abduction", detail: "1 × 8 each side" }, { name: "Supported calf raise", detail: "1 × 10" }, { name: "Supported balance", detail: "2 × 20s each side" }, { name: "Hip, calf and ankle mobility", detail: "5 minutes" } ] },
+    { day: "Saturday", type: "cycling", title: "Longest Training Ride", duration: "90 min",
+      rideLabel: "Ride 45 · 3 of 3", category: "Long Endurance",
+      goal: "Complete the longest training ride before achievement week. Practise patient pacing, hydration, fuelling, posture and fatigue management. The first 48 minutes must remain easy and controlled. This is not the final achievement ride.",
+      notes: "Posture check at the end of every endurance block: relax the hands, drop the shoulders, check neck and back, reposition gently, confirm cadence, drink water. Hydration: small drinks every 10–15 minutes. Fuelling: familiar food only; a small carbohydrate snack may be taken before and during the second half.",
+      intervals: [
+        { name: "Settle In", minutes: 5, rpe: "2" },
+        { name: "Warm-Up Build", minutes: 7, rpe: "2–3" },
+        { name: "Endurance Block 1", minutes: 12, rpe: "3" },
+        { name: "Endurance Block 2", minutes: 12, rpe: "3" },
+        { name: "Endurance Block 3", minutes: 12, rpe: "3" },
+        { name: "Endurance Block 4", minutes: 12, rpe: "3–4" },
+        { name: "Endurance Block 5", minutes: 12, rpe: "3–4" },
+        { name: "Controlled Finish", minutes: 8, rpe: "4" },
+        { name: "Cool-Down", minutes: 10, rpe: "1–2" },
+      ],
+      easierOption: "Complete 75 minutes: warm-up 12m, four 12-minute endurance blocks, Controlled Finish 5m, cool-down 10m.",
+      completionMessage: "You completed your strongest training ride by managing the full ninety minutes. The achievement was not simply the duration — it was the way you paced, fuelled and stayed composed." },
+    { ...rest(), notes: "No scheduled training. Prioritise hydration, sleep and gentle everyday movement." },
+  ],
+};
+
+const week16: Week = {
+  number: 16, title: "From Couch to Road", weekType: "Achievement and reduced-volume preparation",
+  objective: "Reduce fatigue, reinforce confidence and complete the final From Couch to Road Achievement Ride. Do not add extra training — arrive at Saturday rested, prepared and confident.",
+  days: [
+    { day: "Monday", type: "strength", title: "Light Mobility and Activation", duration: "12–15 min",
+      notes: "Intensity: Very easy. The session should leave you feeling more mobile, not tired.",
+      warmup: ["Easy marching — 2 minutes", "Shoulder rolls — 30s", "Ankle circles — 30s each side"],
+      exercises: [ { name: "Sit-to-stand", detail: "1 × 8" }, { name: "Glute bridge", detail: "1 × 8" }, { name: "Wall push-up", detail: "1 × 8" }, { name: "Supported calf raise", detail: "1 × 10" }, { name: "Standing hip abduction", detail: "1 × 8 each side" } ],
+      cooldown: ["Gentle calf stretch", "Hip-flexor stretch", "Relaxed breathing"] },
+    { day: "Tuesday", type: "cycling", title: "Confidence Ride", duration: "40 min",
+      rideLabel: "Ride 46 · 1 of 3", category: "Easy Endurance",
+      goal: "Reinforce confidence and comfortable movement without creating fatigue. Nothing new is required — trust the skills you have built.",
+      intervals: [
+        { name: "Settle In", minutes: 4, rpe: "2", cadence: "60–70 rpm" },
+        { name: "Warm-Up Build", minutes: 5, rpe: "2–3", cadence: "65–75 rpm" },
+        { name: "Comfortable Block 1", minutes: 8, rpe: "3", cadence: "68–82 rpm" },
+        { name: "Comfortable Block 2", minutes: 8, rpe: "3", cadence: "70–84 rpm" },
+        { name: "Confidence Block", minutes: 7, rpe: "3–4", cadence: "70–84 rpm", coach: "Ride with the calm rhythm you have developed throughout the plan.", technique: "Keep the posture tall and upper body relaxed.", breathing: "Maintain easy, controlled breathing.", prep: "Begin easing off before the cool-down.", motivation: "Nothing new is required today. Trust the skills you have built." },
+        { name: "Cool-Down", minutes: 8, rpe: "1–2" },
+      ],
+      easierOption: "Complete 30 minutes by removing the Confidence Block and shortening Comfortable Block 2 to five minutes.",
+      completionMessage: "You did not need to prove anything today. You simply rode with the control and confidence you have built over sixteen weeks." },
+    { day: "Wednesday", type: "recovery", title: "Recovery or Complete Rest", duration: "~10 min", optional: true, notes: "Choose one: easy walking 10m · gentle mobility 10m · complete rest. Do not complete a demanding workout." },
+    { day: "Thursday", type: "cycling", title: "Leg Opener and Skills Ride", duration: "35 min",
+      rideLabel: "Ride 47 · 2 of 3", category: "Preparation and Skills",
+      goal: "Keep the legs responsive while avoiding fatigue before the achievement ride. The cadence efforts should make the legs feel responsive, not tired.",
+      intervals: [
+        { name: "Easy Start", minutes: 4, rpe: "2" },
+        { name: "Warm-Up Build", minutes: 5, rpe: "2–3" },
+        { name: "Smooth Cadence 1", minutes: 3, rpe: "4", cadence: "78–88 rpm", resistance: "Light" },
+        { name: "Easy Recovery", minutes: 3, rpe: "2" },
+        { name: "Smooth Cadence 2", minutes: 3, rpe: "4", cadence: "80–90 rpm" },
+        { name: "Easy Recovery", minutes: 3, rpe: "2" },
+        { name: "Short Steady Block", minutes: 4, rpe: "4", cadence: "72–85 rpm" },
+        { name: "Comfortable Aerobic Riding", minutes: 4, rpe: "3" },
+        { name: "Cool-Down", minutes: 6, rpe: "1–2" },
+      ],
+      easierOption: "Complete only one Smooth Cadence interval and replace the second with easy riding.",
+      completionMessage: "You opened the legs, rehearsed your rhythm and finished without fatigue. The work is complete. The next ride is about bringing everything together." },
+    { day: "Friday", type: "rest", title: "Rest or Gentle Mobility", duration: "5–10 min", optional: true,
+      notes: "No strength session. Choose one: complete rest · 5–10 min gentle mobility · a short relaxed walk. Prepare: bike/indoor bike, water bottles, helmet and safety equipment, familiar snacks, comfortable clothing, safe route or indoor setup. Do not complete additional training." },
+    { day: "Saturday", type: "cycling", title: "From Couch to Road Achievement Ride", duration: "90 / 75 / 60 min",
+      rideLabel: "Ride 48 · 3 of 3", category: "Achievement Endurance Ride",
+      goal: "Bring together sixteen weeks of endurance, pacing, cadence and confidence. Not a pass-or-fail test. Choose Full (90 min), Supported (75 min) or Foundation (60 min) — completing any option counts as completing the plan.",
+      notes: "Stop the ride for chest pain/pressure, severe dizziness, faintness, sudden unusual breathlessness, loss of control, sharp or worsening pain, new neurological symptoms, or any symptom that feels unsafe. Indoor: use a fan, keep water within reach, change hand position gently, simulate terrain with small resistance changes, remain seated for the majority. Outdoor: choose a safe familiar route, prefer flat/gently rolling terrain, avoid steep climbs and technical descents, obey traffic controls, do not chase speed.",
+      intervals: [
+        { name: "Begin the Journey", minutes: 5, phase: "Warm-up", rpe: "2", cadence: "60–70 rpm", resistance: "Very light", position: "Seated", coach: "Begin gently. Give your body and mind time to settle.", technique: "Relax the hands, shoulders and jaw.", breathing: "Breathe slowly and comfortably.", prep: "Let cadence rise gradually during the final minute.", motivation: "Sixteen weeks ago, beginning was the goal. Today, you begin with experience." },
+        { name: "Warm-Up Build", minutes: 7, phase: "Warm-up", rpe: "2–3", cadence: "65–75 rpm", resistance: "Light", coach: "Build gradually into your comfortable endurance rhythm.", technique: "Keep the hips quiet and pedal stroke smooth.", breathing: "Maintain full-sentence breathing.", prep: "Select a gear you can hold comfortably.", motivation: "There is no need to rush into this ride." },
+        { name: "Endurance Block 1: Settle", minutes: 12, phase: "Main set", rpe: "3", cadence: "68–82 rpm", resistance: "Light", coach: "Hold a deliberately easy pace.", technique: "Keep the chest open and elbows relaxed.", breathing: "Breathing should remain conversational.", prep: "Check posture, hydration and route before the next block.", motivation: "Patience now protects your strength later." },
+        { name: "Endurance Block 2: Find Your Rhythm", minutes: 12, phase: "Main set", rpe: "3", cadence: "68–84 rpm", coach: "Stay with the rhythm rather than chasing speed.", technique: "Keep pressure even through both pedals.", breathing: "Use an even inhale and relaxed exhale.", prep: "Take a small drink and check hand position.", motivation: "This is the rhythm you have built over sixteen weeks." },
+        { name: "Endurance Block 3: Stay Composed", minutes: 12, phase: "Main set", rpe: "3", cadence: "70–84 rpm", coach: "Keep the effort controlled as the ride passes the halfway point.", technique: "Relax any tension in the neck, back or hands.", breathing: "Breathing should still feel manageable.", prep: "Shift early if terrain or resistance changes.", motivation: "You do not need to force progress. Stay composed." },
+        { name: "Endurance Block 4: Ride with Purpose", minutes: 12, phase: "Main set", rpe: "3–4", cadence: "70–85 rpm", coach: "Allow the effort to become slightly steadier while remaining sustainable.", technique: "Keep the hips stable as fatigue begins to appear.", breathing: "Speak in short sentences to confirm the effort remains controlled.", prep: "Take another small drink and prepare for the next block.", motivation: "You are managing the ride, not merely enduring it." },
+        { name: "Endurance Block 5: Confidence", minutes: 12, phase: "Main set", rpe: "3–4", cadence: "70–85 rpm", coach: "Continue with a pace that feels strong but sustainable.", technique: "Keep the upper body quiet and pedal stroke smooth.", breathing: "Avoid holding the breath during terrain or resistance changes.", prep: "Prepare for the controlled final section.", motivation: "Confidence is knowing you can remain calm as the ride grows longer." },
+        { name: "Controlled Achievement Finish", minutes: 8, phase: "Main set", rpe: "4", cadence: "72–86 rpm", resistance: "Light to moderate", coach: "Finish with controlled purpose, not an all-out effort.", technique: "Maintain posture and smooth cadence.", breathing: "Breathing may deepen, but it must remain under control.", prep: "Begin easing the effort during the final minute.", motivation: "Finish in a way that reflects the strength you have built." },
+        { name: "Achievement Cool-Down", minutes: 10, phase: "Cool-down", rpe: "1–2", cadence: "60–70 rpm", resistance: "Minimal", coach: "Reduce resistance gradually and let your body recover.", technique: "Relax the hands, shoulders, jaw and hips.", breathing: "Allow breathing to return slowly to normal.", prep: "Continue gentle movement before stopping and dismount carefully.", motivation: "The ride is complete. Take time to recognise what you have achieved." },
+      ],
+      easierOption: "Supported Achievement Ride (75 min): Begin the Journey 5m, Warm-Up Build 7m, Endurance Blocks 1–3 (12m each), Endurance Block 4 9m, Controlled Finish 8m, Cool-down 10m. Foundation Achievement Ride (60 min): Begin the Journey 5m, Warm-Up Build 7m, Endurance Blocks 1–3 (10m each), Controlled Finish 8m, Cool-down 10m.",
+      completionMessage: "Twelve rides ago, you entered the final phase preparing to ride beyond an hour. Sixteen weeks ago, the goal was simply to begin. Your strongest ride is your own — and this one belongs to you." },
+    { ...rest(), title: "Complete Rest and Plan Reflection", notes: "No scheduled training. Encourage hydration, food, sleep, gentle walking if comfortable, and reflection on the sixteen-week journey." },
+  ],
+  reflection: [
+    "What changed most during the plan?",
+    "Which ride felt like the biggest milestone?",
+    "What did you learn about pacing?",
+    "How did your confidence change?",
+    "Which strength or mobility exercises were most useful?",
+    "What would you like to improve next?",
+    "Do you feel ready to consider an intermediate endurance plan?",
+  ],
+};
+
+const phase4: Phase = {
+  number: 4, name: "Road Ready", weeksLabel: "Weeks 13–16",
+  objective: "Prepare the rider to complete the final From Couch to Road Achievement Ride and demonstrate a strong intermediate endurance foundation.",
+  focus: [
+    "Riding confidently beyond one hour", "Extending the weekly endurance ride to 75, 80 and 90 minutes",
+    "Combining pacing, cadence and gentle hill skills", "Conserving energy during the first half of longer rides",
+    "Maintaining posture and technique as fatigue develops", "Completing controlled endurance intervals",
+    "Managing gears and resistance over varied terrain", "Developing practical hydration and fuelling habits",
+    "Reducing training load before the final achievement ride",
+    "Recognising progress without treating the final ride as a pass-or-fail test",
+  ],
+  intensity: ["RPE 2 — Very easy", "RPE 3 — Easy and conversational", "RPE 4 — Steady and comfortable", "RPE 5 — Moderate and controlled", "RPE 6 — Strong but sustainable (short controlled efforts, Weeks 14–15 only)", "Do not use maximal efforts, sprinting, threshold testing, VO₂ max intervals or exhaustion-based training."],
+  cadence: ["Warm-up: 60–75 rpm", "Comfortable endurance: 65–85 rpm", "Steady endurance: 70–86 rpm", "Cadence practice: 78–90 rpm", "Gentle seated hills: 58–74 rpm", "Recovery: 60–75 rpm or natural", "Cool-down: 60–70 rpm"],
+  cadenceQuote: "Your smoothest controllable cadence is more important than matching an exact number.",
+  milestone: [
+    "Complete three cycling workouts in one week", "Ride continuously for approximately 75–90 minutes",
+    "Begin longer rides conservatively", "Maintain sustainable effort as fatigue increases",
+    "Combine cadence, pacing and gentle hill skills", "Shift gears before cadence becomes too slow",
+    "Hydrate and fuel appropriately during longer rides", "Finish a long ride with controlled technique",
+    "Demonstrate readiness to consider an intermediate endurance plan",
+  ],
+  weeks: [week13, week14, week15, week16],
+  complete: {
+    heading: "PHASE 4 COMPLETE — ROAD READY",
+    summary: [
+      "Sixteen weeks completed", "Forty-eight cycling workouts available", "Four complete training phases",
+      "Longest planned ride: 90 minutes", "Three cycling workouts scheduled each week",
+      "Strength, balance, mobility and recovery work completed or attempted",
+      "Cadence, pacing and hill skills combined", "Long-ride hydration and fuelling practised",
+      "Achievement Ride completed using the 60, 75 or 90-minute option", "Confidence and endurance reflection recorded",
+    ],
+    coachMessage: "You started by learning how to get comfortable on the bike. You then built a foundation, extended your endurance and became ready for the road ahead. You can ride longer, pace yourself more effectively and respond to changes in cadence, resistance and terrain with greater control. This is not the end of the road. It is the beginning of what comes next. Your strongest ride is your own.",
+  },
+};
+
 export const COUCH_TO_ROAD: Program = {
   id: "couch-to-road",
   name: "From Couch to Road",
@@ -939,6 +1252,7 @@ export const COUCH_TO_ROAD: Program = {
   frequency: "3 rides per week",
   outcome: "Build a beginner rider’s endurance, confidence, cycling skills and consistency to an intermediate endurance foundation.",
   assignedTo: "Green Lantern",
+  startDate: "2026-07-27",
   weeklyRhythm: [
     { day: "Monday", session: "Strength and mobility" },
     { day: "Tuesday", session: "Cycling Workout 1" },
@@ -954,8 +1268,39 @@ export const COUCH_TO_ROAD: Program = {
     { number: 3, name: "Extend Your Endurance", weeks: "Weeks 9–12" },
     { number: 4, name: "Road Ready", weeks: "Weeks 13–16" },
   ],
-  phases: [phase1],
+  phases: [phase1, phase2, phase3, phase4],
 };
+
+// The Monday date (YYYY-MM-DD) each plan week begins on, derived from startDate.
+export function ctrWeekStart(weekNumber: number): string {
+  const [y, m, d] = COUCH_TO_ROAD.startDate.split("-").map((n) => parseInt(n, 10));
+  const base = new Date(Date.UTC(y, m - 1, d));
+  base.setUTCDate(base.getUTCDate() + (weekNumber - 1) * 7);
+  return base.toISOString().slice(0, 10);
+}
+
+// Deterministic id for a cycling session, shared by the catalog + calendar so a
+// ride opened from anywhere resolves to the same Live Workout timeline.
+export function ctrRideId(s: Session): string {
+  const m = s.rideLabel?.match(/Ride\s+(\d+)/i);
+  if (m) return `ctr-ride-${m[1]}`;
+  return `ctr-${s.day.toLowerCase()}-${s.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}`;
+}
+
+export type CtrSessionRef = { phase: Phase; week: Week; session: Session; id: string };
+
+// Every cycling session across all four phases, in plan order.
+export function ctrCyclingSessions(): CtrSessionRef[] {
+  const out: CtrSessionRef[] = [];
+  for (const phase of COUCH_TO_ROAD.phases) {
+    for (const week of phase.weeks) {
+      for (const session of week.days) {
+        if (session.type === "cycling") out.push({ phase, week, session, id: ctrRideId(session) });
+      }
+    }
+  }
+  return out;
+}
 
 export const SESSION_META: Record<SessionType, { icon: string; color: string; label: string }> = {
   strength: { icon: "barbell-outline", color: "#F0A500", label: "Strength" },

@@ -11,6 +11,7 @@ import { SideNavigation } from "@/src/components/SideNavigation";
 import { BrandHeader } from "@/src/components/BrandHeader";
 import { navItems, navFooter } from "@/src/data";
 import { useCoach } from "@/src/lib/coach-persona";
+import { usePlan } from "@/src/lib/plan";
 import {
   AlbertoTrainingCard,
   MainWorkoutCard,
@@ -54,6 +55,9 @@ export default function TodaysTraining() {
   const rightColW = compact ? mainWidth : 330;
 
   const router = useRouter();
+  const { plan } = usePlan();
+  const todayRideId = (plan.workouts?.[0] as any)?.id as string | undefined;
+  const startRide = () => router.push(todayRideId ? ({ pathname: "/workout", params: { workoutId: todayRideId } } as any) : "/workout");
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
   const [leftW, setLeftW] = React.useState(560);
 
@@ -139,7 +143,7 @@ export default function TodaysTraining() {
               <View style={[styles.rightCol, { width: rightColW }, compact && styles.fullCol]}>
                 <ReadinessCard />
                 <TrainingLoadCard width={rightColW} />
-                <WorkoutBreakdownCard onStart={() => router.push("/workout")} />
+                <WorkoutBreakdownCard onStart={startRide} />
                 <EquipmentCard onItemPress={(label) => showToast(`${label} status`)} />
               </View>
             </View>

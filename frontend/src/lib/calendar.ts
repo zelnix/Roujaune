@@ -22,6 +22,7 @@ export type CalendarSession = {
   color?: string;
   category?: string;
   target_power?: number;
+  workout_id?: string;
   profile?: number[];
   created_by?: string;
   checkin?: boolean;

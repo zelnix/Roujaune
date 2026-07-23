@@ -1,0 +1,36 @@
+{
+  "summary": "Validated 'From Couch to Road' plan/calendar/workout flows for rider 'Green Lantern'. Backend: 8/8 pytest cases pass (rider profile, /api/plan title+phases+goals+ctr-ride ids, /api/calendar/week Week 1 with 27 Jul 2026 start, cycling ids ctr-ride-1/2/3, per-day slots incl. readiness). Frontend: Plan screen renders 'From Couch to Road' + 4 phases (Get Moving / Build the Foundation / Extend Your Endurance / Road Ready) + Plan Goals + Weekly Load + Key Workouts (Welcome Ride, Pedal Smoothly, First Endurance Ride). Tapping a Key Workout card navigates to /workout?workoutId=ctr-ride-1&title=Welcome%20Ride with STEP 1/5 timeline. Calendar screen renders the 27 Jul – 2 Aug 2026 week with cycling in TRAINING row, strength in STRENGTH & MOBILITY (FB50) row, recovery in RECOVERY & WELLNESS row; selecting Tuesday's 'Welcome Ride' -> View Workout opens Live Workout with STEP 1/5. Direct /workout?workoutId=ctr-ride-3 loads 'First Endu…' with a real 5-step interval timeline (STEP 1/5). Today's Training (/training) 'Start Workout' navigates to /workout?workoutId=ctr-ride-1 without crashing. No red-screen errors; only benign web-preview warnings (textShadow*, pointerEvents, useNativeDriver on web).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/training", "issues": ["Main workout card still displays 'Threshold Climb' (advanced) as the featured Today's Training session, but the 'Start Workout' CTA correctly routes into a Green-Lantern couch-to-road ride (ctr-ride-1). Consider surfacing the current couch-to-road day (e.g. Welcome Ride on Tue 28 Jul) on /training so what the user sees matches what the button launches."]}
+    ],
+    "react_native_issues": [
+      {"component": "textShadow style", "issue": "Console warning: '\"textShadow*\" style props are deprecated. Use \"textShadow\".' Emitted multiple times on /plan and /calendar (RN Web deprecation)."},
+      {"component": "pointerEvents prop", "issue": "Console warning: 'props.pointerEvents is deprecated. Use style.pointerEvents' on /calendar."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_couch_to_road.py",
+    "/app/test_reports/pytest/iter21_ctr.xml"
+  ],
+  "action_items": [
+    "(Cosmetic) Replace deprecated RN Web props: migrate textShadowColor/textShadowOffset/textShadowRadius to the shorthand `textShadow` style, and move `pointerEvents` from props to `style.pointerEvents` in the components used on /plan and /calendar to silence web deprecation warnings.",
+    "(UX polish) Make /training's featured workout match the couch-to-road day-of-week for Green Lantern (currently shows Threshold Climb even though Start Workout correctly launches Welcome Ride / ctr-ride-1)."
+  ],
+  "critical_code_review_comments": [
+    "Backend hardcodes the couch-to-road Week 1 (_CTR_WEEK1) in server.py — future weeks (2–16) will need to be exposed similarly or the endpoint made week-aware so the calendar continues to work past Aug 2.",
+    "frontend/src/lib/programs/couch-to-road.ts is a single very large file (>1000 lines by structure); consider splitting per-phase to keep files under the 700-line guideline."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_couch_to_road.py (new)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None — rider profile 'Green Lantern' already seeded.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend BASE_URL comes from EXPO_PUBLIC_BACKEND_URL. Rider 'Green Lantern' triggers the beginner plan via case-insensitive name match. /api/plan returns From Couch to Road with 4 phases + 3 goals + key workouts ctr-ride-1/2/3. /api/calendar/week returns Week 1 starting 2026-07-27; each day carries cycling+strength+recovery+readiness. Frontend uses testID sparingly — most flow tests here use visible text ('Welcome Ride', 'Start Workout', 'View Workout'). The Live Workout URL pattern is /workout?workoutId=<id>[&title=...].",
+  "rca_of_issue": "N/A — no functional bugs found."
+}

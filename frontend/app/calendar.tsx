@@ -125,7 +125,7 @@ export default function CalendarScreen() {
                 <Text style={styles.subtitle}>Plan your week. Execute your day.</Text>
               </View>
             </View>
-            {selDay ? <SelectedDayPanel day={selDay} onPrev={() => setSelected((s) => (s + 6) % 7)} onMenu={() => showToast("Session options")} onViewWorkout={() => router.push("/workout")} /> : null}
+            {selDay ? <SelectedDayPanel day={selDay} onPrev={() => setSelected((s) => (s + 6) % 7)} onMenu={() => showToast("Session options")} onViewWorkout={() => router.push(selDay?.cycling?.workout_id ? { pathname: "/workout", params: { workoutId: selDay.cycling.workout_id } } : "/workout")} /> : null}
             {week ? <WeekSummaryCard summary={week.summary} /> : null}
             <QuickActionsCard onAction={onQuickAction} />
             {week ? <CalendarTipFooter tip={week.tip} /> : null}
@@ -259,7 +259,7 @@ export default function CalendarScreen() {
 
               {/* right panel */}
               <View style={styles.rightCol}>
-                {selDay ? <SelectedDayPanel day={selDay} onPrev={() => setSelected((s) => (s + 6) % 7)} onMenu={() => showToast("Session options")} onViewWorkout={() => router.push("/workout")} /> : null}
+                {selDay ? <SelectedDayPanel day={selDay} onPrev={() => setSelected((s) => (s + 6) % 7)} onMenu={() => showToast("Session options")} onViewWorkout={() => router.push(selDay?.cycling?.workout_id ? { pathname: "/workout", params: { workoutId: selDay.cycling.workout_id } } : "/workout")} /> : null}
                 {week ? <WeekSummaryCard summary={week.summary} /> : null}
                 <QuickActionsCard onAction={onQuickAction} />
               </View>
