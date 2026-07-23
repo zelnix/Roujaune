@@ -3,17 +3,17 @@ import { View, Text, StyleSheet, ScrollView, Pressable, Switch } from "react-nat
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { Rider3D } from "@/src/avatar3d/Rider3D";
+import { Rider3D, KIT_PRESETS, KitPresetKey } from "@/src/avatar3d/Rider3D";
 
 const C = { bg: "#0B0B0B", card: "#161616", border: "rgba(255,255,255,0.12)", text: "#F5F1EA", dim: "#9A938B", accent: "#F2C230", stage: "#0E1216" };
-const KITS = ["#F2C230", "#C4232B", "#6E1D2B", "#141414", "#EBA6C4", "#2E6CF2", "#2FA35A"];
+const PRESET_KEYS = Object.keys(KIT_PRESETS) as KitPresetKey[];
 
 export default function Avatar3DDemo() {
   const [cadence, setCadence] = React.useState(85);
   const [power, setPower] = React.useState(210);
   const [isStanding, setStanding] = React.useState(false);
   const [isPaused, setPaused] = React.useState(false);
-  const [kitColor, setKit] = React.useState(KITS[0]);
+  const [preset, setPreset] = React.useState<KitPresetKey>("yellow");
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -21,9 +21,9 @@ export default function Avatar3DDemo() {
       <SafeAreaView style={styles.container} edges={["bottom"]}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.stage}>
-            <Rider3D size={280} inputs={{ cadence, power, isStanding, isPaused, kitColor }} />
+            <Rider3D size={300} inputs={{ cadence, power, isStanding, isPaused, preset }} />
           </View>
-          <Text style={styles.note}>Pipeline preview — a placeholder rigged model. Swap in a rigged cyclist GLB to get the real seated/standing pedalling look. Best viewed on a device / Expo Go (3D uses the GPU).</Text>
+          <Text style={styles.note}>Real-time 3D rider — a rigged human on a procedural bike with IK pedalling. Legs track the pedals, cadence sets the pace, power/standing drive the lean. Best on a device / Expo Go (GPU).</Text>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Inputs</Text>
@@ -34,11 +34,20 @@ export default function Avatar3DDemo() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Kit colour (live)</Text>
+            <Text style={styles.sectionTitle}>ROUJAUNE kit</Text>
             <View style={styles.swatches}>
-              {KITS.map((k) => (
-                <Pressable key={k} onPress={() => setKit(k)} style={[styles.sw, { backgroundColor: k }, kitColor === k && styles.swActive]} />
-              ))}
+              {PRESET_KEYS.map((k) => {
+                const p = KIT_PRESETS[k];
+                return (
+                  <Pressable key={k} onPress={() => setPreset(k)} style={[styles.kit, preset === k && styles.kitActive]}>
+                    <View style={styles.kitDots}>
+                      <View style={[styles.kitDot, { backgroundColor: p.jersey }]} />
+                      <View style={[styles.kitDot, { backgroundColor: p.shorts }]} />
+                    </View>
+                    <Text style={styles.kitLabel}>{p.label}</Text>
+                  </Pressable>
+                );
+              })}
             </View>
           </View>
         </ScrollView>
@@ -79,6 +88,9 @@ const styles = StyleSheet.create({
   val: { color: C.text, fontSize: 15, fontWeight: "800", minWidth: 74, textAlign: "center" },
   unit: { color: C.dim, fontSize: 12 },
   swatches: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  sw: { width: 34, height: 34, borderRadius: 9, borderWidth: 2, borderColor: "rgba(255,255,255,0.15)" },
-  swActive: { borderColor: C.accent },
+  kit: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 2, borderColor: "rgba(255,255,255,0.12)" },
+  kitActive: { borderColor: C.accent },
+  kitDots: { flexDirection: "row", gap: 4 },
+  kitDot: { width: 16, height: 16, borderRadius: 5, borderWidth: 1, borderColor: "rgba(255,255,255,0.2)" },
+  kitLabel: { color: C.text, fontSize: 13, fontWeight: "700" },
 });
