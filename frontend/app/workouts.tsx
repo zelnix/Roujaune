@@ -10,7 +10,7 @@ import Svg, { Rect } from "react-native-svg";
 
 import { CC } from "@/src/components/calendar";
 import { TopStatus } from "@/src/components/plan";
-import { WideSidebar } from "@/src/components/WideSidebar";
+import { SideNavigation } from "@/src/components/SideNavigation";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
 import { useCoach } from "@/src/lib/coach-persona";
 import { markPlanSeen } from "@/src/lib/plan-badge";
@@ -99,8 +99,10 @@ function Toast({ message }: { message: { id: number; text: string } | null }) {
 export default function WorkoutsScreen() {
   const router = useRouter();
   const persona = useCoach();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const compact = width < 820;
+  const navCompact = height < 560;
+  const navWidth = navCompact ? Math.max(72, Math.min(88, width * 0.09)) : Math.max(84, Math.min(104, width * 0.085));
 
   const [tab, setTab] = React.useState<WorkoutTab>("All Workouts");
   const [favs, setFavs] = React.useState<Set<string>>(new Set());
@@ -184,7 +186,7 @@ export default function WorkoutsScreen() {
       <StatusBar hidden />
       <SafeAreaView style={{ flex: 1, backgroundColor: CC.bg }} edges={["top", "bottom", "left"]}>
         <View style={s.canvas}>
-          {!compact && <WideSidebar active="workouts" onSelect={onSelectNav} persona={persona} />}
+          {!compact && <SideNavigation active="workouts" onSelect={onSelectNav} width={navWidth} compact={navCompact} />}
 
           <ScrollView style={{ flex: 1 }} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
             {/* header */}

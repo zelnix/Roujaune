@@ -37,7 +37,7 @@ function Row({ item, active, onPress, badge }: { item: NavItem; active: boolean;
 /** Wide, labelled Roujaune sidebar with the ROUJAUNE logo + wordmark, the locked
  * navigation order, a dynamic coach portrait card (no message button) and the
  * Settings / Help footer. Reusable across full-width tablet screens. */
-export function WideSidebar({ active, onSelect, persona, width = 210 }: { active: string; onSelect: (key: string) => void; persona: CoachPersona; width?: number }) {
+export function WideSidebar({ active, onSelect, width = 210 }: { active: string; onSelect: (key: string) => void; persona: CoachPersona; width?: number }) {
   const planBadge = usePlanBadge();
   return (
     <View style={[ws.nav, { width }]} testID="wide-sidebar">
@@ -56,18 +56,6 @@ export function WideSidebar({ active, onSelect, persona, width = 210 }: { active
               badge={item.key === "training" && planBadge && active !== "training"} />
           ))}
         </View>
-
-        <Pressable testID="sidebar-coach-card" onPress={() => onSelect("settings")} style={({ hovered }: any) => [ws.coachCard, hovered && ws.coachCardHover]}>
-          <View style={ws.coachTop}>
-            <Image source={persona.image} style={ws.coachImg} contentFit="cover" contentPosition="top center" />
-            <View style={ws.onlineDot} />
-          </View>
-          <Text style={ws.coachName}>{persona.name}</Text>
-          <View style={ws.coachMetaRow}>
-            <Text style={ws.coachRole}>Your Companion Coach</Text>
-            <Text style={ws.coachSig}>{persona.signature}</Text>
-          </View>
-        </Pressable>
 
         <View style={ws.footer}>
           {navFooter.map((item) => (

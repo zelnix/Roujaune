@@ -53,7 +53,7 @@ export default function Dashboard() {
     : Math.max(84, Math.min(104, width * 0.085));
   const contentWidth = width - navWidth;
   const mainWidth = contentWidth - spacing.lg * 2;
-  const heroHeight = compact ? Math.max(320, Math.round(height * 0.94)) : 432;
+  const heroHeight = compact ? Math.max(320, Math.round(height * 0.94)) : 476;
 
   const router = useRouter();
   const persona = useCoach();
@@ -105,6 +105,7 @@ export default function Dashboard() {
               onStart={() => router.push("/training")}
               onToast={showToast}
               onMessage={() => setShowChat(true)}
+              onProfile={() => router.push("/profile")}
               compact={compact}
             />
 

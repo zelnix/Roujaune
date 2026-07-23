@@ -7,13 +7,13 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { useCoach } from "@/src/lib/coach-persona";
-import { usePlan, useAdaptation } from "@/src/lib/plan";
+import { usePlan, useAdaptation, useAdaptiveTargets } from "@/src/lib/plan";
 import { markPlanSeen } from "@/src/lib/plan-badge";
 import {
   C, PLAN_OPTIONS, PlanPhase, KeyWorkout, PlanProvider,
   PlanHeader, TopStatus, PlanSelector, PlanTabs,
   PlanHeroCard, PlanGoalsCard, CurrentPhaseRoadmap, WeeklyLoadCard,
-  KeyWorkoutsCard, AlbertoAdaptationsCard, PlanProgressStrip, AlbertoTipFooter,
+  KeyWorkoutsCard, AlbertoAdaptationsCard, AdaptiveTargetsCard, PlanProgressStrip, AlbertoTipFooter,
 } from "@/src/components/plan";
 import { SideNavigation } from "@/src/components/SideNavigation";
 import { EditGoalsModal, ProgressModal, AdaptationsModal } from "@/src/components/plan-modals";
@@ -43,6 +43,7 @@ export default function TrainingPlanScreen() {
   const persona = useCoach();
   const { plan, loading, live } = usePlan();
   const adaptation = useAdaptation(persona.name, persona.gender);
+  const adaptiveTargets = useAdaptiveTargets();
   const { width } = useWindowDimensions();
   const compact = width < 700; // phones scroll; tablets fill
 
@@ -122,7 +123,7 @@ export default function TrainingPlanScreen() {
   } else if (tab === "Load & Progress") {
     body = (<><WeeklyLoadCard width={fullW} onFilter={() => showToast("Filter: This Plan")} />{progress}{tip}</>);
   } else if (tab === "Adaptations") {
-    body = (<><AlbertoAdaptationsCard persona={persona} width={fullW} onViewAll={() => setShowAdaptations(true)} text={adaptation.text} loading={adaptation.loading} onRefresh={adaptation.refresh} />{progress}{tip}</>);
+    body = (<><View style={styles.rowGap}><AlbertoAdaptationsCard persona={persona} onViewAll={() => setShowAdaptations(true)} text={adaptation.text} loading={adaptation.loading} onRefresh={adaptation.refresh} /><View style={{ width: 380 }}><AdaptiveTargetsCard targets={adaptiveTargets.targets} loading={adaptiveTargets.loading} width={380} /></View></View>{progress}{tip}</>);
   } else {
     body = (<>{hero}{roadmapRow}{workoutsRow}{progress}{tip}</>);
   }

@@ -801,10 +801,15 @@ async def _update_adaptive_targets(plan_id: str, intervals: List[Dict[str, Any]]
 
 @api_router.get("/plan/targets")
 async def get_plan_targets(plan_id: str = "build-and-climb"):
-    """Current adaptive per-zone target bias (fraction, e.g. Z4: 0.04 → +4%).
-    The live HUD applies this on top of FTP × zone% so targets track execution."""
+    """Current adaptive per-zone target bias (fraction, e.g. Z4: 0.04 → +4%) plus
+    the recent execution ratios that produced it. The live HUD applies the bias
+    on top of FTP × zone%; the Plan screen visualises both."""
     plan = await db.training_plans.find_one({"id": plan_id}) or {}
-    return {"zone_bias": plan.get("zone_bias") or {}}
+    return {
+        "zone_bias": plan.get("zone_bias") or {},
+        "zone_exec": plan.get("zone_exec") or {},
+        "zones": NUDGE_ZONES,
+    }
 
 
 # ----------------------- Trainer telemetry (BLE bridge stand-in) -----------------------

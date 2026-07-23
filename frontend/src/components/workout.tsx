@@ -12,6 +12,7 @@ import type { RouteOption } from "../data";
 import type { Settings } from "../lib/settings";
 
 const glyph = require("../../assets/images/logo_glyph_t.png");
+const wordmark = require("../../assets/images/wordmark_t.png");
 const riderImg = require("../../assets/images/hero_cyclist_b2.jpg");
 
 const ZONE = { z1: "#43C65A", z2: "#9ACD32", z3: colors.yellow, z4: "#E8631C", z5: colors.red };
@@ -21,10 +22,7 @@ export function BrandWordmark() {
   return (
     <View style={styles.brandRow}>
       <Image source={glyph} style={{ width: 34, height: 34 }} contentFit="contain" />
-      <Text style={styles.brandText}>
-        <Text style={{ color: colors.red }}>ROU</Text>
-        <Text style={{ color: colors.yellow }}>JAUNE</Text>
-      </Text>
+      <Image source={wordmark} style={styles.brandMark} contentFit="contain" contentPosition="left" accessibilityLabel="ROUJAUNE" />
     </View>
   );
 }
@@ -916,7 +914,7 @@ const styles = StyleSheet.create({
   /* top bar */
   topBar: { flexDirection: "row", alignItems: "center", gap: spacing.lg, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.lg, paddingVertical: 10, ...shadow.card },
   brandRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  brandText: { fontSize: 24, fontWeight: "900", fontStyle: "italic", letterSpacing: 0.5 },
+  brandMark: { width: 168, height: 26 },
   topElapsed: { alignItems: "flex-start" },
   elapsedVal: { color: colors.white, fontSize: 26, fontWeight: "800", letterSpacing: 0.5 },
   microLabel: { color: colors.textDim, fontSize: 10, fontWeight: "700", letterSpacing: 0.6 },

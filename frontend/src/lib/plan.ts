@@ -119,7 +119,6 @@ export async function fetchPlanProgress(planId = "build-and-climb"): Promise<Pla
 }
 
 export type EditableGoal = { id: string; title: string; description: string; status: "complete" | "incomplete" };
-
 export async function savePlanGoals(goals: EditableGoal[], planId = "build-and-climb"): Promise<void> {
   const res = await fetch(`${apiBase()}/api/plan/goals`, {
     method: "PUT",
@@ -127,4 +126,35 @@ export async function savePlanGoals(goals: EditableGoal[], planId = "build-and-c
     body: JSON.stringify({ plan_id: planId, goals }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
+}
+
+/* ── Adaptive per-zone targets (auto-tuned from ride execution) ── */
+export type ZoneTarget = { zone: string; bias: number; recent: number[] };
+
+export function useAdaptiveTargets(planId = "build-and-climb") {
+  const [targets, setTargets] = useState<ZoneTarget[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`${apiBase()}/api/plan/targets?plan_id=${planId}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const zones: string[] = data?.zones ?? ["Z2", "Z3", "Z4", "Z5", "Z6"];
+        const bias = data?.zone_bias ?? {};
+        const exec = data?.zone_exec ?? {};
+        const list: ZoneTarget[] = zones.map((z) => ({ zone: z, bias: bias[z] ?? 0, recent: exec[z] ?? [] }));
+        if (alive) setTargets(list);
+      } catch {
+        if (alive) setTargets([]);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, [planId]);
+
+  return { targets, loading };
 }

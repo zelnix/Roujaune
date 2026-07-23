@@ -8,7 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { CC } from "@/src/components/calendar";
 import { TopStatus } from "@/src/components/plan";
-import { WideSidebar } from "@/src/components/WideSidebar";
+import { SideNavigation } from "@/src/components/SideNavigation";
 import { useCoach } from "@/src/lib/coach-persona";
 import { markPlanSeen } from "@/src/lib/plan-badge";
 import { WORKOUT_TYPES } from "@/src/lib/workouts";
@@ -78,8 +78,10 @@ export default function WorkoutListScreen() {
   const router = useRouter();
   const persona = useCoach();
   const params = useLocalSearchParams<{ type?: string; workout?: string }>();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const compact = width < 900;
+  const navCompact = height < 560;
+  const navWidth = navCompact ? Math.max(72, Math.min(88, width * 0.09)) : Math.max(84, Math.min(104, width * 0.085));
 
   const [typeFilter, setTypeFilter] = React.useState<string>(params.type ?? "all");
   const [band, setBand] = React.useState<DurationBand>("any");
@@ -124,7 +126,7 @@ export default function WorkoutListScreen() {
   const toggleFav = (id: string) => {
     setFavs((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
     toggleFavorite(id).catch(() => {});
@@ -154,7 +156,7 @@ export default function WorkoutListScreen() {
       <StatusBar hidden />
       <SafeAreaView style={{ flex: 1, backgroundColor: CC.bg }} edges={["top", "bottom", "left"]}>
         <View style={s.canvas}>
-          {!compact && <WideSidebar active="workouts" onSelect={onSelectNav} persona={persona} />}
+          {!compact && <SideNavigation active="workouts" onSelect={onSelectNav} width={navWidth} compact={navCompact} />}
 
           <View style={{ flex: 1 }}>
             {/* header */}

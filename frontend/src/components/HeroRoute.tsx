@@ -12,7 +12,7 @@ import { GlassPill } from "./ui";
 
 const heroImg = require("../../assets/images/hero_cyclist_b2.jpg");
 
-function StatusBar({ onPress }: { onPress: (m: string) => void }) {
+function StatusBar({ onPress, onProfile }: { onPress: (m: string) => void; onProfile?: () => void }) {
   return (
     <View style={styles.statusRow}>
       <GlassPill testID="flame-pill" onPress={() => onPress("12 day streak 🔥")}>
@@ -27,7 +27,7 @@ function StatusBar({ onPress }: { onPress: (m: string) => void }) {
         </View>
       </GlassPill>
 
-      <GlassPill testID="profile-pill" style={styles.avatar} onPress={() => onPress("Profile")}>
+      <GlassPill testID="profile-pill" style={styles.avatar} onPress={() => (onProfile ? onProfile() : onPress("Profile"))}>
         <Ionicons name="person" size={18} color="#fff" />
       </GlassPill>
     </View>
@@ -40,6 +40,7 @@ export function HeroRoute({
   onStart,
   onToast,
   onMessage,
+  onProfile,
   compact = false,
 }: {
   width: number;
@@ -47,6 +48,7 @@ export function HeroRoute({
   onStart: () => void;
   onToast: (m: string) => void;
   onMessage?: () => void;
+  onProfile?: () => void;
   compact?: boolean;
 }) {
   const persona = useCoach();
@@ -78,7 +80,7 @@ export function HeroRoute({
       </View>
 
       {/* top-right status */}
-      <StatusBar onPress={onToast} />
+      <StatusBar onPress={onToast} onProfile={onProfile} />
 
       {/* right: Alberto signature + coach */}
       <View style={[styles.signatureArea, compact && { top: "26%" }]}>

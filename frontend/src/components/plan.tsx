@@ -499,6 +499,80 @@ export function AlbertoAdaptationsCard({ persona, onViewAll, width = 430, text, 
   );
 }
 
+/* ── adaptive per-zone targets ──────────────────────────────────────────── */
+const ZONE_COL: Record<string, string> = { Z2: "#40A9C6", Z3: C.green, Z4: C.yellow, Z5: C.orange, Z6: C.rouge };
+
+function ExecSpark({ recent, color, width = 84, height = 26 }: { recent: number[]; color: string; width?: number; height?: number }) {
+  // Plot recent actual/target ratios around the 1.0 (on-target) baseline.
+  const lo = 0.85, hi = 1.15;
+  const yFor = (r: number) => {
+    const clamped = Math.max(lo, Math.min(hi, r));
+    return height - ((clamped - lo) / (hi - lo)) * height;
+  };
+  const baseY = yFor(1);
+  if (recent.length < 2) {
+    return (
+      <Svg width={width} height={height}>
+        <Line x1={0} y1={baseY} x2={width} y2={baseY} stroke="rgba(255,255,255,0.14)" strokeWidth={1} strokeDasharray="3,3" />
+      </Svg>
+    );
+  }
+  const stepX = width / (recent.length - 1);
+  const pts = recent.map((r, i) => `${i * stepX},${yFor(r)}`);
+  const last = recent[recent.length - 1];
+  return (
+    <Svg width={width} height={height}>
+      <Line x1={0} y1={baseY} x2={width} y2={baseY} stroke="rgba(255,255,255,0.14)" strokeWidth={1} strokeDasharray="3,3" />
+      <Path d={`M${pts.join(" L")}`} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+      <Circle cx={(recent.length - 1) * stepX} cy={yFor(last)} r={2.6} fill={color} />
+    </Svg>
+  );
+}
+
+export function AdaptiveTargetsCard({ targets, loading = false, width }: { targets: { zone: string; bias: number; recent: number[] }[]; loading?: boolean; width?: number }) {
+  const active = targets.filter((t) => Math.abs(t.bias) > 0.0001 || t.recent.length > 0);
+  return (
+    <View style={[s.card, width ? { width } : { flex: 1 }]} testID="adaptive-targets">
+      <View style={s.cardHeadRow}>
+        <View style={s.cardHead}>
+          <Ionicons name="options-outline" size={15} color={C.yellow} />
+          <Text style={[s.cardHeadText, { color: C.yellow }]}>ADAPTIVE TARGETS</Text>
+        </View>
+        <Text style={s.lastUpdated}>Auto-tuned from your rides</Text>
+      </View>
+
+      {active.length === 0 ? (
+        <View style={s.atEmpty}>
+          <Ionicons name="sparkles-outline" size={20} color={C.dim} />
+          <Text style={s.atEmptyText}>
+            {loading ? "Loading your targets…" : "Ride a few sessions and your companion coach will fine-tune each zone's power target to how you actually perform."}
+          </Text>
+        </View>
+      ) : (
+        <View style={{ gap: 8, marginTop: 4 }}>
+          {targets.map((t) => {
+            const col = ZONE_COL[t.zone] ?? C.dim;
+            const pct = Math.round(t.bias * 100);
+            const biasColor = t.bias > 0 ? C.green : t.bias < 0 ? C.amber : C.dim;
+            const biasText = t.bias > 0 ? `+${pct}%` : t.bias < 0 ? `${pct}%` : "On base";
+            return (
+              <View key={t.zone} style={s.atRow}>
+                <View style={[s.atZoneChip, { borderColor: col }]}>
+                  <Text style={[s.atZoneText, { color: col }]}>{t.zone}</Text>
+                </View>
+                <ExecSpark recent={t.recent} color={col} />
+                <View style={{ flex: 1 }} />
+                <Text style={[s.atBias, { color: biasColor }]}>{biasText}</Text>
+              </View>
+            );
+          })}
+          <Text style={s.atHint}>Overshoot a zone repeatedly and its target rises; fade and it eases — capped at ±8%.</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 /* ── progress strip + tip ───────────────────────────────────────────────── */
 function Metric({ value, label, color }: { value: string; label: string; color?: string }) {
   return (
@@ -677,6 +751,13 @@ const s = StyleSheet.create({
   adaptRow: { flexDirection: "row", gap: 12, marginTop: 6 },
   adaptAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: "rgba(255,255,255,0.08)" },
   adaptText: { flex: 1, color: C.white, fontSize: 13, lineHeight: 19 },
+  atRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  atZoneChip: { minWidth: 34, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
+  atZoneText: { fontSize: 12, fontWeight: "900" },
+  atBias: { fontSize: 15, fontWeight: "900" },
+  atHint: { color: C.dim, fontSize: 11, lineHeight: 15, marginTop: 6 },
+  atEmpty: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10 },
+  atEmptyText: { flex: 1, color: C.dim, fontSize: 12.5, lineHeight: 18 },
   adaptFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 14, gap: 10, flexWrap: "wrap" },
   statusChip: { flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: "rgba(85,200,80,0.10)", borderWidth: 1, borderColor: "rgba(85,200,80,0.35)", borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12 },
   statusChipText: { color: C.green, fontSize: 12, fontWeight: "700" },
