@@ -1,10 +1,12 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { colors, radius, spacing } from "../theme";
 import { ReadinessScale } from "./ui";
 import { useRiderSeason } from "../lib/rider-profile";
 import { useSettings } from "../lib/settings";
+import { useTodayReadiness, readinessTone } from "../lib/checkin";
 
 function fmtHours(h: number) {
   const hh = Math.floor(h);
@@ -13,10 +15,15 @@ function fmtHours(h: number) {
 }
 
 /** Weekly training summary — real aggregates for the last 7 days (rides, time,
- * distance, elevation) plus current FTP and readiness. */
+ * distance, elevation) plus current FTP and today's live readiness. */
 export function MetricSummaryStrip() {
   const season = useRiderSeason(7);
   const { settings } = useSettings();
+  const { readiness } = useTodayReadiness();
+  const router = useRouter();
+
+  const rTone = readinessTone(readiness.available ? readiness.score : undefined, readiness.safetyOverride);
+  const readinessValue = readiness.available && !readiness.safetyOverride ? `${readiness.score}%` : readiness.safetyOverride ? "!" : "—";
 
   const cells = [
     { key: "rides", label: "WEEKLY RIDES", icon: "bicycle" as const, iconColor: colors.red, value: season ? `${season.rides}` : "—", status: "This week" },
@@ -24,7 +31,6 @@ export function MetricSummaryStrip() {
     { key: "distance", label: "DISTANCE", icon: "navigate" as const, iconColor: "#40A9C6", value: season ? `${season.distance_km.toLocaleString()} km` : "—", status: "This week" },
     { key: "elevation", label: "ELEVATION", icon: "trending-up" as const, iconColor: colors.green, value: season ? `${season.elevation_m.toLocaleString()} m` : "—", status: "Gained this week" },
     { key: "ftp", label: "FTP", icon: "flash" as const, iconColor: colors.yellow, value: `${settings.ftp} W`, status: "Current" },
-    { key: "readiness", label: "READINESS", icon: "heart-outline" as const, iconColor: colors.red, value: "82%", status: "Good to go", scale: true },
   ];
 
   return (
@@ -38,9 +44,19 @@ export function MetricSummaryStrip() {
             <Text style={styles.value}>{m.value}</Text>
             <Text style={styles.status}>{m.status}</Text>
           </View>
-          {m.scale && <ReadinessScale />}
         </View>
       ))}
+      {/* Live readiness — tap to open the daily check-in */}
+      <Pressable testID="readiness-cell" onPress={() => router.push("/checkin")} style={styles.cell} accessibilityRole="button" accessibilityLabel="Open daily check-in">
+        <View style={styles.divider} />
+        <Ionicons name="heart-outline" size={24} color={rTone.color} style={{ marginRight: 10 }} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.label}>READINESS</Text>
+          <Text style={styles.value}>{readinessValue}</Text>
+          <Text style={[styles.status, { color: rTone.color }]}>{readiness.available ? rTone.label : "Tap to check in"}</Text>
+        </View>
+        {readiness.available && !readiness.safetyOverride ? <ReadinessScale /> : <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />}
+      </Pressable>
     </View>
   );
 }

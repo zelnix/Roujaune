@@ -75,6 +75,17 @@ function structured(o: {
   };
 }
 
+// Build an interval set: n efforts separated by an easy recovery.
+function set(n: number, mk: (i: number) => SegSpec, restMin: number): SegSpec[] {
+  const a: SegSpec[] = [];
+  for (let i = 1; i <= n; i++) {
+    a.push(mk(i));
+    if (i < n) a.push(easy(restMin));
+  }
+  return a;
+}
+const rep = (label: string, zoneIdx: number, minutes: number, targetPct: number): SegSpec => ({ label, zoneIdx, minutes, targetPct });
+
 // ── Structured Indoor Endurance Library (level-based; durations kept within the
 // Foundation/Development/Performance limits — no 90-min+ standard indoor rides) ──
 const END_COLOR = "#55C850";
@@ -163,6 +174,62 @@ const STRUCTURED: Workout[] = [
     level: "Performance", difficulty: "Hard", focus: "Endurance durability", tss: 54, if: 0.68, zones: zones(40, 60, 0, 0, 0, 0),
     description: "Three long Zone 2 blocks that each finish in upper Zone 2 — durable endurance in 70 focused minutes. 50+ tip: keep the finishes controlled, vary your position, and reduce resistance any time joints feel it.",
     spec: [wu(15), { label: "Zone 2 · Block 1", zoneIdx: 1, minutes: 11, targetPct: T.z2 }, { label: "Upper Z2 Finish", zoneIdx: 1, minutes: 3, targetPct: T.z2up }, easy(3), { label: "Zone 2 · Block 2", zoneIdx: 1, minutes: 11, targetPct: T.z2 }, { label: "Upper Z2 Finish", zoneIdx: 1, minutes: 3, targetPct: T.z2up }, easy(3), { label: "Zone 2 · Block 3", zoneIdx: 1, minutes: 11, targetPct: T.z2 }, { label: "Upper Z2 Finish", zoneIdx: 1, minutes: 3, targetPct: T.z2up }, cd(7)] }),
+
+  // 7. Threshold Intervals (sustainable power at/near FTP)
+  structured({ id: "threshold-intervals-foundation", name: "Threshold Intervals", typeId: "threshold", typeName: "Threshold", color: "#FFC20A", icon: "flash",
+    level: "Foundation", difficulty: "Moderate", focus: "Sustainable power", tss: 32, if: 0.82, zones: zones(38, 20, 0, 42, 0, 0),
+    description: "A gentle introduction to threshold work — two short efforts just below your limit. 50+ tip: keep your breathing controlled and ease off early if your form starts to fade.",
+    spec: [wu(10), ...set(2, (i) => rep(`Threshold · ${i}/2`, 3, 6, 0.92), 4), cd(8)] }),
+  structured({ id: "threshold-intervals-development", name: "Threshold Intervals", typeId: "threshold", typeName: "Threshold", color: "#FFC20A", icon: "flash",
+    level: "Development", difficulty: "Hard", focus: "Sustainable power", tss: 50, if: 0.87, zones: zones(32, 18, 0, 50, 0, 0),
+    description: "Three eight-minute efforts right at threshold to lift your sustainable power. Hold a strong, even cadence and repeatable output across all three.",
+    spec: [wu(12), ...set(3, (i) => rep(`Threshold · ${i}/3`, 3, 8, 0.95), 4), cd(8)] }),
+  structured({ id: "threshold-intervals-performance", name: "Threshold Intervals", typeId: "threshold", typeName: "Threshold", color: "#FFC20A", icon: "flash",
+    level: "Performance", difficulty: "Very Hard", focus: "Sustainable power", tss: 68, if: 0.9, zones: zones(28, 16, 0, 56, 0, 0),
+    description: "Four demanding eight-minute threshold efforts for serious FTP gains. Precise pacing throughout — every effort should look the same on power.",
+    spec: [wu(14), ...set(4, (i) => rep(`Threshold · ${i}/4`, 3, 8, 0.97), 4), cd(8)] }),
+
+  // 8. VO2 Max Intervals (aerobic ceiling)
+  structured({ id: "vo2-intervals-foundation", name: "VO2 Max Intervals", typeId: "vo2max", typeName: "VO2 Max", color: "#40A9C6", icon: "speedometer-outline",
+    level: "Foundation", difficulty: "Hard", focus: "Aerobic ceiling", tss: 34, if: 0.85, zones: zones(30, 20, 0, 0, 50, 0),
+    description: "Short two-minute efforts to open up your top-end aerobic system. 50+ tip: build into each rep rather than starting flat-out, and stop if you feel light-headed.",
+    spec: [wu(10), ...set(4, (i) => rep(`VO2 · ${i}/4`, 4, 2, 1.1), 2), cd(8)] }),
+  structured({ id: "vo2-intervals-development", name: "VO2 Max Intervals", typeId: "vo2max", typeName: "VO2 Max", color: "#40A9C6", icon: "speedometer-outline",
+    level: "Development", difficulty: "Very Hard", focus: "Aerobic ceiling", tss: 48, if: 0.9, zones: zones(28, 18, 0, 0, 54, 0),
+    description: "Classic five-by-three-minute VO2 efforts with equal recovery. Raises your aerobic ceiling and the power you can hold when it really hurts.",
+    spec: [wu(12), ...set(5, (i) => rep(`VO2 · ${i}/5`, 4, 3, 1.12), 3), cd(8)] }),
+  structured({ id: "vo2-intervals-performance", name: "VO2 Max Intervals", typeId: "vo2max", typeName: "VO2 Max", color: "#40A9C6", icon: "speedometer-outline",
+    level: "Performance", difficulty: "Very Hard", focus: "Aerobic ceiling", tss: 60, if: 0.93, zones: zones(26, 16, 0, 0, 58, 0),
+    description: "Six brutal three-minute VO2 efforts for the strongest riders. Hold your target on every rep — this is where race-winning fitness is built.",
+    spec: [wu(14), ...set(6, (i) => rep(`VO2 · ${i}/6`, 4, 3, 1.13), 3), cd(8)] }),
+
+  // 9. Sprint Power (short, maximal neuromuscular efforts)
+  structured({ id: "sprint-power-foundation", name: "Sprint Power", typeId: "sprints", typeName: "Sprints", color: "#A65AE2", icon: "flash-outline",
+    level: "Foundation", difficulty: "Moderate", focus: "Explosive power", tss: 24, if: 0.7, zones: zones(45, 40, 0, 0, 0, 15),
+    description: "Five short fifteen-second sprints with full recovery. 50+ tip: stay seated or rise smoothly — never lunge — and keep plenty of easy spinning between efforts.",
+    spec: [wu(10), ...set(5, (i) => rep(`Sprint · ${i}/5`, 5, 0.25, 1.5), 2.5), cd(6)] }),
+  structured({ id: "sprint-power-development", name: "Sprint Power", typeId: "sprints", typeName: "Sprints", color: "#A65AE2", icon: "flash-outline",
+    level: "Development", difficulty: "Hard", focus: "Explosive power", tss: 30, if: 0.74, zones: zones(42, 40, 0, 0, 0, 18),
+    description: "Six maximal fifteen-second sprints to sharpen your top-end speed and neuromuscular power. Full, unhurried recovery between each.",
+    spec: [wu(12), ...set(6, (i) => rep(`Sprint · ${i}/6`, 5, 0.25, 1.5), 2.5), cd(6)] }),
+  structured({ id: "sprint-power-performance", name: "Sprint Power", typeId: "sprints", typeName: "Sprints", color: "#A65AE2", icon: "flash-outline",
+    level: "Performance", difficulty: "Very Hard", focus: "Explosive power", tss: 38, if: 0.78, zones: zones(40, 38, 0, 0, 0, 22),
+    description: "Eight all-out sprints for a race-winning kick. Commit fully to each effort, then recover completely — quality over quantity every time.",
+    spec: [wu(12), ...set(8, (i) => rep(`Sprint · ${i}/8`, 5, 0.25, 1.55), 2.5), cd(7)] }),
+
+  // 10. Recovery Spin (very light active recovery)
+  structured({ id: "recovery-spin-foundation", name: "Recovery Spin", typeId: "recovery", typeName: "Recovery", color: "#3FBFAE", icon: "heart-outline",
+    level: "Foundation", difficulty: "Easy", focus: "Active recovery", tss: 9, if: 0.5, zones: zones(100, 0, 0, 0, 0, 0),
+    description: "A short, feather-light spin to promote blood flow and ease the legs. Keep it gentle and high-cadence — this should feel restful, not like training.",
+    spec: [rep("Easy Spin", 0, 25, 0.5)] }),
+  structured({ id: "recovery-spin-development", name: "Recovery Spin", typeId: "recovery", typeName: "Recovery", color: "#3FBFAE", icon: "heart-outline",
+    level: "Development", difficulty: "Easy", focus: "Active recovery", tss: 13, if: 0.5, zones: zones(100, 0, 0, 0, 0, 0),
+    description: "An easy thirty-five-minute flush to speed recovery between harder days. Stay strictly in Zone 1 and enjoy the spin.",
+    spec: [rep("Easy Spin", 0, 35, 0.52)] }),
+  structured({ id: "recovery-spin-performance", name: "Recovery Spin", typeId: "recovery", typeName: "Recovery", color: "#3FBFAE", icon: "heart-outline",
+    level: "Performance", difficulty: "Easy", focus: "Active recovery", tss: 18, if: 0.55, zones: zones(85, 15, 0, 0, 0, 0),
+    description: "A longer active-recovery spin with a couple of light cadence lifts to keep the legs supple. Still easy throughout — recovery is the goal, not fitness.",
+    spec: [rep("Easy Spin", 0, 15, 0.5), rep("Light Lift", 1, 3, 0.62), rep("Easy Spin", 0, 12, 0.5), rep("Light Lift", 1, 3, 0.62), rep("Easy Spin", 0, 10, 0.5)] }),
 ];
 
 export const WORKOUTS: Workout[] = [

@@ -67,13 +67,20 @@ export function EditGoalsModal({
 
   const update = (id: string, patch: Partial<EditableGoal>) =>
     setDraft((d) => d.map((g) => (g.id === id ? { ...g, ...patch } : g)));
-  const toggle = (id: string) =>
-    update(id, { status: draft.find((g) => g.id === id)?.status === "complete" ? "incomplete" : "complete" });
+  const selectedCount = draft.filter((g) => g.status === "complete").length;
+  const toggle = (id: string) => {
+    const g = draft.find((x) => x.id === id);
+    if (!g) return;
+    // Enforce exactly three selected focus goals.
+    if (g.status !== "complete" && selectedCount >= 3) return;
+    update(id, { status: g.status === "complete" ? "incomplete" : "complete" });
+  };
   const remove = (id: string) => setDraft((d) => d.filter((g) => g.id !== id));
   const add = () => setDraft((d) => [...d, { id: `new-${Date.now()}-${goalSeq++}`, title: "", description: "", status: "incomplete" }]);
 
   const save = async () => {
     const clean = draft.filter((g) => g.title.trim());
+    if (clean.filter((g) => g.status === "complete").length !== 3) return;
     setSaving(true);
     try {
       await savePlanGoals(clean);
@@ -87,24 +94,31 @@ export function EditGoalsModal({
   return (
     <ModalShell
       visible={visible} onClose={onClose} title="Edit Plan Goals"
-      subtitle="Tune what this training block is working toward." icon="disc-outline" iconColor={C.rouge}
+      subtitle="Choose exactly 3 focus goals for this training block." icon="disc-outline" iconColor={C.rouge}
       footer={
         <View style={m.footerRow}>
+          <Text style={[m.selHint, selectedCount === 3 ? m.selHintOk : m.selHintWarn]}>
+            {selectedCount === 3 ? "3 of 3 selected" : `Select 3 goals (${selectedCount}/3)`}
+          </Text>
+          <View style={{ flex: 1 }} />
           <Pressable testID="goals-cancel" onPress={onClose} style={({ hovered }: any) => [m.btnGhost, hovered && m.btnGhostHover]}>
             <Text style={m.btnGhostText}>Cancel</Text>
           </Pressable>
-          <Pressable testID="goals-save" onPress={save} disabled={saving} style={({ hovered }: any) => [m.btnPrimary, hovered && { opacity: 0.9 }, saving && { opacity: 0.6 }]}>
+          <Pressable testID="goals-save" onPress={save} disabled={saving || selectedCount !== 3} style={({ hovered }: any) => [m.btnPrimary, hovered && { opacity: 0.9 }, (saving || selectedCount !== 3) && { opacity: 0.6 }]}>
             {saving ? <ActivityIndicator size="small" color="#241B00" /> : <Ionicons name="checkmark" size={16} color="#241B00" />}
             <Text style={m.btnPrimaryText}>{saving ? "Saving…" : "Save Goals"}</Text>
           </Pressable>
         </View>
       }
     >
-      {draft.map((g) => (
-        <View key={g.id} style={m.goalCard}>
-          <Pressable testID={`goal-toggle-${g.id}`} onPress={() => toggle(g.id)} hitSlop={8} accessibilityRole="checkbox" accessibilityState={{ checked: g.status === "complete" }}
-            style={[m.goalCheck, g.status === "complete" ? m.goalCheckOn : m.goalCheckOff]}>
-            {g.status === "complete" ? <Ionicons name="checkmark" size={16} color="#04210F" /> : null}
+      {draft.map((g) => {
+        const on = g.status === "complete";
+        const disabled = !on && selectedCount >= 3;
+        return (
+        <View key={g.id} style={[m.goalCard, disabled && { opacity: 0.55 }]}>
+          <Pressable testID={`goal-toggle-${g.id}`} onPress={() => toggle(g.id)} hitSlop={8} accessibilityRole="checkbox" accessibilityState={{ checked: on }}
+            style={[m.goalCheck, on ? m.goalCheckOn : m.goalCheckOff]}>
+            {on ? <Ionicons name="checkmark" size={16} color="#04210F" /> : null}
           </Pressable>
           <View style={{ flex: 1, gap: 6 }}>
             <TextInput
@@ -120,7 +134,8 @@ export function EditGoalsModal({
             <Ionicons name="trash-outline" size={18} color={C.dim} />
           </Pressable>
         </View>
-      ))}
+        );
+      })}
       <Pressable testID="goal-add" onPress={add} style={({ hovered }: any) => [m.addRow, hovered && m.btnGhostHover]}>
         <Ionicons name="add" size={18} color={C.yellow} />
         <Text style={m.addText}>Add a goal</Text>
@@ -301,7 +316,10 @@ const m = StyleSheet.create({
   subtitle: { color: C.dim, fontSize: 12, marginTop: 2 },
   closeBtn: { width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   footer: { padding: 16, borderTopWidth: 1, borderTopColor: C.borderSoft },
-  footerRow: { flexDirection: "row", justifyContent: "flex-end", gap: 12 },
+  footerRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  selHint: { fontSize: 12, fontWeight: "700" },
+  selHintOk: { color: C.green },
+  selHintWarn: { color: C.dim },
 
   btnGhost: { paddingVertical: 11, paddingHorizontal: 18, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: "rgba(255,255,255,0.03)", minHeight: 44, justifyContent: "center" },
   btnGhostHover: { borderColor: "rgba(255,255,255,0.28)", backgroundColor: "rgba(255,255,255,0.06)" },

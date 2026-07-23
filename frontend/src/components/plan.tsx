@@ -338,6 +338,8 @@ export function PlanHeroCard() {
 
 export function PlanGoalsCard({ onEdit }: { onEdit: () => void }) {
   const PLAN = useP();
+  const selected = PLAN.goals.filter((g) => g.status === "complete").slice(0, 3);
+  const list = selected.length ? selected : PLAN.goals.slice(0, 3);
   return (
     <View style={[s.card, s.goalsCard]} testID="plan-goals">
       <View style={s.cardHead}>
@@ -345,14 +347,14 @@ export function PlanGoalsCard({ onEdit }: { onEdit: () => void }) {
         <Text style={[s.cardHeadText, { color: C.rouge }]}>PLAN GOALS</Text>
       </View>
       <View style={{ flex: 1 }}>
-        {PLAN.goals.map((g, i) => (
-          <View key={g.id} style={[s.goalRow, i < PLAN.goals.length - 1 && s.rowDivider]}>
-            <View style={s.goalIcon}><Ionicons name={g.status === "complete" ? "trending-up" : "bicycle"} size={16} color={C.dim} /></View>
+        {list.map((g, i) => (
+          <View key={g.id} style={[s.goalRow, i < list.length - 1 && s.rowDivider]}>
+            <View style={s.goalIcon}><Ionicons name="bicycle" size={16} color={C.dim} /></View>
             <View style={{ flex: 1 }}>
               <Text style={s.goalTitle}>{g.title}</Text>
               <Text style={s.goalDesc}>{g.description}</Text>
             </View>
-            <StatusCheck done={g.status === "complete"} />
+            <StatusCheck done />
           </View>
         ))}
       </View>
@@ -698,7 +700,7 @@ const s = StyleSheet.create({
   heroImgWrap: { flex: 1, backgroundColor: "#0A0C0B" },
 
   // goals
-  goalsCard: { width: 330 },
+  goalsCard: { minWidth: 0 },
   goalRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 11 },
   rowDivider: { borderBottomWidth: 1, borderBottomColor: C.borderSoft },
   goalIcon: { width: 30, height: 30, borderRadius: 9, backgroundColor: "rgba(255,255,255,0.05)", alignItems: "center", justifyContent: "center" },

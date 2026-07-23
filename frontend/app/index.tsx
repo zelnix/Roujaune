@@ -13,6 +13,7 @@ import { MetricSummaryStrip } from "@/src/components/MetricSummaryStrip";
 import { TrainingPlanCard } from "@/src/components/TrainingPlanCard";
 import { FeaturedRouteCard } from "@/src/components/FeaturedRouteCard";
 import { CalendarCard } from "@/src/components/CalendarCard";
+import { ReadinessGate } from "@/src/components/ReadinessGate";
 import { ProgressCard, CommunityCard, WellnessCard, AchievementCard } from "@/src/components/BottomCards";
 import { navItems, navFooter } from "@/src/data";
 import { useCoach } from "@/src/lib/coach-persona";
@@ -116,6 +117,8 @@ export default function Dashboard() {
             />
 
             <MetricSummaryStrip />
+
+            <ReadinessGate />
 
             <View style={[styles.midRow, compact && { minHeight: 210 }]}>
               <View style={styles.midCol}>

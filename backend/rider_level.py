@@ -105,6 +105,12 @@ def compute_rider_level(payload: dict) -> dict:
     comp = _frac(payload.get("completion_rate")) or 0
     rec = _frac(payload.get("recovery"))
     concerns = bool(payload.get("readiness_concerns"))
+    missed = _num(payload.get("missed_or_stopped"))
+    improving = _bool(payload.get("improving"))
+    longest = _num(payload.get("longest_ride_min"))
+    # A repeated pattern of reduced/stopped workouts is treated as a safety/consistency concern.
+    if missed is not None and missed >= 3:
+        concerns = True
     weeks_int = _num(payload.get("weeks_meeting_intermediate")) or 0
     weeks_adv = _num(payload.get("weeks_meeting_advanced")) or 0
     weeks_below = _num(payload.get("weeks_below_current")) or 0
@@ -167,6 +173,10 @@ def compute_rider_level(payload: dict) -> dict:
         reasons.append("Controlled RPE across sessions")
     if rec is not None and rec >= 0.7:
         reasons.append("Recovering reliably between sessions")
+    if improving:
+        reasons.append("Improving in duration, workload or efficiency")
+    if longest is not None and longest >= 45:
+        reasons.append(f"Completed a {int(longest)}-minute indoor ride")
     if not reasons:
         reasons = ["Building your recent training picture"]
 

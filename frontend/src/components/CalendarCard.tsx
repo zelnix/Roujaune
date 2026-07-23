@@ -35,7 +35,7 @@ function TodayRow({ label, time, state, active, onPress, testID }: {
     <Touchable testID={testID} onPress={onPress} scaleTo={0.97} lift={false}>
       <View style={[styles.todayRow, active && styles.todayRowActive]}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.todayLabel}>{label}</Text>
+          <Text style={styles.todayLabel} numberOfLines={1}>{label}</Text>
         </View>
         <Text style={styles.todayTime}>{time}</Text>
         <Ionicons name={icon.name} size={18} color={icon.color} style={{ marginLeft: 8 }} />
@@ -44,7 +44,7 @@ function TodayRow({ label, time, state, active, onPress, testID }: {
   );
 }
 
-export function CalendarCard({ onToast, onOpenCalendar }: { onToast: (m: string) => void; onOpenCalendar?: () => void }) {
+export function CalendarCard({ onToast, onOpenCalendar, scope = "today" }: { onToast: (m: string) => void; onOpenCalendar?: () => void; scope?: "today" | "week" }) {
   const { week } = useCalendarWeek();
   const [month, setMonth] = React.useState(dayjs("2025-05-13").startOf("month"));
   const [selected, setSelected] = React.useState(13);
@@ -71,14 +71,34 @@ export function CalendarCard({ onToast, onOpenCalendar }: { onToast: (m: string)
 
   // Today's plan rows = the real sessions scheduled for the live "today".
   const planRows = React.useMemo(() => {
-    const today = (week?.days ?? []).find((d) => d.date === week?.selected_date);
-    if (!today) return todayPlan;
     const state = (s?: string): "done" | "active" | "todo" =>
       s === "completed" ? "done" : s === "today" ? "active" : "todo";
+    const days = week?.days ?? [];
+
+    if (scope === "week") {
+      // The week's main (cycling) session per day.
+      return days
+        .map((d) => {
+          const c = d.cycling;
+          if (!c) return null;
+          const day = d.day_name ? d.day_name.charAt(0) + d.day_name.slice(1).toLowerCase() : "";
+          const rest = c.status === "rest";
+          return {
+            key: d.date,
+            label: `${day} · ${rest ? "Rest Day" : c.title}`,
+            time: rest ? "Rest" : c.duration || "—",
+            state: state(c.status),
+          };
+        })
+        .filter((r): r is NonNullable<typeof r> => !!r);
+    }
+
+    const today = days.find((d) => d.date === week?.selected_date);
+    if (!today) return todayPlan;
     return [today.cycling, today.fb50, today.wellness]
       .filter((s): s is NonNullable<typeof s> => !!s)
       .map((s) => ({ key: s.id, label: s.title, time: s.duration || "—", state: state(s.status) }));
-  }, [week]);
+  }, [week, scope]);
 
   return (
     <View style={styles.card} testID="calendar-card">
@@ -128,13 +148,19 @@ export function CalendarCard({ onToast, onOpenCalendar }: { onToast: (m: string)
             );
           })}
         </View>
+        <View style={{ flex: 1 }} />
+        <SecondaryButton
+          testID="view-calendar-button"
+          label="View Full Calendar"
+          onPress={() => (onOpenCalendar ? onOpenCalendar() : onToast("Opening full calendar"))}
+        />
       </View>
 
       <View style={styles.vDivider} />
 
-      {/* today's plan */}
+      {/* plan list (today or this week) */}
       <View style={styles.planSide}>
-        <SectionLabel color={colors.textDim}>TODAY&apos;S PLAN</SectionLabel>
+        <SectionLabel color={colors.textDim}>{scope === "week" ? "THIS WEEK'S PLAN" : "TODAY'S PLAN"}</SectionLabel>
         <View style={{ marginTop: spacing.sm, gap: 6 }}>
           {planRows.map((w) => (
             <TodayRow
@@ -148,12 +174,6 @@ export function CalendarCard({ onToast, onOpenCalendar }: { onToast: (m: string)
             />
           ))}
         </View>
-        <View style={{ flex: 1 }} />
-        <SecondaryButton
-          testID="view-calendar-button"
-          label="View Full Calendar"
-          onPress={() => (onOpenCalendar ? onOpenCalendar() : onToast("Opening full calendar"))}
-        />
       </View>
     </View>
   );
@@ -169,7 +189,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: spacing.md,
   },
-  calSide: { flex: 1.4 },
+  calSide: { flex: 1.25 },
   monthRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 6 },
   month: { color: colors.white, fontSize: 16, fontWeight: "800" },
   arrows: { flexDirection: "row", gap: 12 },

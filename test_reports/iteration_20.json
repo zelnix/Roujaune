@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 20 - Daily Check-in, live readiness, ReadinessGate, plan header trim, Edit-Goals modal enforcement, calendar override, rider_level engine and the 12 new leveled workouts all verified end-to-end. Backend: 7/7 pytest PASSED in /app/backend/tests/test_iter20_checkin_level.py - POST /api/rider/checkin returns a full readiness result (healthy>=55, safety override with chest_pain returns readinessScore=0, status='Do Not Train', safetyOverride true). GET /api/rider/readiness/today after a healthy check-in returns available=true with score/status/band/mainFactors/metrics (keys energy/sleep/stress/soreness) and safetyOverride false. GET /api/calendar/week?start=2025-05-12 for the 2025-05-13 day is overridden to readiness.source='Daily check-in' with the exact score from the check-in, while other days keep their original source. POST /api/rider/level returns riderLevel/previousLevel/levelChanged/progressTowardNextLevel/confidence/mainReasons/nextLevelRequirements; improving/longest_ride_min surface in reasons when there is room, and missed_or_stopped>=3 correctly suppresses promotion to Intermediate. Frontend (landscape 1280x800): /checkin renders all 5 scales (Sleep quality / Energy / Leg soreness / Stress / Motivation), sleep +/- stepper works (7.5h -> 8.5h), symptom chips toggle on/off, 'Get my readiness' submits and shows the result card (score=93, band 'Ready to Perform', factors list). 'Done' correctly returns via router.back() when there is history. Home: READINESS cell shows live 28% 'Rest & reassess' after a low check-in and 84% 'Good to go' after a healthy one; the cell is tappable and navigates to /checkin. ReadinessGate banner appears only when score<55 (or safety override) with BOTH CTAs 'Start recovery ride' + 'Browse recovery' and disappears after resetting to healthy. Plan (/plan): 'THIS WEEK'S PLAN' list on the right, 'View Full Calendar' button under the dates on the left, header shows NO plan dropdown, NO 'Full calendar' pill and NO 'Live plan' pill. Edit Goals modal: 'Choose exactly 3 focus goals' copy, counter 'X of 3 selected', Save Goals becomes aria-disabled=true when count!=3 and clicking it is a no-op (modal stays open). Workouts hub: /workout-list?type=recovery|threshold|vo2max|sprints each shows the 3 leveled variants (Beginner=Foundation / Intermediate=Development / Advanced=Performance) with the correct Level tag in the detail panel; 'Start Workout' opens /workout?workoutId=recovery-spin-foundation (live workout screen renders). Data left in healthy state as requested (score=84, Ready to Train, safetyOverride=false).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "textShadow style props (carry-over from iter 19)", "issue": "Non-blocking RN Web console warning on /checkin: '\"textShadow*\" style props are deprecated. Use \"textShadow\".' Reference: /app/frontend/app/checkin.tsx / referenced from theme or workout module."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter20_checkin_level.py",
+    "/app/test_reports/pytest/iter20.xml",
+    "/app/test_reports/iteration_20.json"
+  ],
+  "action_items": [
+    "Optional: silence the deprecated 'textShadow*' style warning surfaced on /checkin.",
+    "Minor UX: when /checkin is opened directly (deep link), 'Done' calls router.back() which the navigator warns cannot handle ('The action \"GO_BACK\" was not handled by any navigator'). Consider router.replace('/') as a fallback when there's no history."
+  ],
+  "critical_code_review_comments": [
+    "server.py rider_checkin persists two documents (id='latest' and id=<date>) - clean singleton + per-date model; readiness/today reads only 'latest'. Metrics helper _checkin_metrics maps energy/sleep_quality/stress/soreness to 0-100 with a High/Good/Moderate/Low label used by the calendar ring.",
+    "server.py get_calendar_week overrides the selected_date day only when a check-in exists (source='Daily check-in') - matches the spec of updating today's ring only.",
+    "readiness.py: safety symptoms (chest_pain, severe_dizziness, shortness_of_breath, illness, new_pain) are all in CRITICAL_SYMPTOMS and correctly force score=0/status='Do Not Train'/safetyOverride=true.",
+    "rider_level.py returns full contract; note that mainReasons is capped at 4, so 'improving' and 'longest_ride_min' only surface when the earlier reasons (completion/rides/consistency/RPE) do not already fill the slots - see the test that uses a sparse payload to verify they appear.",
+    "frontend ReadinessGate.tsx uses testIDs gate-recovery-start and gate-recovery-browse and correctly maps rider capability -> Foundation/Development/Performance recovery workout id. shouldGate() gates when score<55 OR safetyOverride.",
+    "frontend checkin.tsx submits sleep_quality/energy/motivation scaled to 0-10 (n*2) and soreness/stress scaled ((n-1)/4*10). Only truthy symptoms are included in the payload."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter20_checkin_level.py",
+    "/app/test_reports/pytest/iter20.xml",
+    "/app/test_reports/iteration_20.json"
+  ],
+  "success_rate": {"backend": "100% (7/7 pytest)", "frontend": "100% of requested flows (checkin scales/stepper/symptoms/submit/result/Done, Home READINESS live score+band+tap-to-/checkin, ReadinessGate low-score gating with both CTAs, Plan header trim + THIS WEEK'S PLAN + View Full Calendar, Edit Goals exact-3 enforcement, 12 leveled workouts across recovery/threshold/vo2max/sprints, Start Workout opens live)"},
+  "seed_data_creation": "During testing a low check-in was posted to trigger the ReadinessGate (score 28) and then reset to a healthy check-in (score 84, Ready to Train, safetyOverride=false) - final state is healthy as requested by the review context.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Reuse /app/backend/tests/test_iter20_checkin_level.py for regression on rider check-in / readiness/today / calendar override / rider_level. Testable Frontend testIDs: checkin-back / checkin-submit / checkin-done / checkin-redo / checkin-result / sleep-plus / sleep-minus / symptom-<key> / Sleep quality-<1..5> / Energy-<1..5> / Motivation-<1..5> / Leg soreness-<1..5> / Stress-<1..5>. ReadinessGate testIDs: readiness-gate / gate-recovery-start / gate-recovery-browse / gate-wellness. Plan testID: edit-goals (open modal). Note the Save Goals button uses aria-disabled=true (no explicit save-goals testID). Home READINESS cell has no home-readiness testID yet - clicking the 'READINESS' text works. Calendar override key: source='Daily check-in'.",
+  "rca_of_issue": "N/A - all P1 features working."
+}

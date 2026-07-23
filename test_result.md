@@ -237,17 +237,20 @@ metadata:
 
 test_plan:
   current_focus:
-    - "GET /api/rider/season?days=N — period-filtered aggregates"
-    - "GET /api/rider/achievements — auto-unlock badges from ride history"
-    - "Profile: YOUR PROGRESS card with period pills + reusable ProgressPanel"
-    - "Home: flame->progress modal, bell->notifications, avatar"
-    - "Profile: edit FTP + regional details"
+    - "POST /api/rider/checkin — stores daily check-in, returns readiness (incl. safety override on symptoms)"
+    - "GET /api/rider/readiness/today — returns latest stored readiness"
+    - "GET /api/calendar/week — today's readiness ring overridden by latest check-in (source 'Daily check-in')"
+    - "Daily Check-in screen (/checkin): scales, sleep stepper, symptoms, submit -> result card"
+    - "Home: live READINESS cell (tap -> /checkin), ReadinessGate banner when score<55 or safety override"
+    - "Plan screen: CalendarCard live 'THIS WEEK'S PLAN', 3-goal limit in Edit Goals, header pills removed"
+    - "12 new leveled workouts (VO2/Threshold/Sprint/Recovery Foundation/Development/Performance) in catalog"
+    - "rider_level.py enhanced with longest_ride/missed/improving signals"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
     -agent: "main"
-    -comment: "Large fork batch complete. Please test backend endpoints (season with days param incl 7/30/90/365, achievements, connections services) and frontend flows (profile YOUR PROGRESS pills switch period + refetch, FTP edit persists, home flame/bell/avatar, notifications read/unread, connections connect/disconnect reflecting live-ride state). ride_history was intentionally reset to empty so season/achievements return zeros/[]. Do NOT test actual OAuth linking for services (needs keys + native build)."
+    -comment: "New P1 batch: Daily Check-in + readiness engine wiring, live readiness on Home/Calendar, readiness plan gating banner (CTAs: Start recovery ride -> /workout, Browse recovery -> /workout-list?type=recovery), 12 new leveled workouts, rider_level enhancements. Backend self-tested via curl (checkin/today/calendar override/safety override all pass). Please validate backend endpoints and frontend flows. Note: readiness is stored as a singleton 'latest' + per-date; calendar overrides only the selected_date day. Current demo readiness reset to a healthy ~76-82. To test the gate, POST a low check-in."
 
 #====================================================================================================

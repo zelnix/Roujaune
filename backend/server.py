@@ -721,6 +721,76 @@ async def rider_level(payload: dict):
     return compute_rider_level(payload or {})
 
 
+def _checkin_metrics(c: dict) -> list:
+    """Readiness sub-metrics (0–100, higher = better) for the calendar ring detail."""
+    def word(v: float) -> str:
+        return "High" if v >= 75 else "Good" if v >= 60 else "Moderate" if v >= 45 else "Low"
+    out = []
+    def add(key, label, val):
+        if val is None:
+            return
+        v = max(0.0, min(100.0, float(val)))
+        out.append({"key": key, "label": label, "value": round(v), "display": word(v)})
+    if c.get("energy") is not None:
+        add("energy", "Energy", float(c["energy"]) * 10)
+    if c.get("sleep_quality") is not None:
+        add("sleep", "Sleep", float(c["sleep_quality"]) * 10)
+    if c.get("stress") is not None:
+        add("stress", "Stress", (10 - float(c["stress"])) * 10)
+    if c.get("soreness") is not None:
+        add("soreness", "Legs", (10 - float(c["soreness"])) * 10)
+    return out
+
+
+def _cal_status(score: int) -> str:
+    if score >= 70:
+        return "Good"
+    if score >= 55:
+        return "Steady"
+    if score >= 40:
+        return "Easy day"
+    return "Rest"
+
+
+@api_router.post("/rider/checkin")
+async def rider_checkin(payload: dict):
+    """Store today's daily check-in and return the computed readiness score."""
+    from datetime import date
+    payload = payload or {}
+    enriched = await _enrich_activity(payload)
+    result = compute_readiness(enriched)
+    d = payload.get("date") or date.today().isoformat()
+    checkin = payload.get("checkin") or {}
+    doc = {
+        "score": result.get("readinessScore", 0),
+        "status": result.get("status"),
+        "band": result.get("status"),
+        "mainFactors": result.get("mainFactors", []),
+        "confidence": result.get("confidence"),
+        "safetyOverride": result.get("safetyOverride", False),
+        "metrics": _checkin_metrics(checkin),
+        "checkin": checkin,
+        "date": d,
+        "at": now_iso(),
+    }
+    try:
+        await db.daily_checkins.update_one({"id": "latest"}, {"$set": {**doc, "id": "latest"}}, upsert=True)
+        await db.daily_checkins.update_one({"id": d}, {"$set": {**doc, "id": d}}, upsert=True)
+    except Exception:
+        logging.warning("checkin persist failed")
+    return {**result, "date": d}
+
+
+@api_router.get("/rider/readiness/today")
+async def rider_readiness_today():
+    """Return the latest stored daily check-in readiness (or unavailable)."""
+    doc = await db.daily_checkins.find_one({"id": "latest"})
+    if not doc:
+        return {"available": False}
+    doc.pop("_id", None)
+    return {"available": True, **doc}
+
+
 
 
 async def _build_rider_context(plan_id: str = "build-and-climb") -> str:
@@ -1483,6 +1553,21 @@ async def get_calendar_week(start: str = "2025-05-12"):
                 day["scheduled"] = by_date.get(day["date"], [])
         except Exception:
             logging.warning("attach scheduled workouts failed")
+        # Override today's readiness ring with the rider's latest daily check-in.
+        try:
+            ci = await db.daily_checkins.find_one({"id": "latest"})
+            if ci:
+                sel = doc.get("selected_date")
+                for day in doc.get("days", []):
+                    if day.get("date") == sel:
+                        day["readiness"] = {
+                            "score": ci.get("score", 0),
+                            "status": _cal_status(int(ci.get("score", 0))),
+                            "source": "Daily check-in",
+                            "metrics": ci.get("metrics", []),
+                        }
+        except Exception:
+            logging.warning("calendar readiness override failed")
         return doc
     except Exception:
         logging.exception("get_calendar_week failed")

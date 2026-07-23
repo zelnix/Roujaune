@@ -10,13 +10,14 @@ import { useCoach } from "@/src/lib/coach-persona";
 import { usePlan, useAdaptation, useAdaptiveTargets } from "@/src/lib/plan";
 import { markPlanSeen } from "@/src/lib/plan-badge";
 import {
-  C, PLAN_OPTIONS, PlanPhase, KeyWorkout, PlanProvider,
-  PlanHeader, PlanSelector, PlanTabs,
+  C, PlanPhase, KeyWorkout, PlanProvider,
+  PlanHeader, PlanTabs,
   PlanHeroCard, PlanGoalsCard, CurrentPhaseRoadmap, WeeklyLoadCard,
   KeyWorkoutsCard, AlbertoAdaptationsCard, AdaptiveTargetsCard, PlanProgressStrip, AlbertoTipFooter,
 } from "@/src/components/plan";
 import { SideNavigation } from "@/src/components/SideNavigation";
 import { CalendarCard } from "@/src/components/CalendarCard";
+import { ReadinessGate } from "@/src/components/ReadinessGate";
 import { EditGoalsModal, ProgressModal, AdaptationsModal } from "@/src/components/plan-modals";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
 import type { EditableGoal } from "@/src/lib/plan";
@@ -42,14 +43,13 @@ function Toast({ message }: { message: { id: number; text: string } | null }) {
 export default function TrainingPlanScreen() {
   const router = useRouter();
   const persona = useCoach();
-  const { plan, loading, live } = usePlan();
+  const { plan } = usePlan();
   const adaptation = useAdaptation(persona.name, persona.gender);
   const adaptiveTargets = useAdaptiveTargets();
   const { width } = useWindowDimensions();
   const compact = width < 700; // phones scroll; tablets fill
 
   const [tab, setTab] = React.useState("Overview");
-  const [planName, setPlanName] = React.useState<string | null>(null);
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
   const [availW, setAvailW] = React.useState(0);
 
@@ -80,14 +80,6 @@ export default function TrainingPlanScreen() {
     showToast(`${key.charAt(0).toUpperCase() + key.slice(1)} — coming soon`);
   };
 
-  const options = React.useMemo(() => Array.from(new Set([plan.title, ...PLAN_OPTIONS])), [plan.title]);
-  const selectedPlan = planName ?? plan.title;
-  const cyclePlan = () => {
-    const i = options.indexOf(selectedPlan);
-    const next = options[(i + 1) % options.length];
-    setPlanName(next);
-    showToast(`Plan: ${next}`);
-  };
   const onPhase = (p: PlanPhase) => showToast(`${p.name} · ${p.weeks} · ${p.pct}% complete`);
   const onWorkout = (w: KeyWorkout) => showToast(`${w.title} · ${w.duration} · ${w.tss}`);
 
@@ -99,7 +91,7 @@ export default function TrainingPlanScreen() {
       <View style={styles.heroCard}><PlanHeroCard /></View>
       <View style={styles.heroGoals}><PlanGoalsCard onEdit={() => setShowGoals(true)} /></View>
       <View style={styles.heroCalendar}>
-        <CalendarCard onToast={showToast} onOpenCalendar={() => router.push("/calendar")} />
+        <CalendarCard onToast={showToast} onOpenCalendar={() => router.push("/calendar")} scope="week" />
       </View>
     </View>
   );
@@ -150,24 +142,9 @@ export default function TrainingPlanScreen() {
             <Text style={styles.messageBtnText}>Message {persona.name}</Text>
             <Ionicons name="chatbubble-ellipses" size={15} color={C.yellow} />
           </Pressable>
-          <PlanSelector value={selectedPlan} onPress={cyclePlan} />
-          <Pressable
-            testID="view-calendar"
-            onPress={() => router.push("/calendar")}
-            accessibilityRole="button"
-            accessibilityLabel="View full calendar"
-            style={({ hovered }: any) => [styles.calendarPill, hovered && styles.messageBtnHover]}
-          >
-            <Ionicons name="calendar-outline" size={15} color={C.yellow} />
-            <Text style={styles.calendarPillText}>Full calendar</Text>
-          </Pressable>
-          {loading ? (
-            <View style={styles.syncPill}><Text style={styles.syncText}>Syncing plan…</Text></View>
-          ) : live ? (
-            <View style={styles.syncPill}><View style={styles.liveDot} /><Text style={styles.syncText}>Live plan</Text></View>
-          ) : null}
         </View>
       </View>
+      <ReadinessGate />
       {body}
     </View>
   );
@@ -220,9 +197,9 @@ const styles = StyleSheet.create({
   syncText: { color: C.dim, fontSize: 11, fontWeight: "600" },
   liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.green },
   rowGap: { flexDirection: "row", gap: 14, alignItems: "stretch" },
-  heroCard: { flex: 1, minWidth: 200 },
-  heroGoals: { width: 286 },
-  heroCalendar: { width: 404 },
+  heroCard: { flex: 1, minWidth: 170 },
+  heroGoals: { width: 258 },
+  heroCalendar: { width: 520 },
   toast: { position: "absolute", bottom: 30, alignSelf: "center", backgroundColor: "rgba(20,22,21,0.96)", borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 18 },
   toastText: { color: C.white, fontSize: 13, fontWeight: "600" },
 });
