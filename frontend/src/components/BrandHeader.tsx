@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from "react-native";
 import { Image } from "expo-image";
 import { colors } from "../theme";
 import { brand } from "../data";
+import { useCoach } from "../lib/coach-persona";
 
 const wordmark = require("../../assets/images/wordmark_t.png");
 
@@ -52,11 +53,12 @@ function Wordmark3D({ scale = 1 }: { scale?: number }) {
 }
 
 export function BrandHeader({ compact = false, showDescriptor = true }: { compact?: boolean; showDescriptor?: boolean }) {
+  const persona = useCoach();
   return (
     <View testID="brand-header">
       <Wordmark3D scale={compact ? 0.72 : 1} />
       <Text style={[styles.tagline, compact && { fontSize: 24, marginTop: 6 }]}>{brand.tagline}</Text>
-      {showDescriptor && <Text style={[styles.descriptor, compact && { fontSize: 13 }]}>{brand.descriptor}</Text>}
+      {showDescriptor && <Text style={[styles.descriptor, compact && { fontSize: 13 }]}>{`Personalised cycling training with ${persona.name}.`}</Text>}
     </View>
   );
 }

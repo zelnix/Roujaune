@@ -11,6 +11,7 @@ import { colors, radius, spacing, shadow } from "@/src/theme";
 import { SideNavigation } from "@/src/components/SideNavigation";
 import { BrandHeader } from "@/src/components/BrandHeader";
 import { navItems, navFooter, brand } from "@/src/data";
+import { useCoach } from "@/src/lib/coach-persona";
 import { GlassPill } from "@/src/components/ui";
 import {
   AlbertoTrainingCard,
@@ -24,8 +25,6 @@ import {
   FB50RecommendationCard,
   MPCRecommendationCard,
 } from "@/src/components/training";
-
-const coachAvatar = require("../assets/images/coach_alberto_b2.jpg");
 
 function Toast({ message }: { message: { id: number; text: string } | null }) {
   const anim = React.useRef(new Animated.Value(0)).current;
@@ -48,6 +47,7 @@ function Toast({ message }: { message: { id: number; text: string } | null }) {
 }
 
 function TopStatus({ onPress }: { onPress: (m: string) => void }) {
+  const persona = useCoach();
   return (
     <View style={styles.statusWrap}>
       <View style={styles.statusRow}>
@@ -60,11 +60,11 @@ function TopStatus({ onPress }: { onPress: (m: string) => void }) {
           <View style={styles.badge}><Text style={styles.badgeText}>{brand.notifications}</Text></View>
         </GlassPill>
         <GlassPill testID="profile-pill" style={styles.avatar} onPress={() => onPress("Profile")}>
-          <Image source={coachAvatar} style={styles.avatarImg} contentFit="cover" contentPosition="top center" />
+          <Image source={persona.image} style={styles.avatarImg} contentFit="cover" contentPosition="top center" />
         </GlassPill>
       </View>
       <View style={styles.scriptWrap}>
-        <Text style={styles.script}>Alberto</Text>
+        <Text style={styles.script}>{persona.name}</Text>
         <Text style={styles.scriptSub}>Your Coach</Text>
       </View>
     </View>
@@ -73,6 +73,7 @@ function TopStatus({ onPress }: { onPress: (m: string) => void }) {
 
 export default function TodaysTraining() {
   const { width, height } = useWindowDimensions();
+  const persona = useCoach();
   const compact = height < 560;
   const navWidth = compact ? Math.max(72, Math.min(88, width * 0.09)) : Math.max(84, Math.min(104, width * 0.085));
   const contentPadH = compact ? spacing.md : spacing.lg;
@@ -123,7 +124,7 @@ export default function TodaysTraining() {
                   <Ionicons name="calendar-outline" size={15} color={colors.textDim} />
                   <Text style={styles.dateText}>Wednesday, 12 May 2025</Text>
                 </View>
-                <AlbertoTrainingCard width={mainWidth} onPress={() => showToast("Message from Alberto")} />
+                <AlbertoTrainingCard width={mainWidth} onPress={() => showToast(`Message from ${persona.name}`)} />
               </View>
             ) : (
               <View style={styles.header}>
@@ -136,7 +137,7 @@ export default function TodaysTraining() {
                   </View>
                 </View>
 
-                <AlbertoTrainingCard width={400} onPress={() => showToast("Message from Alberto")} />
+                <AlbertoTrainingCard width={400} onPress={() => showToast(`Message from ${persona.name}`)} />
 
                 <View style={{ width: rightColW, alignItems: "flex-end" }}>
                   <TopStatus onPress={showToast} />

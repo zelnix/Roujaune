@@ -7,6 +7,7 @@ import Svg, { Rect, Path, Polyline, Circle, Line } from "react-native-svg";
 import { colors, radius, spacing, shadow } from "../theme";
 import { Touchable, SectionLabel } from "./ui";
 import { posterFor } from "../lib/youtube";
+import { CoachId, COACHES } from "../lib/coach-persona";
 import type { RouteOption } from "../data";
 import type { Settings } from "../lib/settings";
 
@@ -728,17 +729,36 @@ export function SettingsPanel({ settings, setSetting, onClose }: {
   );
 }
 
-export function MusicPanel({ musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, voiceOptions, voiceId, selectVoice, onClose }: {
+export function MusicPanel({ musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, voiceOptions, voiceId, selectVoice, coach, chooseCoach, coachName, onClose }: {
   musicOn: boolean; toggleMusic: () => void; volume: number; setVolume: (v: number) => void; voiceOn: boolean; toggleVoice: () => void;
-  voiceOptions: { id: string; label: string; sublabel: string; accent: string; gender: "male" | "female" | "neutral" }[]; voiceId?: string; selectVoice: (id: string) => void; onClose: () => void;
+  voiceOptions: { id: string; label: string; sublabel: string; accent: string; gender: "male" | "female" | "neutral" }[]; voiceId?: string; selectVoice: (id: string) => void;
+  coach: CoachId; chooseCoach: (id: CoachId) => void; coachName: string; onClose: () => void;
 }) {
   const level = Math.round(volume * 5);
   return (
     <Pressable style={styles.rpOverlay} onPress={onClose} testID="music-panel">
       <Pressable style={styles.spPanel} onPress={() => { /* swallow */ }}>
         <View style={styles.rpHead}>
-          <View style={{ flex: 1 }}><Text style={styles.rpTitle}>Music & audio</Text><Text style={styles.rpSub}>Ride soundtrack & Alberto&apos;s voice</Text></View>
+          <View style={{ flex: 1 }}><Text style={styles.rpTitle}>Music & audio</Text><Text style={styles.rpSub}>Ride soundtrack & your coach&apos;s voice</Text></View>
           <Pressable onPress={onClose} testID="music-close" hitSlop={10}><Ionicons name="close" size={22} color={colors.white} /></Pressable>
+        </View>
+
+        <Text style={styles.coachPickHint}>Your coach</Text>
+        <View style={styles.coachPickRow}>
+          {(["alberto", "adriana"] as CoachId[]).map((id) => {
+            const c = COACHES[id];
+            const active = coach === id;
+            return (
+              <Pressable key={id} testID={`coach-${id}`} onPress={() => chooseCoach(id)} style={[styles.coachPick, active && styles.coachPickActive]}>
+                <Image source={c.image} style={styles.coachPickImg} contentFit="cover" contentPosition="top center" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.coachPickName}>{c.name}</Text>
+                  <Text style={styles.coachPickSub}>{c.gender === "female" ? "Female voice" : "Male voice"}</Text>
+                </View>
+                <Ionicons name={active ? "checkmark-circle" : "ellipse-outline"} size={20} color={active ? colors.yellow : colors.textDim} />
+              </Pressable>
+            );
+          })}
         </View>
 
         <View style={styles.spRow}>
@@ -761,7 +781,7 @@ export function MusicPanel({ musicOn, toggleMusic, volume, setVolume, voiceOn, t
 
         <View style={styles.spRow}>
           <View style={styles.spIcon}><Ionicons name="mic" size={18} color={colors.yellow} /></View>
-          <View style={{ flex: 1 }}><Text style={styles.spLabel}>Alberto&apos;s voice</Text><Text style={styles.spSub}>Spoken cues · softens music</Text></View>
+          <View style={{ flex: 1 }}><Text style={styles.spLabel}>{coachName}&apos;s voice</Text><Text style={styles.spSub}>Spoken cues · softens music</Text></View>
           <Switch testID="toggle-voice" value={voiceOn} onValueChange={toggleVoice} trackColor={{ true: colors.red, false: "rgba(255,255,255,0.2)" }} thumbColor="#fff" />
         </View>
 
@@ -1056,6 +1076,13 @@ const styles = StyleSheet.create({
   volBars: { flexDirection: "row", gap: 4, alignItems: "center", marginHorizontal: 4 },
   volSeg: { width: 12, height: 16, borderRadius: 3 },
   voiceBlock: { borderTopWidth: 1, borderTopColor: colors.borderSoft, paddingTop: 12, marginTop: 4 },
+  coachPickHint: { color: colors.textDim, fontSize: 11.5, fontWeight: "700", letterSpacing: 0.4, marginBottom: 8, marginTop: 2, textTransform: "uppercase" },
+  coachPickRow: { flexDirection: "row", gap: 10, marginBottom: 6 },
+  coachPick: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, padding: 8, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 2, borderColor: colors.borderSoft },
+  coachPickActive: { borderColor: colors.yellow },
+  coachPickImg: { width: 42, height: 42, borderRadius: 21, backgroundColor: "rgba(255,255,255,0.08)" },
+  coachPickName: { color: colors.white, fontSize: 15, fontWeight: "800" },
+  coachPickSub: { color: colors.textDim, fontSize: 11.5, marginTop: 1 },
   voiceHint: { color: colors.textDim, fontSize: 11.5, fontWeight: "700", letterSpacing: 0.4, marginBottom: 8, textTransform: "uppercase" },
   voiceList: { maxHeight: 168 },
   voiceRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, paddingHorizontal: 12, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: "rgba(255,255,255,0.03)", marginBottom: 6 },

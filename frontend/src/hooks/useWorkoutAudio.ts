@@ -2,6 +2,7 @@ import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import * as Speech from "expo-speech";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getVoiceId, setVoiceId } from "../lib/prefs";
+import { useCoach, setCoach as persistCoach, COACHES, CoachId } from "../lib/coach-persona";
 
 // Royalty-free instrumental track used as upbeat cycling music (admin-replaceable).
 const MUSIC_SOURCE = { uri: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3" };
@@ -9,7 +10,7 @@ const MUSIC_SOURCE = { uri: "https://www.soundhelix.com/examples/mp3/SoundHelix-
 const DUCK = 0.22; // music volume multiplier while Alberto is speaking
 const PREVIEW = "Alright, let's ride. Hold steady and breathe.";
 
-export type VoiceOption = { id: string; label: string; sublabel: string; accent: string; gender: "male" | "female" | "neutral"; lang: string };
+export type VoiceOption = { id: string; label: string; sublabel: string; accent: string; gender: "male" | "female" | "neutral"; lang: string; num: number };
 
 // A human-readable name for a device voice (falls back to the identifier tail).
 function readableName(v: Speech.Voice): string {
@@ -59,7 +60,19 @@ function numbersToWords(text: string): string {
   });
 }
 
-/** Cycling music + Alberto's spoken coaching cues.
+/** Choose the device voice for a coach persona: prefer the exact Spanish (English)
+ * voice number, then a saved manual pick, then any matching-gender voice. */
+function pickVoiceForCoach(opts: VoiceOption[], coachId: CoachId, savedId?: string | null): VoiceOption | undefined {
+  const persona = COACHES[coachId];
+  const byNum = opts.find((o) => o.accent === "Spanish (English)" && o.num === persona.voiceNum);
+  if (byNum) return byNum;
+  if (savedId) { const s = opts.find((o) => o.id === savedId); if (s) return s; }
+  const es = opts.filter((o) => o.accent === "Spanish (English)");
+  const pool = es.length ? es : opts;
+  return pool.find((o) => o.gender === persona.gender) || pool[0] || opts[0];
+}
+
+/** Cycling music + the coach's spoken cues.
  * Music softens (ducks) while a cue is spoken, then returns to full volume.
  * Alberto speaks as a male voice with a mild Spanish accent (reading English). */
 export function useWorkoutAudio() {
@@ -69,9 +82,13 @@ export function useWorkoutAudio() {
   const [voiceOn, setVoiceOn] = useState(true);
   const speaking = useRef(false);
   const voice = useRef<{ id?: string; lang: string }>({ id: undefined, lang: "es-ES" });
+  const pitchRef = useRef(0.9);
   const voiceReady = useRef(false);
   const [voiceOptions, setVoiceOptions] = useState<VoiceOption[]>([]);
   const [voiceId, setVoiceIdState] = useState<string | undefined>(undefined);
+  const savedVoice = useRef<string | null>(null);
+  const persona = useCoach();
+  const coach = persona.id;
 
   // Build a curated, de-duplicated list of Spanish/English voices for the
   // selector, and choose Alberto's default (a Spanish male) or the rider's
@@ -100,19 +117,13 @@ export function useWorkoutAudio() {
           const gTag = gender === "female" ? " · female" : gender === "male" ? " · male" : "";
           const label = `${accent} voice ${n}`;
           const sublabel = `${readableName(v)}${gTag}`;
-          opts.push({ id: v.identifier, label, sublabel, accent, gender, lang: v.language ?? "es-ES" });
+          opts.push({ id: v.identifier, label, sublabel, accent, gender, lang: v.language ?? "es-ES", num: n });
         }
         // Sort: detected males first (Alberto's preference), then neutral, then female.
         const rank = (o: VoiceOption) => (o.gender === "male" ? 0 : o.gender === "neutral" ? 1 : 2);
         opts.sort((a, b) => rank(a) - rank(b) || a.label.localeCompare(b.label));
         setVoiceOptions(opts);
-
-        const saved = await getVoiceId();
-        const chosen = (saved && opts.find((o) => o.id === saved)) || opts[0];
-        if (chosen) {
-          voice.current = { id: chosen.id, lang: chosen.lang };
-          setVoiceIdState(chosen.id);
-        }
+        savedVoice.current = await getVoiceId();
       } catch {
         /* keep default es-ES */
       } finally {
@@ -120,6 +131,18 @@ export function useWorkoutAudio() {
       }
     })();
   }, []);
+
+  // Pick the coach's voice once voices load, and whenever the coach changes
+  // (covers the persisted coach loading in asynchronously on a cold start).
+  useEffect(() => {
+    if (!voiceOptions.length) return;
+    const chosen = pickVoiceForCoach(voiceOptions, coach, savedVoice.current);
+    pitchRef.current = coach === "adriana" ? 1.02 : 0.9;
+    if (chosen && chosen.id !== voice.current.id) {
+      voice.current = { id: chosen.id, lang: chosen.lang };
+      setVoiceIdState(chosen.id);
+    }
+  }, [coach, voiceOptions]);
 
   const apply = useCallback(() => {
     try {
@@ -187,5 +210,25 @@ export function useWorkoutAudio() {
     }
   }, [voiceOptions, voiceOn, duck]);
 
-  return { musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, speak, voiceOptions, voiceId, selectVoice };
+  /** Switch coach persona (Alberto ↔ Adriana): updates the app-wide persona and
+   * selects that coach's voice (Alberto → Spanish/English 18, Adriana → 7). */
+  const chooseCoach = useCallback((id: CoachId) => {
+    persistCoach(id);
+    const chosen = pickVoiceForCoach(voiceOptions, id);
+    if (chosen) {
+      voice.current = { id: chosen.id, lang: chosen.lang };
+      setVoiceIdState(chosen.id);
+      setVoiceId(chosen.id);
+      Speech.stop();
+      if (voiceOn) {
+        duck(true);
+        Speech.speak(PREVIEW, {
+          voice: chosen.id, language: chosen.lang, pitch: id === "adriana" ? 1.02 : 0.9, rate: 0.92,
+          onDone: () => duck(false), onStopped: () => duck(false), onError: () => duck(false),
+        });
+      }
+    }
+  }, [voiceOptions, voiceOn, duck]);
+
+  return { musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, speak, voiceOptions, voiceId, selectVoice, coach, chooseCoach, coachName: COACHES[coach].name };
 }

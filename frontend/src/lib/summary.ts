@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { rideRecorder, RideRoute } from "./ride";
+import { getCoach, COACHES } from "./coach-persona";
 
 export type Zone = { z: string; time: string; pct: number; w: number };
 
@@ -148,6 +149,7 @@ export function useCoachDebrief(stats: SummaryStats, route: RideRoute) {
   useEffect(() => {
     let alive = true;
     const rec = rideRecorder.snapshot();
+    const persona = COACHES[getCoach()];
     (async () => {
       try {
         const res = await fetch(`${apiBase()}/api/coach/debrief`, {
@@ -171,6 +173,8 @@ export function useCoachDebrief(stats: SummaryStats, route: RideRoute) {
             intensity: stats.intensity,
             compliance: stats.compliance?.overall ?? 0,
             zones: stats.zones?.map((z) => ({ z: z.z, pct: z.pct })) ?? [],
+            coach_name: persona.name,
+            coach_gender: persona.gender,
           }),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);

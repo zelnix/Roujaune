@@ -333,17 +333,19 @@ async def ride_history(limit: int = 20):
     return docs
 
 
-# ----------------------- Alberto: AI coaching cue -----------------------
-ALBERTO_SYSTEM = (
-    "You are Alberto, a former professional cyclist who won multiple Grand Tours. "
-    "Today you are a professor of cycling coaching, a sports team director, and a "
-    "sports psychologist. You are coaching a rider through an indoor workout in real time.\n"
-    "Speak in first person, warm but authoritative, like a mentor who has been in the "
-    "hardest moments of a race. Blend physiology, tactics and psychology.\n"
-    "Rules: reply with ONE short spoken sentence (max 16 words). No emojis, no lists, "
-    "no quotation marks. Be specific to the numbers you are given. Vary your wording. "
-    "It must sound natural read aloud."
-)
+# ----------------------- Coach: AI coaching cue -----------------------
+def coach_system(name: str = "Alberto", gender: str = "male") -> str:
+    champion = "who won multiple Grand Tours"
+    return (
+        f"You are {name}, a former professional cyclist {champion}. "
+        "Today you are a professor of cycling coaching, a sports team director, and a "
+        "sports psychologist. You are coaching a rider through an indoor workout in real time.\n"
+        "Speak in first person, warm but authoritative, like a mentor who has been in the "
+        "hardest moments of a race. Blend physiology, tactics and psychology.\n"
+        "Rules: reply with ONE short spoken sentence (max 16 words). No emojis, no lists, "
+        "no quotation marks. Be specific to the numbers you are given. Vary your wording. "
+        "It must sound natural read aloud."
+    )
 
 
 class CoachCueRequest(BaseModel):
@@ -357,6 +359,8 @@ class CoachCueRequest(BaseModel):
     cadence_high: int = 100
     workout: str = "Threshold Climb"
     route: Optional[str] = None
+    coach_name: str = "Alberto"
+    coach_gender: str = "male"
 
 
 @api_router.post("/coach/cue")
@@ -380,8 +384,8 @@ async def coach_cue(req: CoachCueRequest):
         from emergentintegrations.llm.chat import LlmChat, UserMessage
         chat = LlmChat(
             api_key=key,
-            session_id="alberto-live-coach",
-            system_message=ALBERTO_SYSTEM,
+            session_id=f"{req.coach_name.lower()}-live-coach",
+            system_message=coach_system(req.coach_name, req.coach_gender),
         ).with_model("anthropic", "claude-sonnet-4-6")
         reply = await chat.send_message(UserMessage(text=prompt))
         cue = (reply or "").strip().strip('"').split("\n")[0]
@@ -411,21 +415,24 @@ class CoachDebriefRequest(BaseModel):
     intensity: float = 0
     compliance: int = 0
     zones: List[Dict[str, Any]] = Field(default_factory=list)
+    coach_name: str = "Alberto"
+    coach_gender: str = "male"
 
 
 @api_router.post("/coach/debrief")
 async def coach_debrief(req: CoachDebriefRequest):
-    """Alberto's post-ride debrief: effort, zones and one tip for next time."""
+    """The coach's post-ride debrief: effort, zones and one tip for next time."""
     key = os.environ.get("EMERGENT_LLM_KEY")
     if not key:
         raise HTTPException(status_code=503, detail="Coaching model not configured")
 
-    # Return the cached debrief if this ride already has one.
+    # Return the cached debrief if this ride already has one (keyed by coach).
+    cache_key = f"debrief_{req.coach_name.lower()}"
     if req.ride_id:
         try:
             doc = await db.ride_history.find_one({"id": req.ride_id})
-            if doc and doc.get("debrief"):
-                return {"debrief": doc["debrief"], "cached": True}
+            if doc and doc.get(cache_key):
+                return {"debrief": doc[cache_key], "cached": True}
         except Exception:
             logging.warning("debrief cache lookup failed")
 
@@ -440,15 +447,15 @@ async def coach_debrief(req: CoachDebriefRequest):
         f"plan compliance {req.compliance}%. Time in zones: {zones_txt}.\n"
         "Give a warm, personal post-ride debrief: 2 to 3 short sentences. "
         "Praise what went well, note one thing physiologically/tactically, and end with "
-        "one concrete tip for next time. Speak as Alberto, first person, no lists, no emojis."
+        f"one concrete tip for next time. Speak as {req.coach_name}, first person, no lists, no emojis."
     )
 
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
         chat = LlmChat(
             api_key=key,
-            session_id="alberto-debrief",
-            system_message=ALBERTO_SYSTEM,
+            session_id=f"{req.coach_name.lower()}-debrief",
+            system_message=coach_system(req.coach_name, req.coach_gender),
         ).with_model("anthropic", "claude-sonnet-4-6")
         reply = await chat.send_message(UserMessage(text=prompt))
         text = (reply or "").strip().strip('"')
@@ -457,7 +464,7 @@ async def coach_debrief(req: CoachDebriefRequest):
         # Cache it against the ride so revisits don't re-generate (or re-charge).
         if req.ride_id:
             try:
-                await db.ride_history.update_one({"id": req.ride_id}, {"$set": {"debrief": text}})
+                await db.ride_history.update_one({"id": req.ride_id}, {"$set": {cache_key: text}})
             except Exception:
                 logging.warning("debrief cache write failed")
         return {"debrief": text, "cached": False}

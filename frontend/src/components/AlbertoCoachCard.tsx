@@ -4,11 +4,11 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, radius, spacing } from "../theme";
 import { coach } from "../data";
+import { useCoach } from "../lib/coach-persona";
 import { PrimaryButton } from "./ui";
 
-const albertoPortrait = require("../../assets/images/coach_alberto_b2.jpg");
-
 export function AlbertoCoachCard({ width, onStart, compact = false }: { width: number; onStart: () => void; compact?: boolean }) {
+  const persona = useCoach();
   const portraitW = compact ? 108 : 150;
   return (
     <LinearGradient
@@ -19,7 +19,7 @@ export function AlbertoCoachCard({ width, onStart, compact = false }: { width: n
       style={[styles.card, { width }, compact && { minHeight: 150 }]}
     >
       <View style={[styles.portraitWrap, { width: portraitW }, compact && { minHeight: 150 }]}>
-        <Image source={albertoPortrait} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition="top center" accessibilityLabel="Coach Alberto" />
+        <Image source={persona.image} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition="top center" accessibilityLabel={`Coach ${persona.name}`} />
         <LinearGradient
           colors={["transparent", "rgba(10,9,8,0.9)"]}
           start={{ x: 0, y: 0.5 }}
@@ -31,7 +31,7 @@ export function AlbertoCoachCard({ width, onStart, compact = false }: { width: n
       <View style={[styles.body, compact && { padding: spacing.sm }]}>
         <View style={styles.headRow}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.name, compact && { fontSize: 15 }]}>{coach.name}</Text>
+            <Text style={[styles.name, compact && { fontSize: 15 }]}>{persona.name}</Text>
             <Text style={styles.role}>{coach.role}</Text>
           </View>
           <Text style={[styles.quoteMark, compact && { fontSize: 34, lineHeight: 34 }]}>&#8220;</Text>

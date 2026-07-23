@@ -9,10 +9,10 @@ import Svg, {
 import { colors, radius, spacing, shadow } from "../theme";
 import { Touchable, SectionLabel } from "./ui";
 import { summaryContent as C, SummaryStats, fmtDuration } from "../lib/summary";
+import { useCoach } from "../lib/coach-persona";
 
 const glyph = require("../../assets/images/logo_glyph_t.png");
 const heroImg = require("../../assets/images/hero_cyclist_b2.jpg");
-const coachImg = require("../../assets/images/coach_alberto_b2.jpg");
 
 const ZONE_COLORS = ["#43C65A", "#9ACD32", colors.yellow, "#E8631C", colors.red];
 
@@ -80,6 +80,7 @@ const SIDE_ITEMS = [
 ];
 
 export function SummarySidebar({ active, onSelect, width, iconOnly = false }: { active: string; onSelect: (k: string) => void; width: number; iconOnly?: boolean }) {
+  const persona = useCoach();
   return (
     <View style={[styles.sidebar, { width }, iconOnly && { paddingHorizontal: 6 }]} testID="summary-sidebar">
       <View style={{ gap: 4 }}>
@@ -110,10 +111,10 @@ export function SummarySidebar({ active, onSelect, width, iconOnly = false }: { 
 
       <View style={styles.sideCoach}>
         <View style={[styles.coachAvatarWrap, iconOnly && { width: 40, height: 40 }]}>
-          <Image source={coachImg} style={[styles.coachAvatar, iconOnly && { width: 40, height: 40, borderRadius: 20 }]} contentFit="cover" contentPosition="top center" />
+          <Image source={persona.image} style={[styles.coachAvatar, iconOnly && { width: 40, height: 40, borderRadius: 20 }]} contentFit="cover" contentPosition="top center" />
           <View style={styles.coachDot} />
         </View>
-        {!iconOnly && <Text style={styles.coachName}>Alberto</Text>}
+        {!iconOnly && <Text style={styles.coachName}>{persona.name}</Text>}
         {!iconOnly && <Text style={styles.coachRole}>Coach</Text>}
       </View>
     </View>
@@ -122,6 +123,7 @@ export function SummarySidebar({ active, onSelect, width, iconOnly = false }: { 
 
 /* ======================= HERO SUMMARY ======================= */
 export function HeroSummaryCard({ compact = false, recap, recapLoading = false }: { compact?: boolean; recap?: string; recapLoading?: boolean }) {
+  const persona = useCoach();
   const recapText = recap ?? C.recap;
   return (
     <View style={styles.hero} testID="hero-summary-card">
@@ -136,13 +138,13 @@ export function HeroSummaryCard({ compact = false, recap, recapLoading = false }
         <Text style={[styles.heroSub, compact && { fontSize: 17 }]}>{C.subhead}</Text>
 
         <View style={[styles.recapCard, compact && { marginTop: 10, padding: 10 }]}>
-          <Image source={coachImg} style={[styles.recapAvatar, compact && { width: 40, height: 40, borderRadius: 20 }]} contentFit="cover" contentPosition="top center" />
+          <Image source={persona.image} style={[styles.recapAvatar, compact && { width: 40, height: 40, borderRadius: 20 }]} contentFit="cover" contentPosition="top center" />
           <View style={{ flex: 1 }}>
             <View style={styles.recapTitleRow}>
-              <Text style={styles.recapTitle}>{C.recapTitle}</Text>
+              <Text style={styles.recapTitle}>{`${persona.name}'s recap`}</Text>
               {recapLoading && <ActivityIndicator size="small" color={colors.yellow} />}
             </View>
-            <Text style={styles.recapText} numberOfLines={compact ? 3 : undefined}>{recapLoading ? "Alberto is reviewing your ride…" : recapText}</Text>
+            <Text style={styles.recapText} numberOfLines={compact ? 3 : undefined}>{recapLoading ? `${persona.name} is reviewing your ride…` : recapText}</Text>
           </View>
         </View>
       </View>

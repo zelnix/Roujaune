@@ -2,20 +2,20 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const LAST_ROUTE_KEY = "roujaune:lastRouteId";
 const VOICE_KEY = "roujaune:voiceId";
-const KIT_KEY = "roujaune:kitPreset";
+const COACH_KEY = "roujaune:coachId";
 
-/** Persisted 3D-rider kit preset key (e.g. "yellow"). */
-export async function getKitPreset(): Promise<string | null> {
+/** Persisted coach persona id ("alberto" | "adriana"). */
+export async function getCoachId(): Promise<string | null> {
   try {
-    return await AsyncStorage.getItem(KIT_KEY);
+    return await AsyncStorage.getItem(COACH_KEY);
   } catch {
     return null;
   }
 }
 
-export async function setKitPreset(preset: string): Promise<void> {
+export async function setCoachId(id: string): Promise<void> {
   try {
-    await AsyncStorage.setItem(KIT_KEY, preset);
+    await AsyncStorage.setItem(COACH_KEY, id);
   } catch {
     /* noop */
   }

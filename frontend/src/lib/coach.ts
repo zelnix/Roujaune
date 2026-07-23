@@ -7,6 +7,8 @@ export type CoachContext = {
   cadence_high: number;
   workout: string;
   route?: string | null;
+  coach_name?: string;
+  coach_gender?: string;
 };
 
 function apiBase(): string {

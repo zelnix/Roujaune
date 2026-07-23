@@ -15,8 +15,8 @@ import Svg, {
 } from "react-native-svg";
 import { colors, radius, spacing, shadow } from "../theme";
 import { PrimaryButton, SecondaryButton, ReadinessScale, SectionLabel, Touchable } from "./ui";
+import { useCoach } from "../lib/coach-persona";
 
-const coachPortrait = require("../../assets/images/coach_alberto_b2.jpg");
 const routeImg = require("../../assets/images/hero_cyclist_b2.jpg");
 
 /* ------------------------- small shared pieces ------------------------- */
@@ -38,6 +38,7 @@ function StatusDot({ state }: { state: "done" | "active" | "todo" }) {
 
 /* ------------------------- Alberto coach card ------------------------- */
 export function AlbertoTrainingCard({ width, onPress }: { width: number; onPress: () => void }) {
+  const persona = useCoach();
   return (
     <Touchable testID="alberto-coach-card" onPress={onPress} lift style={{ width }}>
       <LinearGradient
@@ -47,12 +48,12 @@ export function AlbertoTrainingCard({ width, onPress }: { width: number; onPress
         style={styles.coachCard}
       >
         <View style={styles.coachPortraitWrap}>
-          <Image source={coachPortrait} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition="top center" accessibilityLabel="Coach Alberto" />
+          <Image source={persona.image} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition="top center" accessibilityLabel={`Coach ${persona.name}`} />
           <LinearGradient colors={["transparent", "rgba(12,10,9,0.95)"]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
         </View>
         <View style={styles.coachBody}>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Text style={styles.coachName}>Alberto</Text>
+            <Text style={styles.coachName}>{persona.name}</Text>
             <Text style={styles.coachQuoteMark}>&#8220;</Text>
           </View>
           <Text style={styles.coachMsg}>You&apos;re ready to climb. Focus on steady power and smooth cadence.</Text>

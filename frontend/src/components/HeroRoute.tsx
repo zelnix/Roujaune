@@ -5,6 +5,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing } from "../theme";
 import { brand, heroRoute } from "../data";
+import { useCoach } from "../lib/coach-persona";
 import { BrandHeader } from "./BrandHeader";
 import { AlbertoCoachCard } from "./AlbertoCoachCard";
 import { GlassPill } from "./ui";
@@ -46,6 +47,7 @@ export function HeroRoute({
   onToast: (m: string) => void;
   compact?: boolean;
 }) {
+  const persona = useCoach();
   return (
     <View style={[styles.wrap, { height }]} testID="hero-route">
       <Image
@@ -78,7 +80,7 @@ export function HeroRoute({
 
       {/* right: Alberto signature + coach */}
       <View style={[styles.signatureArea, compact && { top: "26%" }]}>
-        <Text style={[styles.signature, compact && { fontSize: 26 }]}>Alberto</Text>
+        <Text style={[styles.signature, compact && { fontSize: 26 }]}>{persona.name}</Text>
         <Text style={styles.signatureSub}>Your Coach</Text>
       </View>
 
