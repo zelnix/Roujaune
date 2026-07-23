@@ -125,7 +125,12 @@ export function computeIntervals(): IntervalResult {
   const ftp = rec.ftp || 287;
   const samples = rec.samples;
   const total = segs.reduce((a, s) => a + s.durationSec, 0);
-  const hasData = samples.length > 5 && total > 0;
+  const n = samples.length;
+  // Samples are recorded across the ACTUAL ride time (elapsed), not the planned
+  // total — so a ride that ended early only scores the segments it reached; the
+  // rest are shown as "not ridden".
+  const ridden = rec.elapsed > 0 ? rec.elapsed : total;
+  const hasData = n > 5 && ridden > 0;
 
   const intervals: IntervalScore[] = [];
   let compAcc = 0;
@@ -135,9 +140,12 @@ export function computeIntervals(): IntervalResult {
     const tW = targetWatts(s, ftp);
     let avgW: number | null = null;
     let compliance: number | null = null;
-    if (hasData && s.durationSec > 0 && tW > 0) {
-      const i0 = Math.floor((acc / total) * samples.length);
-      const i1 = Math.max(i0 + 1, Math.floor(((acc + s.durationSec) / total) * samples.length));
+    const segStart = acc;
+    const segEnd = acc + s.durationSec;
+    if (hasData && s.durationSec > 0 && tW > 0 && segStart < ridden) {
+      const covEnd = Math.min(segEnd, ridden);
+      const i0 = Math.floor((segStart / ridden) * n);
+      const i1 = Math.max(i0 + 1, Math.ceil((covEnd / ridden) * n));
       const slice = samples.slice(i0, i1);
       if (slice.length) {
         avgW = Math.round(slice.reduce((a, x) => a + x.power, 0) / slice.length);
