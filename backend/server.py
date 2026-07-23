@@ -530,7 +530,7 @@ def _chat_id(coach_name: str) -> str:
 
 
 # ----------------------- Rider profile (feeds coach intelligence) -----------
-RIDER_DEFAULT = {"id": "me", "name": "Rider One", "weight_kg": 78.0, "age": 42, "gender": "male", "city": "", "region": "", "country": ""}
+RIDER_DEFAULT = {"id": "me", "name": "Rider One", "weight_kg": 78.0, "age": 42, "gender": "male", "city": "", "region": "", "country": "", "capability": "intermediate"}
 
 
 class RiderProfileUpdate(BaseModel):
@@ -541,6 +541,7 @@ class RiderProfileUpdate(BaseModel):
     city: Optional[str] = None
     region: Optional[str] = None
     country: Optional[str] = None
+    capability: Optional[str] = None
 
 
 async def _rider_doc() -> dict:
@@ -549,6 +550,7 @@ async def _rider_doc() -> dict:
         doc = dict(RIDER_DEFAULT)
         await db.rider_profile.insert_one(dict(doc))
     doc.pop("_id", None)
+    doc.setdefault("capability", "intermediate")
     return doc
 
 

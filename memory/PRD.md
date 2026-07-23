@@ -186,6 +186,14 @@ Home Alberto "Start Today's Ride" & sidebar Workouts → `/training`. Training "
 - Workouts list (`workout-list.tsx`): added a coloured Level badge on cards, a "Level" stat, and a "SESSION STRUCTURE" breakdown (each segment's duration · zone · %FTP) in the detail pane. Verified via screenshot.
 - NOTE: legacy long endurance rides still in catalog (Endurance Ride 1h45m, Long Base Builder 2h30m, Alpine Simulator 2h) VIOLATE the new 25–75 min indoor rule — pending user decision to remove/revise.
 
+## Capability, level filter, outdoor rides, rider image, workout layout (2026-06-23)
+- **Rider capability** added to profile (`beginner`/`intermediate`/`advanced`) — backend `RIDER_DEFAULT`+`RiderProfileUpdate`+`_rider_doc` default, frontend `RiderProfile` type + edit-modal chips + identity badge (coloured by level). Verified backend returns `capability`.
+- **Workouts level filter** (`workout-list.tsx`): All levels / Beginner / Intermediate / Advanced chips; **defaults to the rider's capability** (verified Intermediate preselected). Filter shows the matching-level structured sessions + always shows unleveled ones. `CAPABILITY_TO_LEVEL` maps capability→Level.
+- **Outdoor conversion:** the 3 long indoor rides (Endurance Ride, Long Base Builder, Alpine Simulator) got `environment: "outdoor"` + an "OUTDOOR" badge on the card and " · Outdoor ride" in detail (user chose "convert to outdoor").
+- **Rider cutout cleanup:** removed the white background from `rider_male_rear_cut.png` & `rider_female_rear_cut.png` via edge flood-fill (PIL) → clean transparent cutouts (backups in /tmp). Virtual-route rider remains animated (bob + sway = in motion).
+- **Live workout layout:** restructured the body into a top `innerRow` (Power/HR/Cadence | center | Terrain+Route) and a `bottomRow` (RideSummaryStrip | Wearable). ROUTE map height reduced (96px) so the ROUTE card lines up with the cadence card bottom; the WEARABLE card now sits in line with the SPEED/DISTANCE/ELEVATION strip. Verified via screenshot.
+- STILL OPEN: connected-services real OAuth/health linking (needs keys + native build) — user hasn't finalised; service toggles remain local-state.
+
 ## Now-playing pill, profile region + avatar removal (2026-06-23 fork)
 - **Now-playing pill:** tracks now carry cycling-themed names (`MUSIC_TRACKS` = `{name, uri}`); the hook returns `trackName` + `nextTrack`. A pill (♪ track name + skip-forward) shows in the live-workout media bar (`app/workout.tsx`, testID `now-playing`/`skip-track`) AND in the immersive full-screen HUD (`ImmersiveHud` gained `musicOn`/`trackName`/`onSkip`, top-right under ROUTES, testID `hud-now-playing`/`hud-skip-track`) so riders can see/skip without collapsing the ride. Verified via screenshots.
 - **Profile regional details:** the Profile identity card now shows the rider's location (`city, region, country` from `rider/profile`) as a "📍 …" line under the org name. Verified ("Perh, Western Australia, Australia").

@@ -10,6 +10,7 @@ import { ProgressPanel } from "@/src/components/ProgressPanel";
 import { useSettings } from "@/src/lib/settings";
 import { useCoach } from "@/src/lib/coach-persona";
 import { useRiderProfile, useRiderAchievements, RiderProfile } from "@/src/lib/rider-profile";
+import { LEVEL_META, CAPABILITY_TO_LEVEL } from "@/src/lib/workout-catalog";
 
 const riderImg = require("../assets/images/hero_cyclist_b2.jpg");
 
@@ -17,6 +18,12 @@ const GENDERS = [
   { id: "male", label: "Male" },
   { id: "female", label: "Female" },
   { id: "other", label: "Other" },
+];
+
+const CAPS = [
+  { id: "beginner", label: "Beginner" },
+  { id: "intermediate", label: "Intermediate" },
+  { id: "advanced", label: "Advanced" },
 ];
 
 function Stat({ v, l, accent }: { v: string; l: string; accent?: string }) {
@@ -40,6 +47,8 @@ export default function ProfileScreen() {
 
   const [editing, setEditing] = React.useState(false);
   const genderLabel = GENDERS.find((g) => g.id === profile.gender)?.label ?? "—";
+  const capLabel = CAPS.find((c) => c.id === profile.capability)?.label ?? "Intermediate";
+  const capColor = LEVEL_META[CAPABILITY_TO_LEVEL[profile.capability]].color;
   const locationText = [profile.city, profile.region, profile.country].map((p) => p?.trim()).filter(Boolean).join(", ");
 
   const pickImage = async () => {
@@ -95,9 +104,9 @@ export default function ProfileScreen() {
                 </View>
               ) : null}
               <View style={s.badgeRow}>
-                <View style={s.tierBadge}>
-                  <Ionicons name="star" size={11} color="#241B00" />
-                  <Text style={s.tierText}>Climber · Cat 2</Text>
+                <View style={[s.tierBadge, { backgroundColor: capColor }]}>
+                  <Ionicons name="podium-outline" size={11} color="#241B00" />
+                  <Text style={s.tierText}>{capLabel}</Text>
                 </View>
                 <View style={s.coachChip}>
                   <Image source={persona.image} style={s.coachChipImg} contentFit="cover" contentPosition="top center" />
@@ -165,6 +174,7 @@ function EditModal({ visible, profile, ftp: ftpInit, onClose, onSave }: { visibl
   const [age, setAge] = React.useState(String(profile.age));
   const [ftp, setFtp] = React.useState(String(ftpInit));
   const [gender, setGender] = React.useState(profile.gender);
+  const [capability, setCapability] = React.useState(profile.capability);
   const [city, setCity] = React.useState(profile.city);
   const [region, setRegion] = React.useState(profile.region);
   const [country, setCountry] = React.useState(profile.country);
@@ -176,6 +186,7 @@ function EditModal({ visible, profile, ftp: ftpInit, onClose, onSave }: { visibl
       setAge(String(profile.age));
       setFtp(String(ftpInit));
       setGender(profile.gender);
+      setCapability(profile.capability);
       setCity(profile.city);
       setRegion(profile.region);
       setCountry(profile.country);
@@ -188,6 +199,7 @@ function EditModal({ visible, profile, ftp: ftpInit, onClose, onSave }: { visibl
       weight_kg: Math.max(30, Math.min(200, parseInt(weight, 10) || 78)),
       age: Math.max(12, Math.min(100, parseInt(age, 10) || 42)),
       gender,
+      capability,
       city: city.trim(),
       region: region.trim(),
       country: country.trim(),
@@ -231,6 +243,19 @@ function EditModal({ visible, profile, ftp: ftpInit, onClose, onSave }: { visibl
               );
             })}
           </View>
+
+          <Text style={s.fieldLabel}>Riding capability</Text>
+          <View style={s.genderRow}>
+            {CAPS.map((c) => {
+              const on = capability === c.id;
+              return (
+                <Pressable key={c.id} testID={`capability-${c.id}`} onPress={() => setCapability(c.id as RiderProfile["capability"])} style={[s.genderChip, on && s.genderChipOn]}>
+                  <Text style={[s.genderText, on && s.genderTextOn]}>{c.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={s.locHint}>Sets which workouts are shown to you by default.</Text>
 
           <Text style={s.fieldLabel}>City / Suburb</Text>
           <TextInput testID="input-city" value={city} onChangeText={setCity} placeholder="e.g. Melbourne" placeholderTextColor={CC.dim} style={s.input} />

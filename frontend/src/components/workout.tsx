@@ -372,7 +372,7 @@ function ClimbMini({ width, height = 64, climb = true, descent = false, progress
   );
 }
 
-export function RouteMapCard({ title = "Alpe d'Huez", progress = 0, riddenKm = 0, totalKm = 0, timeBased = false }: { title?: string; progress?: number; riddenKm?: number; totalKm?: number; timeBased?: boolean }) {
+export function RouteMapCard({ title = "Alpe d'Huez", progress = 0, riddenKm = 0, totalKm = 0, timeBased = false, fill = false }: { title?: string; progress?: number; riddenKm?: number; totalKm?: number; timeBased?: boolean; fill?: boolean }) {
   const pct = Math.round(progress * 100);
   return (
     <View style={styles.sideCard} testID="route-map-card">
@@ -383,7 +383,7 @@ export function RouteMapCard({ title = "Alpe d'Huez", progress = 0, riddenKm = 0
         <View style={[styles.routeDot, { left: `${pct}%` }]} />
       </View>
       <Text style={styles.routeProg}>{riddenKm.toFixed(1)} / {totalKm.toFixed(1)} km · {pct}%{timeBased ? " · time-based" : ""}</Text>
-      <View style={styles.mapWrap}>
+      <View style={[styles.mapWrap, { height: fill ? 96 : 200 }]}>
         <Svg width="100%" height="100%" viewBox="0 0 240 200" preserveAspectRatio="xMidYMid meet">
           <Path d="M40 185 C90 175 60 150 100 145 C140 140 90 120 120 110 C155 98 110 80 150 70 C185 62 150 45 175 35 C195 27 205 22 210 15" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth={3} strokeLinecap="round" />
           <Path d="M40 185 C90 175 60 150 100 145 C140 140 90 120 120 110" fill="none" stroke={colors.yellow} strokeWidth={3} strokeLinecap="round" />
@@ -1025,7 +1025,7 @@ const styles = StyleSheet.create({
   routeFill: { height: 6, borderRadius: 3, backgroundColor: colors.yellow },
   routeDot: { position: "absolute", width: 12, height: 12, borderRadius: 6, backgroundColor: "#fff", marginLeft: -6, borderWidth: 2, borderColor: colors.red },
   routeProg: { color: colors.textDim, fontSize: 11, fontWeight: "600", marginTop: 8 },
-  mapWrap: { height: 200, marginTop: 8, borderRadius: radius.md, backgroundColor: "#0C0E0D", borderWidth: 1, borderColor: colors.borderSoft, overflow: "hidden" },
+  mapWrap: { marginTop: 8, borderRadius: radius.md, backgroundColor: "#0C0E0D", borderWidth: 1, borderColor: colors.borderSoft, overflow: "hidden" },
   wGridRow: { flexDirection: "row", marginTop: 10 },
   wCell: { flex: 1 },
   wVal: { color: colors.white, fontSize: 24, fontWeight: "800", marginTop: 2 },

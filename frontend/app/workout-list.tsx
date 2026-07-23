@@ -9,13 +9,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { CC } from "@/src/components/calendar";
 import { SideNavigation } from "@/src/components/SideNavigation";
 import { useCoach } from "@/src/lib/coach-persona";
+import { useRiderProfile } from "@/src/lib/rider-profile";
 import { markPlanSeen } from "@/src/lib/plan-badge";
 import { WORKOUT_TYPES } from "@/src/lib/workouts";
 import { fetchFavorites, toggleFavorite, scheduleWorkout } from "@/src/lib/workout-prefs";
 import {
   Workout, getWorkout, workoutsByType, sortWorkouts, SORTS, SortKey,
   DURATION_BANDS, DurationBand, inDurationBand, fmtDuration, DIFFICULTY_COLOR,
-  LEVEL_META, buildSegments, mmss,
+  LEVEL_META, CAPABILITY_TO_LEVEL, buildSegments, mmss,
 } from "@/src/lib/workout-catalog";
 
 const ROUTE: Record<string, string> = {
@@ -28,6 +29,13 @@ const TYPE_FILTERS = [
   { id: "all", label: "All" },
   ...WORKOUT_TYPES.map((t) => ({ id: t.id, label: t.name })),
   { id: "fb50", label: "FB50" },
+];
+
+const LEVEL_FILTERS = [
+  { id: "all", label: "All levels" },
+  { id: "Foundation", label: "Beginner" },
+  { id: "Development", label: "Intermediate" },
+  { id: "Performance", label: "Advanced" },
 ];
 
 function ZoneBar({ zones }: { zones: Workout["zones"] }) {
@@ -77,6 +85,7 @@ function Stat({ label, value, color = CC.white }: { label: string; value: string
 export default function WorkoutListScreen() {
   const router = useRouter();
   const persona = useCoach();
+  const { profile } = useRiderProfile();
   const params = useLocalSearchParams<{ type?: string; workout?: string }>();
   const { width, height } = useWindowDimensions();
   const compact = width < 900;
@@ -86,12 +95,19 @@ export default function WorkoutListScreen() {
   const [typeFilter, setTypeFilter] = React.useState<string>(params.type ?? "all");
   const [band, setBand] = React.useState<DurationBand>("any");
   const [sort, setSort] = React.useState<SortKey>("recommended");
+  const [levelFilter, setLevelFilter] = React.useState<string>("all");
+  const [levelTouched, setLevelTouched] = React.useState(false);
   const [selectedId, setSelectedId] = React.useState<string | null>(params.workout ?? null);
   const [favs, setFavs] = React.useState<Set<string>>(new Set());
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
   const showToast = React.useCallback((t: string) => setToast({ id: Date.now(), text: t }), []);
 
   React.useEffect(() => { fetchFavorites().then((ids) => setFavs(new Set(ids))); }, []);
+
+  // Default the level filter to the rider's self-rated capability (until they change it).
+  React.useEffect(() => {
+    if (!levelTouched) setLevelFilter(CAPABILITY_TO_LEVEL[profile.capability]);
+  }, [profile.capability, levelTouched]);
 
   // If arriving with a specific workout, align the type filter to it.
   React.useEffect(() => {
@@ -104,9 +120,11 @@ export default function WorkoutListScreen() {
   }, [params.type, params.workout]);
 
   const filtered = React.useMemo(() => {
-    const list = workoutsByType(typeFilter).filter((w) => inDurationBand(w, band));
+    const list = workoutsByType(typeFilter)
+      .filter((w) => inDurationBand(w, band))
+      .filter((w) => levelFilter === "all" || !w.level || w.level === levelFilter);
     return sortWorkouts(list, sort);
-  }, [typeFilter, band, sort]);
+  }, [typeFilter, band, sort, levelFilter]);
 
   const selected = getWorkout(selectedId) ?? filtered[0];
   const selectedValid = selected && filtered.some((w) => w.id === selected.id);
@@ -186,6 +204,16 @@ export default function WorkoutListScreen() {
               </ScrollView>
               <View style={s.filterMeta}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipRow}>
+                  {LEVEL_FILTERS.map((lv) => {
+                    const on = levelFilter === lv.id;
+                    return (
+                      <Pressable key={lv.id} testID={`level-${lv.id}`} onPress={() => { setLevelFilter(lv.id); setLevelTouched(true); }} accessibilityState={{ selected: on }}
+                        style={[s.miniChip, on && s.miniChipLevelOn]}>
+                        <Text style={[s.miniChipText, on && { color: CC.white, fontWeight: "700" }]}>{lv.label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                  <View style={s.sortDivider} />
                   {DURATION_BANDS.map((b) => {
                     const on = band === b.id;
                     return (
@@ -231,6 +259,11 @@ export default function WorkoutListScreen() {
                               <Text style={[s.lvlText, { color: LEVEL_META[w.level].color }]}>{LEVEL_META[w.level].tier}</Text>
                             </View>
                           ) : null}
+                          {w.environment === "outdoor" ? (
+                            <View style={[s.lvlPill, { borderColor: "#40A9C666", backgroundColor: "#40A9C61A" }]}>
+                              <Text style={[s.lvlText, { color: "#40A9C6" }]}>OUTDOOR</Text>
+                            </View>
+                          ) : null}
                         </View>
                         <Text style={s.listMeta}>{fmtDuration(w.duration)} · {w.tss} TSS · IF {w.if.toFixed(2)}</Text>
                       </View>
@@ -250,7 +283,7 @@ export default function WorkoutListScreen() {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={s.detailName}>{detail.name}</Text>
-                      <Text style={[s.detailType, { color: detail.color }]}>{detail.typeName} · {detail.focus}</Text>
+                      <Text style={[s.detailType, { color: detail.color }]}>{detail.typeName} · {detail.focus}{detail.environment === "outdoor" ? " · Outdoor ride" : ""}</Text>
                     </View>
                     <Pressable testID="detail-fav" onPress={() => toggleFav(detail.id)} hitSlop={8} style={s.favBtn}>
                       <Ionicons name={favs.has(detail.id) ? "star" : "star-outline"} size={18} color={favs.has(detail.id) ? CC.yellow : CC.dim} />
@@ -326,6 +359,7 @@ const s = StyleSheet.create({
   filterMeta: {},
   miniChip: { borderWidth: 1, borderColor: CC.borderSoft, borderRadius: 8, paddingVertical: 6, paddingHorizontal: 11, backgroundColor: "rgba(255,255,255,0.02)", minHeight: 32, justifyContent: "center" },
   miniChipOn: { borderColor: CC.rouge, backgroundColor: "rgba(201,23,39,0.1)" },
+  miniChipLevelOn: { borderColor: CC.yellow, backgroundColor: "rgba(255,194,10,0.14)" },
   miniChipText: { color: CC.dim, fontSize: 11.5, fontWeight: "600" },
   sortDivider: { width: 1, backgroundColor: CC.borderSoft, marginHorizontal: 6, alignSelf: "stretch" },
 

@@ -18,6 +18,7 @@ export type Workout = {
   focus: string;
   zones: Zone[];
   level?: "Foundation" | "Development" | "Performance";
+  environment?: "indoor" | "outdoor";
   segmentSpec?: { label: string; zoneIdx: number; minutes: number; targetPct?: number }[];
 };
 
@@ -45,6 +46,11 @@ export const LEVEL_META: Record<Level, { label: string; tier: string; color: str
   Foundation: { label: "Foundation", tier: "Beginner", color: "#55C850" },
   Development: { label: "Development", tier: "Intermediate", color: "#40A9C6" },
   Performance: { label: "Performance", tier: "Advanced", color: "#FFC20A" },
+};
+
+// Map the rider's self-rated capability to a workout Level tier.
+export const CAPABILITY_TO_LEVEL: Record<string, Level> = {
+  beginner: "Foundation", intermediate: "Development", advanced: "Performance",
 };
 
 // An explicit, ordered segment spec (minutes) that overrides the auto-builder.
@@ -164,12 +170,12 @@ export const WORKOUTS: Workout[] = [
   // ── Endurance ──
   { id: "endurance-ride", name: "Endurance Ride", typeId: "endurance", typeName: "Endurance", color: "#55C850", icon: "bicycle",
     duration: 105, tss: 70, if: 0.62, difficulty: "Easy", focus: "Aerobic base",
-    description: "A long, steady Zone 2 ride to build your aerobic engine and fat-burning efficiency. Keep it conversational the whole way.",
-    zones: zones(10, 75, 15, 0, 0, 0) },
+    description: "A long, steady Zone 2 ride to build your aerobic engine and fat-burning efficiency. Keep it conversational the whole way. Best done outdoors where terrain and momentum keep it engaging.",
+    zones: zones(10, 75, 15, 0, 0, 0), environment: "outdoor" },
   { id: "long-base-builder", name: "Long Base Builder", typeId: "endurance", typeName: "Endurance", color: "#55C850", icon: "bicycle",
     duration: 150, tss: 95, if: 0.63, difficulty: "Moderate", focus: "Endurance volume",
-    description: "Extended endurance ride with a few tempo surges to keep the legs honest. Great weekend base session.",
-    zones: zones(8, 68, 20, 4, 0, 0) },
+    description: "Extended endurance ride with a few tempo surges to keep the legs honest. Great weekend base session — take it outdoors for the full experience.",
+    zones: zones(8, 68, 20, 4, 0, 0), environment: "outdoor" },
   { id: "fasted-aerobic", name: "Fasted Aerobic Spin", typeId: "endurance", typeName: "Endurance", color: "#55C850", icon: "bicycle",
     duration: 75, tss: 48, if: 0.6, difficulty: "Easy", focus: "Fat metabolism",
     description: "Gentle, controlled aerobic ride to develop metabolic efficiency. Stay strictly in Zone 2.",
@@ -186,8 +192,8 @@ export const WORKOUTS: Workout[] = [
     zones: zones(8, 22, 10, 35, 20, 5) },
   { id: "alpine-simulator", name: "Alpine Simulator", typeId: "climbing", typeName: "Climbing", color: "#C91727", icon: "trending-up",
     duration: 120, tss: 130, if: 0.85, difficulty: "Very Hard", focus: "Big-mountain endurance",
-    description: "A long climb simulation blending tempo and threshold to prepare for grand-tour style ascents.",
-    zones: zones(4, 26, 25, 35, 10, 0) },
+    description: "A long climb simulation blending tempo and threshold to prepare for grand-tour style ascents. An outdoor big-mountain day.",
+    zones: zones(4, 26, 25, 35, 10, 0), environment: "outdoor" },
 
   // ── Threshold ──
   { id: "sweet-spot-2x20", name: "Sweet Spot 2x20", typeId: "threshold", typeName: "Threshold", color: "#FFC20A", icon: "flash",

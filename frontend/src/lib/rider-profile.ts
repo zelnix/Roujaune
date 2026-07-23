@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export type RiderProfile = { name: string; weight_kg: number; age: number; gender: string; city: string; region: string; country: string };
+export type Capability = "beginner" | "intermediate" | "advanced";
+export type RiderProfile = { name: string; weight_kg: number; age: number; gender: string; city: string; region: string; country: string; capability: Capability };
 
-const DEFAULT: RiderProfile = { name: "Rider One", weight_kg: 78, age: 42, gender: "male", city: "", region: "", country: "" };
+const DEFAULT: RiderProfile = { name: "Rider One", weight_kg: 78, age: 42, gender: "male", city: "", region: "", country: "", capability: "intermediate" };
 const AVATAR_KEY = "roujaune:riderAvatar";
 
 // Module-level snapshot so non-React code (coach context builders) can read it.
@@ -29,7 +30,7 @@ export function useRiderProfile() {
         const res = await fetch(`${base()}/api/rider/profile`);
         if (res.ok) {
           const d = await res.json();
-          const p: RiderProfile = { name: d.name, weight_kg: d.weight_kg, age: d.age, gender: d.gender, city: d.city ?? "", region: d.region ?? "", country: d.country ?? "" };
+          const p: RiderProfile = { name: d.name, weight_kg: d.weight_kg, age: d.age, gender: d.gender, city: d.city ?? "", region: d.region ?? "", country: d.country ?? "", capability: d.capability ?? "intermediate" };
           _snap = p;
           setProfile(p);
         }

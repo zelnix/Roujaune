@@ -420,43 +420,47 @@ export default function LiveWorkout() {
       <WorkoutTopBar elapsed={fmt(telemetry.elapsed)} connectionState={connectionState} stale={stale} onPress={(m) => (m === "Settings" ? setShowSettings(true) : showToast(m))} routeName={routeInfo.title} riddenKm={riddenKm} totalKm={routeInfo.km} demoMode={settings.demoMode} onToggleDemo={() => setSetting("demoMode", !settings.demoMode)} />
 
       <View style={styles.bodyRow}>
-        <View style={styles.leftBlock}>
-          <View style={styles.innerRow}>
-            <View style={[styles.leftCol, { width: leftW }]}>
-              <PowerCard power={telemetry.power} wkg={(telemetry.power / (getRiderProfile().weight_kg || 78)).toFixed(1)} connected={trainerOn} target={targetW} zoneLabel={activeSeg?.segment.zoneLabel} zoneIdx={activeSeg?.segment.zoneIdx} />
-              <HeartRateCard hr={telemetry.hr} connected={wearableOn} />
-              <CadenceCard cadence={telemetry.cadence} connected={trainerOn} />
-            </View>
-            <View style={styles.centerCol} onLayout={onCenterLayout}>
-              <WorkoutTimelineCard width={centerW} onPress={() => showToast("Workout timeline")} title={workoutTitle} color={workoutColor} profile={workoutProfile} step={stepLabel} timeLeft={timeLeftLabel} activeIndex={activeSeg?.index} />
-              {expanded ? (
-                <VideoPlaceholder width={centerW} onRestore={() => setExpanded(false)} />
-              ) : virtualMode ? (
-                <View style={{ position: "relative" }}>
-                  <VirtualRoute width={centerW} height={Math.round(centerW * 0.5625)} speed={trainerOn ? telemetry.speed : 0} cadence={trainerOn ? telemetry.cadence : 88} gender={getRiderProfile().gender} paused={paused || !trainerOn} />
-                  <View style={styles.inlineRoutes} pointerEvents="box-none">
-                    <RoutesButton onPress={() => setVirtualMode(false)} testID="switch-video" label="Video" icon="videocam" />
-                  </View>
-                </View>
-              ) : (
-                <RouteVideo source={activeRoute.url} title={`${activeRoute.title}${routeAuto ? " · Auto-matched" : activeRoute.id === lastRouteId ? " · Last ride" : ""}`} playing={!paused} muted width={centerW} onToggleExpand={() => setExpanded(true)} expanded={false}>
-                  <View style={styles.inlineRoutes} pointerEvents="box-none">
-                    <RoutesButton onPress={() => setShowRoutes(true)} testID="inline-routes" />
-                    <RoutesButton onPress={() => setVirtualMode(true)} testID="switch-virtual" label="Virtual" icon="bicycle" />
-                  </View>
-                </RouteVideo>
-              )}
-              <NextUpStrip next={nextSeg} />
-              <SafetyNote />
-            </View>
+        <View style={styles.innerRow}>
+          <View style={[styles.leftCol, { width: leftW }]}>
+            <PowerCard power={telemetry.power} wkg={(telemetry.power / (getRiderProfile().weight_kg || 78)).toFixed(1)} connected={trainerOn} target={targetW} zoneLabel={activeSeg?.segment.zoneLabel} zoneIdx={activeSeg?.segment.zoneIdx} />
+            <HeartRateCard hr={telemetry.hr} connected={wearableOn} />
+            <CadenceCard cadence={telemetry.cadence} connected={trainerOn} />
           </View>
-          <RideSummaryStrip speed={String(Math.round(telemetry.speed))} trainerConnected={trainerOn} riddenKm={riddenKm} totalKm={routeInfo.km} elevM={routeInfo.elev} progress={progress} temp={weather} />
+          <View style={styles.centerCol} onLayout={onCenterLayout}>
+            <WorkoutTimelineCard width={centerW} onPress={() => showToast("Workout timeline")} title={workoutTitle} color={workoutColor} profile={workoutProfile} step={stepLabel} timeLeft={timeLeftLabel} activeIndex={activeSeg?.index} />
+            {expanded ? (
+              <VideoPlaceholder width={centerW} onRestore={() => setExpanded(false)} />
+            ) : virtualMode ? (
+              <View style={{ position: "relative" }}>
+                <VirtualRoute width={centerW} height={Math.round(centerW * 0.5625)} speed={trainerOn ? telemetry.speed : 0} cadence={trainerOn ? telemetry.cadence : 88} gender={getRiderProfile().gender} paused={paused || !trainerOn} />
+                <View style={styles.inlineRoutes} pointerEvents="box-none">
+                  <RoutesButton onPress={() => setVirtualMode(false)} testID="switch-video" label="Video" icon="videocam" />
+                </View>
+              </View>
+            ) : (
+              <RouteVideo source={activeRoute.url} title={`${activeRoute.title}${routeAuto ? " · Auto-matched" : activeRoute.id === lastRouteId ? " · Last ride" : ""}`} playing={!paused} muted width={centerW} onToggleExpand={() => setExpanded(true)} expanded={false}>
+                <View style={styles.inlineRoutes} pointerEvents="box-none">
+                  <RoutesButton onPress={() => setShowRoutes(true)} testID="inline-routes" />
+                  <RoutesButton onPress={() => setVirtualMode(true)} testID="switch-virtual" label="Virtual" icon="bicycle" />
+                </View>
+              </RouteVideo>
+            )}
+            <NextUpStrip next={nextSeg} />
+            <SafetyNote />
+          </View>
+          <View style={[styles.rightCol, { width: rightW }]}>
+            <ClimbCard route={routeInfo} riddenKm={riddenKm} progress={progress} />
+            <RouteMapCard title={routeInfo.title} progress={progress} riddenKm={riddenKm} totalKm={routeInfo.km} timeBased={!trainerOn} fill />
+          </View>
         </View>
 
-        <View style={[styles.rightCol, { width: rightW }]}>
-          <ClimbCard route={routeInfo} riddenKm={riddenKm} progress={progress} />
-          <RouteMapCard title={routeInfo.title} progress={progress} riddenKm={riddenKm} totalKm={routeInfo.km} timeBased={!trainerOn} />
-          <WearableDataCard connected={wearableOn} />
+        <View style={styles.bottomRow}>
+          <View style={{ flex: 1 }}>
+            <RideSummaryStrip speed={String(Math.round(telemetry.speed))} trainerConnected={trainerOn} riddenKm={riddenKm} totalKm={routeInfo.km} elevM={routeInfo.elev} progress={progress} temp={weather} />
+          </View>
+          <View style={{ width: rightW }}>
+            <WearableDataCard connected={wearableOn} />
+          </View>
         </View>
       </View>
 
@@ -645,9 +649,10 @@ const styles = StyleSheet.create({
   hudCast: { position: "absolute", top: 56, left: 12, width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center", zIndex: 5 },
   hudCastOn: { backgroundColor: colors.yellow, borderColor: colors.yellow },
   inlineRoutes: { position: "absolute", left: 10, bottom: 10 },
-  bodyRow: { flexDirection: "row", gap: spacing.md },
+  bodyRow: { flexDirection: "column", gap: spacing.md },
   leftBlock: { flex: 1, gap: spacing.md },
-  innerRow: { flexDirection: "row", gap: spacing.md },
+  innerRow: { flexDirection: "row", gap: spacing.md, alignItems: "stretch" },
+  bottomRow: { flexDirection: "row", gap: spacing.md, alignItems: "stretch" },
   leftCol: { gap: spacing.md },
   centerCol: { flex: 1, gap: spacing.md },
   rightCol: { gap: spacing.md },
