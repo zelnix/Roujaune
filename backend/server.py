@@ -13,6 +13,9 @@ from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone
 
+from readiness import compute_readiness
+from rider_level import compute_rider_level
+
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -682,6 +685,41 @@ async def get_rider_achievements():
     add(streak >= 7, "flame", "7-Day Streak", "On fire this week", "#C91727")
     add(total_elev >= 8848, "flag", "Everest Challenge", "8,848 m climbed", "#FFC20A")
     return {"achievements": unlocked}
+
+
+async def _enrich_activity(payload: dict) -> dict:
+    """Fill training load from real ride history when the client did not supply
+    it (so readiness reflects recent Roujaune activity)."""
+    from datetime import timedelta
+    out = dict(payload)
+    if not out.get("activity"):
+        try:
+            now = datetime.now(timezone.utc)
+            rides = await db.ride_history.find().to_list(length=5000)
+            def tss_since(days):
+                cutoff = (now - timedelta(days=days)).isoformat()
+                return sum((r.get("tss") or 0) for r in rides if str(r.get("created_at")) >= cutoff)
+            acute = tss_since(7)
+            chronic = tss_since(28) / 4.0
+            if chronic > 0:
+                out["activity"] = {"acute_load": acute, "chronic_load": chronic}
+        except Exception:
+            pass
+    return out
+
+
+@api_router.post("/rider/readiness")
+async def rider_readiness(payload: dict):
+    """Compute the rider's 0–100 readiness score (see readiness.py)."""
+    enriched = await _enrich_activity(payload or {})
+    return compute_readiness(enriched)
+
+
+@api_router.post("/rider/level")
+async def rider_level(payload: dict):
+    """Classify the rider as Beginner / Intermediate / Advanced (see rider_level.py)."""
+    return compute_rider_level(payload or {})
+
 
 
 

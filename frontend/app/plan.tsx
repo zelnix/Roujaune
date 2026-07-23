@@ -148,6 +148,16 @@ export default function TrainingPlanScreen() {
             <Ionicons name="chatbubble-ellipses" size={15} color={C.yellow} />
           </Pressable>
           <PlanSelector value={selectedPlan} onPress={cyclePlan} />
+          <Pressable
+            testID="view-calendar"
+            onPress={() => router.push("/calendar")}
+            accessibilityRole="button"
+            accessibilityLabel="View full calendar"
+            style={({ hovered }: any) => [styles.calendarPill, hovered && styles.messageBtnHover]}
+          >
+            <Ionicons name="calendar-outline" size={15} color={C.yellow} />
+            <Text style={styles.calendarPillText}>Full calendar</Text>
+          </Pressable>
           {loading ? (
             <View style={styles.syncPill}><Text style={styles.syncText}>Syncing plan…</Text></View>
           ) : live ? (
@@ -201,6 +211,8 @@ const styles = StyleSheet.create({
   messageBtnHover: { borderColor: "rgba(255,194,10,0.4)", backgroundColor: "rgba(255,255,255,0.05)" },
   messageAvatar: { width: 26, height: 26, borderRadius: 13, backgroundColor: "rgba(255,255,255,0.08)" },
   messageBtnText: { color: C.white, fontSize: 13, fontWeight: "700" },
+  calendarPill: { flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12, minHeight: 44 },
+  calendarPillText: { color: C.white, fontSize: 13, fontWeight: "700" },
   syncPill: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: C.border },
   syncText: { color: C.dim, fontSize: 11, fontWeight: "600" },
   liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.green },
