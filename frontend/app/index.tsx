@@ -62,7 +62,11 @@ export default function Dashboard() {
   }, []);
 
   const onSelectNav = (key: string) => {
-    if (key === "workouts" || key === "training") {
+    if (key === "training") {
+      router.push("/plan");
+      return;
+    }
+    if (key === "workouts") {
       router.push("/training");
       return;
     }

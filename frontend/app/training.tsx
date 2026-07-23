@@ -91,7 +91,11 @@ export default function TodaysTraining() {
       router.replace("/");
       return;
     }
-    if (key === "workouts" || key === "training") return; // already here
+    if (key === "training") {
+      router.push("/plan");
+      return;
+    }
+    if (key === "workouts") return; // already here
     const item = [...navItems, ...navFooter].find((n) => n.key === key);
     showToast(`${item?.label ?? key}`);
   };
