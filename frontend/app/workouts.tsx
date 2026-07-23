@@ -102,12 +102,12 @@ export default function WorkoutsScreen() {
   const compact = width < 820;
 
   const [tab, setTab] = React.useState<WorkoutTab>("All Workouts");
-  const [activeCat, setActiveCat] = React.useState("all");
   const [favs, setFavs] = React.useState<Set<string>>(new Set());
   const [showChat, setShowChat] = React.useState(false);
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
   const [centerW, setCenterW] = React.useState(760);
   const showToast = React.useCallback((t: string) => setToast({ id: Date.now(), text: t }), []);
+  const openList = (params: Record<string, string>) => router.push({ pathname: "/workout-list", params } as any);
 
   const onSelectNav = (key: string) => {
     if (key === "workouts") return;
@@ -122,11 +122,7 @@ export default function WorkoutsScreen() {
     return next;
   });
 
-  const onCategory = (id: string) => {
-    if (id === "fb50") { setTab("FB50 Sessions"); setActiveCat("fb50"); return; }
-    setActiveCat(id);
-    if (["My Workouts", "Favorites", "FB50 Sessions"].includes(tab)) setTab("All Workouts");
-  };
+  const onCategory = (id: string) => openList({ type: id });
 
   const cols = centerW >= 1000 ? 4 : centerW >= 700 ? 3 : centerW >= 460 ? 2 : 1;
   const gridGap = 14;
@@ -136,16 +132,13 @@ export default function WorkoutsScreen() {
 
   // Which types to show in the grid
   let gridTypes = typesForTab(tab);
-  if (activeCat !== "all" && activeCat !== "fb50" && !["FB50 Sessions", "My Workouts", "Favorites"].includes(tab)) {
-    gridTypes = gridTypes.filter((t) => t.id === activeCat);
-  }
   if (tab === "Favorites") gridTypes = typesForTab("All Workouts").filter((t) => favs.has(t.id));
 
   const renderGrid = () => (
     <View style={s.grid}>
       {gridTypes.map((t) => (
         <WorkoutTypeCard key={t.id} t={t} width={cols === 1 ? centerW : cardW} fav={favs.has(t.id)}
-          onFav={() => toggleFav(t.id)} onView={() => showToast(`Loading ${t.name} workouts…`)} />
+          onFav={() => toggleFav(t.id)} onView={() => openList({ type: t.id })} />
       ))}
     </View>
   );
@@ -164,7 +157,7 @@ export default function WorkoutsScreen() {
               <View key={x} style={s.fb50Tag}><Text style={s.fb50TagText}>{x}</Text></View>
             ))}
           </View>
-          <Pressable testID="view-fb50" onPress={() => showToast("Loading FB50 sessions…")} style={({ hovered }: any) => [s.fb50Btn, hovered && { opacity: 0.9 }]}>
+          <Pressable testID="view-fb50" onPress={() => openList({ type: "fb50" })} style={({ hovered }: any) => [s.fb50Btn, hovered && { opacity: 0.9 }]}>
             <Text style={s.fb50BtnText}>View FB50 Sessions</Text>
             <Ionicons name="chevron-forward" size={15} color="#132200" />
           </Pressable>
@@ -262,9 +255,9 @@ export default function WorkoutsScreen() {
                 <View style={s.card}>
                   <Text style={s.cardTitle}>WORKOUT CATEGORIES</Text>
                   {WORKOUT_CATEGORIES.map((c, i) => {
-                    const on = (c.id === activeCat) || (c.id === "fb50" && tab === "FB50 Sessions");
+                    const on = false;
                     return (
-                      <Pressable key={c.id} testID={`cat-${c.id}`} onPress={() => onCategory(c.id)} accessibilityState={{ selected: on }}
+                      <Pressable key={c.id} testID={`cat-${c.id}`} onPress={() => onCategory(c.id)}
                         style={({ hovered }: any) => [s.catRow, i === WORKOUT_CATEGORIES.length - 1 && { borderTopWidth: 1, borderTopColor: CC.borderSoft, marginTop: 4, paddingTop: 10 }, (hovered || on) && s.catRowOn]}>
                         <Ionicons name={c.icon} size={16} color={c.color} />
                         <Text style={[s.catLabel, on && { color: CC.white, fontWeight: "700" }]}>{c.label}</Text>
@@ -277,7 +270,7 @@ export default function WorkoutsScreen() {
                 <View style={s.card}>
                   <Text style={s.cardTitle}>POPULAR THIS WEEK</Text>
                   {POPULAR_THIS_WEEK.map((p, i) => (
-                    <Pressable key={p.id} testID={`popular-${p.id}`} onPress={() => showToast(`Opening ${p.name}`)}
+                    <Pressable key={p.id} testID={`popular-${p.id}`} onPress={() => openList({ workout: p.workoutId })}
                       style={({ hovered }: any) => [s.popRow, i < POPULAR_THIS_WEEK.length - 1 && s.divider, hovered && s.catRowOn]}>
                       <View style={[s.popIcon, { backgroundColor: `${p.color}1F` }]}><Ionicons name={p.icon} size={15} color={p.color} /></View>
                       <View style={{ flex: 1 }}>
@@ -286,7 +279,7 @@ export default function WorkoutsScreen() {
                       </View>
                     </Pressable>
                   ))}
-                  <Pressable testID="view-all-popular" onPress={() => showToast("All popular workouts")} style={({ hovered }: any) => [s.popAll, hovered && s.ghostHover]}>
+                  <Pressable testID="view-all-popular" onPress={() => openList({ type: "all" })} style={({ hovered }: any) => [s.popAll, hovered && s.ghostHover]}>
                     <Text style={s.popAllText}>View All Popular</Text>
                     <Ionicons name="chevron-forward" size={14} color={CC.white} />
                   </Pressable>

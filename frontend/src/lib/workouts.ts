@@ -93,12 +93,12 @@ export const WORKOUT_CATEGORIES: Category[] = [
   { id: "fb50", label: "FB50 Sessions", icon: "barbell-outline", color: "#9BD84B", count: 34 },
 ];
 
-export type Popular = { id: string; name: string; icon: Ion; color: string; duration: string; tss: number };
+export type Popular = { id: string; name: string; icon: Ion; color: string; duration: string; tss: number; workoutId: string };
 export const POPULAR_THIS_WEEK: Popular[] = [
-  { id: "p1", name: "Threshold Climb", icon: "trending-up", color: "#C91727", duration: "1h 00m", tss: 92 },
-  { id: "p2", name: "Sweet Spot 2x20", icon: "flash", color: "#FFC20A", duration: "1h 20m", tss: 75 },
-  { id: "p3", name: "Endurance Ride", icon: "bicycle", color: "#55C850", duration: "1h 45m", tss: 70 },
-  { id: "p4", name: "VO2 Max Intervals", icon: "speedometer-outline", color: "#40A9C6", duration: "1h 10m", tss: 85 },
+  { id: "p1", name: "Threshold Climb", icon: "trending-up", color: "#C91727", duration: "1h 00m", tss: 92, workoutId: "threshold-climb" },
+  { id: "p2", name: "Sweet Spot 2x20", icon: "flash", color: "#FFC20A", duration: "1h 20m", tss: 75, workoutId: "sweet-spot-2x20" },
+  { id: "p3", name: "Endurance Ride", icon: "bicycle", color: "#55C850", duration: "1h 45m", tss: 70, workoutId: "endurance-ride" },
+  { id: "p4", name: "VO2 Max Intervals", icon: "speedometer-outline", color: "#40A9C6", duration: "1h 10m", tss: 85, workoutId: "vo2-max-intervals" },
 ];
 
 export type QuickAction = { id: string; label: string; icon: Ion };

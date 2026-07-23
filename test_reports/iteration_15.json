@@ -1,0 +1,47 @@
+{
+  "summary": "Frontend-only regression on new /workout-list catalog-detail screen plus /workouts hub. All 8 requested feature groups verified end-to-end at tablet-landscape viewport (1280x800). No functional bugs found. Minor React Native Web deprecation warnings observed (non-blocking).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "react-native-web deprecations", "issue": "Console warnings: 'textShadow*' style props deprecated (use 'textShadow'); props.pointerEvents deprecated (use style.pointerEvents); Animated useNativeDriver falling back to JS on web. Cosmetic on web preview but should be cleaned up. Reference: multiple screens (workouts/workout-list toasts and shadows)."}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_15.json"],
+  "action_items": [
+    "Optional: replace deprecated 'textShadow*' style shorthand with the new 'textShadow' prop and pointerEvents style to silence RN-Web warnings.",
+    "Optional: consider setting accessibilityRole='button' on Pressables that use accessibilityState.selected so screen readers/tests can read aria-selected (not required, chips look correct visually)."
+  ],
+  "critical_code_review_comments": [
+    "workout-list.tsx line 122 uses expression-statement ternary `next.has(id) ? next.delete(id) : next.add(id);` — works but eslint-no-unused-expressions may flag. Consider if/else for clarity.",
+    "Detail auto-selection effect (line 110-112) correctly reconciles when filters exclude the current selection — verified empty state and re-select behavior."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100%"},
+  "seed_data_creation": "None. Workout catalog is static frontend data in src/lib/workout-catalog.ts (as declared mocked).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Test at tablet landscape viewport 1280x800 (compact breakpoint is 900px). aria-selected is NOT emitted by Pressable+accessibilityState on RN-Web — verify chip active state via URL params or visible detail content instead of aria attributes. Popular cards navigate with ?workout=<id>, categories with ?type=<id>. Coach persistence uses AsyncStorage per browser context — set via /settings then navigate to /workout-list to verify sidebar/coach card. Start Workout pushes to /workout?title=<name>; Rest Day shows toast 'Enjoy your rest day' instead.",
+  "verified_flows": {
+    "workouts_hub_type_cards": "view-threshold clicked → /workout-list?type=threshold, title 'Threshold Workouts' rendered. view-* pattern verified.",
+    "workouts_hub_categories": "cat-endurance, cat-all, cat-fb50 all navigate to /workout-list?type=<id>. cat-all → All Workouts (21 sessions listed), cat-fb50 → FB50 Sessions.",
+    "popular_preselect": "popular-p1→threshold-climb, p2→sweet-spot-2x20, p3→endurance-ride, p4→vo2-max-intervals — URL contains ?workout=<id> and detail panel displays correct workout name.",
+    "view_all_popular": "→ /workout-list?type=all with 21 sessions and All chip active (visual).",
+    "view_fb50": "→ /workout-list?type=fb50 (verified via cat-fb50 same route).",
+    "filter_chips_bands_sort": "type-filter-climbing + band-long + sort-tss chain works; list updates; detail auto-selects first match.",
+    "empty_state": "type=restday + band-short shows 'No workouts match these filters.'",
+    "workout_row_selection": "workout-ftp-4x8 tap updates right-detail (name, stats, zones bar).",
+    "detail_fav_toggle": "detail-fav star toggles.",
+    "start_workout": "Navigates to /workout?title=<name> (HUD).",
+    "rest_day_toast": "Rest Day Start button shows 'Enjoy your rest day' toast, stays on /workout-list.",
+    "add_to_calendar_toast": "Shows 'Added <name> to your calendar' toast.",
+    "back_to_catalog": "Returns to /workouts.",
+    "sidebar_nav": "nav-calendar navigates to /calendar. Workouts entry visually active (LinearGradient rendered).",
+    "dynamic_coach": "After selecting coach-adriana in /settings, /workout-list sidebar shows Adriana with Adriana signature; no Alberto text bleed-through."
+  }
+}
