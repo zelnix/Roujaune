@@ -5,8 +5,8 @@
  "level": "Advanced",
  "type": "structured",
  "description": "An advanced 12-week performance plan across three phases — Performance Foundation, Power & Durability, and Peak Performance — that develops sustainable power, aerobic durability, climbing strength, cadence control and performance under fatigue, toward a personalised achievement ride.",
- "duration_weeks": 4,
- "duration_label": "4 Weeks",
+ "duration_weeks": 12,
+ "duration_label": "12 Weeks",
  "average_label": "3 Rides/Week",
  "frequency": "3 rides/week",
  "start_date": "2025-05-12",
@@ -38,6 +38,18 @@
    "name": "Performance Foundation",
    "weeks_label": "Weeks 1–4",
    "objective": "Establish the rider's advanced performance baseline and develop the control, aerobic durability and technical efficiency needed for the rest of the program."
+  },
+  {
+   "number": 2,
+   "name": "Power and Durability",
+   "weeks_label": "Weeks 5–8",
+   "objective": "Build on the aerobic foundation to produce more sustained power — longer threshold efforts, controlled VO₂ work, stronger climbing and quality effort produced after fatigue has accumulated."
+  },
+  {
+   "number": 3,
+   "name": "Performance Ready",
+   "weeks_label": "Weeks 9–12",
+   "objective": "Convert eight weeks of fitness into goal-specific performance — changes of pace, over-unders, goal-pace efforts and disciplined long-ride pacing — then taper to arrive at the Achievement Ride rested and confident."
   }
  ],
  "weeks": [
@@ -325,6 +337,582 @@
      "type": "recovery",
      "kind": "recovery",
      "title": "Optional Recovery Spin or Rest",
+     "duration": "optional"
+    }
+   ]
+  },
+  {
+   "number": 5,
+   "phase": 2,
+   "phase_name": "Power and Durability",
+   "phase_weeks": "Weeks 5–8",
+   "title": "Sustainable Power",
+   "objective": "Begin producing more sustained power — longer tempo intervals, cadence control under load and durable long-ride endurance.",
+   "start_date": "2025-06-09",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest or Gentle Mobility",
+     "duration": ""
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Advanced Tempo Strength Builder",
+     "duration": "90–100 min",
+     "workout_id": "rb-ride-13",
+     "zone": "RPE 1–7",
+     "tss": 87,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "strength",
+     "kind": "strength",
+     "title": "Fit Beyond 50 — Cycling Strength",
+     "duration": "~30 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Cadence Under Load",
+     "duration": "75–90 min",
+     "workout_id": "rb-ride-14",
+     "zone": "RPE 1–6",
+     "tss": 72,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Rest or Gentle Mobility",
+     "duration": "optional"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Long Steady Endurance Ride",
+     "duration": "165–195 min",
+     "workout_id": "rb-ride-15",
+     "zone": "RPE 1–5",
+     "tss": 145,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Optional Recovery Spin or Rest",
+     "duration": "optional"
+    }
+   ]
+  },
+  {
+   "number": 6,
+   "phase": 2,
+   "phase_name": "Power and Durability",
+   "phase_weeks": "Weeks 5–8",
+   "title": "Climbing Power",
+   "objective": "Develop seated and standing climbing power, positional control and climbing durability across a long ride.",
+   "start_date": "2025-06-16",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest or Gentle Mobility",
+     "duration": ""
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Seated Climbing Strength",
+     "duration": "85–95 min",
+     "workout_id": "rb-ride-16",
+     "zone": "RPE 1–8",
+     "tss": 82,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "strength",
+     "kind": "strength",
+     "title": "Fit Beyond 50 — Cycling Strength",
+     "duration": "~30 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Aerobic Endurance with Hill Skills",
+     "duration": "80–95 min",
+     "workout_id": "rb-ride-17",
+     "zone": "RPE 1–6",
+     "tss": 45,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Rest or Gentle Mobility",
+     "duration": "optional"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Hills and Endurance",
+     "duration": "180–210 min",
+     "workout_id": "rb-ride-18",
+     "zone": "RPE 1–7",
+     "tss": 145,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Optional Recovery Spin or Rest",
+     "duration": "optional"
+    }
+   ]
+  },
+  {
+   "number": 7,
+   "phase": 2,
+   "phase_name": "Power and Durability",
+   "phase_weeks": "Weeks 5–8",
+   "title": "Threshold and VO₂ Development",
+   "objective": "The most demanding week of Phase 2: longer threshold work, controlled VO₂ intervals and quality effort late in a long ride.",
+   "start_date": "2025-06-23",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest or Gentle Mobility",
+     "duration": ""
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Threshold Progression",
+     "duration": "90–105 min",
+     "workout_id": "rb-ride-19",
+     "zone": "RPE 1–8",
+     "tss": 88,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "strength",
+     "kind": "strength",
+     "title": "Fit Beyond 50 — Cycling Strength",
+     "duration": "~30 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "VO₂ Power Intervals",
+     "duration": "75–90 min",
+     "workout_id": "rb-ride-20",
+     "zone": "RPE 1–9",
+     "tss": 55,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Rest or Gentle Mobility",
+     "duration": "optional"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Goal-Specific Durability Ride",
+     "duration": "180–225 min",
+     "workout_id": "rb-ride-21",
+     "zone": "RPE 1–7",
+     "tss": 160,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Optional Recovery Spin or Rest",
+     "duration": "optional"
+    }
+   ]
+  },
+  {
+   "number": 8,
+   "phase": 2,
+   "phase_name": "Power and Durability",
+   "phase_weeks": "Weeks 5–8",
+   "title": "Consolidate and Absorb",
+   "objective": "Maintain hard-earned tempo, threshold and climbing fitness with less total work, and confirm readiness for Phase 3.",
+   "start_date": "2025-06-30",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest or Gentle Mobility",
+     "duration": ""
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Short Tempo Consolidation",
+     "duration": "65–75 min",
+     "workout_id": "rb-ride-22",
+     "zone": "RPE 1–8",
+     "tss": 55,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "strength",
+     "kind": "strength",
+     "title": "Fit Beyond 50 — Cycling Strength",
+     "duration": "~25 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Strength and Cadence Consolidation",
+     "duration": "65–80 min",
+     "workout_id": "rb-ride-23",
+     "zone": "RPE 1–6",
+     "tss": 60,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Rest or Gentle Mobility",
+     "duration": "optional"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Phase 2 Confidence Endurance Ride",
+     "duration": "150–180 min",
+     "workout_id": "rb-ride-24",
+     "zone": "RPE 1–8",
+     "tss": 143,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Optional Recovery Spin or Rest",
+     "duration": "optional"
+    }
+   ]
+  },
+  {
+   "number": 9,
+   "phase": 3,
+   "phase_name": "Performance Ready",
+   "phase_weeks": "Weeks 9–12",
+   "title": "Changes of Pace",
+   "objective": "Move repeatedly between threshold and above-threshold effort, develop leg speed and complete a goal-simulation ride.",
+   "start_date": "2025-07-07",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest or Gentle Mobility",
+     "duration": ""
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Goal-Specific Over-Under Intervals",
+     "duration": "90–100 min",
+     "workout_id": "rb-ride-25",
+     "zone": "RPE 1–8",
+     "tss": 82,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "strength",
+     "kind": "strength",
+     "title": "Fit Beyond 50 — Cycling Strength",
+     "duration": "~30 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Aerobic Endurance and Leg Speed",
+     "duration": "75–90 min",
+     "workout_id": "rb-ride-26",
+     "zone": "RPE 1–5",
+     "tss": 42,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Rest or Gentle Mobility",
+     "duration": "optional"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Goal Simulation Ride",
+     "duration": "180–240 min",
+     "workout_id": "rb-ride-27",
+     "zone": "RPE 1–8",
+     "tss": 172,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Optional Recovery Spin or Rest",
+     "duration": "optional"
+    }
+   ]
+  },
+  {
+   "number": 10,
+   "phase": 3,
+   "phase_name": "Performance Ready",
+   "phase_weeks": "Weeks 9–12",
+   "title": "Peak Performance Load",
+   "objective": "The highest goal-specific training load of the program: a sustained performance workout, a controlled sharpener and the longest or most demanding ride.",
+   "start_date": "2025-07-14",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest or Gentle Mobility",
+     "duration": ""
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Sustained Goal Effort",
+     "duration": "95–110 min",
+     "workout_id": "rb-ride-28",
+     "zone": "RPE 1–8",
+     "tss": 87,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "strength",
+     "kind": "strength",
+     "title": "Fit Beyond 50 — Cycling Strength",
+     "duration": "~30 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Endurance with Leg Openers",
+     "duration": "70–85 min",
+     "workout_id": "rb-ride-29",
+     "zone": "RPE 1–8",
+     "tss": 41,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Rest or Gentle Mobility",
+     "duration": "optional"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Peak Goal-Specific Training Ride",
+     "duration": "210–270 min",
+     "workout_id": "rb-ride-30",
+     "zone": "RPE 1–8",
+     "tss": 207,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Optional Recovery Spin or Rest",
+     "duration": "optional"
+    }
+   ]
+  },
+  {
+   "number": 11,
+   "phase": 3,
+   "phase_name": "Performance Ready",
+   "phase_weeks": "Weeks 9–12",
+   "title": "Sharpen and Build Confidence",
+   "objective": "Reduce volume while maintaining threshold and high-intensity sharpness; complete a final confidence simulation without excessive fatigue.",
+   "start_date": "2025-07-21",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest or Gentle Mobility",
+     "duration": ""
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Controlled Sharpening",
+     "duration": "75–90 min",
+     "workout_id": "rb-ride-31",
+     "zone": "RPE 1–9",
+     "tss": 65,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "strength",
+     "kind": "strength",
+     "title": "Fit Beyond 50 — Cycling Strength",
+     "duration": "~25 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Steady Endurance and Technique",
+     "duration": "60–75 min",
+     "workout_id": "rb-ride-32",
+     "zone": "RPE 1–4",
+     "tss": 34,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Rest or Gentle Mobility",
+     "duration": "optional"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Achievement Confidence Simulation",
+     "duration": "150–195 min",
+     "workout_id": "rb-ride-33",
+     "zone": "RPE 1–8",
+     "tss": 136,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Optional Recovery Spin or Rest",
+     "duration": "optional"
+    }
+   ]
+  },
+  {
+   "number": 12,
+   "phase": 3,
+   "phase_name": "Performance Ready",
+   "phase_weeks": "Weeks 9–12",
+   "title": "Taper and Achievement",
+   "objective": "Reduce training load while preserving sharpness, then complete the personalised Ride Beyond Achievement Ride rested and confident.",
+   "start_date": "2025-07-28",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest or Gentle Mobility",
+     "duration": ""
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Achievement Confidence Ride",
+     "duration": "60–75 min",
+     "workout_id": "rb-ride-34",
+     "zone": "RPE 1–7",
+     "tss": 49,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "strength",
+     "kind": "mobility",
+     "title": "Fit Beyond 50 — Gentle Mobility",
+     "duration": "~20 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Leg Opener and Goal Skills Ride",
+     "duration": "40–55 min",
+     "workout_id": "rb-ride-35",
+     "zone": "RPE 1–8",
+     "tss": 26,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Rest or Gentle Mobility",
+     "duration": "optional"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Ride Beyond Achievement Ride",
+     "duration": "Personalised · goal-specific",
+     "workout_id": "rb-ride-36",
+     "zone": "RPE 1–7",
+     "tss": 164,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Post-Achievement Recovery — Rest or Gentle Spin",
      "duration": "optional"
     }
    ]

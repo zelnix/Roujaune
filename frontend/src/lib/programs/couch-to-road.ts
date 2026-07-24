@@ -81,6 +81,7 @@ export type Program = {
   weeklyRhythm: { day: string; session: string }[];
   phaseTitles: { number: number; name: string; weeks: string }[];
   phases: Phase[];
+  endMessage?: string;
 };
 
 const rest = (): Session => ({ day: "Sunday", type: "rest", title: "Complete Rest", notes: "No scheduled training. Optional gentle walking or stretching only." });
