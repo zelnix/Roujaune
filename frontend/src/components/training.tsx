@@ -129,7 +129,7 @@ export function MainWorkoutCard({ onDetails, chartWidth, workout }: { onDetails:
             {workout ? (
               <>
                 <Tag icon={<MaterialCommunityIcons name="chart-timeline-variant" size={14} color={colors.red} />} label="Structured Workout" />
-                <Tag icon={<Ionicons name="bicycle" size={14} color={colors.green} />} label="Beginner" />
+                <Tag icon={<Ionicons name="bicycle" size={14} color={colors.green} />} label={workout.level === "Performance" ? "Advanced" : workout.level === "Development" ? "Intermediate" : "Beginner"} />
                 <Tag icon={<Ionicons name="pulse" size={14} color="#5AA9E6" />} label={workout.focus} />
               </>
             ) : (
