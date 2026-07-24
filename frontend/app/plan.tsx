@@ -19,6 +19,8 @@ import { SideNavigation } from "@/src/components/SideNavigation";
 import { CalendarCard } from "@/src/components/CalendarCard";
 import { ReadinessGate } from "@/src/components/ReadinessGate";
 import { EditGoalsModal, ProgressModal, AdaptationsModal } from "@/src/components/plan-modals";
+import { PhaseCelebrationModal } from "@/src/components/PhaseCelebrationModal";
+import { usePhaseCelebration } from "@/src/lib/phase-complete";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
 import type { EditableGoal } from "@/src/lib/plan";
 
@@ -46,6 +48,7 @@ export default function TrainingPlanScreen() {
   const { plan, refresh: refreshPlan } = usePlan();
   const adaptation = useAdaptation(persona.name, persona.gender);
   const adaptiveTargets = useAdaptiveTargets();
+  const { celebration, dismiss: dismissCelebration } = usePhaseCelebration(plan);
   const { width } = useWindowDimensions();
   const compact = width < 700; // phones scroll; tablets fill
 
@@ -176,6 +179,7 @@ export default function TrainingPlanScreen() {
         <ProgressModal visible={showProgress} onClose={() => setShowProgress(false)} />
         <AdaptationsModal visible={showAdaptations} onClose={() => setShowAdaptations(false)} persona={persona} />
         <CoachChatModal visible={showChat} onClose={() => setShowChat(false)} persona={persona} onPlanUpdated={refreshPlan} />
+        <PhaseCelebrationModal visible={!!celebration} celebration={celebration} persona={persona} onClose={dismissCelebration} />
       </SafeAreaView>
     </GestureHandlerRootView>
   );

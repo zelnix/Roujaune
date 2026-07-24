@@ -10,6 +10,7 @@ function apiBase(): string {
 function normalize(d: any): TrainingPlan {
   return {
     ...PLAN,
+    id: d.id ?? PLAN.id,
     title: d.title ?? PLAN.title,
     label: d.label ?? PLAN.label,
     description: d.description ?? PLAN.description,

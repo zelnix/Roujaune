@@ -892,7 +892,7 @@ async def assign_rider_plan(req: AssignPlanRequest):
         {"user_id": auth.current_user_id()},
         {"$set": {"onboarded": True, "assigned_plan_id": req.plan_id}},
     )
-    if req.reset_progress and req.plan_id in ("couch-to-road", "ride-stronger"):
+    if req.reset_progress and req.plan_id in ("couch-to-road", "ride-stronger", "ride-beyond"):
         await udb.plan_state.update_one(
             {"id": req.plan_id},
             {"$set": {"current_week": 1}, "$unset": {"eased_weeks": ""}},
@@ -903,7 +903,7 @@ async def assign_rider_plan(req: AssignPlanRequest):
 
 # Which plan is the sensible default for each rider level. Falls back gracefully
 # until intermediate/advanced plans are authored in the admin project.
-LEVEL_PLAN = {"Beginner": "couch-to-road", "Intermediate": "ride-stronger", "Advanced": "build-and-climb"}
+LEVEL_PLAN = {"Beginner": "couch-to-road", "Intermediate": "ride-stronger", "Advanced": "ride-beyond"}
 
 
 async def _plan_for_level(level: str):
@@ -1780,11 +1780,30 @@ async def _reload_rs_from_db():
     _RS_PLANNED_TSS = {d["workout_id"]: d.get("tss", 0) for w in doc["weeks"] for d in w["days"] if d.get("kind") == "cycling" and d.get("workout_id")}
 
 
+# ---- Ride Beyond (Advanced) structured plan ---------------------------------
+with open(ROOT_DIR / "ride_beyond_plan.json", encoding="utf-8") as _f:
+    RB_PLAN = json.load(_f)
+RB_WEEKS = {w["number"]: w for w in RB_PLAN["weeks"]}
+_RB_PLANNED_TSS = {d["workout_id"]: d.get("tss", 0) for w in RB_PLAN["weeks"] for d in w["days"] if d.get("kind") == "cycling" and d.get("workout_id")}
+
+
+async def _reload_rb_from_db():
+    global RB_PLAN, RB_WEEKS, _RB_PLANNED_TSS
+    doc = await plans_admin.get_plan_def("ride-beyond")
+    if not doc or not doc.get("weeks"):
+        return
+    RB_PLAN = doc
+    RB_WEEKS = {w["number"]: w for w in doc["weeks"]}
+    _RB_PLANNED_TSS = {d["workout_id"]: d.get("tss", 0) for w in doc["weeks"] for d in w["days"] if d.get("kind") == "cycling" and d.get("workout_id")}
+
+
 # Registry of structured plans driven by the generalized plan engine below.
 def _struct_ctx(plan_id: str):
     """Return (plan_doc, weeks_map, planned_tss, ride_prefix) for a structured plan."""
     if plan_id == "ride-stronger":
         return RS_PLAN, RS_WEEKS, _RS_PLANNED_TSS, "rs-ride-"
+    if plan_id == "ride-beyond":
+        return RB_PLAN, RB_WEEKS, _RB_PLANNED_TSS, "rb-ride-"
     return CTR_PLAN, CTR_WEEKS, _CTR_PLANNED_TSS, "ctr-ride-"
 
 
@@ -1794,6 +1813,8 @@ async def _on_plan_change(plan_id: str):
         await _reload_ctr_from_db()
     elif plan_id == "ride-stronger":
         await _reload_rs_from_db()
+    elif plan_id == "ride-beyond":
+        await _reload_rb_from_db()
 
 
 async def _active_plan_id() -> str:
@@ -2078,6 +2099,11 @@ async def get_plan(id: str = "build-and-climb"):
             cur, ride_map, _supp = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id="ride-stronger", ride_prefix=prefix)
             prog = await _ctr_progress(ride_map, ride_prefix=prefix, planned_tss=planned)
             return _ctr_plan_response(cur, ride_map, prog, weeks=weeks_map, plan_doc=pdoc, plan_id="ride-stronger")
+        if active == "ride-beyond" or id == "ride-beyond":
+            pdoc, weeks_map, planned, prefix = _struct_ctx("ride-beyond")
+            cur, ride_map, _supp = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id="ride-beyond", ride_prefix=prefix)
+            prog = await _ctr_progress(ride_map, ride_prefix=prefix, planned_tss=planned)
+            return _ctr_plan_response(cur, ride_map, prog, weeks=weeks_map, plan_doc=pdoc, plan_id="ride-beyond")
         doc = await udb.training_plans.find_one({"id": id})
         base = await plans_admin.get_plan_def(id)
         if not base:
@@ -2401,6 +2427,10 @@ async def get_calendar_week(start: str = "2025-05-12"):
             pdoc, weeks_map, planned, prefix = _struct_ctx("ride-stronger")
             cur, ride_map, supp_dates = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id="ride-stronger", ride_prefix=prefix)
             doc = _ctr_calendar_week(weeks_map[cur], ride_map, supp_dates, _ctr_today())
+        elif active == "ride-beyond":
+            pdoc, weeks_map, planned, prefix = _struct_ctx("ride-beyond")
+            cur, ride_map, supp_dates = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id="ride-beyond", ride_prefix=prefix)
+            doc = _ctr_calendar_week(weeks_map[cur], ride_map, supp_dates, _ctr_today())
         else:
             doc = await udb.calendar_weeks.find_one({"start_date": start})
             if not doc or doc.get("seed_version") != CALENDAR_WEEK["seed_version"]:
@@ -2723,6 +2753,7 @@ async def _seed_plans_on_startup():
         await plans_admin.seed_plans({
             "couch-to-road": {**CTR_PLAN, "type": "structured", "title": CTR_PLAN.get("title", "From Couch to Road")},
             "ride-stronger": {**RS_PLAN, "type": "structured", "title": RS_PLAN.get("title", "Ride Stronger")},
+            "ride-beyond": {**RB_PLAN, "type": "structured", "title": RB_PLAN.get("title", "Ride Beyond")},
             "build-and-climb": {**BUILD_AND_CLIMB, "type": "roadmap"},
         })
         await _reload_ctr_from_db()
@@ -2736,11 +2767,19 @@ async def _seed_plans_on_startup():
             upsert=True,
         )
         await _reload_rs_from_db()
+        # Ride Beyond (Advanced) is likewise code-owned — force-refresh from the
+        # shipped JSON each boot so new phases/weeks land automatically.
+        await plans_admin._db.plans.update_one(
+            {"id": "ride-beyond"},
+            {"$set": {**RB_PLAN, "type": "structured", "level": "Advanced"}},
+            upsert=True,
+        )
+        await _reload_rb_from_db()
         # Tag the shipped plans with their target rider level (idempotent) so the
-        # onboarding recommender can match by level. Ride Stronger is the authored
-        # Intermediate default; build-and-climb reverts to an Advanced roadmap.
+        # onboarding recommender can match by level.
         await plans_admin._db.plans.update_one({"id": "couch-to-road"}, {"$set": {"level": "Beginner"}})
         await plans_admin._db.plans.update_one({"id": "ride-stronger"}, {"$set": {"level": "Intermediate"}})
+        await plans_admin._db.plans.update_one({"id": "ride-beyond"}, {"$set": {"level": "Advanced"}})
         await plans_admin._db.plans.update_one({"id": "build-and-climb"}, {"$unset": {"level": ""}})
         logger.info("Plan definitions seeded/loaded from MongoDB")
     except Exception:

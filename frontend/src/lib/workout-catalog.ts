@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { COUCH_TO_ROAD, ctrRideId, type Interval, type Session } from "./programs/couch-to-road";
 import { RIDE_STRONGER, rsRideId } from "./programs/ride-stronger";
+import { RIDE_BEYOND, rbRideId } from "./programs/ride-beyond";
 
 type Ion = keyof typeof Ionicons.glyphMap;
 
@@ -337,9 +338,61 @@ export const RS_WORKOUTS: Workout[] = (() => {
   return out;
 })();
 
+// Ride Beyond (Advanced) cycling sessions → runnable Live Workout timelines.
+function rbSessionToWorkout(s: Session): Workout {
+  const intervals: Interval[] = s.intervals ?? [];
+  const spec: SegSpec[] = intervals.map((iv) => {
+    const { zoneIdx, targetPct } = rpeToZone(iv.rpe);
+    return { label: iv.name, zoneIdx, minutes: iv.minutes, targetPct };
+  });
+  const duration = spec.reduce((a, sp) => a + sp.minutes, 0);
+  const cat = (s.category || s.title || "").toLowerCase();
+  const isRecovery = /recovery|maintenance|consolidation|confidence/i.test(cat);
+  const isThreshold = /threshold/i.test(cat);
+  const isClimb = /climb|hill/i.test(cat);
+  const isTempo = /tempo|sustainable speed/i.test(cat);
+  const typeId = isThreshold ? "threshold" : isClimb ? "climbing" : isTempo ? "tempo" : isRecovery ? "recovery" : "endurance";
+  const typeName = isThreshold ? "Threshold" : isClimb ? "Climbing" : isTempo ? "Tempo" : isRecovery ? "Recovery" : "Endurance";
+  const color = isThreshold ? "#FFC20A" : isClimb ? "#C91727" : isTempo ? TEMPO_COLOR : isRecovery ? "#3FBFAE" : END_COLOR;
+  return {
+    id: rbRideId(s),
+    name: s.title,
+    typeId,
+    typeName,
+    color,
+    icon: isClimb ? "trending-up" : "bicycle",
+    duration,
+    tss: Math.round(duration * 0.66),
+    if: 0.7,
+    difficulty: isThreshold || isClimb ? "Hard" : "Moderate",
+    focus: s.category || "Advanced performance",
+    description: s.goal || s.notes || "A Ride Beyond advanced session.",
+    zones: zones(20, 45, 20, 15, 0, 0),
+    level: "Performance",
+    segmentSpec: spec.length ? spec : [wu(8), easy(14), cd(8)],
+  };
+}
+
+export const RB_WORKOUTS: Workout[] = (() => {
+  const out: Workout[] = [];
+  const seen = new Set<string>();
+  for (const phase of RIDE_BEYOND.phases) {
+    for (const week of phase.weeks) {
+      for (const day of week.days) {
+        if (day.type === "cycling") {
+          const w = rbSessionToWorkout(day);
+          if (!seen.has(w.id)) { seen.add(w.id); out.push(w); }
+        }
+      }
+    }
+  }
+  return out;
+})();
+
 export const WORKOUTS: Workout[] = [
   ...CTR_WORKOUTS,
   ...RS_WORKOUTS,
+  ...RB_WORKOUTS,
   ...STRUCTURED,
   // ── Endurance ──
   { id: "endurance-ride", name: "Endurance Ride", typeId: "endurance", typeName: "Endurance", color: "#55C850", icon: "bicycle",

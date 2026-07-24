@@ -23,6 +23,7 @@ export type PlanPhase = { id: string; number: number; name: string; weeks: strin
 export type KeyWorkout = { id: string; title: string; icon: keyof typeof Ionicons.glyphMap; duration: string; zone: string; tss: string; footer: string; color: string; profile: number[]; completed?: boolean; status?: string; actual_tss?: string; actual_duration?: string };
 
 export const PLAN = {
+  id: "build-and-climb",
   title: "Build & Climb",
   label: "BUILD & CLIMB",
   description: "A 12-week plan to build sustainable power, climbing strength and endurance so you can conquer long climbs with confidence.",
@@ -126,11 +127,11 @@ export const MiniArea = React.memo(function MiniArea({ points, active, width = 1
 });
 
 export const WorkoutProfile = React.memo(function WorkoutProfile({ bars, color, width = 150, height = 46 }: { bars: number[]; color: string; width?: number; height?: number }) {
-  const n = bars.length; const gap = 2; const bw = (width - gap * (n - 1)) / n;
+  const n = bars.length; const gap = 2; const bw = Math.max(0, (width - gap * (n - 1)) / n);
   return (
     <Svg width={width} height={height} accessibilityLabel="Workout intensity profile">
       {bars.map((b, i) => (
-        <Rect key={i} x={i * (bw + gap)} y={height - b * height} width={bw} height={b * height} rx={1.5} fill={color} opacity={0.85} />
+        <Rect key={i} x={i * (bw + gap)} y={height - Math.max(0, b) * height} width={bw} height={Math.max(0, b) * height} rx={1.5} fill={color} opacity={0.85} />
       ))}
     </Svg>
   );
@@ -139,7 +140,7 @@ export const WorkoutProfile = React.memo(function WorkoutProfile({ bars, color, 
 export const WeeklyLoadChart = React.memo(function WeeklyLoadChart({ values, hereWeek, width = 400, height = 150 }: { values: number[]; hereWeek: number; width?: number; height?: number }) {
   const max = 600; const padL = 26; const padB = 18; const padT = 14;
   const chartW = width - padL; const chartH = height - padB - padT;
-  const n = values.length; const gap = 6; const bw = (chartW - gap * (n - 1)) / n;
+  const n = values.length; const gap = 6; const bw = Math.max(0, (chartW - gap * (n - 1)) / n);
   const colorFor = (i: number) => (i < 4 ? C.yellow : i < 8 ? C.orange : i < 12 ? C.rouge : "#4A4C4A");
   const yTicks = [0, 200, 400, 600];
   const hereX = padL + (hereWeek - 1) * (bw + gap) + bw / 2;
@@ -155,7 +156,7 @@ export const WeeklyLoadChart = React.memo(function WeeklyLoadChart({ values, her
         );
       })}
       {values.map((v, i) => {
-        const bh = (v / max) * chartH; const x = padL + i * (bw + gap); const y = padT + chartH - bh;
+        const bh = Math.max(0, (v / max) * chartH); const x = padL + i * (bw + gap); const y = padT + chartH - bh;
         return (
           <React.Fragment key={i}>
             <Rect x={x} y={y} width={bw} height={bh} rx={2} fill={colorFor(i)} opacity={0.92} />
