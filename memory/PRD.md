@@ -262,3 +262,9 @@ Home Alberto "Start Today's Ride" & sidebar Workouts → `/training`. Training "
 
 ## Live Workout responsive layout (rebuilt)
 - Replaced the distorting non-uniform `scaleX/scaleY` transform with a responsive flexbox layout: the route video fills remaining vertical space (`flex:1`) and the tablet view uses a `flexGrow:1` ScrollView — fills large tablets without stretching and scrolls (no compression/overlap) on shorter tablets. Verified at 1400×1000 and 1024×700.
+
+## Ride Stronger — COMPLETE (12 weeks / 3 phases / 36 rides)
+- Phase 2 (Weeks 5–8 "Strength and Sustainable Power", rides 13–24) and Phase 3 (Weeks 9–12 "Goal Ready", rides 25–36 incl. the 150-min personalised Achievement Ride) appended to programs/ride-stronger.ts. `ride_stronger_plan.json` regenerated (12 weeks). All rs-ride-1..36 auto-wired into Live Workout via RS_WORKOUTS.
+- Startup now force-refreshes the ride-stronger def from the shipped JSON on every boot. FIXED a bug where `_reload_rs_from_db()` ran before the force-update and clobbered the fresh JSON with a stale DB doc — force-update now uses the module-loaded JSON, then reloads.
+- Verified (testing iter27/28/29): GET /api/plans week_count 12; GET /api/plan duration_weeks 12 with 3 phases (Foundation active, Strength + Goal Ready locked), progress "1 / 12"; /plan renders all 3 phase rows; Phase-2 & Phase-3 rides (e.g. rs-ride-30, rs-ride-36) launch in Live Workout with authored interval timelines; no regression to beginner couch-to-road (16 weeks). Green Lantern remains on couch-to-road.
+- Known minor (non-blocking): Recharts logs a negative-width warning on /plan Weekly Load Overview when a phase pct is 0.
