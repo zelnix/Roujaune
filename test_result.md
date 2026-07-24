@@ -105,6 +105,18 @@
 user_problem_statement: "ROUJAUNE cycling app — fork session: /training date hydration, CalendarCard key fix, Seated Mode toggle, Native BLE sensors feeding WS telemetry."
 
 backend:
+  - task: "Plan definitions in MongoDB — portable plans_admin router + non-destructive seed"
+    implemented: true
+    working: "NA"
+    file: "backend/plans_admin.py, backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "New portable module backend/plans_admin.py exposes /api/plans CRUD + structured editors (PUT /plans/{id}/weeks/{n}, PATCH /plans/{id}/weeks/{n}/days/{i}, POST /plans/{id}/adapt) writing to a `plans` collection. On startup, server seeds couch-to-road (from JSON) + build-and-climb (from BUILD_AND_CLIMB) ONLY if missing (non-destructive). couch-to-road edits reload an in-memory cache via on_change so /api/plan + /api/calendar/week reflect edits instantly (no rebuild). Self-tested: PATCH day duration 20->22 reflected in /api/plan and /api/calendar/week; adapt endpoint applied + recorded edit_history; build-and-climb PATCH persisted. Reset plans collection to pristine afterwards. NEEDS regression: GET /api/plan (Green Lantern couch-to-road) full structure + progress unaffected; GET /api/plan?id=build-and-climb definition from DB overlaying training_plans goals; PUT /api/plan/goals still works (overlay)."
+
   - task: "POST /api/coach/cue — seated flag adjusts cue (no standing efforts)"
     implemented: true
     working: true

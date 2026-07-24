@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 
 from readiness import compute_readiness
 from rider_level import compute_rider_level
+import plans_admin
 
 
 ROOT_DIR = Path(__file__).parent
@@ -1596,6 +1597,24 @@ _PHASE_POINTS = {
 }
 
 
+async def _reload_ctr_from_db():
+    """Refresh the in-memory couch-to-road plan cache from the `plans` collection
+    so admin edits (via plans_admin) take effect without a rebuild/restart."""
+    global CTR_PLAN, CTR_WEEKS, _CTR_PLANNED_TSS
+    doc = await plans_admin.get_plan_def("couch-to-road")
+    if not doc or not doc.get("weeks"):
+        return
+    CTR_PLAN = doc
+    CTR_WEEKS = {w["number"]: w for w in doc["weeks"]}
+    _CTR_PLANNED_TSS = {d["workout_id"]: d.get("tss", 0) for w in doc["weeks"] for d in w["days"] if d.get("kind") == "cycling" and d.get("workout_id")}
+
+
+async def _on_plan_change(plan_id: str):
+    """Callback fired by plans_admin after any plan edit."""
+    if plan_id == "couch-to-road":
+        await _reload_ctr_from_db()
+
+
 def _ctr_today():
     from datetime import date
     return date.today()
@@ -1823,11 +1842,22 @@ async def get_plan(id: str = "build-and-climb"):
             prog = await _ctr_progress(ride_map)
             return _ctr_plan_response(cur, ride_map, prog)
         doc = await db.training_plans.find_one({"id": id})
-        if not doc:
-            await db.training_plans.update_one({"id": id}, {"$set": BUILD_AND_CLIMB}, upsert=True)
-            doc = dict(BUILD_AND_CLIMB)
-        doc.pop("_id", None)
-        return doc
+        base = await plans_admin.get_plan_def(id)
+        if not base:
+            base = dict(BUILD_AND_CLIMB)
+        base.pop("_id", None)
+        # Overlay mutable runtime state the app edits (goals, coach adaptations,
+        # adaptive zone bias) onto the admin-managed plan definition.
+        merged = dict(base)
+        if doc:
+            doc.pop("_id", None)
+            for k in ("goals", "adaptation_history", "zone_bias", "zone_exec"):
+                if k in doc:
+                    merged[k] = doc[k]
+            for k, v in doc.items():
+                if k.startswith("adaptation_ai_"):
+                    merged[k] = v
+        return merged
     except Exception:
         logging.exception("get_plan failed")
         return BUILD_AND_CLIMB
@@ -2420,6 +2450,7 @@ async def get_community():
     return COMMUNITY_DATA
 
 
+api_router.include_router(plans_admin.plans_router)
 app.include_router(api_router)
 
 app.add_middleware(
@@ -2432,6 +2463,22 @@ app.add_middleware(
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+
+@app.on_event("startup")
+async def _seed_plans_on_startup():
+    """Move plan DEFINITIONS into MongoDB (non-destructive) and refresh the
+    couch-to-road cache from the DB so edits made via plans_admin take effect."""
+    plans_admin.init(db, on_change=_on_plan_change)
+    try:
+        await plans_admin.seed_plans({
+            "couch-to-road": {**CTR_PLAN, "type": "structured", "title": CTR_PLAN.get("title", "From Couch to Road")},
+            "build-and-climb": {**BUILD_AND_CLIMB, "type": "roadmap"},
+        })
+        await _reload_ctr_from_db()
+        logger.info("Plan definitions seeded/loaded from MongoDB")
+    except Exception:
+        logging.exception("plan seeding failed")
 
 
 @app.on_event("shutdown")

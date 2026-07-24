@@ -1,0 +1,35 @@
+{
+  "summary": "Iter 24 — plans-admin fork validated: 10/10 pytest pass in /app/backend/tests/test_plans_admin_fork.py. Coverage: (1) GET /api/plans returns both seeded plans with correct type/week_count (couch-to-road type=structured week_count=16; build-and-climb type=roadmap). (2) GET /api/plans/couch-to-road returns full 16-week definition; week 1 day-index 1 is the Tuesday cycling day with workout_id ctr-ride-1. GET /api/plans/build-and-climb returns the roadmap. GET /api/plans/nonexistent_xxx → 404. (3) EDIT PROPAGATION (core) verified: PATCH /api/plans/couch-to-road/weeks/1/days/1 {duration:'23 min'} → without any backend restart, GET /api/plan (default rider Green Lantern) shows the ctr-ride-1 workout with duration '23 min' AND GET /api/calendar/week shows the Tuesday cycling day duration '23 min'. Then restored to '20 min' and re-verified in both endpoints. (4) POST /api/plans/couch-to-road/adapt with a day-patch op returns {applied:[...], entry:{id,source,reason,applied,at}} and appends an entry to edit_history; /api/plan reflects the 21-min change; then restored to 20 min. edit_history cap ≤ 30 asserted. (5) Throwaway plan CRUD: POST create returns 200 with echoed doc + timestamps; duplicate id POST → 409; PATCH updates description (GET reflects); PUT /weeks/1 replaces the week and keeps number=1 even when body omits it; DELETE returns {deleted}; subsequent GET → 404; subsequent DELETE → 404. (6) Regressions unbroken by the DB refactor: /api/plan for Green Lantern returns full CTR structure with week_targets{rides,duration,distance_km,elevation_m,supplementary}, workouts list containing ctr-ride-1/2/3, and progress + progress_pct; /api/calendar/week returns exactly 7 days with cycling/fb50/wellness content and readiness on each. (7) PUT /api/plan/goals for build-and-climb persists to training_plans overlay and returns the merged goals; idempotent re-put succeeds. Post-test demo state fully restored: week1 day1 duration='20 min', week1 objective='Begin gently, become familiar with the weekly routine and establish comfort on the bike.', build-and-climb goals restored to seeded g1..g4 via the goals endpoint. Non-destructive edit_history contains 2 entries from testing (well below the 30 cap).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_plans_admin_fork.py",
+    "/app/test_reports/pytest/iter24.xml"
+  ],
+  "action_items": [
+    "Nothing blocking — all 10 tests pass end-to-end and demo state is restored.",
+    "Cosmetic (optional): list_plans summary shows week_count=0 for build-and-climb (correct, no weeks defined) but the plan does define duration_weeks=12; that's consistent with plans_admin._summary but if the admin UI wants a single 'length' field for both types, consider surfacing duration_weeks when week_count is 0."
+  ],
+  "critical_code_review_comments": [
+    "plans_admin.py L120 upserts on _persist — safe because create_plan pre-checks for 409, but the upsert would silently resurrect a plan if someone deleted it between _persist calls. Consider find_one_and_update with a filter or explicit insert vs update paths for stricter semantics.",
+    "plans_admin.py replace_plan (L152) does NOT check for existence — it silently creates the plan if plan_id is unknown. If the intent is strict 'replace-only', add a 404 when existing is None. As-is, it's PUT-as-upsert (documented HTTP behavior), so this is arguably fine.",
+    "plans_admin.py replace_week (L180) accepts arbitrary week shape and only pins number=<url arg> — no schema validation. Fine for a portable admin API, but a downstream cache consumer (server.py _reload_ctr_from_db) can crash if 'days' is missing. Consider a minimal shape check (weeks[*].days is list).",
+    "server.py _on_plan_change (L1613) only reacts to plan_id == 'couch-to-road'. If build-and-climb definitions gain a runtime cache in the future, extend this callback.",
+    "server.py list_plans response omits any error-recovery: if the plans collection is empty (e.g., after manual mongosh deleteMany + restart before seeding completes), the /api/plans endpoint returns []. Acceptable for a startup race, but a health probe on /api/plans would benefit from a fallback."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_plans_admin_fork.py (new)",
+    "/app/test_reports/pytest/iter24.xml (new)"
+  ],
+  "success_rate": {"backend": "100% (10/10 pytest)", "frontend": "not tested (backend-only request)"},
+  "seed_data_creation": "Throwaway plan id 'TEST_plan_admin_fork' was created and DELETEd within the CRUD test (module-scoped fixture also tears it down on teardown). Build-and-climb goals overlay was written during testing and then restored to seeded g1..g4 via a follow-up PUT. Two edit_history entries remain on couch-to-road (from PATCH/adapt round-trips) — well below the 30-entry cap and explicitly allowed by the problem statement.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend BASE_URL = EXPO_PUBLIC_BACKEND_URL from /app/frontend/.env. Reproduce: EXPO_PUBLIC_BACKEND_URL=<url> pytest backend/tests/test_plans_admin_fork.py -v. Key shape notes: /api/plan returns 'workouts' as a LIST of {id,title,duration,...} (NOT a dict keyed by id) when rider is Green Lantern; GoalsUpdateRequest requires each goal to have 'id' and 'title' (Pydantic 422 otherwise). Non-destructive seed means any edits persist across restarts — always restore any real-plan edits after your test, or use `mongosh mongodb://localhost:27017/test_database --eval 'db.plans.deleteMany({})' && sudo supervisorctl restart backend` to force a clean re-seed. Do all create/delete on 'TEST_plan_admin_fork' — never on the two real plans.",
+  "rca_of_issue": "n/a — no failures. Initial test-run had 4 false failures (my mistaken assumptions about response shape / goal schema); rewrote assertions to match actual API contracts and all 10 tests now pass."
+}
