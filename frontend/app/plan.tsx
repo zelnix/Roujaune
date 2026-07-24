@@ -61,6 +61,7 @@ export default function TrainingPlanScreen() {
   const [showProgress, setShowProgress] = React.useState(false);
   const [showAdaptations, setShowAdaptations] = React.useState(false);
   const [showChat, setShowChat] = React.useState(false);
+  const [chatSeed, setChatSeed] = React.useState<string | undefined>(undefined);
   const [goalsOverride, setGoalsOverride] = React.useState<EditableGoal[] | null>(null);
 
   const displayPlan = React.useMemo(
@@ -178,8 +179,18 @@ export default function TrainingPlanScreen() {
         />
         <ProgressModal visible={showProgress} onClose={() => setShowProgress(false)} />
         <AdaptationsModal visible={showAdaptations} onClose={() => setShowAdaptations(false)} persona={persona} />
-        <CoachChatModal visible={showChat} onClose={() => setShowChat(false)} persona={persona} onPlanUpdated={refreshPlan} />
-        <PhaseCelebrationModal visible={!!celebration} celebration={celebration} persona={persona} onClose={dismissCelebration} />
+        <CoachChatModal visible={showChat} onClose={() => { setShowChat(false); setChatSeed(undefined); }} persona={persona} onPlanUpdated={refreshPlan} seedMessage={chatSeed} />
+        <PhaseCelebrationModal
+          visible={!!celebration}
+          celebration={celebration}
+          persona={persona}
+          onClose={dismissCelebration}
+          onChat={(c) => {
+            setChatSeed(`I just finished ${c.name} (${c.weeks}) of my plan. What should I focus on next?`);
+            dismissCelebration();
+            setShowChat(true);
+          }}
+        />
       </SafeAreaView>
     </GestureHandlerRootView>
   );

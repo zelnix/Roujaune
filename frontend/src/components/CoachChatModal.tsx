@@ -18,7 +18,7 @@ function TypingDots() {
   );
 }
 
-export function CoachChatModal({ visible, onClose, persona, onPlanUpdated }: { visible: boolean; onClose: () => void; persona: CoachPersona; onPlanUpdated?: () => void }) {
+export function CoachChatModal({ visible, onClose, persona, onPlanUpdated, seedMessage }: { visible: boolean; onClose: () => void; persona: CoachPersona; onPlanUpdated?: () => void; seedMessage?: string }) {
   const style = useCoachStyle();
   const { speak, stop, speakingId } = useCoachSpeech(persona.id);
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
@@ -39,13 +39,14 @@ export function CoachChatModal({ visible, onClose, persona, onPlanUpdated }: { v
     let alive = true;
     setLoading(true);
     setPlanNotice(null);
+    if (seedMessage) setInput(seedMessage);
     fetchLatestRide().then((r) => { if (alive) setLatestRide(r); });
     fetchChatHistory(persona.name)
       .then((m) => { if (alive) { setMessages(m); scrollToEnd(); } })
       .catch(() => { if (alive) setMessages([]); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [visible, persona.name, stop, scrollToEnd]);
+  }, [visible, persona.name, stop, scrollToEnd, seedMessage]);
 
   const send = async (text: string) => {
     const msg = text.trim();

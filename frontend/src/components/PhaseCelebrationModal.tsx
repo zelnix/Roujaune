@@ -32,12 +32,13 @@ function Sparkle({ style, delay }: { style?: any; delay: number }) {
  * Renders the authored badge heading, achievement summary and the coach's
  * personal message. */
 export function PhaseCelebrationModal({
-  visible, celebration, persona, onClose,
+  visible, celebration, persona, onClose, onChat,
 }: {
   visible: boolean;
   celebration: CelebrationData | null;
   persona: CoachPersona;
   onClose: () => void;
+  onChat?: (c: CelebrationData) => void;
 }) {
   const pop = React.useRef(new Animated.Value(0)).current;
   React.useEffect(() => {
@@ -111,6 +112,19 @@ export function PhaseCelebrationModal({
             <Text style={s.continueText}>Continue</Text>
             <Ionicons name="arrow-forward" size={17} color="#241B00" />
           </Pressable>
+
+          {onChat ? (
+            <Pressable
+              testID="phase-celebration-chat"
+              onPress={() => onChat(celebration)}
+              accessibilityRole="button"
+              accessibilityLabel={`Talk to ${persona.name} about this phase`}
+              style={({ hovered, pressed }: any) => [s.chatBtn, hovered && s.chatBtnHover, pressed && { opacity: 0.8 }]}
+            >
+              <Ionicons name="chatbubble-ellipses" size={15} color={C.yellow} />
+              <Text style={s.chatBtnText}>Talk to {persona.name} about this phase</Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
     </Modal>
@@ -144,4 +158,7 @@ const s = StyleSheet.create({
     borderRadius: 14, paddingVertical: 13, paddingHorizontal: 40, marginTop: 18, minHeight: 48, alignSelf: "center",
   },
   continueText: { color: "#241B00", fontSize: 15, fontWeight: "800" },
+  chatBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 12, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 12, minHeight: 40, alignSelf: "center", borderWidth: 1, borderColor: "rgba(255,194,10,0.3)", backgroundColor: "rgba(255,194,10,0.06)" },
+  chatBtnHover: { borderColor: "rgba(255,194,10,0.55)", backgroundColor: "rgba(255,194,10,0.1)" },
+  chatBtnText: { color: C.yellow, fontSize: 13, fontWeight: "700" },
 });
