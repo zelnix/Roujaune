@@ -24,7 +24,6 @@ function AuthGate() {
     if (loading) return;
     const route = segments[0];
     const onAuthScreen = route === "login";
-    const onOnboarding = route === "onboarding";
 
     if (!user) {
       if (!onAuthScreen) router.replace("/login");
@@ -32,11 +31,11 @@ function AuthGate() {
     }
     // Signed in but hasn't chosen a plan yet → onboarding.
     if (!user.onboarded) {
-      if (!onOnboarding) router.replace("/onboarding");
+      if (route !== "onboarding") router.replace("/onboarding");
       return;
     }
-    // Signed in + onboarded but sitting on an auth/onboarding screen → home.
-    if (onAuthScreen || onOnboarding) router.replace("/");
+    // Signed in + onboarded but sitting on the login screen → home.
+    if (onAuthScreen) router.replace("/");
   }, [user, loading, segments, router]);
 
   if (loading) {

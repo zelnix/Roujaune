@@ -12,6 +12,7 @@ import { useCoach } from "@/src/lib/coach-persona";
 import { useRiderProfile, useRiderAchievements, RiderProfile } from "@/src/lib/rider-profile";
 import { LEVEL_META, CAPABILITY_TO_LEVEL } from "@/src/lib/workout-catalog";
 import { useAuth } from "@/src/lib/auth-context";
+import { useRouter } from "expo-router";
 
 const riderImg = require("../assets/images/hero_cyclist_b2.jpg");
 
@@ -43,6 +44,7 @@ export default function ProfileScreen() {
   const persona = useCoach();
   const { profile, avatar, update, setAvatar } = useRiderProfile();
   const { user, signOut } = useAuth();
+  const router = useRouter();
   const achievements = useRiderAchievements() ?? ACHIEVEMENTS;
   const { width } = useWindowDimensions();
   const twoCol = width >= 900;
@@ -120,6 +122,10 @@ export default function ProfileScreen() {
             <Pressable testID="edit-profile" onPress={() => setEditing(true)} style={({ hovered }: any) => [s.editBtn, hovered && s.hover]}>
               <Ionicons name="create-outline" size={15} color={CC.white} />
               <Text style={s.editText}>Edit</Text>
+            </Pressable>
+            <Pressable testID="change-plan" onPress={() => router.push("/onboarding")} style={({ hovered }: any) => [s.editBtn, hovered && s.hover]}>
+              <Ionicons name="swap-horizontal" size={15} color={CC.white} />
+              <Text style={s.editText}>Change plan</Text>
             </Pressable>
             <Pressable testID="sign-out" onPress={signOut} style={({ hovered }: any) => [s.signOutBtn, hovered && s.hover]}>
               <Ionicons name="log-out-outline" size={15} color={CC.red ?? "#E01E2B"} />

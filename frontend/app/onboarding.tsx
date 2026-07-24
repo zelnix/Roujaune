@@ -63,6 +63,17 @@ export default function OnboardingScreen() {
     }
   };
 
+  const skipToPlans = async () => {
+    setBusy(true);
+    try {
+      const r = await fetch(`${API}/api/rider/plan`);
+      const d = await r.json();
+      setReco({ level: "", recommended: null, plans: d.plans || [], allow_free: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <View style={[styles.root, { paddingTop: insets.top + 12 }]}>
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -90,10 +101,13 @@ export default function OnboardingScreen() {
             <Pressable style={[styles.primary, (!allAnswered || busy) && { opacity: 0.5 }]} disabled={!allAnswered || busy} onPress={submit} testID="see-plan-btn">
               {busy ? <ActivityIndicator color="#000" /> : <Text style={styles.primaryText}>See my recommendation</Text>}
             </Pressable>
+            <Pressable onPress={skipToPlans} disabled={busy} testID="skip-to-plans">
+              <Text style={styles.skip}>Skip — just show me the plans</Text>
+            </Pressable>
           </>
         ) : (
           <>
-            <Text style={styles.title}>You're a <Text style={{ color: colors.yellow }}>{reco.level}</Text> rider</Text>
+            <Text style={styles.title}>{reco.level ? <>You're a <Text style={{ color: colors.yellow }}>{reco.level}</Text> rider</> : "Choose your plan"}</Text>
             {reco.recommended && (
               <Pressable style={styles.recoCard} onPress={() => choose(reco.recommended!.id)} testID="accept-reco">
                 <View style={styles.recoTop}>
@@ -150,6 +164,7 @@ const styles = StyleSheet.create({
   optTextActive: { color: "#000", fontWeight: "800" },
   primary: { backgroundColor: colors.yellow, borderRadius: radius.md, paddingVertical: 15, alignItems: "center", marginTop: 22 },
   primaryText: { color: "#000", fontWeight: "800", fontSize: 15 },
+  skip: { color: colors.textDim, fontSize: 13, textAlign: "center", paddingVertical: 12, textDecorationLine: "underline" },
   recoCard: { backgroundColor: "rgba(245,179,1,0.08)", borderWidth: 1, borderColor: colors.yellow, borderRadius: radius.lg, padding: spacing.lg, marginTop: 12, gap: 6 },
   recoTop: { flexDirection: "row", alignItems: "center", gap: 6 },
   recoBadge: { color: colors.yellow, fontSize: 11, fontWeight: "800", letterSpacing: 0.5 },
