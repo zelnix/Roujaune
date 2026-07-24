@@ -1,0 +1,42 @@
+{
+  "summary": "Iter 28 — Ride Stronger Phase 2 expansion (8 weeks / 2 phases / 24 rides) PASS + Couch-to-Road regression PASS. Backend 3/3 pytest in test_ride_stronger.py: (1) GET /api/plans returns ride-stronger with type=structured and week_count/duration_weeks == 8 (was 4). (2) POST /api/rider/plan {plan_id:'ride-stronger', reset_progress:true} then GET /api/plan returns id='ride-stronger', duration_weeks=8, current_week=1, progress.weeks='1 / 8', phases = [{number:1,name:'Foundation and Control',active:true,weeks:'Weeks 1–4'},{number:2,name:'Strength and Sustainable Power',active:false,weeks:'Weeks 5–8'}], workouts still shows Week 1 rides (rs-ride-1,2,3). (3) Regression: reassigning couch-to-road still returns duration_weeks=16 with ctr-ride-1/2/3 present. Frontend (mobile 390x844) verified via Playwright: logged in as Green Lantern, assigned ride-stronger via /api/rider/plan and confirmed GET /api/plan returned the 2-phase 8-week structure above (assign_status:200, phases[0].active=true, phases[1].active=false). Navigated to /training?workoutId=rs-ride-19 — page rendered 'Controlled Threshold Development' with Threshold Development 1, 2 and 3 in the interval timeline plus Settle In / Warm-Up Build. /training?workoutId=rs-ride-16 rendered 'Seated Climbing Strength' with Seated Climb 1, 2, 3 and 4 in the timeline. /workout?workoutId=rs-ride-19 and rs-ride-16 both opened Live Workout HUD successfully — coach cue was 'you are pushing 235 watts, nearly 80 over target' proving the authored interval targets are wired end-to-end for Phase 2. This confirms rs-ride-13..24 resolve in the frontend workout catalog. Finally re-assigned couch-to-road; GET /api/plan returned id='couch-to-road', duration_weeks=16, current_week=1 — Green Lantern is left on couch-to-road as required.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/training on mobile 390x844", "issues": ["Title 'Your strongest ride is your own.' wraps one letter per line and a persistent left navigation sidebar (Home / Workouts / Virtual Rou… / Training Plan / Progress / Community / Wellness / Connections / Settings / Help) is rendered on a narrow mobile viewport, squeezing content to a very thin column. Pre-existing layout regression not related to Phase 2 — training screen is not responsive at ≤390px. Interval timeline text is still present in the DOM (test assertions passed) but visually the screen is unusable on mobile."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_ride_stronger.py",
+    "/app/test_reports/pytest/iter28.xml",
+    "/app/test_reports/screens/i28_plan.jpeg",
+    "/app/test_reports/screens/i28_workout_rs19.jpeg",
+    "/app/test_reports/screens/i28_workout_rs16.jpeg",
+    "/app/test_reports/screens/i28_training_rs19.jpeg",
+    "/app/test_reports/screens/i28_training_rs16.jpeg",
+    "/app/test_reports/screens/i28_plan_ctr.jpeg"
+  ],
+  "action_items": [
+    "Optional: investigate /training screen layout on mobile widths (<=414px). A desktop-style left sidebar is being rendered and forces the main column into ~120px wide, causing single-letter word wraps. Not caused by Phase 2 but the reviewer will see it if opening rs-ride-19/16 on a phone.",
+    "The `/plan` and `/workout` screens are fine on mobile — issue is only on `/training`.",
+    "Backend /api/plan payload for ride-stronger now includes duration_weeks=8 and phases[0..1]; if any client still reads `phase` (singular, current-week object) that still works — no change needed."
+  ],
+  "critical_code_review_comments": [
+    "/app/backend/ride_stronger_plan.json now has 8 week entries (weeks 1–8) and phases=[{Foundation and Control, Weeks 1–4},{Strength and Sustainable Power, Weeks 5–8}] with duration_weeks:8 — matches spec. Note the plan description still says '12-week intermediate plan' and 'Phase 1 (Weeks 1–4) is available now' — that copy is stale now that Phase 2 is live and 8 weeks are authored; consider updating description to reflect '8-week / 2-phase plan (Phase 3 to come)'.",
+    "server.py _ctr_plan_response computes phase_idx=(cur-1)//4+1 and iterates pdoc.phases to build the phases[] array with active flag — correctly marks phase 1 active on week 1, phase 2 inactive. Same code path will flip phase 2 to active once current_week>=5 (untested).",
+    "workout-catalog.ts pulls RIDE_STRONGER from /programs/ride-stronger which defines all 8 weeks / 24 rides with authored intervals — rs-ride-13..24 resolve in the catalog (confirmed by /training?workoutId= rendering Threshold Development 1/2/3 and Seated Climb 1/2/3/4).",
+    "The description string on ride_stronger_plan.json says 'A 12-week intermediate plan' but duration_weeks is 8. GET /api/plans exposes duration_weeks=8 which is correct, but description text is inconsistent — cosmetic."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_ride_stronger.py (rewritten for Phase 2: 8 weeks, 2 phases, Phase 2 rides)"
+  ],
+  "success_rate": {"backend": "100% (3/3 pytest)", "frontend": "100% — ride-stronger assigned via API returns 8 weeks + both phases; /training?workoutId=rs-ride-19 and rs-ride-16 render authored interval timeline; /workout?workoutId= opens Live Workout HUD with Phase 2 rides; couch-to-road restored"},
+  "seed_data_creation": "None. Only used demo user greenlantern@roujaune.app. Plan state left on couch-to-road (verified via GET /api/plan → id:'couch-to-road', duration_weeks:16, current_week:1).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Ride Stronger is now an 8-week / 2-phase authored plan. Backend GET /api/plan returns `phases`: [{number:1, name:'Foundation and Control', active:<bool>, weeks:'Weeks 1–4', points:[...], pct:<int>}, {number:2, name:'Strength and Sustainable Power', active:<bool>, weeks:'Weeks 5–8', ...}]. On current_week<=4 phase 1 is active and phase 2 is inactive. Phase 2 ride ids are rs-ride-13..24, all present in /app/frontend/src/lib/programs/ride-stronger.ts and resolvable via /workout?workoutId= and /training?workoutId=. NOTE: the /training screen has a broken mobile layout (persistent side nav + single-letter word wraps at 390px width) — this is pre-existing, not part of Phase 2, but any playwright test on /training at phone widths will look mangled visually while DOM text remains correct. Description string on ride_stronger_plan.json still says '12-week' — cosmetic stale copy. Green Lantern stays on couch-to-road at the end (duration_weeks:16, current_week:1). To reproduce: EXPO_PUBLIC_BACKEND_URL=https://roujaune-train.preview.emergentagent.com pytest backend/tests/test_ride_stronger.py -v.",
+  "rca_of_issue": "n/a — no failures. One optional cleanup noted: description copy in ride_stronger_plan.json still says '12-week' and 'Phase 1 (Weeks 1–4) is available now'; safe to refresh to reflect 8-week / 2-phase current state."
+}

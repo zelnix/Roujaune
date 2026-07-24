@@ -2727,6 +2727,14 @@ async def _seed_plans_on_startup():
         })
         await _reload_ctr_from_db()
         await _reload_rs_from_db()
+        # Ride Stronger is a code-owned default: force-refresh its definition from
+        # the shipped JSON each boot so new phases/weeks land without a manual edit.
+        await plans_admin._db.plans.update_one(
+            {"id": "ride-stronger"},
+            {"$set": {**RS_PLAN, "type": "structured", "level": "Intermediate"}},
+            upsert=True,
+        )
+        await _reload_rs_from_db()
         # Tag the shipped plans with their target rider level (idempotent) so the
         # onboarding recommender can match by level. Ride Stronger is the authored
         # Intermediate default; build-and-climb reverts to an Advanced roadmap.

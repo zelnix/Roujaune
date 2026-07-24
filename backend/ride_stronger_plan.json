@@ -5,8 +5,8 @@
  "level": "Intermediate",
  "type": "structured",
  "description": "A 12-week intermediate plan that builds a controlled aerobic foundation — endurance, cadence, tempo and seated strength — toward your chosen goal. Phase 1 (Weeks 1–4) is available now.",
- "duration_weeks": 4,
- "duration_label": "4 Weeks",
+ "duration_weeks": 8,
+ "duration_label": "8 Weeks",
  "average_label": "3 Rides/Week",
  "frequency": "3 rides/week",
  "start_date": "2025-05-12",
@@ -38,6 +38,12 @@
    "name": "Foundation and Control",
    "weeks_label": "Weeks 1–4",
    "objective": "Establish the rider's current intermediate baseline and build a controlled aerobic foundation for the twelve-week plan."
+  },
+  {
+   "number": 2,
+   "name": "Strength and Sustainable Power",
+   "weeks_label": "Weeks 5–8",
+   "objective": "Develop the ability to sustain stronger cycling efforts, manage moderate climbing resistance and maintain efficient technique as muscular fatigue increases."
   }
  ],
  "weeks": [
@@ -318,6 +324,294 @@
      "workout_id": "rs-ride-12",
      "zone": "RPE 1–4",
      "tss": 49,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest",
+     "duration": ""
+    }
+   ]
+  },
+  {
+   "number": 5,
+   "phase": 2,
+   "phase_name": "Strength and Sustainable Power",
+   "phase_weeks": "Weeks 5–8",
+   "title": "Build Sustainable Strength",
+   "objective": "Introduce longer moderate efforts and develop controlled cycling strength without sacrificing cadence or technique.",
+   "start_date": "2025-06-09",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "strength",
+     "kind": "strength",
+     "title": "Cycling Strength and Stability",
+     "duration": "~30–32 min"
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Tempo Strength Builder",
+     "duration": "65 min",
+     "workout_id": "rs-ride-13",
+     "zone": "RPE 1–6",
+     "tss": 50,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Recovery and Mobility",
+     "duration": "12–15 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Cadence Under Load",
+     "duration": "60 min",
+     "workout_id": "rs-ride-14",
+     "zone": "RPE 1–6",
+     "tss": 41,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "strength",
+     "kind": "balance",
+     "title": "Core, Balance and Cycling Support",
+     "duration": "~22–25 min"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Long Steady Endurance Ride",
+     "duration": "110 min",
+     "workout_id": "rs-ride-15",
+     "zone": "RPE 1–5",
+     "tss": 72,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest",
+     "duration": ""
+    }
+   ]
+  },
+  {
+   "number": 6,
+   "phase": 2,
+   "phase_name": "Strength and Sustainable Power",
+   "phase_weeks": "Weeks 5–8",
+   "title": "Develop Climbing Control",
+   "objective": "Develop seated climbing strength and manage resistance, cadence and breathing on moderate gradients — approach hills with preparation, not force.",
+   "start_date": "2025-06-16",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "strength",
+     "kind": "strength",
+     "title": "Climbing Strength Support",
+     "duration": "~30 min"
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Seated Climbing Strength",
+     "duration": "65 min",
+     "workout_id": "rs-ride-16",
+     "zone": "RPE 1–6",
+     "tss": 47,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Recovery or Complete Rest",
+     "duration": "10–15 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Aerobic Endurance with Hill Skills",
+     "duration": "65 min",
+     "workout_id": "rs-ride-17",
+     "zone": "RPE 1–6",
+     "tss": 48,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "strength",
+     "kind": "balance",
+     "title": "Balance, Core and Posture",
+     "duration": "~22–25 min"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Hills and Endurance",
+     "duration": "115 min",
+     "workout_id": "rs-ride-18",
+     "zone": "RPE 1–6",
+     "tss": 76,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest",
+     "duration": ""
+    }
+   ]
+  },
+  {
+   "number": 7,
+   "phase": 2,
+   "phase_name": "Strength and Sustainable Power",
+   "phase_weeks": "Weeks 5–8",
+   "title": "Hold Stronger Efforts",
+   "objective": "The strongest development week of Phase 2: sustain controlled threshold-development work and hold useful effort late in a longer ride. Not maximal intensity.",
+   "start_date": "2025-06-23",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "strength",
+     "kind": "strength",
+     "title": "Controlled Strength for Cyclists",
+     "duration": "~30 min"
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Controlled Threshold Development",
+     "duration": "70 min",
+     "workout_id": "rs-ride-19",
+     "zone": "RPE 1–7",
+     "tss": 56,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Recovery and Mobility",
+     "duration": "12–18 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Aerobic Maintenance",
+     "duration": "65 min",
+     "workout_id": "rs-ride-20",
+     "zone": "RPE 1–4",
+     "tss": 39,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "strength",
+     "kind": "mobility",
+     "title": "Light Activation and Mobility",
+     "duration": "~15–18 min"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Goal-Specific Durability Ride",
+     "duration": "120 min",
+     "workout_id": "rs-ride-21",
+     "zone": "RPE 1–6",
+     "tss": 79,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest",
+     "duration": ""
+    }
+   ]
+  },
+  {
+   "number": 8,
+   "phase": 2,
+   "phase_name": "Strength and Sustainable Power",
+   "phase_weeks": "Weeks 5–8",
+   "title": "Recover and Consolidate",
+   "objective": "Reduce accumulated fatigue, reinforce the major Phase 2 skills and review readiness for goal-specific Phase 3. Volume drops ~30–40%.",
+   "start_date": "2025-06-30",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "strength",
+     "kind": "mobility",
+     "title": "Mobility and Light Activation",
+     "duration": "18–20 min"
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Short Tempo Consolidation",
+     "duration": "50 min",
+     "workout_id": "rs-ride-22",
+     "zone": "RPE 1–6",
+     "tss": 35,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Recovery or Complete Rest",
+     "duration": "10–12 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Strength and Cadence Consolidation",
+     "duration": "45 min",
+     "workout_id": "rs-ride-23",
+     "zone": "RPE 1–5",
+     "tss": 30,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "strength",
+     "kind": "balance",
+     "title": "Gentle Mobility and Balance",
+     "duration": "~15 min"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Phase 2 Confidence Endurance Ride",
+     "duration": "90 min",
+     "workout_id": "rs-ride-24",
+     "zone": "RPE 1–5",
+     "tss": 57,
      "rest": false
     },
     {
