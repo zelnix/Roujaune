@@ -4,9 +4,9 @@
  "name": "Ride Stronger",
  "level": "Intermediate",
  "type": "structured",
- "description": "A 12-week intermediate plan that builds a controlled aerobic foundation — endurance, cadence, tempo and seated strength — toward your chosen goal. Phase 1 (Weeks 1–4) is available now.",
- "duration_weeks": 8,
- "duration_label": "8 Weeks",
+ "description": "A 12-week intermediate plan across three phases — Foundation & Control, Strength & Sustainable Power, and Goal Ready — that builds endurance, cadence, tempo, threshold and seated climbing, then converts it into goal-ready performance and a personalised achievement ride.",
+ "duration_weeks": 12,
+ "duration_label": "12 Weeks",
  "average_label": "3 Rides/Week",
  "frequency": "3 rides/week",
  "start_date": "2025-05-12",
@@ -44,6 +44,12 @@
    "name": "Strength and Sustainable Power",
    "weeks_label": "Weeks 5–8",
    "objective": "Develop the ability to sustain stronger cycling efforts, manage moderate climbing resistance and maintain efficient technique as muscular fatigue increases."
+  },
+  {
+   "number": 3,
+   "name": "Goal Ready",
+   "weeks_label": "Weeks 9–12",
+   "objective": "Convert improved endurance, strength and sustainable power into practical performance for your selected goal, and complete a personalised Ride Stronger Achievement Ride."
   }
  ],
  "weeks": [
@@ -612,6 +618,294 @@
      "workout_id": "rs-ride-24",
      "zone": "RPE 1–5",
      "tss": 57,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest",
+     "duration": ""
+    }
+   ]
+  },
+  {
+   "number": 9,
+   "phase": 3,
+   "phase_name": "Goal Ready",
+   "phase_weeks": "Weeks 9–12",
+   "title": "Train for Your Goal",
+   "objective": "Introduce structured goal-specific work while preserving the aerobic foundation and sustainable pacing from Phases 1 & 2.",
+   "start_date": "2025-07-07",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "strength",
+     "kind": "strength",
+     "title": "Goal-Specific Cycling Strength",
+     "duration": "~28–32 min"
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Goal-Specific Intervals",
+     "duration": "70 min",
+     "workout_id": "rs-ride-25",
+     "zone": "RPE 1–7",
+     "tss": 51,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Recovery and Mobility",
+     "duration": "12–15 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Aerobic Endurance and Leg Speed",
+     "duration": "65 min",
+     "workout_id": "rs-ride-26",
+     "zone": "RPE 1–5",
+     "tss": 40,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "strength",
+     "kind": "balance",
+     "title": "Core, Balance and Posture",
+     "duration": "~22–25 min"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Goal Simulation Ride",
+     "duration": "125 min",
+     "workout_id": "rs-ride-27",
+     "zone": "RPE 1–6",
+     "tss": 87,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest",
+     "duration": ""
+    }
+   ]
+  },
+  {
+   "number": 10,
+   "phase": 3,
+   "phase_name": "Goal Ready",
+   "phase_weeks": "Weeks 9–12",
+   "title": "Peak Goal Development",
+   "objective": "Complete the highest goal-specific training load of the plan while maintaining controlled intensity and reliable recovery. Not a maximal week.",
+   "start_date": "2025-07-14",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "strength",
+     "kind": "strength",
+     "title": "Controlled Cycling Strength",
+     "duration": "~28–30 min"
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Sustained Goal Effort",
+     "duration": "75 min",
+     "workout_id": "rs-ride-28",
+     "zone": "RPE 1–7",
+     "tss": 58,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Recovery and Mobility",
+     "duration": "12–18 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Endurance with Leg Openers",
+     "duration": "65 min",
+     "workout_id": "rs-ride-29",
+     "zone": "RPE 1–7",
+     "tss": 45,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "strength",
+     "kind": "mobility",
+     "title": "Light Activation and Mobility",
+     "duration": "~15–18 min"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Peak Goal-Specific Training Ride",
+     "duration": "140 min",
+     "workout_id": "rs-ride-30",
+     "zone": "RPE 1–7",
+     "tss": 98,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest",
+     "duration": ""
+    }
+   ]
+  },
+  {
+   "number": 11,
+   "phase": 3,
+   "phase_name": "Goal Ready",
+   "phase_weeks": "Weeks 9–12",
+   "title": "Sharpen and Build Confidence",
+   "objective": "Maintain goal-specific fitness while reducing overall workload and rehearsing your achievement strategy. Finish confident, not exhausted.",
+   "start_date": "2025-07-21",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "strength",
+     "kind": "strength",
+     "title": "Controlled Strength Maintenance",
+     "duration": "~22–25 min"
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Controlled Sharpening",
+     "duration": "65 min",
+     "workout_id": "rs-ride-31",
+     "zone": "RPE 1–7",
+     "tss": 48,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Recovery and Mobility",
+     "duration": "10–15 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Steady Endurance and Technique",
+     "duration": "60 min",
+     "workout_id": "rs-ride-32",
+     "zone": "RPE 1–4",
+     "tss": 37,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "strength",
+     "kind": "mobility",
+     "title": "Light Activation and Mobility",
+     "duration": "~15 min"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Achievement Confidence Simulation",
+     "duration": "110 min",
+     "workout_id": "rs-ride-33",
+     "zone": "RPE 1–6",
+     "tss": 75,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest",
+     "duration": ""
+    }
+   ]
+  },
+  {
+   "number": 12,
+   "phase": 3,
+   "phase_name": "Goal Ready",
+   "phase_weeks": "Weeks 9–12",
+   "title": "Ride Stronger Achievement Week",
+   "objective": "Reduce fatigue, reinforce confidence and complete your personalised Ride Stronger Achievement Ride. You may choose a shorter or supported option at any time — that is never failure.",
+   "start_date": "2025-07-28",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "strength",
+     "kind": "mobility",
+     "title": "Light Mobility and Activation",
+     "duration": "12–15 min"
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Achievement Confidence Ride",
+     "duration": "45 min",
+     "workout_id": "rs-ride-34",
+     "zone": "RPE 1–4",
+     "tss": 26,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Recovery or Complete Rest",
+     "duration": "10 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Leg Opener and Goal Skills Ride",
+     "duration": "40 min",
+     "workout_id": "rs-ride-35",
+     "zone": "RPE 1–5",
+     "tss": 24,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Rest or Gentle Mobility",
+     "duration": "5–10 min"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Ride Stronger Achievement Ride",
+     "duration": "150 min",
+     "workout_id": "rs-ride-36",
+     "zone": "RPE 1–7",
+     "tss": 105,
      "rest": false
     },
     {

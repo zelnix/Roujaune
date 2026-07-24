@@ -701,15 +701,355 @@ const phase2: Phase = {
   },
 };
 
+// ---------------------------------------------------------------- WEEK 9
+const week9: Week = {
+  number: 9,
+  title: "Train for Your Goal",
+  objective:
+    "Introduce structured goal-specific work while preserving the aerobic foundation and sustainable pacing from Phases 1 & 2.",
+  days: [
+    { day: "Monday", type: "strength", title: "Goal-Specific Cycling Strength", duration: "~28–32 min" },
+    {
+      day: "Tuesday", type: "cycling", title: "Goal-Specific Intervals", rideLabel: "Ride 25",
+      duration: "70 min", category: "Goal-Specific Development", environment: "Indoor or outdoor",
+      goal: "Complete controlled intervals that directly support your selected current goal.",
+      intervals: [
+        iv("Settle In", 5, "RPE 2", "65–75 rpm", { resistance: "Very light" }),
+        iv("Warm-Up Build", 9, "RPE 2–3", "70–84 rpm", { resistance: "Light" }),
+        iv("Aerobic Preparation", 8, "RPE 3–4", "74–90 rpm"),
+        iv("Goal Interval 1", 8, "RPE 5–7", "goal-dependent"),
+        iv("Recovery 1", 4, "RPE 2–3", "68–82 rpm"),
+        iv("Goal Interval 2", 8, "RPE 5–7", "goal-dependent"),
+        iv("Recovery 2", 4, "RPE 2–3"),
+        iv("Goal Interval 3", 8, "RPE 5–7", "goal-dependent"),
+        iv("Controlled Aerobic Finish", 8, "RPE 3–4", "74–90 rpm"),
+        iv("Cool-Down", 8, "RPE 1–2", "60–75 rpm"),
+      ],
+      easierOption: "Complete two goal intervals (or reduce each by one RPE); replace the third with 5 min endurance + 3 min cool-down.",
+      completionMessage:
+        "You completed work that directly supported your goal without letting the session become uncontrolled. Goal-specific training is purposeful, not reckless.",
+    },
+    { day: "Wednesday", type: "recovery", title: "Recovery and Mobility", duration: "12–15 min", optional: true },
+    {
+      day: "Thursday", type: "cycling", title: "Aerobic Endurance and Leg Speed", rideLabel: "Ride 26",
+      duration: "65 min", category: "Aerobic Endurance and Cadence", environment: "Indoor or outdoor",
+      goal: "Maintain aerobic fitness while keeping cadence responsive after Tuesday's goal-specific work.",
+      intervals: [
+        iv("Easy Start", 6, "RPE 2", "65–76 rpm"),
+        iv("Warm-Up Build", 8, "RPE 2–3", "70–84 rpm"),
+        iv("Aerobic Block 1", 10, "RPE 3", "74–88 rpm"),
+        iv("Cadence Lift 1", 3, "RPE 4", "90–102 rpm", { resistance: "Light" }),
+        iv("Recovery 1", 3, "RPE 2–3"),
+        iv("Aerobic Block 2", 10, "RPE 3–4", "76–90 rpm"),
+        iv("Cadence Lift 2", 3, "RPE 4–5", "92–104 rpm"),
+        iv("Recovery 2", 3, "RPE 2–3"),
+        iv("Aerobic Block 3", 10, "RPE 3–4", "76–92 rpm"),
+        iv("Comfortable Finish", 3, "RPE 3"),
+        iv("Cool-Down", 6, "RPE 1–2"),
+      ],
+      easierOption: "Complete one cadence lift; keep cadence below 96 rpm where needed.",
+      completionMessage:
+        "You maintained your aerobic base and kept the legs responsive without adding fatigue — that balance supports stronger goal-specific work.",
+    },
+    { day: "Friday", type: "strength", title: "Core, Balance and Posture", duration: "~22–25 min" },
+    {
+      day: "Saturday", type: "cycling", title: "Goal Simulation Ride", rideLabel: "Ride 27",
+      duration: "125 min", category: "Long Endurance and Goal Simulation", environment: "Indoor or outdoor",
+      goal: "Practise the pacing, terrain, hydration and fuelling requirements of your goal.",
+      intervals: [
+        iv("Settle In", 6, "RPE 2"),
+        iv("Warm-Up Build", 9, "RPE 2–3"),
+        iv("Endurance Block 1", 15, "RPE 3"),
+        iv("Endurance Block 2", 15, "RPE 3"),
+        iv("Endurance Block 3", 15, "RPE 3–4"),
+        iv("Easy Reset", 5, "RPE 2–3"),
+        iv("Goal Simulation Block 1", 15, "RPE 4–6", "goal-dependent"),
+        iv("Recovery Endurance", 5, "RPE 3"),
+        iv("Goal Simulation Block 2", 15, "RPE 4–6", "goal-dependent"),
+        iv("Controlled Endurance Finish", 15, "RPE 4"),
+        iv("Cool-Down", 10, "RPE 1–2"),
+      ],
+      easierOption: "Complete 105 minutes using three endurance blocks and one 15-minute goal simulation block.",
+      completionMessage:
+        "You rehearsed the demands of your goal while protecting your energy early. Preparation and pacing make stronger riding possible.",
+    },
+    rest(),
+  ],
+};
+
+// ---------------------------------------------------------------- WEEK 10
+const week10: Week = {
+  number: 10,
+  title: "Peak Goal Development",
+  objective:
+    "Complete the highest goal-specific training load of the plan while maintaining controlled intensity and reliable recovery. Not a maximal week.",
+  days: [
+    { day: "Monday", type: "strength", title: "Controlled Cycling Strength", duration: "~28–30 min" },
+    {
+      day: "Tuesday", type: "cycling", title: "Sustained Goal Effort", rideLabel: "Ride 28",
+      duration: "75 min", category: "Goal-Specific Sustained Effort", environment: "Indoor or outdoor",
+      goal: "Complete two longer goal-specific intervals with stable pacing and technique.",
+      intervals: [
+        iv("Settle In", 5, "RPE 2"),
+        iv("Warm-Up Build", 9, "RPE 2–3", "70–84 rpm"),
+        iv("Aerobic Preparation", 8, "RPE 3–4", "74–90 rpm"),
+        iv("Preparation Lift", 4, "RPE 5", "78–94 rpm"),
+        iv("Easy Reset", 3, "RPE 2–3"),
+        iv("Sustained Goal Effort 1", 15, "RPE 5–7", "goal-dependent"),
+        iv("Recovery", 6, "RPE 2–3", "68–82 rpm"),
+        iv("Sustained Goal Effort 2", 15, "RPE 5–7", "goal-dependent"),
+        iv("Easy Aerobic Finish", 4, "RPE 3"),
+        iv("Cool-Down", 6, "RPE 1–2"),
+      ],
+      easierOption: "Complete two 10-minute goal efforts (or reduce each by one RPE); use the removed time as endurance.",
+      completionMessage:
+        "You sustained longer work reflecting your goal without losing control. This is where earlier fitness becomes practical performance.",
+    },
+    { day: "Wednesday", type: "recovery", title: "Recovery and Mobility", duration: "12–18 min", optional: true },
+    {
+      day: "Thursday", type: "cycling", title: "Endurance with Leg Openers", rideLabel: "Ride 29",
+      duration: "65 min", category: "Aerobic Endurance and Preparation", environment: "Indoor or outdoor",
+      goal: "Maintain endurance while completing brief controlled efforts that keep the legs responsive.",
+      intervals: [
+        iv("Easy Start", 6, "RPE 2"),
+        iv("Warm-Up Build", 8, "RPE 2–3"),
+        iv("Aerobic Block 1", 10, "RPE 3", "74–88 rpm"),
+        iv("Leg Opener 1", 2, "RPE 6", "88–102 rpm", { resistance: "Light to moderate" }),
+        iv("Recovery 1", 4, "RPE 2"),
+        iv("Aerobic Block 2", 10, "RPE 3–4"),
+        iv("Leg Opener 2", 2, "RPE 6–7", "88–102 rpm"),
+        iv("Recovery 2", 4, "RPE 2"),
+        iv("Aerobic Block 3", 10, "RPE 3–4"),
+        iv("Leg Opener 3", 2, "RPE 6–7", "88–102 rpm"),
+        iv("Comfortable Finish", 6, "RPE 3"),
+        iv("Cool-Down", 4, "RPE 1–2"),
+      ],
+      easierOption: "Complete two leg openers; replace the third with 90 seconds of comfortable endurance.",
+      completionMessage:
+        "You kept the legs responsive without another demanding interval session. The strongest preparation is often brief and controlled.",
+    },
+    { day: "Friday", type: "strength", title: "Light Activation and Mobility", duration: "~15–18 min" },
+    {
+      day: "Saturday", type: "cycling", title: "Peak Goal-Specific Training Ride", rideLabel: "Ride 30",
+      duration: "140 min", category: "Peak Endurance and Goal Simulation", environment: "Indoor or outdoor",
+      goal: "Complete the most demanding goal-specific training ride before achievement preparation begins.",
+      intervals: [
+        iv("Settle In", 7, "RPE 2"),
+        iv("Warm-Up Build", 10, "RPE 2–3"),
+        iv("Endurance Block 1", 15, "RPE 3"),
+        iv("Endurance Block 2", 15, "RPE 3"),
+        iv("Endurance Block 3", 15, "RPE 3–4"),
+        iv("Easy Reset", 5, "RPE 2–3"),
+        iv("Goal Block 1", 15, "RPE 4–6", "goal-dependent"),
+        iv("Recovery Endurance", 5, "RPE 3"),
+        iv("Goal Block 2", 15, "RPE 4–7", "goal-dependent"),
+        iv("Recovery Endurance", 5, "RPE 3"),
+        iv("Goal Block 3", 15, "RPE 4–7", "goal-dependent"),
+        iv("Controlled Endurance Finish", 8, "RPE 4"),
+        iv("Cool-Down", 10, "RPE 1–2"),
+      ],
+      easierOption: "Complete 120 minutes using three endurance blocks and two 15-minute goal blocks.",
+      completionMessage:
+        "You completed the peak training ride by managing the whole session. Your pacing, fuelling and goal-specific control are ready to be refined for achievement week.",
+    },
+    rest(),
+  ],
+  reflection: [
+    "What worked well and what needs adjustment?",
+    "Was the opening pace conservative enough?",
+    "Was the fuelling strategy practical?",
+    "Is the achievement goal still realistic and appropriate?",
+  ],
+};
+
+// ---------------------------------------------------------------- WEEK 11
+const week11: Week = {
+  number: 11,
+  title: "Sharpen and Build Confidence",
+  objective:
+    "Maintain goal-specific fitness while reducing overall workload and rehearsing your achievement strategy. Finish confident, not exhausted.",
+  days: [
+    { day: "Monday", type: "strength", title: "Controlled Strength Maintenance", duration: "~22–25 min" },
+    {
+      day: "Tuesday", type: "cycling", title: "Controlled Sharpening", rideLabel: "Ride 31",
+      duration: "65 min", category: "Goal-Specific Sharpening", environment: "Indoor or outdoor",
+      goal: "Maintain high-quality goal-specific effort with reduced interval duration.",
+      intervals: [
+        iv("Settle In", 5, "RPE 2"),
+        iv("Warm-Up Build", 9, "RPE 2–3"),
+        iv("Aerobic Preparation", 8, "RPE 3–4"),
+        iv("Sharpening Interval 1", 6, "RPE 6–7", "goal-dependent"),
+        iv("Recovery 1", 4, "RPE 2–3"),
+        iv("Sharpening Interval 2", 6, "RPE 6–7", "goal-dependent"),
+        iv("Recovery 2", 4, "RPE 2–3"),
+        iv("Sharpening Interval 3", 6, "RPE 6–7", "goal-dependent"),
+        iv("Easy Aerobic Finish", 10, "RPE 3"),
+        iv("Cool-Down", 7, "RPE 1–2"),
+      ],
+      easierOption: "Complete two sharpening intervals; replace the third with 6 min comfortable endurance riding.",
+      completionMessage:
+        "You maintained the quality of your goal-specific work while reducing total load. The purpose now is confidence and readiness, not fatigue.",
+    },
+    { day: "Wednesday", type: "recovery", title: "Recovery and Mobility", duration: "10–15 min", optional: true },
+    {
+      day: "Thursday", type: "cycling", title: "Steady Endurance and Technique", rideLabel: "Ride 32",
+      duration: "60 min", category: "Aerobic Endurance", environment: "Indoor or outdoor",
+      goal: "Maintain endurance while reinforcing relaxed technique and efficient pacing.",
+      intervals: [
+        iv("Easy Start", 6, "RPE 2"),
+        iv("Warm-Up Build", 8, "RPE 2–3"),
+        iv("Endurance Block 1", 12, "RPE 3", "74–88 rpm"),
+        iv("Endurance Block 2", 12, "RPE 3–4", "76–90 rpm"),
+        iv("Easy Reset", 5, "RPE 2"),
+        iv("Steady Technique Block", 10, "RPE 4", "76–92 rpm"),
+        iv("Cool-Down", 7, "RPE 1–2"),
+      ],
+      easierOption: "Complete the Steady Technique Block at RPE 3.",
+      completionMessage:
+        "You maintained endurance while reinforcing the technique that supports your achievement ride. Efficient riding is one of your strongest tools.",
+    },
+    { day: "Friday", type: "strength", title: "Light Activation and Mobility", duration: "~15 min" },
+    {
+      day: "Saturday", type: "cycling", title: "Achievement Confidence Simulation", rideLabel: "Ride 33",
+      duration: "110 min", category: "Goal Simulation and Confidence", environment: "Indoor or outdoor",
+      goal: "Rehearse the achievement ride strategy at a reduced duration and controlled intensity.",
+      intervals: [
+        iv("Settle In", 6, "RPE 2"),
+        iv("Warm-Up Build", 9, "RPE 2–3"),
+        iv("Endurance Block 1", 15, "RPE 3"),
+        iv("Endurance Block 2", 15, "RPE 3"),
+        iv("Endurance Block 3", 15, "RPE 3–4"),
+        iv("Easy Reset", 5, "RPE 2–3"),
+        iv("Achievement Practice Block", 20, "RPE 4–6", "goal-dependent"),
+        iv("Controlled Endurance Finish", 15, "RPE 4"),
+        iv("Cool-Down", 10, "RPE 1–2"),
+      ],
+      easierOption: "Complete 90 minutes using three endurance blocks and a 10-minute achievement practice block.",
+      completionMessage:
+        "You rehearsed your achievement strategy without trying to prove your fitness. The goal was to confirm what works and arrive at Week 12 with confidence.",
+    },
+    rest(),
+  ],
+};
+
+// ---------------------------------------------------------------- WEEK 12
+const week12: Week = {
+  number: 12,
+  title: "Ride Stronger Achievement Week",
+  weekType: "Achievement and reduced-volume preparation",
+  objective:
+    "Reduce fatigue, reinforce confidence and complete your personalised Ride Stronger Achievement Ride. You may choose a shorter or supported option at any time — that is never failure.",
+  days: [
+    { day: "Monday", type: "strength", title: "Light Mobility and Activation", duration: "12–15 min" },
+    {
+      day: "Tuesday", type: "cycling", title: "Achievement Confidence Ride", rideLabel: "Ride 34",
+      duration: "45 min", category: "Easy Endurance", environment: "Indoor or outdoor",
+      goal: "Reinforce comfortable movement and confidence without creating fatigue.",
+      intervals: [
+        iv("Settle In", 5, "RPE 2", "65–75 rpm"),
+        iv("Warm-Up Build", 7, "RPE 2–3", "70–84 rpm"),
+        iv("Comfortable Endurance 1", 10, "RPE 3", "74–88 rpm"),
+        iv("Comfortable Endurance 2", 10, "RPE 3", "76–90 rpm"),
+        iv("Confidence Block", 6, "RPE 3–4", "76–92 rpm"),
+        iv("Cool-Down", 7, "RPE 1–2"),
+      ],
+      easierOption: "Complete 35 minutes by removing the Confidence Block and shortening Comfortable Endurance 2 to 6 min.",
+      completionMessage:
+        "You did not need to prove anything today. You reinforced the control, rhythm and confidence you have built over twelve weeks.",
+    },
+    { day: "Wednesday", type: "recovery", title: "Recovery or Complete Rest", duration: "10 min", optional: true },
+    {
+      day: "Thursday", type: "cycling", title: "Leg Opener and Goal Skills Ride", rideLabel: "Ride 35",
+      duration: "40 min", category: "Preparation and Skills", environment: "Indoor or outdoor",
+      goal: "Keep the legs responsive and rehearse one final goal-specific skill without creating fatigue.",
+      intervals: [
+        iv("Easy Start", 5, "RPE 2"),
+        iv("Warm-Up Build", 7, "RPE 2–3"),
+        iv("Smooth Cadence 1", 3, "RPE 4", "88–100 rpm", { resistance: "Light" }),
+        iv("Easy Recovery", 3, "RPE 2"),
+        iv("Goal Skill Block", 5, "RPE 4–5", "goal-dependent"),
+        iv("Easy Recovery", 3, "RPE 2"),
+        iv("Smooth Cadence 2", 3, "RPE 4", "90–102 rpm"),
+        iv("Comfortable Aerobic Riding", 4, "RPE 3"),
+        iv("Cool-Down", 7, "RPE 1–2"),
+      ],
+      easierOption: "Complete one Smooth Cadence interval; replace the second with easy riding.",
+      completionMessage:
+        "You opened the legs, rehearsed your goal skill and finished without fatigue. The training is complete — the next ride is about using what you have built.",
+    },
+    { day: "Friday", type: "recovery", title: "Rest or Gentle Mobility", duration: "5–10 min", optional: true },
+    {
+      day: "Saturday", type: "cycling", title: "Ride Stronger Achievement Ride", rideLabel: "Ride 36",
+      duration: "150 min", category: "Personalised Intermediate Achievement Ride", environment: "Indoor or outdoor",
+      goal: "Demonstrate the endurance, strength, pacing and confidence built across twelve weeks. Choose Full (150 min), Supported (120 min) or Foundation (90 min) — any approved option completes Ride Stronger. Not a pass/fail test.",
+      intervals: [
+        iv("Begin Your Strongest Ride", 7, "RPE 2", "65–75 rpm", { resistance: "Very light", position: "Seated" }),
+        iv("Warm-Up Build", 10, "RPE 2–3", "70–84 rpm", { resistance: "Light" }),
+        iv("Endurance Block 1 · Settle", 15, "RPE 3", "74–88 rpm"),
+        iv("Endurance Block 2 · Find Your Rhythm", 15, "RPE 3", "74–90 rpm"),
+        iv("Endurance Block 3 · Stay Composed", 15, "RPE 3–4", "76–90 rpm"),
+        iv("Endurance Block 4 · Ride with Purpose", 15, "RPE 3–4", "76–92 rpm"),
+        iv("Easy Reset", 5, "RPE 2–3", "68–82 rpm"),
+        iv("Goal Block 1", 15, "RPE 4–6", "goal-dependent"),
+        iv("Recovery Endurance", 5, "RPE 3", "72–86 rpm"),
+        iv("Goal Block 2", 15, "RPE 4–7", "goal-dependent"),
+        iv("Confidence Endurance", 13, "RPE 4", "76–92 rpm"),
+        iv("Controlled Achievement Finish", 10, "RPE 4–5", "78–94 rpm"),
+        iv("Achievement Cool-Down", 10, "RPE 1–2", "60–75 rpm", { resistance: "Minimal" }),
+      ],
+      easierOption: "Supported (120 min) or Foundation (90 min) achievement options are full completions. Ride Faster riders may use the Speed Achievement format (Full 105 / Supported 85 / Foundation 65 min).",
+      completionMessage:
+        "You began Ride Stronger with a goal that mattered to you. Today's achievement was about using what you built — your goal, your circumstances, your strongest sustainable effort. Your strongest ride is your own, and this one belongs to you.",
+    },
+    rest(),
+  ],
+  reflection: [
+    "Which achievement path and option did you complete?",
+    "How did the first and second halves feel?",
+    "Did you achieve your original goal, and has it changed?",
+    "What are you most proud of from the twelve weeks?",
+    "Do you want to maintain, repeat or progress?",
+  ],
+};
+
+const phase3: Phase = {
+  number: 3,
+  name: "Goal Ready",
+  weeksLabel: "Weeks 9–12",
+  objective:
+    "Convert improved endurance, strength and sustainable power into practical performance for your selected goal, and complete a personalised Ride Stronger Achievement Ride.",
+  focus: [
+    "Goal-specific tempo, climbing or endurance work adapted to your goal.",
+    "Maintaining quality effort later in longer rides; pacing for a target distance, climb or event.",
+    "Rehearsing hydration, fuelling, equipment and route preparation.",
+    "Peak goal-specific load in Week 10, sharpening in Week 11, taper in Week 12.",
+    "A personalised achievement ride (Full / Supported / Foundation options) across five goal paths.",
+  ],
+  cadenceQuote: "Your smoothest controllable cadence is more important than matching an exact number.",
+  weeks: [week9, week10, week11, week12],
+  complete: {
+    heading: "PHASE 3 COMPLETE — GOAL READY",
+    summary: [
+      "Twelve total plan weeks completed; thirty-six cycling workouts available; three phases.",
+      "Goal-specific intervals, simulations and a peak goal-specific ride completed or modified.",
+      "Achievement strategy rehearsed; longest planned ride 140 min; longest achievement option 150 min.",
+      "Hydration, fuelling, equipment and route preparation practised.",
+      "Ride Stronger Achievement Ride completed using an approved option.",
+    ],
+    coachMessage:
+      "You completed Ride Stronger by building from the rider you were at the beginning. You can now ride with greater endurance, stronger pacing, improved cadence and more confidence. This is not the end of your development — it is the beginning of your next strongest ride. Your strongest ride is your own.",
+  },
+};
+
 export const RIDE_STRONGER: Program = {
   id: "ride-stronger",
   name: "Ride Stronger",
   level: "Intermediate",
-  durationWeeks: 8,
-  phaseCount: 2,
+  durationWeeks: 12,
+  phaseCount: 3,
   frequency: "3 rides/week",
   outcome:
-    "Build a controlled aerobic foundation and sustainable strength — endurance, cadence, tempo, threshold and seated climbing — toward your chosen goal.",
+    "A 12-week intermediate plan: build a controlled aerobic foundation, develop sustainable strength, then convert it into goal-ready performance and a personalised achievement ride.",
   startDate: "2025-05-12",
   weeklyRhythm: [
     { day: "Mon", session: "Strength" },
@@ -723,8 +1063,9 @@ export const RIDE_STRONGER: Program = {
   phaseTitles: [
     { number: 1, name: "Foundation and Control", weeks: "Weeks 1–4" },
     { number: 2, name: "Strength and Sustainable Power", weeks: "Weeks 5–8" },
+    { number: 3, name: "Goal Ready", weeks: "Weeks 9–12" },
   ],
-  phases: [phase1, phase2],
+  phases: [phase1, phase2, phase3],
 };
 
 // Deterministic id for a Ride Stronger cycling session (namespaced `rs-ride-N`).

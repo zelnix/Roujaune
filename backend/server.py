@@ -2726,9 +2726,10 @@ async def _seed_plans_on_startup():
             "build-and-climb": {**BUILD_AND_CLIMB, "type": "roadmap"},
         })
         await _reload_ctr_from_db()
-        await _reload_rs_from_db()
         # Ride Stronger is a code-owned default: force-refresh its definition from
         # the shipped JSON each boot so new phases/weeks land without a manual edit.
+        # (Use the module-loaded RS_PLAN from JSON — do NOT reload from DB first,
+        # or a stale DB doc would clobber the fresh definition.)
         await plans_admin._db.plans.update_one(
             {"id": "ride-stronger"},
             {"$set": {**RS_PLAN, "type": "structured", "level": "Intermediate"}},

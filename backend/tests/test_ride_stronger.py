@@ -1,15 +1,18 @@
-"""Iter 28 — Ride Stronger Phase 2 expansion (8 weeks / 2 phases / 24 rides) +
+"""Iter 29 — Ride Stronger Phase 3 expansion (12 weeks / 3 phases / 36 rides) +
 regression on Couch-to-Road.
 
 Runs as Green Lantern (Bearer auth). Order matters: we assign 'ride-stronger',
-verify structured response with duration_weeks=8 and both phases, then reset
-back to 'couch-to-road' so the demo user is left on the beginner plan.
+verify structured response with duration_weeks=12 and all three phases, then
+reset back to 'couch-to-road' so the demo user is left on the beginner plan.
 """
 import os
 import pytest
 import requests
 
-BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://roujaune-train.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get(
+    "EXPO_PUBLIC_BACKEND_URL",
+    "https://roujaune-train.preview.emergentagent.com",
+).rstrip("/")
 EMAIL = "greenlantern@roujaune.app"
 PASSWORD = "rideon9900"
 
@@ -26,9 +29,9 @@ def api():
     return s
 
 
-# ---------- 1. GET /api/plans (ride-stronger week_count/duration_weeks == 8) ----------
+# ---------- 1. GET /api/plans (ride-stronger week_count/duration_weeks == 12) ----------
 class TestPlansCatalog:
-    def test_ride_stronger_is_eight_weeks(self, api):
+    def test_ride_stronger_is_twelve_weeks(self, api):
         r = api.get(f"{BASE_URL}/api/plans")
         assert r.status_code == 200, r.text
         payload = r.json()
@@ -39,15 +42,18 @@ class TestPlansCatalog:
         rs = by_id["ride-stronger"]
         assert rs.get("type") == "structured", f"type mismatch: {rs.get('type')}"
         wk = rs.get("week_count") or rs.get("duration_weeks")
-        assert wk == 8, f"expected ride-stronger week_count/duration_weeks==8, got {wk} — full={rs}"
+        assert wk == 12, f"expected ride-stronger week_count/duration_weeks==12, got {wk} — full={rs}"
         # Regression: couch-to-road still listed
         assert "couch-to-road" in by_id
 
 
-# ---------- 2. Assign ride-stronger -> GET /api/plan (8 weeks, both phases) ----------
-class TestAssignRideStrongerPhase2:
-    def test_assign_and_fetch_two_phase_plan(self, api):
-        r = api.post(f"{BASE_URL}/api/rider/plan", json={"plan_id": "ride-stronger", "reset_progress": True})
+# ---------- 2. Assign ride-stronger -> GET /api/plan (12 weeks, three phases) ----------
+class TestAssignRideStrongerPhase3:
+    def test_assign_and_fetch_three_phase_plan(self, api):
+        r = api.post(
+            f"{BASE_URL}/api/rider/plan",
+            json={"plan_id": "ride-stronger", "reset_progress": True},
+        )
         assert r.status_code == 200, r.text
 
         r = api.get(f"{BASE_URL}/api/plan")
@@ -56,27 +62,30 @@ class TestAssignRideStrongerPhase2:
 
         # id + duration
         assert data.get("id") == "ride-stronger", f"id mismatch: {data.get('id')}"
-        assert data.get("duration_weeks") == 8, f"duration_weeks: {data.get('duration_weeks')}"
+        assert data.get("duration_weeks") == 12, f"duration_weeks: {data.get('duration_weeks')}"
 
         # current_week == 1 (after reset)
         cw = data.get("current_week") or (data.get("progress") or {}).get("current_week")
         assert cw == 1, f"current_week != 1: {cw}"
 
-        # progress.weeks "1 / 8"
+        # progress.weeks "1 / 12"
         progress = data.get("progress") or {}
         weeks_label = str(progress.get("weeks") or "")
-        assert weeks_label.replace(" ", "") == "1/8", f"progress.weeks: {weeks_label!r}"
+        assert weeks_label.replace(" ", "") == "1/12", f"progress.weeks: {weeks_label!r}"
 
-        # phases: both should be present, phase 1 active, phase 2 inactive
+        # phases: all three should be present, phase 1 active
         phases = data.get("phases") or []
-        assert isinstance(phases, list) and len(phases) == 2, f"expected 2 phases, got {phases}"
+        assert isinstance(phases, list) and len(phases) == 3, f"expected 3 phases, got {phases}"
         p1 = next((p for p in phases if p.get("number") == 1), None)
         p2 = next((p for p in phases if p.get("number") == 2), None)
-        assert p1 is not None and p2 is not None, f"missing phase 1/2 in {phases}"
+        p3 = next((p for p in phases if p.get("number") == 3), None)
+        assert p1 and p2 and p3, f"missing phase 1/2/3 in {phases}"
         assert "foundation and control" in (p1.get("name") or "").lower(), f"phase1 name: {p1}"
         assert "strength and sustainable power" in (p2.get("name") or "").lower(), f"phase2 name: {p2}"
+        assert "goal ready" in (p3.get("name") or "").lower(), f"phase3 name: {p3}"
         assert p1.get("active") is True, f"phase1 should be active: {p1}"
         assert p2.get("active") is False, f"phase2 should NOT be active while on week 1: {p2}"
+        assert p3.get("active") is False, f"phase3 should NOT be active while on week 1: {p3}"
 
         # Week 1 workouts still resolve (rs-ride-1..3)
         workouts = data.get("workouts") or []
@@ -89,7 +98,10 @@ class TestAssignRideStrongerPhase2:
 # ---------- 3. Regression: reassign couch-to-road (leaves state clean) ----------
 class TestCouchToRoadRegression:
     def test_reassign_and_fetch(self, api):
-        r = api.post(f"{BASE_URL}/api/rider/plan", json={"plan_id": "couch-to-road", "reset_progress": True})
+        r = api.post(
+            f"{BASE_URL}/api/rider/plan",
+            json={"plan_id": "couch-to-road", "reset_progress": True},
+        )
         assert r.status_code == 200, r.text
 
         r = api.get(f"{BASE_URL}/api/plan")
@@ -98,7 +110,6 @@ class TestCouchToRoadRegression:
         assert data.get("id") == "couch-to-road", f"id mismatch: {data.get('id')}"
         assert data.get("duration_weeks") == 16, f"duration_weeks: {data.get('duration_weeks')}"
 
-        # Ensure 3 weekly workouts (rides) for week 1
         workouts = data.get("workouts") or []
         assert len(workouts) >= 3, f"expected 3 rides, got {len(workouts)}"
         blob = str(data)

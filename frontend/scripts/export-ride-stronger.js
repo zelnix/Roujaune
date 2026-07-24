@@ -72,7 +72,7 @@ const result = {
   name: RIDE_STRONGER.name,
   level: "Intermediate",
   type: "structured",
-  description: "A 12-week intermediate plan that builds a controlled aerobic foundation — endurance, cadence, tempo and seated strength — toward your chosen goal. Phase 1 (Weeks 1–4) is available now.",
+  description: "A 12-week intermediate plan across three phases — Foundation & Control, Strength & Sustainable Power, and Goal Ready — that builds endurance, cadence, tempo, threshold and seated climbing, then converts it into goal-ready performance and a personalised achievement ride.",
   duration_weeks: RIDE_STRONGER.durationWeeks,
   duration_label: `${RIDE_STRONGER.durationWeeks} Weeks`,
   average_label: "3 Rides/Week",
