@@ -20,7 +20,7 @@ import { CalendarCard } from "@/src/components/CalendarCard";
 import { ReadinessGate } from "@/src/components/ReadinessGate";
 import { EditGoalsModal, ProgressModal, AdaptationsModal } from "@/src/components/plan-modals";
 import { PhaseCelebrationModal } from "@/src/components/PhaseCelebrationModal";
-import { usePhaseCelebration } from "@/src/lib/phase-complete";
+import { usePhaseCelebration, usePlanCompletion } from "@/src/lib/phase-complete";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
 import type { EditableGoal } from "@/src/lib/plan";
 
@@ -49,6 +49,7 @@ export default function TrainingPlanScreen() {
   const adaptation = useAdaptation(persona.name, persona.gender);
   const adaptiveTargets = useAdaptiveTargets();
   const { celebration, dismiss: dismissCelebration } = usePhaseCelebration(plan);
+  const { completion, dismiss: dismissCompletion } = usePlanCompletion(plan);
   const { width } = useWindowDimensions();
   const compact = width < 700; // phones scroll; tablets fill
 
@@ -181,13 +182,24 @@ export default function TrainingPlanScreen() {
         <AdaptationsModal visible={showAdaptations} onClose={() => setShowAdaptations(false)} persona={persona} />
         <CoachChatModal visible={showChat} onClose={() => { setShowChat(false); setChatSeed(undefined); }} persona={persona} onPlanUpdated={refreshPlan} seedMessage={chatSeed} />
         <PhaseCelebrationModal
-          visible={!!celebration}
+          visible={!!celebration && !completion}
           celebration={celebration}
           persona={persona}
           onClose={dismissCelebration}
           onChat={(c) => {
             setChatSeed(`I just finished ${c.name} (${c.weeks}) of my plan. What should I focus on next?`);
             dismissCelebration();
+            setShowChat(true);
+          }}
+        />
+        <PhaseCelebrationModal
+          visible={!!completion}
+          celebration={completion}
+          persona={persona}
+          onClose={dismissCompletion}
+          onChat={(c) => {
+            setChatSeed(`I just completed the entire ${c.name} programme! What would you suggest for my next goal?`);
+            dismissCompletion();
             setShowChat(true);
           }}
         />

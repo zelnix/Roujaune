@@ -1898,6 +1898,17 @@ def _ctr_week_complete(week, ride_ids, supp_dates, today):
     return True
 
 
+def _plan_done(weeks_map, cur, dw, ride_map, supp_dates):
+    """True once the rider is on the final week and that week is fully complete —
+    i.e. the whole structured plan has been finished."""
+    if cur < dw:
+        return False
+    wk = weeks_map.get(cur)
+    if not wk:
+        return False
+    return _ctr_week_complete(wk, set(ride_map.keys()), supp_dates, _ctr_today())
+
+
 async def _ctr_state(weeks=None, duration_weeks=None, plan_id="couch-to-road", ride_prefix="ctr-ride-"):
     """Return (current_week, ride_map, supp_dates), advancing the plan whenever the
     current week is fully completed (all rides + all supplementary + past rest days)."""
@@ -2003,7 +2014,7 @@ def _ctr_calendar_week(week, ride_map, supp_dates, today):
             "tip": (week.get("objective") or "")[:140], "seed_version": 2}
 
 
-def _ctr_plan_response(cur, ride_map, prog, weeks=None, plan_doc=None, plan_id="couch-to-road"):
+def _ctr_plan_response(cur, ride_map, prog, weeks=None, plan_doc=None, plan_id="couch-to-road", plan_complete=False):
     weeks_map = weeks or CTR_WEEKS
     pdoc = plan_doc or CTR_PLAN
     is_ctr = (plan_id == "couch-to-road")
@@ -2064,6 +2075,7 @@ def _ctr_plan_response(cur, ride_map, prog, weeks=None, plan_doc=None, plan_id="
         "phases": phases,
         "weekly_load": weekly_load,
         "you_are_here": cur, "workouts": workouts,
+        "plan_complete": plan_complete,
         "adaptation": f"Week {cur} \u2014 {week['title']}. {week['objective']}",
         "adaptation_status": f"{level} plan \u2014 week {cur} of {dw}",
         "week_targets": {"rides": len(cyc), "duration": _fmt_dur(total_min), "distance_km": round(total_min * 0.34), "elevation_m": 50 + cur * 6, "supplementary": len(supp_days)},
@@ -2091,19 +2103,22 @@ async def get_plan(id: str = "build-and-climb"):
                     "description": "You're riding without a structured plan. Jump into any ride whenever you like.",
                     "workouts": [], "goals": [], "progress_pct": 0}
         if active == "couch-to-road" or id == "couch-to-road":
-            cur, ride_map, _supp = await _ctr_state()
+            cur, ride_map, supp = await _ctr_state()
             prog = await _ctr_progress(ride_map)
-            return _ctr_plan_response(cur, ride_map, prog)
+            done = _plan_done(CTR_WEEKS, cur, int(CTR_PLAN.get("duration_weeks") or 16), ride_map, supp)
+            return _ctr_plan_response(cur, ride_map, prog, plan_complete=done)
         if active == "ride-stronger" or id == "ride-stronger":
             pdoc, weeks_map, planned, prefix = _struct_ctx("ride-stronger")
-            cur, ride_map, _supp = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id="ride-stronger", ride_prefix=prefix)
+            cur, ride_map, supp = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id="ride-stronger", ride_prefix=prefix)
             prog = await _ctr_progress(ride_map, ride_prefix=prefix, planned_tss=planned)
-            return _ctr_plan_response(cur, ride_map, prog, weeks=weeks_map, plan_doc=pdoc, plan_id="ride-stronger")
+            done = _plan_done(weeks_map, cur, int(pdoc.get("duration_weeks") or 12), ride_map, supp)
+            return _ctr_plan_response(cur, ride_map, prog, weeks=weeks_map, plan_doc=pdoc, plan_id="ride-stronger", plan_complete=done)
         if active == "ride-beyond" or id == "ride-beyond":
             pdoc, weeks_map, planned, prefix = _struct_ctx("ride-beyond")
-            cur, ride_map, _supp = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id="ride-beyond", ride_prefix=prefix)
+            cur, ride_map, supp = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id="ride-beyond", ride_prefix=prefix)
             prog = await _ctr_progress(ride_map, ride_prefix=prefix, planned_tss=planned)
-            return _ctr_plan_response(cur, ride_map, prog, weeks=weeks_map, plan_doc=pdoc, plan_id="ride-beyond")
+            done = _plan_done(weeks_map, cur, int(pdoc.get("duration_weeks") or 12), ride_map, supp)
+            return _ctr_plan_response(cur, ride_map, prog, weeks=weeks_map, plan_doc=pdoc, plan_id="ride-beyond", plan_complete=done)
         doc = await udb.training_plans.find_one({"id": id})
         base = await plans_admin.get_plan_def(id)
         if not base:

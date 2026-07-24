@@ -49,7 +49,7 @@ export function PhaseCelebrationModal({
   }, [visible, pop]);
 
   if (!celebration) return null;
-  const { number, name, weeks, complete } = celebration;
+  const { number, name, weeks, complete, isPlanEnd, endMessage } = celebration;
   const scale = pop.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
 
   return (
@@ -68,18 +68,24 @@ export function PhaseCelebrationModal({
             <Svg width={116} height={116} viewBox="0 0 116 116">
               <Circle cx={58} cy={58} r={54} fill="#241B00" stroke={C.yellow} strokeWidth={3} />
               <Circle cx={58} cy={58} r={44} fill="none" stroke="rgba(255,194,10,0.35)" strokeWidth={1.5} />
-              <Polygon points="58,26 66,50 92,50 71,66 79,92 58,76 37,92 45,66 24,50 50,50" fill={C.yellow} opacity={0.95} />
+              {!isPlanEnd ? (
+                <Polygon points="58,26 66,50 92,50 71,66 79,92 58,76 37,92 45,66 24,50 50,50" fill={C.yellow} opacity={0.95} />
+              ) : null}
             </Svg>
             <View style={s.badgeNumberWrap}>
-              <Text style={s.badgeNumber}>{number}</Text>
+              {isPlanEnd ? (
+                <Ionicons name="trophy" size={46} color={C.yellow} />
+              ) : (
+                <Text style={s.badgeNumber}>{number}</Text>
+              )}
             </View>
           </Animated.View>
 
-          <Text style={s.kicker}>PHASE {number} COMPLETE</Text>
-          <Text style={s.heading}>{complete.heading}</Text>
-          <Text style={s.weeks}>{name} · {weeks}</Text>
+          <Text style={s.kicker}>{isPlanEnd ? "PROGRAMME COMPLETE" : `PHASE ${number} COMPLETE`}</Text>
+          <Text style={s.heading}>{isPlanEnd ? `You Completed ${name}` : complete.heading}</Text>
+          <Text style={s.weeks}>{isPlanEnd ? `${weeks} · Your strongest ride is your own` : `${name} · ${weeks}`}</Text>
 
-          <ScrollView style={{ maxHeight: 260, alignSelf: "stretch" }} contentContainerStyle={{ paddingHorizontal: 24 }} showsVerticalScrollIndicator={false}>
+          <ScrollView style={{ maxHeight: 280, alignSelf: "stretch" }} contentContainerStyle={{ paddingHorizontal: 24 }} showsVerticalScrollIndicator={false}>
             <View style={s.summaryBox}>
               {complete.summary.map((line, i) => (
                 <View key={i} style={s.summaryRow}>
@@ -98,7 +104,7 @@ export function PhaseCelebrationModal({
                 </View>
                 <Ionicons name="chatbubble-ellipses" size={16} color={C.yellow} />
               </View>
-              <Text style={s.coachMessage}>{complete.coachMessage}</Text>
+              <Text style={s.coachMessage}>{isPlanEnd && endMessage ? endMessage : complete.coachMessage}</Text>
             </View>
           </ScrollView>
 
@@ -106,11 +112,11 @@ export function PhaseCelebrationModal({
             testID="phase-celebration-continue"
             onPress={onClose}
             accessibilityRole="button"
-            accessibilityLabel="Continue"
+            accessibilityLabel={isPlanEnd ? "Finish" : "Continue"}
             style={({ hovered, pressed }: any) => [s.continueBtn, hovered && { opacity: 0.92 }, pressed && { opacity: 0.8 }]}
           >
-            <Text style={s.continueText}>Continue</Text>
-            <Ionicons name="arrow-forward" size={17} color="#241B00" />
+            <Text style={s.continueText}>{isPlanEnd ? "Celebrate" : "Continue"}</Text>
+            <Ionicons name={isPlanEnd ? "sparkles" : "arrow-forward"} size={17} color="#241B00" />
           </Pressable>
 
           {onChat ? (
