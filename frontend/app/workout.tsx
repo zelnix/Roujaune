@@ -144,8 +144,8 @@ export default function LiveWorkout() {
   const segments = React.useMemo(() => (selected ? buildSegments(selected) : []), [selected]);
   const workoutProfile = React.useMemo(() => (segments.length ? segmentProfile(segments) : selectedType?.profile), [segments, selectedType]);
   const compact = height < 620;
-  const leftW = compact ? 240 : 300;
-  const rightW = compact ? 300 : 340;
+  const leftW = compact ? 120 : 150;
+  const rightW = compact ? 150 : 170;
 
   const [centerW, setCenterW] = React.useState(560);
   const [availH, setAvailH] = React.useState(0);

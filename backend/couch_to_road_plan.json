@@ -1,0 +1,1189 @@
+{
+ "id": "couch-to-road",
+ "title": "From Couch to Road",
+ "name": "From Couch to Road",
+ "assigned_to": "Green Lantern",
+ "start_date": "2026-07-27",
+ "duration_weeks": 16,
+ "frequency": "3 rides per week",
+ "phases": [
+  {
+   "number": 1,
+   "name": "Get Moving",
+   "weeks_label": "Weeks 1–4",
+   "objective": "Help you become comfortable on the bike, establish a consistent weekly routine and learn the foundations of safe, controlled endurance cycling."
+  },
+  {
+   "number": 2,
+   "name": "Build the Foundation",
+   "weeks_label": "Weeks 5–8",
+   "objective": "Develop a stronger aerobic base while improving pacing, cadence control, pedalling efficiency and recovery between sessions."
+  },
+  {
+   "number": 3,
+   "name": "Extend Your Endurance",
+   "weeks_label": "Weeks 9–12",
+   "objective": "Extend continuous riding time while introducing gentle seated hills, resistance changes, improved gear selection and better fatigue management."
+  },
+  {
+   "number": 4,
+   "name": "Road Ready",
+   "weeks_label": "Weeks 13–16",
+   "objective": "Prepare the rider to complete the final From Couch to Road Achievement Ride and demonstrate a strong intermediate endurance foundation."
+  }
+ ],
+ "weeks": [
+  {
+   "number": 1,
+   "phase": 1,
+   "phase_name": "Get Moving",
+   "phase_weeks": "Weeks 1–4",
+   "title": "Start Where You Are",
+   "objective": "Begin gently, become familiar with the weekly routine and establish comfort on the bike.",
+   "start_date": "2026-07-27",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "strength",
+     "kind": "strength",
+     "title": "Beginner Cycling Strength",
+     "duration": "~15 min"
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Welcome Ride",
+     "duration": "20 min",
+     "workout_id": "ctr-ride-1",
+     "zone": "RPE 1–3",
+     "tss": 11,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Recovery and Mobility",
+     "duration": "10 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Pedal Smoothly",
+     "duration": "25 min",
+     "workout_id": "ctr-ride-2",
+     "zone": "RPE 1–4",
+     "tss": 14,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "balance",
+     "kind": "balance",
+     "title": "Balance and Cycling Support",
+     "duration": "~15 min"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "First Endurance Ride",
+     "duration": "30 min",
+     "workout_id": "ctr-ride-3",
+     "zone": "RPE 1–3",
+     "tss": 18,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest",
+     "duration": ""
+    }
+   ]
+  },
+  {
+   "number": 2,
+   "phase": 1,
+   "phase_name": "Get Moving",
+   "phase_weeks": "Weeks 1–4",
+   "title": "Build the Habit",
+   "objective": "Repeat the weekly rhythm and begin making cycling a consistent part of your routine.",
+   "start_date": "2026-08-03",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "strength",
+     "kind": "strength",
+     "title": "Foundation Strength",
+     "duration": "15–18 min"
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Easy Foundation Ride",
+     "duration": "25 min",
+     "workout_id": "ctr-ride-4",
+     "zone": "RPE 1–3",
+     "tss": 15,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Recovery or Rest",
+     "duration": "~10 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Cadence Introduction",
+     "duration": "30 min",
+     "workout_id": "ctr-ride-5",
+     "zone": "RPE 1–4",
+     "tss": 17,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "balance",
+     "kind": "balance",
+     "title": "Balance and Core Support",
+     "duration": "~15 min"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Comfortable Endurance Ride",
+     "duration": "35 min",
+     "workout_id": "ctr-ride-6",
+     "zone": "RPE 1–3",
+     "tss": 21,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest",
+     "duration": ""
+    }
+   ]
+  },
+  {
+   "number": 3,
+   "phase": 1,
+   "phase_name": "Get Moving",
+   "phase_weeks": "Weeks 1–4",
+   "title": "Find Your Rhythm",
+   "objective": "Learn the difference between easy and steady effort while continuing to build time on the bike.",
+   "start_date": "2026-08-10",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "strength",
+     "kind": "strength",
+     "title": "Cycling Strength",
+     "duration": "~18 min"
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Steady Foundation Ride",
+     "duration": "30 min",
+     "workout_id": "ctr-ride-7",
+     "zone": "RPE 1–4",
+     "tss": 20,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Recovery Mobility",
+     "duration": "~10 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Rhythm Changes",
+     "duration": "30 min",
+     "workout_id": "ctr-ride-8",
+     "zone": "RPE 1–4",
+     "tss": 18,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "balance",
+     "kind": "balance",
+     "title": "Strength and Balance",
+     "duration": "~15 min"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Endurance Builder",
+     "duration": "40 min",
+     "workout_id": "ctr-ride-9",
+     "zone": "RPE 1–4",
+     "tss": 24,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest",
+     "duration": ""
+    }
+   ]
+  },
+  {
+   "number": 4,
+   "phase": 1,
+   "phase_name": "Get Moving",
+   "phase_weeks": "Weeks 1–4",
+   "title": "Settle and Strengthen",
+   "objective": "Reduce training load slightly, reinforce technique and allow your body to absorb the first three weeks.",
+   "start_date": "2026-08-17",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "strength",
+     "kind": "mobility",
+     "title": "Light Strength and Mobility",
+     "duration": "12–15 min"
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Easy Reset Ride",
+     "duration": "25 min",
+     "workout_id": "ctr-ride-10",
+     "zone": "RPE 1–3",
+     "tss": 13,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Recovery or Complete Rest",
+     "duration": "~10 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Smooth Pedalling Skills",
+     "duration": "30 min",
+     "workout_id": "ctr-ride-11",
+     "zone": "RPE 1–3",
+     "tss": 17,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "balance",
+     "kind": "balance",
+     "title": "Light Balance and Mobility",
+     "duration": "~12 min"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Comfortable Endurance Ride",
+     "duration": "35 min",
+     "workout_id": "ctr-ride-12",
+     "zone": "RPE 1–3",
+     "tss": 21,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest and Phase Reflection",
+     "duration": ""
+    }
+   ]
+  },
+  {
+   "number": 5,
+   "phase": 2,
+   "phase_name": "Build the Foundation",
+   "phase_weeks": "Weeks 5–8",
+   "title": "Build the Engine",
+   "objective": "Increase sustainable riding time and introduce short, controlled steady-effort blocks.",
+   "start_date": "2026-08-24",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "strength",
+     "kind": "strength",
+     "title": "Foundation Strength",
+     "duration": "~20 min"
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Aerobic Foundation Ride",
+     "duration": "35 min",
+     "workout_id": "ctr-ride-13",
+     "zone": "RPE 1–4",
+     "tss": 21,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Recovery and Mobility",
+     "duration": "10–15 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Steady Steps",
+     "duration": "35 min",
+     "workout_id": "ctr-ride-14",
+     "zone": "RPE 1–4",
+     "tss": 22,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "balance",
+     "kind": "balance",
+     "title": "Balance, Core and Cycling Support",
+     "duration": "~18 min"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Endurance Ride",
+     "duration": "45 min",
+     "workout_id": "ctr-ride-15",
+     "zone": "RPE 1–4",
+     "tss": 29,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest",
+     "duration": ""
+    }
+   ]
+  },
+  {
+   "number": 6,
+   "phase": 2,
+   "phase_name": "Build the Foundation",
+   "phase_weeks": "Weeks 5–8",
+   "title": "Stronger and Steadier",
+   "objective": "Hold steady aerobic effort for longer while improving cadence control.",
+   "start_date": "2026-08-31",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "strength",
+     "kind": "strength",
+     "title": "Cycling Strength",
+     "duration": "~22 min"
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Steady Endurance Ride",
+     "duration": "40 min",
+     "workout_id": "ctr-ride-16",
+     "zone": "RPE 1–4",
+     "tss": 26,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Recovery or Rest",
+     "duration": "~10 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Cadence and Control",
+     "duration": "35 min",
+     "workout_id": "ctr-ride-17",
+     "zone": "RPE 1–4",
+     "tss": 23,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "balance",
+     "kind": "balance",
+     "title": "Lower-Body Support and Balance",
+     "duration": "~20 min"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Longer Endurance Ride",
+     "duration": "50 min",
+     "workout_id": "ctr-ride-18",
+     "zone": "RPE 1–4",
+     "tss": 31,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest",
+     "duration": ""
+    }
+   ]
+  },
+  {
+   "number": 7,
+   "phase": 2,
+   "phase_name": "Build the Foundation",
+   "phase_weeks": "Weeks 5–8",
+   "title": "Control Your Pace",
+   "objective": "Learn to begin conservatively, conserve energy and finish with a controlled increase in effort.",
+   "start_date": "2026-09-07",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "strength",
+     "kind": "strength",
+     "title": "Strength for Riding Stability",
+     "duration": "~22 min"
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Easy Start, Strong Finish",
+     "duration": "40 min",
+     "workout_id": "ctr-ride-19",
+     "zone": "RPE 1–5",
+     "tss": 27,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Recovery Mobility",
+     "duration": "10–15 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Controlled Effort Blocks",
+     "duration": "40 min",
+     "workout_id": "ctr-ride-20",
+     "zone": "RPE 1–5",
+     "tss": 26,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "balance",
+     "kind": "balance",
+     "title": "Balance, Core and Posture",
+     "duration": "~20 min"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Paced Endurance Ride",
+     "duration": "55 min",
+     "workout_id": "ctr-ride-21",
+     "zone": "RPE 1–4",
+     "tss": 35,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest",
+     "duration": ""
+    }
+   ]
+  },
+  {
+   "number": 8,
+   "phase": 2,
+   "phase_name": "Build the Foundation",
+   "phase_weeks": "Weeks 5–8",
+   "title": "Foundation Recovery",
+   "objective": "Reduce training load, reinforce good movement and absorb the work completed during Weeks 5–7.",
+   "start_date": "2026-09-14",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "strength",
+     "kind": "mobility",
+     "title": "Light Strength and Mobility",
+     "duration": "15 min"
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Recovery Spin",
+     "duration": "30 min",
+     "workout_id": "ctr-ride-22",
+     "zone": "RPE 1–3",
+     "tss": 14,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Recovery or Complete Rest",
+     "duration": "~10 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Smooth and Efficient",
+     "duration": "35 min",
+     "workout_id": "ctr-ride-23",
+     "zone": "RPE 1–3",
+     "tss": 19,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "balance",
+     "kind": "balance",
+     "title": "Light Balance and Mobility",
+     "duration": "12–15 min"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Comfortable Endurance Ride",
+     "duration": "45 min",
+     "workout_id": "ctr-ride-24",
+     "zone": "RPE 1–3",
+     "tss": 26,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest and Phase Reflection",
+     "duration": ""
+    }
+   ]
+  },
+  {
+   "number": 9,
+   "phase": 3,
+   "phase_name": "Extend Your Endurance",
+   "phase_weeks": "Weeks 9–12",
+   "title": "Rolling Confidence",
+   "objective": "Introduce gentle changes in terrain and resistance while maintaining controlled breathing and seated riding form.",
+   "start_date": "2026-09-21",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "strength",
+     "kind": "strength",
+     "title": "Cycling Strength and Stability",
+     "duration": "~24 min"
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Aerobic Foundation Ride",
+     "duration": "40 min",
+     "workout_id": "ctr-ride-25",
+     "zone": "RPE 1–4",
+     "tss": 25,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Recovery and Mobility",
+     "duration": "10–15 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Gentle Rolling Hills",
+     "duration": "40 min",
+     "workout_id": "ctr-ride-26",
+     "zone": "RPE 1–5",
+     "tss": 26,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "balance",
+     "kind": "balance",
+     "title": "Balance, Core and Hill Support",
+     "duration": "~20 min"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Endurance Builder",
+     "duration": "55 min",
+     "workout_id": "ctr-ride-27",
+     "zone": "RPE 1–4",
+     "tss": 35,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest",
+     "duration": ""
+    }
+   ]
+  },
+  {
+   "number": 10,
+   "phase": 3,
+   "phase_name": "Extend Your Endurance",
+   "phase_weeks": "Weeks 9–12",
+   "title": "Extend the Ride",
+   "objective": "Become comfortable riding for one hour while continuing to improve cadence and aerobic control.",
+   "start_date": "2026-09-28",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "strength",
+     "kind": "strength",
+     "title": "Cycling Strength",
+     "duration": "~24 min"
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Steady Foundation Ride",
+     "duration": "45 min",
+     "workout_id": "ctr-ride-28",
+     "zone": "RPE 1–4",
+     "tss": 29,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Recovery or Rest",
+     "duration": "~10 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Cadence and Endurance",
+     "duration": "40 min",
+     "workout_id": "ctr-ride-29",
+     "zone": "RPE 1–4",
+     "tss": 25,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "balance",
+     "kind": "balance",
+     "title": "Lower-Body Support and Balance",
+     "duration": "~22 min"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Long Endurance Ride",
+     "duration": "60 min",
+     "workout_id": "ctr-ride-30",
+     "zone": "RPE 1–4",
+     "tss": 36,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest",
+     "duration": ""
+    }
+   ]
+  },
+  {
+   "number": 11,
+   "phase": 3,
+   "phase_name": "Extend Your Endurance",
+   "phase_weeks": "Weeks 9–12",
+   "title": "Ride with Purpose",
+   "objective": "Improve pacing and fatigue management while building toward the longest ride of Phase 3.",
+   "start_date": "2026-10-05",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "strength",
+     "kind": "strength",
+     "title": "Strength for Endurance",
+     "duration": "~25 min"
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Aerobic Endurance Ride",
+     "duration": "45 min",
+     "workout_id": "ctr-ride-31",
+     "zone": "RPE 1–4",
+     "tss": 29,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Recovery Mobility",
+     "duration": "10–15 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Controlled Steady Blocks",
+     "duration": "45 min",
+     "workout_id": "ctr-ride-32",
+     "zone": "RPE 1–5",
+     "tss": 29,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "balance",
+     "kind": "balance",
+     "title": "Balance, Core and Posture",
+     "duration": "~20 min"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Long Endurance Ride",
+     "duration": "70 min",
+     "workout_id": "ctr-ride-33",
+     "zone": "RPE 1–4",
+     "tss": 44,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest",
+     "duration": ""
+    }
+   ]
+  },
+  {
+   "number": 12,
+   "phase": 3,
+   "phase_name": "Extend Your Endurance",
+   "phase_weeks": "Weeks 9–12",
+   "title": "Endurance Reset",
+   "objective": "Reduce training load, reinforce technique and absorb the endurance gains made during Weeks 9–11.",
+   "start_date": "2026-10-12",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "strength",
+     "kind": "mobility",
+     "title": "Light Strength and Mobility",
+     "duration": "~15 min"
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Easy Reset Ride",
+     "duration": "35 min",
+     "workout_id": "ctr-ride-34",
+     "zone": "RPE 1–3",
+     "tss": 16,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Recovery or Complete Rest",
+     "duration": "~10 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Technique and Control",
+     "duration": "40 min",
+     "workout_id": "ctr-ride-35",
+     "zone": "RPE 1–4",
+     "tss": 23,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "balance",
+     "kind": "balance",
+     "title": "Light Balance and Mobility",
+     "duration": "12–15 min"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Comfortable Endurance Ride",
+     "duration": "55 min",
+     "workout_id": "ctr-ride-36",
+     "zone": "RPE 1–3",
+     "tss": 33,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest and Phase Reflection",
+     "duration": ""
+    }
+   ]
+  },
+  {
+   "number": 13,
+   "phase": 4,
+   "phase_name": "Road Ready",
+   "phase_weeks": "Weeks 13–16",
+   "title": "Build Beyond an Hour",
+   "objective": "Become comfortable riding beyond 60 minutes while maintaining controlled pacing and good cycling form.",
+   "start_date": "2026-10-19",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "strength",
+     "kind": "strength",
+     "title": "Cycling Strength and Stability",
+     "duration": "~25 min"
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Steady Foundation Ride",
+     "duration": "45 min",
+     "workout_id": "ctr-ride-37",
+     "zone": "RPE 1–4",
+     "tss": 29,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Recovery and Mobility",
+     "duration": "10–15 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Cadence and Gentle Hills",
+     "duration": "45 min",
+     "workout_id": "ctr-ride-38",
+     "zone": "RPE 1–5",
+     "tss": 28,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "balance",
+     "kind": "balance",
+     "title": "Balance, Core and Cycling Support",
+     "duration": "~20 min"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Long Endurance Ride",
+     "duration": "75 min",
+     "workout_id": "ctr-ride-39",
+     "zone": "RPE 1–4",
+     "tss": 48,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest",
+     "duration": ""
+    }
+   ]
+  },
+  {
+   "number": 14,
+   "phase": 4,
+   "phase_name": "Road Ready",
+   "phase_weeks": "Weeks 13–16",
+   "title": "Endurance Confidence",
+   "objective": "Hold sustainable effort as ride duration increases and complete controlled endurance intervals.",
+   "start_date": "2026-10-26",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "strength",
+     "kind": "strength",
+     "title": "Strength for Endurance",
+     "duration": "~25–28 min"
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Aerobic Endurance Ride",
+     "duration": "50 min",
+     "workout_id": "ctr-ride-40",
+     "zone": "RPE 1–5",
+     "tss": 33,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Recovery or Rest",
+     "duration": "10–15 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Controlled Endurance Intervals",
+     "duration": "45 min",
+     "workout_id": "ctr-ride-41",
+     "zone": "RPE 1–5",
+     "tss": 29,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "balance",
+     "kind": "balance",
+     "title": "Balance, Core and Posture",
+     "duration": "~20–22 min"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Long Endurance Ride",
+     "duration": "80 min",
+     "workout_id": "ctr-ride-42",
+     "zone": "RPE 1–4",
+     "tss": 51,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest",
+     "duration": ""
+    }
+   ]
+  },
+  {
+   "number": 15,
+   "phase": 4,
+   "phase_name": "Road Ready",
+   "phase_weeks": "Weeks 13–16",
+   "title": "Your Strongest Training Week",
+   "objective": "Complete the highest-volume training week while keeping intensity controlled and beginner appropriate. No maximal efforts, sprinting, threshold testing, standing attacks, exhaustion-based training or aggressive climbing.",
+   "start_date": "2026-11-02",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "strength",
+     "kind": "strength",
+     "title": "Controlled Cycling Strength",
+     "duration": "~25 min"
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Steady and Strong",
+     "duration": "50 min",
+     "workout_id": "ctr-ride-43",
+     "zone": "RPE 1–5",
+     "tss": 36,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Recovery and Mobility",
+     "duration": "10–15 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Pacing, Cadence and Hills",
+     "duration": "50 min",
+     "workout_id": "ctr-ride-44",
+     "zone": "RPE 1–5",
+     "tss": 34,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "balance",
+     "kind": "mobility",
+     "title": "Light Activation and Mobility",
+     "duration": "~15 min"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Longest Training Ride",
+     "duration": "90 min",
+     "workout_id": "ctr-ride-45",
+     "zone": "RPE 1–4",
+     "tss": 58,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest",
+     "duration": ""
+    }
+   ]
+  },
+  {
+   "number": 16,
+   "phase": 4,
+   "phase_name": "Road Ready",
+   "phase_weeks": "Weeks 13–16",
+   "title": "From Couch to Road",
+   "objective": "Reduce fatigue, reinforce confidence and complete the final From Couch to Road Achievement Ride. Do not add extra training — arrive at Saturday rested, prepared and confident.",
+   "start_date": "2026-11-09",
+   "days": [
+    {
+     "day_name": "MON",
+     "type": "strength",
+     "kind": "mobility",
+     "title": "Light Mobility and Activation",
+     "duration": "12–15 min"
+    },
+    {
+     "day_name": "TUE",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Confidence Ride",
+     "duration": "40 min",
+     "workout_id": "ctr-ride-46",
+     "zone": "RPE 1–4",
+     "tss": 23,
+     "rest": false
+    },
+    {
+     "day_name": "WED",
+     "type": "recovery",
+     "kind": "recovery",
+     "title": "Recovery or Complete Rest",
+     "duration": "~10 min"
+    },
+    {
+     "day_name": "THU",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "Leg Opener and Skills Ride",
+     "duration": "35 min",
+     "workout_id": "ctr-ride-47",
+     "zone": "RPE 1–4",
+     "tss": 21,
+     "rest": false
+    },
+    {
+     "day_name": "FRI",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Rest or Gentle Mobility",
+     "duration": "5–10 min"
+    },
+    {
+     "day_name": "SAT",
+     "type": "cycling",
+     "kind": "cycling",
+     "title": "From Couch to Road Achievement Ride",
+     "duration": "90 / 75 / 60 min",
+     "workout_id": "ctr-ride-48",
+     "zone": "RPE 1–4",
+     "tss": 58,
+     "rest": false
+    },
+    {
+     "day_name": "SUN",
+     "type": "rest",
+     "kind": "rest",
+     "title": "Complete Rest and Plan Reflection",
+     "duration": ""
+    }
+   ]
+  }
+ ]
+}

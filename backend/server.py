@@ -4,6 +4,7 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import json
+import re
 import asyncio
 import random
 import logging
@@ -1548,141 +1549,105 @@ BUILD_AND_CLIMB = {
 }
 
 
-# From Couch to Road — beginner 16-week plan (assigned to Green Lantern).
-# Ride ids match the frontend `ctrRideId` scheme (ctr-ride-N) so a session opened
-# from the plan or calendar resolves to the same Live Workout timeline.
-COUCH_TO_ROAD_PLAN = {
-    "id": "couch-to-road",
-    "title": "From Couch to Road",
-    "label": "FROM COUCH TO ROAD",
-    "description": "A 16-week beginner plan to build endurance, confidence and cycling skills from your very first ride to a 90-minute achievement ride.",
-    "duration_weeks": 16,
-    "average_days_per_week": 3,
-    "current_week": 1,
-    "start_date": "2026-07-27",
-    "duration_label": "16 Weeks",
-    "average_label": "3 Rides/Week",
-    "phase": {
-        "name": "Get Moving",
-        "weeks": "Weeks 1\u20134",
-        "description": "Become comfortable on the bike, establish a weekly routine and learn safe, controlled endurance cycling.",
-    },
-    "goals": [
-        {"id": "g1", "title": "Ride Three Times a Week", "description": "Build a consistent routine", "status": "incomplete"},
-        {"id": "g2", "title": "Ride 40 Minutes Continuously", "description": "Grow your endurance base", "status": "incomplete"},
-        {"id": "g3", "title": "Smooth Cadence & Pacing", "description": "Control your effort", "status": "incomplete"},
-    ],
-    "phases": [
-        {"id": "p1", "number": 1, "name": "Get Moving", "weeks": "Weeks 1\u20134", "pct": 10, "active": True, "points": [0.12, 0.2, 0.28, 0.35, 0.3, 0.4, 0.45, 0.5]},
-        {"id": "p2", "number": 2, "name": "Build the Foundation", "weeks": "Weeks 5\u20138", "pct": 0, "active": False, "points": [0.2, 0.3, 0.28, 0.42, 0.4, 0.55, 0.5, 0.62]},
-        {"id": "p3", "number": 3, "name": "Extend Your Endurance", "weeks": "Weeks 9\u201312", "pct": 0, "active": False, "points": [0.3, 0.4, 0.5, 0.48, 0.6, 0.65, 0.7, 0.78]},
-        {"id": "p4", "number": 4, "name": "Road Ready", "weeks": "Weeks 13\u201316", "pct": 0, "active": False, "points": [0.4, 0.55, 0.6, 0.7, 0.75, 0.82, 0.9, 1.0]},
-    ],
-    "weekly_load": [55, 70, 90, 65, 100, 115, 130, 90, 120, 140, 160, 110, 150, 170, 195, 120],
-    "you_are_here": 1,
-    "workouts": [
-        {"id": "ctr-ride-1", "title": "Welcome Ride", "icon": "bicycle", "duration": "20 min", "zone": "RPE 2\u20133", "tss": "12 TSS", "footer": "Week 1 \u2022 Tue", "color": "#55C850", "profile": [0.4, 0.5, 0.55, 0.55, 0.5, 0.45]},
-        {"id": "ctr-ride-2", "title": "Pedal Smoothly", "icon": "bicycle", "duration": "25 min", "zone": "RPE 3\u20134", "tss": "15 TSS", "footer": "Week 1 \u2022 Thu", "color": "#40A9C6", "profile": [0.4, 0.5, 0.55, 0.65, 0.5, 0.65, 0.5, 0.45]},
-        {"id": "ctr-ride-3", "title": "First Endurance Ride", "icon": "bicycle", "duration": "30 min", "zone": "RPE 3", "tss": "18 TSS", "footer": "Week 1 \u2022 Sat", "color": "#55C850", "profile": [0.4, 0.5, 0.6, 0.6, 0.6, 0.6, 0.5, 0.45]},
-    ],
-    "adaptation": "Welcome to From Couch to Road. This first week is all about getting comfortable on the bike and finding a calm, repeatable rhythm. Keep every ride easy and conversational \u2014 your endurance will build itself from here.",
-    "adaptation_status": "Beginner plan \u2014 starts 27 July",
-    "week_targets": {"rides": 3, "duration": "1h 15m", "distance_km": 24, "elevation_m": 70, "supplementary": 3},
-    "progress_pct": 2,
-    "progress": {"weeks": "1 / 16", "workouts": "0", "time": "0.0 h", "tss": "0", "ctl": "\u2014", "atl": "\u2014", "tsb": "\u2014"},
-    "tip": "Your smoothest controllable cadence is more important than matching an exact number.",
-    "created_by": "Alberto",
+# From Couch to Road — beginner 16-week plan (assigned to Green Lantern), driven
+# by couch_to_road_plan.json (generated from the frontend plan source) so every
+# week's rides + strength/recovery/balance days are available for progression.
+with open(ROOT_DIR / "couch_to_road_plan.json", encoding="utf-8") as _f:
+    CTR_PLAN = json.load(_f)
+CTR_WEEKS = {w["number"]: w for w in CTR_PLAN["weeks"]}
+_SUPP_KINDS = ("strength", "mobility", "balance", "recovery")
+_RIDE_COLORS = ["#55C850", "#40A9C6", "#55C850"]
+_CTR_PLANNED_TSS = {d["workout_id"]: d.get("tss", 0) for w in CTR_PLAN["weeks"] for d in w["days"] if d.get("kind") == "cycling" and d.get("workout_id")}
+_PHASE_POINTS = {
+    1: [0.12, 0.2, 0.28, 0.35, 0.3, 0.4, 0.45, 0.5],
+    2: [0.2, 0.3, 0.28, 0.42, 0.4, 0.55, 0.5, 0.62],
+    3: [0.3, 0.4, 0.5, 0.48, 0.6, 0.65, 0.7, 0.78],
+    4: [0.4, 0.55, 0.6, 0.7, 0.75, 0.82, 0.9, 1.0],
 }
 
 
-# Map a couch-to-road session (by day type) onto the calendar's day slots.
-_CTR_WEEK1 = [
-    {"day_name": "MON", "focus": "Cycling Strength",
-     "fb50": {"type": "fb50", "title": "Beginner Cycling Strength", "duration": "~15 min", "status": "scheduled", "category": "Strength"}},
-    {"day_name": "TUE", "focus": "Beginner Endurance",
-     "cycling": {"type": "cycling", "title": "Welcome Ride", "workout_id": "ctr-ride-1", "duration": "20 min", "zone": "RPE 2\u20133", "tss": "12 TSS", "status": "today", "color": "green", "created_by": "Alberto"}},
-    {"day_name": "WED", "focus": "Recovery",
-     "wellness": {"type": "wellness", "title": "Recovery and Mobility", "brand": "My Peaceful Companion", "duration": "10 min", "status": "scheduled"}},
-    {"day_name": "THU", "focus": "Cadence Skills",
-     "cycling": {"type": "cycling", "title": "Pedal Smoothly", "workout_id": "ctr-ride-2", "duration": "25 min", "zone": "RPE 3\u20134", "tss": "15 TSS", "status": "planned", "color": "blue", "created_by": "Alberto"}},
-    {"day_name": "FRI", "focus": "Balance & Support",
-     "fb50": {"type": "fb50", "title": "Balance and Cycling Support", "duration": "~15 min", "status": "planned", "category": "Balance"}},
-    {"day_name": "SAT", "focus": "Endurance",
-     "cycling": {"type": "cycling", "title": "First Endurance Ride", "workout_id": "ctr-ride-3", "duration": "30 min", "zone": "RPE 3", "tss": "18 TSS", "status": "planned", "color": "green", "created_by": "Alberto"}},
-    {"day_name": "SUN", "focus": "Rest",
-     "cycling": {"type": "cycling", "title": "Complete Rest", "subtitle": "Recovery Focus", "duration": "", "zone": "", "tss": "", "status": "rest", "color": "purple", "created_by": "Alberto"}},
-]
+def _ctr_today():
+    from datetime import date
+    return date.today()
 
 
-def _ctr_calendar_week() -> dict:
-    """Build a calendar week for the current couch-to-road week (Week 1, starting
-    27 July 2026) mapped onto the calendar's day/slot structure."""
+def _ctr_day_date(week, i):
     from datetime import date, timedelta
-    start = date(2026, 7, 27)
-    days = []
-    for i, spec in enumerate(_CTR_WEEK1):
-        d = start + timedelta(days=i)
-        day = {
-            "date": d.isoformat(),
-            "day_name": spec["day_name"],
-            "day_num": d.strftime("%-d %b").upper(),
-            "focus": spec["focus"],
-            "cycling": dict(spec["cycling"]) if spec.get("cycling") else None,
-            "fb50": dict(spec["fb50"]) if spec.get("fb50") else None,
-            "wellness": dict(spec["wellness"]) if spec.get("wellness") else None,
-            "readiness": {"score": 80, "status": "Good", "source": "Daily check-in", "metrics": [
-                {"key": "energy", "label": "Energy", "value": 80, "display": "Good"},
-                {"key": "soreness", "label": "Soreness", "value": 82, "display": "Low"},
-                {"key": "stress", "label": "Stress", "value": 80, "display": "Low"},
-                {"key": "sleep", "label": "Sleep", "value": 84, "display": "7h 50m"}]},
-        }
-        if i == 1:
-            day["readiness"] = {"score": 78, "status": "Good", "source": "Daily check-in", "metrics": [
-                {"key": "energy", "label": "Energy", "value": 78, "display": "Good"},
-                {"key": "soreness", "label": "Soreness", "value": 80, "display": "Low"},
-                {"key": "stress", "label": "Stress", "value": 76, "display": "Low"},
-                {"key": "sleep", "label": "Sleep", "value": 82, "display": "7h 40m"}]}
-        days.append(day)
-    end = start + timedelta(days=6)
-    return {
-        "id": "ctr-week-1",
-        "start_date": start.isoformat(),
-        "end_date": end.isoformat(),
-        "range_label": f"{start.strftime('%-d')} \u2013 {end.strftime('%-d %b %Y')}",
-        "selected_date": (start + timedelta(days=1)).isoformat(),
-        "days": days,
-        "summary": {"workouts_completed": 0, "workouts_planned": 3, "duration": "1h 15m", "tss": "45", "zones": [
-            {"z": "Z1", "pct": 30, "time": "00:22:00", "color": "green"},
-            {"z": "Z2", "pct": 55, "time": "00:41:00", "color": "greenyellow"},
-            {"z": "Z3", "pct": 15, "time": "00:12:00", "color": "yellow"}]},
-        "tip": "Week 1 is about getting comfortable on the bike. Keep every ride easy and conversational.",
-        "seed_version": 1,
-    }
+    y, m, d = (int(x) for x in week["start_date"].split("-"))
+    return date(y, m, d) + timedelta(days=i)
 
 
-# Planned TSS per From Couch to Road ride id (Week 1 surfaced in plan/calendar).
-_CTR_PLANNED_TSS = {"ctr-ride-1": 12, "ctr-ride-2": 15, "ctr-ride-3": 18}
+def _fmt_dur(minutes):
+    return f"{minutes // 60}h {minutes % 60:02d}m" if minutes >= 60 else f"{minutes} min"
 
 
-async def _ctr_progress() -> dict:
-    """Aggregate completed From Couch to Road rides from ride_history so the plan,
-    calendar and home screens reflect saved workouts, plus a coach auto-adjustment
-    line based on how the most recent ride compared to plan."""
+def _pm(s):
+    mm = re.search(r"\d+", s or "")
+    return int(mm.group()) if mm else 0
+
+
+async def _ctr_completions():
     try:
-        rides = await db.ride_history.find({"workout_id": {"$regex": "^ctr-ride-"}}).sort("created_at", 1).to_list(2000)
+        rides = await db.ride_history.find({"workout_id": {"$regex": "^ctr-ride-"}}).to_list(3000)
     except Exception:
         rides = []
-    completed: dict = {}
-    total_sec = 0
-    total_tss = 0
+    ride_map = {}
     for r in rides:
-        wid = r.get("workout_id")
-        total_sec += int(r.get("duration_sec") or 0)
-        total_tss += int(r.get("tss") or 0)
-        completed[wid] = {"duration_sec": r.get("duration_sec"), "tss": r.get("tss"), "distance_km": r.get("distance_km")}
+        ride_map[r.get("workout_id")] = {"duration_sec": r.get("duration_sec"), "tss": r.get("tss"), "distance_km": r.get("distance_km")}
+    try:
+        supp = await db.supplementary_log.find({}).to_list(3000)
+    except Exception:
+        supp = []
+    supp_dates = {s.get("date") for s in supp if s.get("date")}
+    return ride_map, supp_dates
+
+
+def _ctr_week_complete(week, ride_ids, supp_dates, today):
+    for i, day in enumerate(week["days"]):
+        dt = _ctr_day_date(week, i)
+        kind = day["kind"]
+        if kind == "cycling":
+            if day.get("workout_id") not in ride_ids:
+                return False
+        elif kind == "rest":
+            if dt >= today:   # a rest day only auto-completes once it has passed
+                return False
+        else:                 # strength / mobility / balance / recovery
+            if dt.isoformat() not in supp_dates:
+                return False
+    return True
+
+
+async def _ctr_state():
+    """Return (current_week, ride_map, supp_dates), advancing the plan whenever the
+    current week is fully completed (all rides + all supplementary + past rest days)."""
+    ride_map, supp_dates = await _ctr_completions()
+    ride_ids = set(ride_map.keys())
+    today = _ctr_today()
+    state = await db.plan_state.find_one({"id": "couch-to-road"})
+    cur = int(state["current_week"]) if state and state.get("current_week") else 1
+    cur = max(1, min(cur, CTR_PLAN["duration_weeks"]))
+    changed = state is None
+    while cur < CTR_PLAN["duration_weeks"] and _ctr_week_complete(CTR_WEEKS[cur], ride_ids, supp_dates, today):
+        cur += 1
+        changed = True
+    if changed:
+        await db.plan_state.update_one({"id": "couch-to-road"}, {"$set": {"current_week": cur, "updated_at": now_iso()}}, upsert=True)
+    return cur, ride_map, supp_dates
+
+
+async def _ctr_progress(ride_map=None):
+    if ride_map is None:
+        ride_map, _ = await _ctr_completions()
+    total_sec = sum(int(v.get("duration_sec") or 0) for v in ride_map.values())
+    total_tss = sum(int(v.get("tss") or 0) for v in ride_map.values())
     adj = ""
-    if rides:
-        last = rides[-1]
+    try:
+        recent = await db.ride_history.find({"workout_id": {"$regex": "^ctr-ride-"}}).sort("created_at", -1).to_list(1)
+    except Exception:
+        recent = []
+    if recent:
+        last = recent[0]
         planned = _CTR_PLANNED_TSS.get(last.get("workout_id"))
         actual = int(last.get("tss") or 0)
         if planned and actual:
@@ -1694,7 +1659,126 @@ async def _ctr_progress() -> dict:
                 adj = "Your last ride was right on plan. Keep this steady rhythm going into your next session."
         else:
             adj = "Great work \u2014 I've logged that ride and factored it into your plan."
-    return {"completed": completed, "count": len(completed), "hours": round(total_sec / 3600.0, 1), "tss": total_tss, "auto_adjustment": adj}
+    return {"completed": ride_map, "count": len(ride_map), "hours": round(total_sec / 3600.0, 1), "tss": total_tss, "auto_adjustment": adj}
+
+
+def _ctr_readiness(score=80):
+    return {"score": score, "status": "Good", "source": "Daily check-in", "metrics": [
+        {"key": "energy", "label": "Energy", "value": score, "display": "Good"},
+        {"key": "soreness", "label": "Soreness", "value": min(100, score + 2), "display": "Low"},
+        {"key": "stress", "label": "Stress", "value": score, "display": "Low"},
+        {"key": "sleep", "label": "Sleep", "value": min(100, score + 4), "display": "7h 50m"}]}
+
+
+def _ctr_calendar_week(week, ride_map, supp_dates, today):
+    from datetime import date, timedelta
+    y, m, d = (int(x) for x in week["start_date"].split("-"))
+    start = date(y, m, d)
+    ride_ids = set(ride_map.keys())
+    days = []
+    ci = 0
+    completed_rides = 0
+    for i, day in enumerate(week["days"]):
+        dt = start + timedelta(days=i)
+        entry = {"date": dt.isoformat(), "day_name": day["day_name"], "day_num": dt.strftime("%-d %b").upper(),
+                 "focus": day["title"], "cycling": None, "fb50": None, "wellness": None, "readiness": _ctr_readiness(78 if i == 1 else 80)}
+        kind = day["kind"]
+        if kind == "cycling":
+            done = day.get("workout_id") in ride_ids
+            act = ride_map.get(day.get("workout_id")) or {}
+            status = "completed" if done else ("today" if dt == today else "planned")
+            dur = f"{round(act['duration_sec'] / 60)} min" if done and act.get("duration_sec") else day.get("duration", "")
+            tssv = f"{act['tss']} TSS" if done and act.get("tss") is not None else (f"{day['tss']} TSS" if day.get("tss") else "")
+            entry["cycling"] = {"type": "cycling", "title": day["title"], "workout_id": day.get("workout_id"), "duration": dur,
+                                "zone": day.get("zone", ""), "tss": tssv, "status": status,
+                                "color": "green" if done else _RIDE_COLORS[ci % 3], "created_by": "Alberto"}
+            ci += 1
+            if done:
+                completed_rides += 1
+        elif kind == "rest":
+            done = dt < today
+            entry["cycling"] = {"type": "cycling", "title": day["title"], "subtitle": "Recovery Focus", "duration": "",
+                                "zone": "", "tss": "", "status": "completed" if done else "rest", "color": "purple", "created_by": "Alberto"}
+        elif kind == "recovery":
+            done = dt.isoformat() in supp_dates
+            entry["wellness"] = {"type": "wellness", "title": day["title"], "brand": "My Peaceful Companion",
+                                 "duration": day.get("duration", "10 min"), "status": "completed" if done else "scheduled"}
+        else:
+            done = dt.isoformat() in supp_dates
+            entry["fb50"] = {"type": "fb50", "title": day["title"], "duration": day.get("duration", "~15 min"),
+                             "status": "completed" if done else "planned", "category": kind.capitalize()}
+        days.append(entry)
+    end = start + timedelta(days=6)
+    planned_rides = sum(1 for dd in week["days"] if dd["kind"] == "cycling")
+    sel = today.isoformat() if start <= today <= end else next((dd["date"] for dd in days if dd["cycling"] and dd["cycling"]["status"] in ("today", "planned")), days[1]["date"])
+    return {"id": f"ctr-week-{week['number']}", "start_date": start.isoformat(), "end_date": end.isoformat(),
+            "range_label": f"{start.strftime('%-d')} \u2013 {end.strftime('%-d %b %Y')}", "selected_date": sel, "days": days,
+            "summary": {"workouts_completed": completed_rides, "workouts_planned": planned_rides, "duration": "1h 15m", "tss": "45", "zones": [
+                {"z": "Z1", "pct": 30, "time": "00:22:00", "color": "green"},
+                {"z": "Z2", "pct": 55, "time": "00:41:00", "color": "greenyellow"},
+                {"z": "Z3", "pct": 15, "time": "00:12:00", "color": "yellow"}]},
+            "tip": (week.get("objective") or "")[:140], "seed_version": 2}
+
+
+def _ctr_plan_response(cur, ride_map, prog):
+    week = CTR_WEEKS[cur]
+    ride_ids = set(ride_map.keys())
+    cyc = [d for d in week["days"] if d["kind"] == "cycling"]
+    supp_days = [d for d in week["days"] if d["kind"] in _SUPP_KINDS]
+    total_min = sum(_pm(d.get("duration")) for d in cyc)
+    workouts = []
+    for idx, d in enumerate(cyc):
+        done = d.get("workout_id") in ride_ids
+        act = ride_map.get(d.get("workout_id")) or {}
+        w = {"id": d.get("workout_id"), "title": d["title"], "icon": "bicycle",
+             "duration": (f"{round(act['duration_sec'] / 60)} min" if done and act.get("duration_sec") else d.get("duration", "")),
+             "zone": d.get("zone", ""), "tss": f"{d.get('tss', 0)} TSS",
+             "footer": f"Week {cur} \u2022 {d['day_name'].capitalize()}",
+             "color": _RIDE_COLORS[idx % 3], "profile": [0.4, 0.5, 0.6, 0.6, 0.55, 0.5, 0.5, 0.45]}
+        if done:
+            w["status"] = "completed"
+            w["completed"] = True
+            if act.get("tss") is not None:
+                w["actual_tss"] = f"{act['tss']} TSS"
+            if act.get("duration_sec"):
+                w["actual_duration"] = f"{round(act['duration_sec'] / 60)} min"
+        workouts.append(w)
+    phase_idx = (cur - 1) // 4 + 1
+    week_in_phase = ((cur - 1) % 4) + 1
+    phases = []
+    for p in CTR_PLAN["phases"]:
+        n = p["number"]
+        if n < phase_idx:
+            pct, active = 100, False
+        elif n == phase_idx:
+            pct, active = round((week_in_phase - 1) / 4 * 100), True
+        else:
+            pct, active = 0, False
+        phases.append({"id": f"p{n}", "number": n, "name": p["name"], "weeks": p["weeks_label"], "pct": pct, "active": active, "points": _PHASE_POINTS.get(n, [])})
+    plan = {
+        "id": "couch-to-road", "title": CTR_PLAN["title"], "label": CTR_PLAN["title"].upper(),
+        "description": "A 16-week beginner plan to build endurance, confidence and cycling skills from your very first ride to a 90-minute achievement ride.",
+        "duration_weeks": 16, "average_days_per_week": 3, "current_week": cur, "start_date": CTR_PLAN["start_date"],
+        "duration_label": "16 Weeks", "average_label": "3 Rides/Week",
+        "phase": {"name": week["phase_name"], "weeks": week["phase_weeks"],
+                  "description": next((p["objective"] for p in CTR_PLAN["phases"] if p["number"] == week["phase"]), "")},
+        "goals": [{"id": "g1", "title": "Ride Three Times a Week", "description": "Build a consistent routine", "status": "incomplete"},
+                  {"id": "g2", "title": "Ride 40 Minutes Continuously", "description": "Grow your endurance base", "status": "incomplete"},
+                  {"id": "g3", "title": "Smooth Cadence & Pacing", "description": "Control your effort", "status": "incomplete"}],
+        "phases": phases,
+        "weekly_load": [55, 70, 90, 65, 100, 115, 130, 90, 120, 140, 160, 110, 150, 170, 195, 120],
+        "you_are_here": cur, "workouts": workouts,
+        "adaptation": f"Week {cur} \u2014 {week['title']}. {week['objective']}",
+        "adaptation_status": f"Beginner plan \u2014 week {cur} of 16",
+        "week_targets": {"rides": len(cyc), "duration": _fmt_dur(total_min), "distance_km": round(total_min * 0.34), "elevation_m": 50 + cur * 6, "supplementary": len(supp_days)},
+        "progress": {"weeks": f"{cur} / 16", "workouts": str(prog["count"]), "time": f"{prog['hours']} h", "tss": str(prog["tss"]), "ctl": "\u2014", "atl": "\u2014", "tsb": "\u2014"},
+        "progress_pct": min(100, round(prog["count"] / 48 * 100)),
+        "tip": "Your smoothest controllable cadence is more important than matching an exact number.",
+        "created_by": "Alberto",
+    }
+    if prog["auto_adjustment"]:
+        plan["auto_adjustment"] = prog["auto_adjustment"]
+    return plan
 
 
 @api_router.get("/plan")
@@ -1704,27 +1788,10 @@ async def get_plan(id: str = "build-and-climb"):
     stays on 'Build & Climb'."""
     try:
         rider = await _rider_doc()
-        if (rider.get("name") or "").strip().lower() == "green lantern" or id == COUCH_TO_ROAD_PLAN["id"]:
-            prog = await _ctr_progress()
-            plan = dict(COUCH_TO_ROAD_PLAN)
-            workouts = []
-            for w in plan["workouts"]:
-                w = dict(w)
-                c = prog["completed"].get(w["id"])
-                if c:
-                    w["status"] = "completed"
-                    w["completed"] = True
-                    if c.get("tss") is not None:
-                        w["actual_tss"] = f"{c['tss']} TSS"
-                    if c.get("duration_sec"):
-                        w["actual_duration"] = f"{round(c['duration_sec'] / 60)} min"
-                workouts.append(w)
-            plan["workouts"] = workouts
-            plan["progress"] = {**plan["progress"], "workouts": str(prog["count"]), "time": f"{prog['hours']} h", "tss": str(prog["tss"])}
-            plan["progress_pct"] = min(100, round(prog["count"] / 48 * 100))
-            if prog["auto_adjustment"]:
-                plan["auto_adjustment"] = prog["auto_adjustment"]
-            return plan
+        if (rider.get("name") or "").strip().lower() == "green lantern" or id == "couch-to-road":
+            cur, ride_map, _supp = await _ctr_state()
+            prog = await _ctr_progress(ride_map)
+            return _ctr_plan_response(cur, ride_map, prog)
         doc = await db.training_plans.find_one({"id": id})
         if not doc:
             await db.training_plans.update_one({"id": id}, {"$set": BUILD_AND_CLIMB}, upsert=True)
@@ -2025,27 +2092,8 @@ async def get_calendar_week(start: str = "2025-05-12"):
         rider = await _rider_doc()
         is_ctr = (rider.get("name") or "").strip().lower() == "green lantern"
         if is_ctr:
-            doc = _ctr_calendar_week()
-            prog = await _ctr_progress()
-            for day in doc["days"]:
-                c = day.get("cycling")
-                if c and c.get("workout_id") in prog["completed"]:
-                    act = prog["completed"][c["workout_id"]]
-                    c["status"] = "completed"
-                    c["color"] = "green"
-                    if act.get("tss") is not None:
-                        c["tss"] = f"{act['tss']} TSS"
-                    if act.get("duration_sec"):
-                        c["duration"] = f"{round(act['duration_sec'] / 60)} min"
-            # Reflect completed supplementary (strength/mobility/recovery/balance)
-            # sessions logged against the plan dates.
-            supp = await db.supplementary_log.find({"date": {"$in": [d["date"] for d in doc["days"]]}}).to_list(200)
-            supp_dates = {s.get("date") for s in supp}
-            for day in doc["days"]:
-                if day["date"] in supp_dates:
-                    for slot in ("fb50", "wellness"):
-                        if day.get(slot):
-                            day[slot]["status"] = "completed"
+            cur, ride_map, supp_dates = await _ctr_state()
+            doc = _ctr_calendar_week(CTR_WEEKS[cur], ride_map, supp_dates, _ctr_today())
         else:
             doc = await db.calendar_weeks.find_one({"start_date": start})
             if not doc or doc.get("seed_version") != CALENDAR_WEEK["seed_version"]:
