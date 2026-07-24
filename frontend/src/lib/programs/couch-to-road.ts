@@ -1270,6 +1270,8 @@ export const COUCH_TO_ROAD: Program = {
     { number: 4, name: "Road Ready", weeks: "Weeks 13–16" },
   ],
   phases: [phase1, phase2, phase3, phase4],
+  endMessage:
+    "FROM COUCH TO ROAD — PLAN COMPLETE. Sixteen weeks ago, the goal was simply to begin. You learned how to feel comfortable on the bike, how to pace yourself and how to build a routine that worked for you. Week by week you became stronger, steadier and more confident — managing your effort, controlling your cadence, handling gentle hills, recovering between sessions and riding for longer without rushing. You did not need to ride faster than anyone else or prove anything; you only needed to keep moving forward in a way that was right for you. You have built a strong endurance foundation and shown that consistency, patience and purpose can carry you further than you may have imagined. This is not the end of your cycling journey — it is the beginning of what comes next. Take a moment to recognise how far you have come. You are no longer simply starting; you are riding with confidence, control and experience. Your strongest ride is your own — and this ride belongs to you.",
 };
 
 // The Monday date (YYYY-MM-DD) each plan week begins on, derived from startDate.

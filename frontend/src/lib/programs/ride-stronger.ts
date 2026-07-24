@@ -1066,6 +1066,8 @@ export const RIDE_STRONGER: Program = {
     { number: 3, name: "Goal Ready", weeks: "Weeks 9–12" },
   ],
   phases: [phase1, phase2, phase3],
+  endMessage:
+    "RIDE STRONGER — COMPLETE. You began this plan with a goal that mattered to you. Over twelve weeks you built a stronger aerobic foundation, developed sustainable cycling power and learned to use your fitness with greater control. You practised pacing, cadence, climbing, endurance, hydration, fuelling and recovery — learning when to push, when to hold steady and when to protect your energy. You did not need to ride like anyone else; you trained around your own ability, circumstances and goal. Your progress may show as greater distance, stronger climbing, improved speed, better endurance, more confidence, or simply feeling more capable on the bike. Every completed ride, every modified workout and every moment you chose control over exhaustion contributed to this achievement. Ride Stronger was never about proving you are the strongest rider — it was about becoming a stronger version of the rider you already were. Take time to recognise what you have achieved and decide what your next strongest ride will be. You built strength with purpose. You rode toward a goal that belonged to you. Your strongest ride is your own.",
 };
 
 // Deterministic id for a Ride Stronger cycling session (namespaced `rs-ride-N`).
