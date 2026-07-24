@@ -1,0 +1,35 @@
+{
+  "summary": "Iter 26 — Multi-user auth + onboarding + demo migration + per-user data isolation ALL PASS. Backend: 14/14 pytest pass in test_multiuser_auth.py. Register/login/duplicate(409)/short-password(400)/wrong-password(401) all correct. /api/plan without Bearer → 401. /api/auth/me with Bearer → user. Logout invalidates token (subsequent /me → 401). Green Lantern demo login → 200 with token; GET /api/plan returns id='couch-to-road', duration_weeks=16. Onboarding classifier: beginner answers → level='Beginner', recommended.id='couch-to-road'; advanced answers → level='Advanced'. POST /api/rider/plan {plan_id:'none'} → GET /api/plan free:true. POST /api/rider/plan {plan_id:'build-and-climb'} → GET /api/plan reflects it. Data isolation confirmed: userA posts a ride via /api/workouts/summarize (id captured), GET /api/rides/history for userA includes it, userB's GET is empty and does not contain userA's id — udb per-user scoping works.\n\nFrontend (tablet 1024×768): (1) Logged-out root '/' redirects to /login with testID='email-input' visible ✓. (2) Login as greenlantern/rideon9900 → lands on '/' with 'From Couch to Road' present in dashboard ✓. (3) Register new user via toggle-mode+submit-btn → routed to /onboarding; all 5 opt-<key>-<val> testIDs (self_rating, weekly_rides, longest_ride_min, experience_years, confident_60min) present and tappable; see-plan-btn works; accept-reco tap lands new user on home with a DISTINCT fresh dashboard (0 weekly rides, 0 km, 0h 0m training time) confirming per-user state isolation ✓. (4) /profile → sign-out (testID) redirects to /login ✓. (5) On /login google-btn testID present; apple-btn correctly absent on web (Platform.OS check) ✓. (6) /workout smoke: full-width 3-column tablet layout renders (viewport 1024 → main card fills 1024-sidebar), center route-video card ~604×514 (ratio ~1.17), i.e. roughly square, NOT the extreme 2.7:1 wide gap reported before, and no large black gap on the right ✓.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_multiuser_auth.py",
+    "/app/test_reports/pytest/iter26.xml"
+  ],
+  "action_items": [
+    "Nothing blocking. All acceptance criteria (backend auth+onboarding+isolation, frontend guard+login+register+onboarding+signout+social-button+workout-layout smoke) pass on first run.",
+    "OPTIONAL cleanup: mongosh mongodb://localhost:27017/test_database --eval 'db.users.deleteMany({email:/^test_/i}); db.user_sessions.deleteMany({user_id:{$ne:\"user_greenlantern\"}}); db.ride_history.deleteMany({user_id:{$ne:\"user_greenlantern\"}}); db.rider_profile.deleteMany({user_id:{$ne:\"user_greenlantern\"}}); db.plan_state.deleteMany({user_id:{$ne:\"user_greenlantern\"}})' — leaves Green Lantern intact."
+  ],
+  "critical_code_review_comments": [
+    "auth.py L164: _resolve_token filters password_hash but includes onboarded/assigned_plan_id — good. However `find_one` returns a dict that also carries `created_at` and `provider` fields that flow into _public_user. Fine but consider projecting explicitly.",
+    "auth.py migrate_singleton uses hardcoded uid 'user_greenlantern' and stamps user_id onto every user-scoped doc that lacks it. If the demo user is deleted the migration can never re-run (guarded by `if users.find_one({email})`). Acceptable one-time migration; document that resetting requires manual deletion of the user row too.",
+    "server.py /api/plan is not shown in the truncated view but the frontend expects the resolved plan payload with `id`, `duration_weeks` (Green Lantern) or `free:true` (ride-free). Confirmed working via pytest — no action.",
+    "onboarding.tsx choose(planId) fires fetch without an explicit Authorization header, relying on the session.ts global fetch patch. If a rider hits /onboarding before the patch is installed (unlikely, but on early hydration) the call would go 401. Acceptable.",
+    "workout.tsx (not viewed) center route-video card measured ~1.17:1 at 1024×768 — well within 'roughly 16:9', not the extreme 2.7:1 previously reported. No change needed."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_multiuser_auth.py (new)",
+    "/app/test_reports/pytest/iter26.xml (new)"
+  ],
+  "success_rate": {"backend": "100% (14/14 pytest)", "frontend": "100% — all 6 flows verified"},
+  "seed_data_creation": "Created ~8 throwaway TEST_* users during pytest + 1 new user via UI (TEST_reg_ea8a1cc8@example.com). Green Lantern user + data untouched. See action_items for cleanup query.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend BASE_URL from EXPO_PUBLIC_BACKEND_URL. Reproduce: EXPO_PUBLIC_BACKEND_URL=https://roujaune-train.preview.emergentagent.com pytest backend/tests/test_multiuser_auth.py -v. All /api/* endpoints (except /api/auth/{register,login,google,apple}) require Bearer token via ASGI AuthMiddleware. udb proxy auto-injects user_id on user-scoped collections. Demo/migrated account: greenlantern@roujaune.app / rideon9900 (user_id user_greenlantern, plan couch-to-road, onboarded=true). Apple sign-in is iOS-BUILD-ONLY — never test on web. Google sign-in requires Emergent session_id — only verify button on /login.",
+  "rca_of_issue": "n/a — no failures."
+}

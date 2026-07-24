@@ -441,7 +441,7 @@ export default function LiveWorkout() {
   // fill the full screen width (no side letterboxing), Y to fit the height so it
   // always stays on one screen. Phones keep scrolling.
   const tablet = !compact;
-  const fitScaleX = tablet && availW > 0 ? Math.max(0.4, Math.min(2.2, availW / DESIGN_W)) : 1;
+  const fitScaleX = tablet && availW > 0 ? Math.max(0.4, Math.min(4.0, availW / DESIGN_W)) : 1;
   const fitScaleY = tablet && contentH > 0 && availH > 0 ? Math.max(0.4, Math.min(2.2, availH / contentH)) : 1;
   // The design is scaled non-uniformly (X fills width, Y fits height), which
   // would stretch the 16:9 route video horizontally. Counter-stretch the video's
@@ -449,7 +449,7 @@ export default function LiveWorkout() {
   const videoAspect = React.useMemo(() => {
     if (!tablet || fitScaleY <= 0) return 16 / 9;
     const stretch = fitScaleX / fitScaleY;
-    return Math.max(0.95, Math.min(16 / 9, (16 / 9) / stretch));
+    return Math.max(0.85, Math.min(16 / 9, (16 / 9) / stretch));
   }, [tablet, fitScaleX, fitScaleY]);
   const videoHeight = Math.round(centerW / videoAspect);
 

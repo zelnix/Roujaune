@@ -11,6 +11,7 @@ import { useSettings } from "@/src/lib/settings";
 import { useCoach } from "@/src/lib/coach-persona";
 import { useRiderProfile, useRiderAchievements, RiderProfile } from "@/src/lib/rider-profile";
 import { LEVEL_META, CAPABILITY_TO_LEVEL } from "@/src/lib/workout-catalog";
+import { useAuth } from "@/src/lib/auth-context";
 
 const riderImg = require("../assets/images/hero_cyclist_b2.jpg");
 
@@ -41,6 +42,7 @@ export default function ProfileScreen() {
   const { settings, setSetting } = useSettings();
   const persona = useCoach();
   const { profile, avatar, update, setAvatar } = useRiderProfile();
+  const { user, signOut } = useAuth();
   const achievements = useRiderAchievements() ?? ACHIEVEMENTS;
   const { width } = useWindowDimensions();
   const twoCol = width >= 900;
@@ -97,6 +99,7 @@ export default function ProfileScreen() {
             <View style={{ flex: 1 }}>
               <Text style={s.name}>{profile.name}</Text>
               <Text style={s.org}>Roujaune · Harmony Wellness Group</Text>
+              {user?.email ? <Text style={s.acctEmail}>{user.email} · {user.provider}</Text> : null}
               {locationText ? (
                 <View style={s.locRow}>
                   <Ionicons name="location" size={13} color={CC.yellow} />
@@ -117,6 +120,10 @@ export default function ProfileScreen() {
             <Pressable testID="edit-profile" onPress={() => setEditing(true)} style={({ hovered }: any) => [s.editBtn, hovered && s.hover]}>
               <Ionicons name="create-outline" size={15} color={CC.white} />
               <Text style={s.editText}>Edit</Text>
+            </Pressable>
+            <Pressable testID="sign-out" onPress={signOut} style={({ hovered }: any) => [s.signOutBtn, hovered && s.hover]}>
+              <Ionicons name="log-out-outline" size={15} color={CC.red ?? "#E01E2B"} />
+              <Text style={s.signOutText}>Sign out</Text>
             </Pressable>
           </View>
 
@@ -306,6 +313,9 @@ const s = StyleSheet.create({
   editBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: CC.border, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: "rgba(255,255,255,0.04)" },
   hover: { borderColor: "rgba(255,255,255,0.3)" },
   editText: { color: CC.white, fontSize: 13, fontWeight: "700" },
+  acctEmail: { color: CC.dim, fontSize: 12, marginTop: 3 },
+  signOutBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "rgba(224,30,43,0.4)", borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: "rgba(224,30,43,0.08)", marginLeft: 8 },
+  signOutText: { color: "#E01E2B", fontSize: 13, fontWeight: "700" },
 
   statsRow: { flexDirection: "row", gap: 12, marginTop: 18, borderTopWidth: 1, borderTopColor: CC.borderSoft, paddingTop: 16 },
   stat: { flex: 1 },

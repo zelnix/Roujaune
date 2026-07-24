@@ -18,6 +18,8 @@ from readiness import compute_readiness
 from rider_level import compute_rider_level
 import plans_admin
 import companion_plan
+import auth
+from auth import udb
 
 
 ROOT_DIR = Path(__file__).parent
@@ -27,6 +29,7 @@ load_dotenv(ROOT_DIR / '.env')
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
+auth.init(db)
 
 # Outdoor ride syncing (imported AFTER load_dotenv so provider/env config resolves)
 import providers as _providers_pkg  # noqa: E402  (bootstraps the provider registry)
@@ -35,7 +38,6 @@ from providers.sandbox import generate_sandbox_activities  # noqa: E402
 import crypto_util  # noqa: E402
 import activity_sync  # noqa: E402
 
-CYCLING_USER_ID = "me"  # single-user app
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -102,13 +104,13 @@ async def get_status_checks():
 @api_router.post("/workouts/start", response_model=WorkoutSession)
 async def start_workout(body: WorkoutStart):
     session = WorkoutSession(workout=body.workout, route=body.route)
-    await db.workout_sessions.insert_one(session.dict())
+    await udb.workout_sessions.insert_one(session.dict())
     return session
 
 
 @api_router.get("/workouts/{session_id}", response_model=WorkoutSession)
 async def get_workout(session_id: str):
-    doc = await db.workout_sessions.find_one({"id": session_id})
+    doc = await udb.workout_sessions.find_one({"id": session_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Session not found")
     doc.pop("_id", None)
@@ -117,7 +119,7 @@ async def get_workout(session_id: str):
 
 @api_router.get("/workouts", response_model=List[WorkoutSession])
 async def list_workouts():
-    rows = await db.workout_sessions.find().sort("started_at", -1).to_list(50)
+    rows = await udb.workout_sessions.find().sort("started_at", -1).to_list(50)
     for r in rows:
         r.pop("_id", None)
     return [WorkoutSession(**r) for r in rows]
@@ -125,10 +127,10 @@ async def list_workouts():
 
 @api_router.post("/workouts/{session_id}/end", response_model=WorkoutSession)
 async def end_workout(session_id: str, summary: WorkoutSummary):
-    doc = await db.workout_sessions.find_one({"id": session_id})
+    doc = await udb.workout_sessions.find_one({"id": session_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Session not found")
-    await db.workout_sessions.update_one(
+    await udb.workout_sessions.update_one(
         {"id": session_id},
         {"$set": {"status": "ended", "ended_at": now_iso(), "summary": summary.dict()}},
     )
@@ -400,7 +402,7 @@ async def _save_ride_history(body: SummarizeRequest, result: dict) -> Optional[s
             "computed": result.get("computed", False),
             "debrief": None,
         }
-        await db.ride_history.insert_one(doc)
+        await udb.ride_history.insert_one(doc)
         return rid
     except Exception as e:  # never block the summary on history write
         logger.warning(f"ride_history insert failed: {e}")
@@ -409,7 +411,7 @@ async def _save_ride_history(body: SummarizeRequest, result: dict) -> Optional[s
 
 @api_router.get("/rides/history")
 async def ride_history(limit: int = 20):
-    docs = await db.ride_history.find().sort("created_at", -1).to_list(length=limit)
+    docs = await udb.ride_history.find().sort("created_at", -1).to_list(length=limit)
     for d in docs:
         d.pop("_id", None)
     return docs
@@ -418,7 +420,7 @@ async def ride_history(limit: int = 20):
 # ----------------------- Outdoor ride syncing (connections) -----------------------
 async def _rider_ftp() -> int:
     try:
-        s = await db.settings.find_one({"id": "app"})
+        s = await udb.settings.find_one({"id": "app"})
         if s and s.get("ftp"):
             return int(s["ftp"])
     except Exception:
@@ -452,11 +454,11 @@ async def _account_view(provider_id: str, acc: Optional[dict]) -> dict:
 @api_router.get("/connections")
 async def list_connections():
     """All supported providers with the rider's connection + sync status."""
-    accounts = {a["provider"]: a for a in await db.connected_accounts.find({"user_id": CYCLING_USER_ID}).to_list(length=50)}
+    accounts = {a["provider"]: a for a in await udb.connected_accounts.find({"user_id": auth.current_user_id()}).to_list(length=50)}
     out = []
     for pid in PROVIDERS:
         out.append(await _account_view(pid, accounts.get(pid)))
-    imported = await db.cycling_activities.count_documents({"user_id": CYCLING_USER_ID})
+    imported = await udb.cycling_activities.count_documents({"user_id": auth.current_user_id()})
     return {"providers": out, "encryption_ready": crypto_util.encryption_ready(), "imported_activities": imported}
 
 
@@ -504,7 +506,7 @@ async def connection_callback(provider_id: str, body: dict):
         await db.oauth_pending.delete_one({"state": body["state"]})
     expiry = int(datetime.now(timezone.utc).timestamp()) + int(tok.get("expires_in", 3600))
     acc = {
-        "id": str(uuid.uuid4()), "user_id": CYCLING_USER_ID, "provider": provider_id,
+        "id": str(uuid.uuid4()), "user_id": auth.current_user_id(), "provider": provider_id,
         "provider_account_id": tok.get("provider_account_id"),
         "access_token_encrypted": crypto_util.encrypt_token(tok.get("access_token")),
         "refresh_token_encrypted": crypto_util.encrypt_token(tok.get("refresh_token")),
@@ -514,8 +516,8 @@ async def connection_callback(provider_id: str, body: dict):
         "created_at": now_iso(), "updated_at": now_iso(),
         "last_successful_sync_at": None, "last_sync_attempt_at": None,
     }
-    await db.connected_accounts.update_one(
-        {"user_id": CYCLING_USER_ID, "provider": provider_id}, {"$set": acc}, upsert=True)
+    await udb.connected_accounts.update_one(
+        {"user_id": auth.current_user_id(), "provider": provider_id}, {"$set": acc}, upsert=True)
     result = await _run_sync(provider_id, initial=True)
     return {"connected": True, "sync": result}
 
@@ -523,10 +525,10 @@ async def connection_callback(provider_id: str, body: dict):
 async def _run_sync(provider_id: str, initial: bool = False) -> dict:
     """Incremental (or initial historical) sync for a connected provider."""
     p = get_provider(provider_id)
-    acc = await db.connected_accounts.find_one({"user_id": CYCLING_USER_ID, "provider": provider_id})
+    acc = await udb.connected_accounts.find_one({"user_id": auth.current_user_id(), "provider": provider_id})
     if not p or not acc:
         raise HTTPException(400, "Not connected")
-    await db.connected_accounts.update_one({"id": acc["id"]}, {"$set": {"connection_status": "syncing", "last_sync_attempt_at": now_iso()}})
+    await udb.connected_accounts.update_one({"id": acc["id"]}, {"$set": {"connection_status": "syncing", "last_sync_attempt_at": now_iso()}})
     now = int(datetime.now(timezone.utc).timestamp())
     since = acc.get("sync_cursor") or (now - 86400 * (90 if initial else 30))
     access = crypto_util.decrypt_token(acc.get("access_token_encrypted"))
@@ -536,13 +538,13 @@ async def _run_sync(provider_id: str, initial: bool = False) -> dict:
             rt = crypto_util.decrypt_token(acc["refresh_token_encrypted"])
             newtok = await p.refresh(rt)
             access = newtok["access_token"]
-            await db.connected_accounts.update_one({"id": acc["id"]}, {"$set": {
+            await udb.connected_accounts.update_one({"id": acc["id"]}, {"$set": {
                 "access_token_encrypted": crypto_util.encrypt_token(newtok["access_token"]),
                 "refresh_token_encrypted": crypto_util.encrypt_token(newtok.get("refresh_token")),
                 "token_expiry": now + int(newtok.get("expires_in", 3600))}})
         except Exception as e:
             logging.warning(f"token refresh failed: {e}")
-            await db.connected_accounts.update_one({"id": acc["id"]}, {"$set": {"connection_status": "reauth_required", "last_error": "Reauthorisation required"}})
+            await udb.connected_accounts.update_one({"id": acc["id"]}, {"$set": {"connection_status": "reauth_required", "last_error": "Reauthorisation required"}})
             return {"status": "reauth_required"}
     # fetch with simple retry/backoff
     ftp = await _rider_ftp()
@@ -556,11 +558,11 @@ async def _run_sync(provider_id: str, initial: bool = False) -> dict:
             err = str(e)
             await asyncio.sleep(0.5 * (2 ** attempt))
     if err is not None:
-        await db.connected_accounts.update_one({"id": acc["id"]}, {"$set": {"connection_status": "sync_failed", "last_error": err[:200]}})
+        await udb.connected_accounts.update_one({"id": acc["id"]}, {"$set": {"connection_status": "sync_failed", "last_error": err[:200]}})
         return {"status": "sync_failed", "error": err[:200]}
     summary = await activity_sync.ingest_activities(
-        db, CYCLING_USER_ID, [dict(a) for a in activities], ftp, disable_route=acc.get("disable_route_import", False))
-    await db.connected_accounts.update_one({"id": acc["id"]}, {"$set": {
+        db, auth.current_user_id(), [dict(a) for a in activities], ftp, disable_route=acc.get("disable_route_import", False))
+    await udb.connected_accounts.update_one({"id": acc["id"]}, {"$set": {
         "connection_status": "connected", "sync_cursor": now,
         "last_successful_sync_at": now_iso(), "last_error": None}})
     return {"status": "connected", **summary}
@@ -573,13 +575,13 @@ async def connection_sync(provider_id: str):
 
 @api_router.post("/connections/{provider_id}/disconnect")
 async def connection_disconnect(provider_id: str):
-    await db.connected_accounts.delete_one({"user_id": CYCLING_USER_ID, "provider": provider_id})
+    await udb.connected_accounts.delete_one({"user_id": auth.current_user_id(), "provider": provider_id})
     return {"disconnected": True}
 
 
 @api_router.delete("/connections/{provider_id}/data")
 async def connection_delete_data(provider_id: str):
-    return await activity_sync.delete_imported(db, CYCLING_USER_ID, provider_id)
+    return await activity_sync.delete_imported(db, auth.current_user_id(), provider_id)
 
 
 @api_router.patch("/connections/{provider_id}/settings")
@@ -590,14 +592,14 @@ async def connection_settings(provider_id: str, body: dict):
             patch[k] = bool(body[k])
     if patch:
         patch["updated_at"] = now_iso()
-        await db.connected_accounts.update_one({"user_id": CYCLING_USER_ID, "provider": provider_id}, {"$set": patch})
-    acc = await db.connected_accounts.find_one({"user_id": CYCLING_USER_ID, "provider": provider_id})
+        await udb.connected_accounts.update_one({"user_id": auth.current_user_id(), "provider": provider_id}, {"$set": patch})
+    acc = await udb.connected_accounts.find_one({"user_id": auth.current_user_id(), "provider": provider_id})
     return await _account_view(provider_id, acc)
 
 
 @api_router.get("/connections/activities")
 async def imported_activities(limit: int = 50):
-    docs = await db.cycling_activities.find({"user_id": CYCLING_USER_ID}).sort("started_at", -1).to_list(length=limit)
+    docs = await udb.cycling_activities.find({"user_id": auth.current_user_id()}).sort("started_at", -1).to_list(length=limit)
     for d in docs:
         d.pop("_id", None)
         d.pop("route_data", None)  # keep the list response lightweight
@@ -609,7 +611,7 @@ async def sandbox_import(count: int = 3):
     """TEST-ONLY: run the import pipeline with demo outdoor rides (no live provider)."""
     ftp = await _rider_ftp()
     acts = [dict(a) for a in generate_sandbox_activities(count)]
-    summary = await activity_sync.ingest_activities(db, CYCLING_USER_ID, acts, ftp)
+    summary = await activity_sync.ingest_activities(db, auth.current_user_id(), acts, ftp)
     return {"sandbox": True, **summary}
 
 
@@ -752,7 +754,7 @@ async def coach_debrief(req: CoachDebriefRequest):
     cache_key = f"debrief_{req.coach_name.lower()}"
     if req.ride_id:
         try:
-            doc = await db.ride_history.find_one({"id": req.ride_id})
+            doc = await udb.ride_history.find_one({"id": req.ride_id})
             if doc and doc.get(cache_key):
                 return {"debrief": doc[cache_key], "cached": True}
         except Exception:
@@ -798,7 +800,7 @@ async def coach_debrief(req: CoachDebriefRequest):
         # Cache it against the ride so revisits don't re-generate (or re-charge).
         if req.ride_id:
             try:
-                await db.ride_history.update_one({"id": req.ride_id}, {"$set": {cache_key: text}})
+                await udb.ride_history.update_one({"id": req.ride_id}, {"$set": {cache_key: text}})
             except Exception:
                 logging.warning("debrief cache write failed")
         # A completed ride makes the plan react: refresh the coach's adaptation
@@ -832,10 +834,10 @@ class RiderProfileUpdate(BaseModel):
 
 
 async def _rider_doc() -> dict:
-    doc = await db.rider_profile.find_one({"id": "me"})
+    doc = await udb.rider_profile.find_one({"id": "me"})
     if not doc:
         doc = dict(RIDER_DEFAULT)
-        await db.rider_profile.insert_one(dict(doc))
+        await udb.rider_profile.insert_one(dict(doc))
     doc.pop("_id", None)
     doc.setdefault("capability", "intermediate")
     return doc
@@ -875,27 +877,88 @@ async def get_rider_plan():
 
 @api_router.post("/rider/plan")
 async def assign_rider_plan(req: AssignPlanRequest):
-    """Switch which plan the current rider is on. Validates the plan exists in the
-    `plans` collection and persists the choice on the rider profile."""
-    plan = await plans_admin.get_plan_def(req.plan_id)
-    if not plan:
-        raise HTTPException(status_code=404, detail="Plan not found")
-    await db.rider_profile.update_one(
+    """Switch which plan the current rider is on. `plan_id` may be "none" to ride
+    free (no plan). Otherwise validated against the `plans` collection."""
+    title = "Free Riding"
+    if req.plan_id and req.plan_id != "none":
+        plan = await plans_admin.get_plan_def(req.plan_id)
+        if not plan:
+            raise HTTPException(status_code=404, detail="Plan not found")
+        title = plan.get("title")
+    await udb.rider_profile.update_one(
         {"id": "me"}, {"$set": {"id": "me", "assigned_plan_id": req.plan_id}}, upsert=True,
     )
+    await auth._db.users.update_one(
+        {"user_id": auth.current_user_id()},
+        {"$set": {"onboarded": True, "assigned_plan_id": req.plan_id}},
+    )
     if req.reset_progress and req.plan_id == "couch-to-road":
-        await db.plan_state.update_one(
+        await udb.plan_state.update_one(
             {"id": "couch-to-road"},
             {"$set": {"current_week": 1}, "$unset": {"eased_weeks": ""}},
             upsert=True,
         )
-    return {"active_plan_id": req.plan_id, "title": plan.get("title")}
+    return {"active_plan_id": req.plan_id, "title": title}
+
+
+# Which plan is the sensible default for each rider level. Falls back gracefully
+# until intermediate/advanced plans are authored in the admin project.
+LEVEL_PLAN = {"Beginner": "couch-to-road", "Intermediate": "build-and-climb", "Advanced": "build-and-climb"}
+
+
+async def _plan_for_level(level: str):
+    """Prefer a plan tagged with this level; else the LEVEL_PLAN default; else None."""
+    doc = await plans_admin._db.plans.find_one({"level": level})
+    if doc:
+        return {"id": doc["id"], "title": doc.get("title"), "authored": True}
+    pid = LEVEL_PLAN.get(level)
+    if pid:
+        p = await plans_admin.get_plan_def(pid)
+        if p:
+            # A generic default is offered when no plan is authored for this level yet.
+            authored = (p.get("level") == level)
+            return {"id": pid, "title": p.get("title"), "authored": authored}
+    return None
+
+
+class OnboardingReq(BaseModel):
+    experience_years: float = 0
+    weekly_rides: int = 0
+    longest_ride_min: int = 0
+    confident_60min: bool = False
+    self_rating: str = "new"        # new | some | confident
+    goal: str | None = None
+
+
+def _classify_level(r: "OnboardingReq") -> str:
+    """Lightweight onboarding classifier (no ride telemetry yet)."""
+    score = 0
+    score += min(3, r.experience_years / 2)          # up to 3 (6+ yrs)
+    score += min(3, r.weekly_rides)                   # up to 3
+    score += min(3, r.longest_ride_min / 45)          # up to 3 (~135min)
+    score += 1.5 if r.confident_60min else 0
+    score += {"new": 0, "some": 1.5, "confident": 3}.get(r.self_rating, 0)
+    if score >= 8:
+        return "Advanced"
+    if score >= 4:
+        return "Intermediate"
+    return "Beginner"
+
+
+@api_router.post("/onboarding/recommend")
+async def onboarding_recommend(req: OnboardingReq):
+    """Classify the rider's level from onboarding answers and recommend the default
+    plan for that level. The rider can accept it, pick another, or ride free."""
+    level = _classify_level(req)
+    recommended = await _plan_for_level(level)
+    plans = await plans_admin.list_plans()
+    return {"level": level, "recommended": recommended, "plans": plans, "allow_free": True}
 
 
 @api_router.put("/rider/profile")
 async def update_rider_profile(req: RiderProfileUpdate):
     upd = {k: v for k, v in req.dict().items() if v is not None}
-    await db.rider_profile.update_one({"id": "me"}, {"$set": {**upd, "id": "me"}}, upsert=True)
+    await udb.rider_profile.update_one({"id": "me"}, {"$set": {**upd, "id": "me"}}, upsert=True)
     return await _rider_doc()
 
 
@@ -947,7 +1010,7 @@ async def get_rider_season(days: int = 0):
     if days and days > 0:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
         query = {"created_at": {"$gte": cutoff}}
-    rides = await db.ride_history.find(query).to_list(length=5000)
+    rides = await udb.ride_history.find(query).to_list(length=5000)
     count = len(rides)
     dist = sum((r.get("distance_km") or 0) for r in rides)
     elev = sum((r.get("elevation_m") or 0) for r in rides)
@@ -969,7 +1032,7 @@ async def get_rider_season(days: int = 0):
     outdoor = [r for r in rides if r.get("indoor_outdoor") == "outdoor"]
     indoor = [r for r in rides if r.get("indoor_outdoor") != "outdoor"]
     try:
-        supplementary = await db.supplementary_log.count_documents(query)
+        supplementary = await udb.supplementary_log.count_documents(query)
     except Exception:
         supplementary = 0
     return {
@@ -995,19 +1058,19 @@ async def complete_supplementary(body: SupplementaryLog):
     """Toggle a completed non-cycling session (strength/mobility/recovery/balance)
     for a given date so the home 'Supplementary Training' actual and the calendar
     both reflect it. Posting the same date+kind again un-marks it."""
-    existing = await db.supplementary_log.find_one({"date": body.date, "kind": body.kind}) if body.date else None
+    existing = await udb.supplementary_log.find_one({"date": body.date, "kind": body.kind}) if body.date else None
     if existing:
-        await db.supplementary_log.delete_one({"_id": existing["_id"]})
+        await udb.supplementary_log.delete_one({"_id": existing["_id"]})
         return {"ok": True, "completed": False}
     doc = {"id": str(uuid.uuid4()), "created_at": now_iso(), "kind": body.kind, "title": body.title, "date": body.date}
-    await db.supplementary_log.insert_one(doc)
+    await udb.supplementary_log.insert_one(doc)
     return {"ok": True, "completed": True}
 
 
 @api_router.get("/rider/achievements")
 async def get_rider_achievements():
     """Compute unlocked achievement badges from the rider's real ride history."""
-    rides = await db.ride_history.find().to_list(length=5000)
+    rides = await udb.ride_history.find().to_list(length=5000)
     if not rides:
         return {"achievements": []}
     total_dist = sum((r.get("distance_km") or 0) for r in rides)
@@ -1048,7 +1111,7 @@ async def _enrich_activity(payload: dict) -> dict:
     if not out.get("activity"):
         try:
             now = datetime.now(timezone.utc)
-            rides = await db.ride_history.find().to_list(length=5000)
+            rides = await udb.ride_history.find().to_list(length=5000)
             def tss_since(days):
                 cutoff = (now - timedelta(days=days)).isoformat()
                 return sum((r.get("tss") or 0) for r in rides if str(r.get("created_at")) >= cutoff)
@@ -1127,8 +1190,8 @@ async def rider_checkin(payload: dict):
         "at": now_iso(),
     }
     try:
-        await db.daily_checkins.update_one({"id": "latest"}, {"$set": {**doc, "id": "latest"}}, upsert=True)
-        await db.daily_checkins.update_one({"id": d}, {"$set": {**doc, "id": d}}, upsert=True)
+        await udb.daily_checkins.update_one({"id": "latest"}, {"$set": {**doc, "id": "latest"}}, upsert=True)
+        await udb.daily_checkins.update_one({"id": d}, {"$set": {**doc, "id": d}}, upsert=True)
     except Exception:
         logging.warning("checkin persist failed")
     return {**result, "date": d}
@@ -1137,7 +1200,7 @@ async def rider_checkin(payload: dict):
 @api_router.get("/rider/readiness/today")
 async def rider_readiness_today():
     """Return the latest stored daily check-in readiness (or unavailable)."""
-    doc = await db.daily_checkins.find_one({"id": "latest"})
+    doc = await udb.daily_checkins.find_one({"id": "latest"})
     if not doc:
         return {"available": False}
     doc.pop("_id", None)
@@ -1155,7 +1218,7 @@ async def _build_rider_context(plan_id: str = "build-and-climb") -> str:
     if rl:
         lines.append(rl)
     try:
-        plan = await db.training_plans.find_one({"id": plan_id})
+        plan = await udb.training_plans.find_one({"id": plan_id})
         if not plan:
             plan = dict(BUILD_AND_CLIMB)
         phase = plan.get("phase", {})
@@ -1176,7 +1239,7 @@ async def _build_rider_context(plan_id: str = "build-and-climb") -> str:
         logging.warning("rider context: plan lookup failed")
 
     try:
-        ride = await db.ride_history.find().sort("created_at", -1).to_list(length=1)
+        ride = await udb.ride_history.find().sort("created_at", -1).to_list(length=1)
         if ride:
             r = ride[0]
             mins = (r.get("duration_sec") or 0) // 60
@@ -1217,13 +1280,13 @@ class CoachChatRequest(BaseModel):
 @api_router.get("/coach/chat/history")
 async def coach_chat_history(coach_name: str = "Alberto"):
     """Return the rider's saved conversation with the given coach (per-coach thread)."""
-    doc = await db.coach_chats.find_one({"id": _chat_id(coach_name)})
+    doc = await udb.coach_chats.find_one({"id": _chat_id(coach_name)})
     return {"messages": (doc or {}).get("messages", [])}
 
 
 @api_router.delete("/coach/chat/history")
 async def clear_coach_chat_history(coach_name: str = "Alberto"):
-    await db.coach_chats.update_one(
+    await udb.coach_chats.update_one(
         {"id": _chat_id(coach_name)}, {"$set": {"messages": []}}, upsert=True
     )
     return {"ok": True}
@@ -1240,7 +1303,7 @@ async def coach_chat(req: CoachChatRequest):
         raise HTTPException(status_code=400, detail="Empty message")
 
     cid = _chat_id(req.coach_name)
-    doc = await db.coach_chats.find_one({"id": cid})
+    doc = await udb.coach_chats.find_one({"id": cid})
     history = (doc or {}).get("messages", [])
 
     rider_ctx = await _build_rider_context()
@@ -1254,7 +1317,7 @@ async def coach_chat(req: CoachChatRequest):
             plan_id = await _active_plan_id()
             plan_def = await plans_admin.get_plan_def(plan_id)
             if plan_def and plan_def.get("weeks"):
-                state = await db.plan_state.find_one({"id": plan_id}) or {}
+                state = await udb.plan_state.find_one({"id": plan_id}) or {}
                 cur = int(state.get("current_week", 1))
                 ops, summary = await companion_plan.extract_plan_ops(
                     req.message, plan_def, cur, req.coach_name, req.coach_gender, key,
@@ -1303,7 +1366,7 @@ async def coach_chat(req: CoachChatRequest):
     user_msg = {"id": uuid.uuid4().hex, "role": "user", "text": req.message.strip(), "at": now_iso()}
     coach_msg = {"id": uuid.uuid4().hex, "role": "coach", "text": reply, "at": now_iso()}
     try:
-        await db.coach_chats.update_one(
+        await udb.coach_chats.update_one(
             {"id": cid},
             {"$push": {"messages": {"$each": [user_msg, coach_msg]}},
              "$set": {"coach_name": req.coach_name}},
@@ -1320,7 +1383,7 @@ async def _refresh_adaptation_after_ride(req: "CoachDebriefRequest", plan_id: st
     """Regenerate and cache the coach's plan-adaptation note after a completed
     ride, so the Training Plan reflects the latest session. Best-effort."""
     try:
-        plan = await db.training_plans.find_one({"id": plan_id})
+        plan = await udb.training_plans.find_one({"id": plan_id})
         if not plan:
             plan = dict(BUILD_AND_CLIMB)
         # Feed interval execution into the adaptive-targets engine first so the
@@ -1343,7 +1406,7 @@ async def _refresh_adaptation_after_ride(req: "CoachDebriefRequest", plan_id: st
             plan_def = await plans_admin.get_plan_def(plan_id)
             structured = bool(plan_def and plan_def.get("weeks"))
             if structured and 0 < req.compliance < 70:
-                state = await db.plan_state.find_one({"id": plan_id}) or {}
+                state = await udb.plan_state.find_one({"id": plan_id}) or {}
                 cur = int(state.get("current_week", 1))
                 target = cur + 1
                 eased = set(state.get("eased_weeks", []))
@@ -1356,7 +1419,7 @@ async def _refresh_adaptation_after_ride(req: "CoachDebriefRequest", plan_id: st
                     )
                     if applied:
                         eased.add(target)
-                        await db.plan_state.update_one(
+                        await udb.plan_state.update_one(
                             {"id": plan_id}, {"$set": {"eased_weeks": list(eased)}}, upsert=True,
                         )
                         recent_ride["plan_adjustment"] = summary
@@ -1364,7 +1427,7 @@ async def _refresh_adaptation_after_ride(req: "CoachDebriefRequest", plan_id: st
             logging.warning("adaptive plan easing failed")
         text = await _generate_adaptation(plan, req.coach_name, req.coach_gender, recent_ride)
         cache_key = f"adaptation_ai_{req.coach_name.lower()}"
-        await db.training_plans.update_one(
+        await udb.training_plans.update_one(
             {"id": plan_id},
             {"$set": {cache_key: text, f"{cache_key}_at": now_iso()}},
             upsert=True,
@@ -1386,7 +1449,7 @@ async def _record_adaptation(plan_id: str, coach_name: str, text: str, trigger: 
             "trigger": trigger,
             "at": now_iso(),
         }
-        await db.training_plans.update_one(
+        await udb.training_plans.update_one(
             {"id": plan_id},
             {"$push": {"adaptation_history": {"$each": [entry], "$position": 0, "$slice": 20}}},
             upsert=True,
@@ -1436,7 +1499,7 @@ async def _update_adaptive_targets(plan_id: str, intervals: List[Dict[str, Any]]
     if not ride_zones:
         return {}, []
     try:
-        plan = await db.training_plans.find_one({"id": plan_id}) or {}
+        plan = await udb.training_plans.find_one({"id": plan_id}) or {}
         zone_exec: Dict[str, List[float]] = dict(plan.get("zone_exec") or {})
         zone_bias: Dict[str, float] = dict(plan.get("zone_bias") or {})
         notes: List[str] = []
@@ -1468,7 +1531,7 @@ async def _update_adaptive_targets(plan_id: str, intervals: List[Dict[str, Any]]
                 else:
                     notes.append(f"eased your {zone} targets to {pct}% (to keep them achievable)")
 
-        await db.training_plans.update_one(
+        await udb.training_plans.update_one(
             {"id": plan_id},
             {"$set": {"zone_exec": zone_exec, "zone_bias": zone_bias}},
             upsert=True,
@@ -1484,7 +1547,7 @@ async def get_plan_targets(plan_id: str = "build-and-climb"):
     """Current adaptive per-zone target bias (fraction, e.g. Z4: 0.04 → +4%) plus
     the recent execution ratios that produced it. The live HUD applies the bias
     on top of FTP × zone%; the Plan screen visualises both."""
-    plan = await db.training_plans.find_one({"id": plan_id}) or {}
+    plan = await udb.training_plans.find_one({"id": plan_id}) or {}
     return {
         "zone_bias": plan.get("zone_bias") or {},
         "zone_exec": plan.get("zone_exec") or {},
@@ -1757,14 +1820,14 @@ def _pm(s):
 
 async def _ctr_completions():
     try:
-        rides = await db.ride_history.find({"workout_id": {"$regex": "^ctr-ride-"}}).to_list(3000)
+        rides = await udb.ride_history.find({"workout_id": {"$regex": "^ctr-ride-"}}).to_list(3000)
     except Exception:
         rides = []
     ride_map = {}
     for r in rides:
         ride_map[r.get("workout_id")] = {"duration_sec": r.get("duration_sec"), "tss": r.get("tss"), "distance_km": r.get("distance_km")}
     try:
-        supp = await db.supplementary_log.find({}).to_list(3000)
+        supp = await udb.supplementary_log.find({}).to_list(3000)
     except Exception:
         supp = []
     supp_dates = {s.get("date") for s in supp if s.get("date")}
@@ -1793,7 +1856,7 @@ async def _ctr_state():
     ride_map, supp_dates = await _ctr_completions()
     ride_ids = set(ride_map.keys())
     today = _ctr_today()
-    state = await db.plan_state.find_one({"id": "couch-to-road"})
+    state = await udb.plan_state.find_one({"id": "couch-to-road"})
     cur = int(state["current_week"]) if state and state.get("current_week") else 1
     cur = max(1, min(cur, CTR_PLAN["duration_weeks"]))
     changed = state is None
@@ -1801,7 +1864,7 @@ async def _ctr_state():
         cur += 1
         changed = True
     if changed:
-        await db.plan_state.update_one({"id": "couch-to-road"}, {"$set": {"current_week": cur, "updated_at": now_iso()}}, upsert=True)
+        await udb.plan_state.update_one({"id": "couch-to-road"}, {"$set": {"current_week": cur, "updated_at": now_iso()}}, upsert=True)
     return cur, ride_map, supp_dates
 
 
@@ -1812,7 +1875,7 @@ async def _ctr_progress(ride_map=None):
     total_tss = sum(int(v.get("tss") or 0) for v in ride_map.values())
     adj = ""
     try:
-        recent = await db.ride_history.find({"workout_id": {"$regex": "^ctr-ride-"}}).sort("created_at", -1).to_list(1)
+        recent = await udb.ride_history.find({"workout_id": {"$regex": "^ctr-ride-"}}).sort("created_at", -1).to_list(1)
     except Exception:
         recent = []
     if recent:
@@ -1958,11 +2021,15 @@ async def get_plan(id: str = "build-and-climb"):
     try:
         rider = await _rider_doc()
         active = await _active_plan_id()
+        if active == "none":
+            return {"id": "none", "title": "Free Riding", "label": "FREE RIDING", "free": True,
+                    "description": "You're riding without a structured plan. Jump into any ride whenever you like.",
+                    "workouts": [], "goals": [], "progress_pct": 0}
         if active == "couch-to-road" or id == "couch-to-road":
             cur, ride_map, _supp = await _ctr_state()
             prog = await _ctr_progress(ride_map)
             return _ctr_plan_response(cur, ride_map, prog)
-        doc = await db.training_plans.find_one({"id": id})
+        doc = await udb.training_plans.find_one({"id": id})
         base = await plans_admin.get_plan_def(id)
         if not base:
             base = dict(BUILD_AND_CLIMB)
@@ -2063,9 +2130,9 @@ async def coach_adaptation(req: AdaptationRequest):
         raise HTTPException(status_code=503, detail="Coaching model not configured")
 
     # Load the plan (seed if needed) so the insight is grounded in real data.
-    plan = await db.training_plans.find_one({"id": req.plan_id})
+    plan = await udb.training_plans.find_one({"id": req.plan_id})
     if not plan:
-        await db.training_plans.update_one({"id": req.plan_id}, {"$set": BUILD_AND_CLIMB}, upsert=True)
+        await udb.training_plans.update_one({"id": req.plan_id}, {"$set": BUILD_AND_CLIMB}, upsert=True)
         plan = dict(BUILD_AND_CLIMB)
 
     cache_key = f"adaptation_ai_{req.coach_name.lower()}"
@@ -2075,7 +2142,7 @@ async def coach_adaptation(req: AdaptationRequest):
     try:
         text = await _generate_adaptation(plan, req.coach_name, req.coach_gender)
         try:
-            await db.training_plans.update_one(
+            await udb.training_plans.update_one(
                 {"id": req.plan_id},
                 {"$set": {cache_key: text, f"{cache_key}_at": now_iso()}},
             )
@@ -2092,9 +2159,9 @@ async def coach_adaptation(req: AdaptationRequest):
 async def get_plan_adaptations(plan_id: str = "build-and-climb", coach_name: Optional[str] = None):
     """Return the coach's adaptation history (newest first). Seeds a first entry
     from the plan's current cached/static adaptation if the history is empty."""
-    plan = await db.training_plans.find_one({"id": plan_id})
+    plan = await udb.training_plans.find_one({"id": plan_id})
     if not plan:
-        await db.training_plans.update_one({"id": plan_id}, {"$set": BUILD_AND_CLIMB}, upsert=True)
+        await udb.training_plans.update_one({"id": plan_id}, {"$set": BUILD_AND_CLIMB}, upsert=True)
         plan = dict(BUILD_AND_CLIMB)
 
     history = plan.get("adaptation_history") or []
@@ -2130,16 +2197,16 @@ class GoalsUpdateRequest(BaseModel):
 @api_router.put("/plan/goals")
 async def update_plan_goals(req: GoalsUpdateRequest):
     """Persist the rider's edited plan goals and return the updated plan."""
-    plan = await db.training_plans.find_one({"id": req.plan_id})
+    plan = await udb.training_plans.find_one({"id": req.plan_id})
     if not plan:
-        await db.training_plans.update_one({"id": req.plan_id}, {"$set": BUILD_AND_CLIMB}, upsert=True)
+        await udb.training_plans.update_one({"id": req.plan_id}, {"$set": BUILD_AND_CLIMB}, upsert=True)
 
     goals = [g.dict() for g in req.goals]
-    await db.training_plans.update_one(
+    await udb.training_plans.update_one(
         {"id": req.plan_id},
         {"$set": {"goals": goals, "goals_updated_at": now_iso()}},
     )
-    doc = await db.training_plans.find_one({"id": req.plan_id})
+    doc = await udb.training_plans.find_one({"id": req.plan_id})
     doc.pop("_id", None)
     return doc
 
@@ -2148,9 +2215,9 @@ async def update_plan_goals(req: GoalsUpdateRequest):
 async def get_plan_progress(plan_id: str = "build-and-climb"):
     """Detailed plan progress for the "View Progress" modal: headline metrics,
     fitness trend series and a per-week completion breakdown."""
-    plan = await db.training_plans.find_one({"id": plan_id})
+    plan = await udb.training_plans.find_one({"id": plan_id})
     if not plan:
-        await db.training_plans.update_one({"id": plan_id}, {"$set": BUILD_AND_CLIMB}, upsert=True)
+        await udb.training_plans.update_one({"id": plan_id}, {"$set": BUILD_AND_CLIMB}, upsert=True)
         plan = dict(BUILD_AND_CLIMB)
     plan.pop("_id", None)
 
@@ -2282,14 +2349,14 @@ async def get_calendar_week(start: str = "2025-05-12"):
             cur, ride_map, supp_dates = await _ctr_state()
             doc = _ctr_calendar_week(CTR_WEEKS[cur], ride_map, supp_dates, _ctr_today())
         else:
-            doc = await db.calendar_weeks.find_one({"start_date": start})
+            doc = await udb.calendar_weeks.find_one({"start_date": start})
             if not doc or doc.get("seed_version") != CALENDAR_WEEK["seed_version"]:
-                await db.calendar_weeks.update_one({"start_date": start}, {"$set": CALENDAR_WEEK}, upsert=True)
+                await udb.calendar_weeks.update_one({"start_date": start}, {"$set": CALENDAR_WEEK}, upsert=True)
                 doc = dict(CALENDAR_WEEK)
         doc.pop("_id", None)
         # Attach rider-scheduled catalog workouts to their matching day.
         try:
-            sched = await db.scheduled_workouts.find().to_list(500)
+            sched = await udb.scheduled_workouts.find().to_list(500)
             by_date: dict = {}
             for sdoc in sched:
                 sdoc.pop("_id", None)
@@ -2300,7 +2367,7 @@ async def get_calendar_week(start: str = "2025-05-12"):
             logging.warning("attach scheduled workouts failed")
         # Override today's readiness ring with the rider's latest daily check-in.
         try:
-            ci = await db.daily_checkins.find_one({"id": "latest"})
+            ci = await udb.daily_checkins.find_one({"id": "latest"})
             if ci:
                 sel = doc.get("selected_date")
                 for day in doc.get("days", []):
@@ -2326,13 +2393,13 @@ class FavToggleRequest(BaseModel):
 
 @api_router.get("/workout-favorites")
 async def get_workout_favorites():
-    doc = await db.workout_prefs.find_one({"id": "favorites"})
+    doc = await udb.workout_prefs.find_one({"id": "favorites"})
     return {"favorites": (doc or {}).get("ids", [])}
 
 
 @api_router.post("/workout-favorites/toggle")
 async def toggle_workout_favorite(req: FavToggleRequest):
-    doc = await db.workout_prefs.find_one({"id": "favorites"})
+    doc = await udb.workout_prefs.find_one({"id": "favorites"})
     ids = list((doc or {}).get("ids", []))
     if req.workout_id in ids:
         ids.remove(req.workout_id)
@@ -2340,7 +2407,7 @@ async def toggle_workout_favorite(req: FavToggleRequest):
     else:
         ids.append(req.workout_id)
         favorited = True
-    await db.workout_prefs.update_one({"id": "favorites"}, {"$set": {"ids": ids}}, upsert=True)
+    await udb.workout_prefs.update_one({"id": "favorites"}, {"$set": {"ids": ids}}, upsert=True)
     return {"favorites": ids, "favorited": favorited}
 
 
@@ -2356,7 +2423,7 @@ class ScheduleRequest(BaseModel):
 
 @api_router.get("/calendar/scheduled")
 async def get_scheduled_workouts():
-    docs = await db.scheduled_workouts.find().to_list(500)
+    docs = await udb.scheduled_workouts.find().to_list(500)
     for d in docs:
         d.pop("_id", None)
     return {"scheduled": docs}
@@ -2370,14 +2437,14 @@ async def schedule_workout(req: ScheduleRequest):
         "zone": req.zone, "color": req.color, "date": req.date,
         "status": "scheduled", "created_by": "You",
     }
-    await db.scheduled_workouts.insert_one(dict(entry))
+    await udb.scheduled_workouts.insert_one(dict(entry))
     entry.pop("_id", None)
     return {"ok": True, "entry": entry}
 
 
 @api_router.delete("/calendar/scheduled/{entry_id}")
 async def delete_scheduled_workout(entry_id: str):
-    await db.scheduled_workouts.delete_one({"id": entry_id})
+    await udb.scheduled_workouts.delete_one({"id": entry_id})
     return {"ok": True}
 
 
@@ -2391,7 +2458,7 @@ class MoveSessionRequest(BaseModel):
 @api_router.post("/calendar/move")
 async def move_calendar_session(req: MoveSessionRequest):
     """Move a session from one day to another and mark it rescheduled."""
-    doc = await db.calendar_weeks.find_one({"start_date": req.week_start})
+    doc = await udb.calendar_weeks.find_one({"start_date": req.week_start})
     if not doc:
         doc = dict(CALENDAR_WEEK)
     days = doc["days"]
@@ -2407,7 +2474,7 @@ async def move_calendar_session(req: MoveSessionRequest):
     sess["scheduled_date"] = req.to_date
     dst[req.session_type] = sess
     src[req.session_type] = None
-    await db.calendar_weeks.update_one({"start_date": req.week_start}, {"$set": {"days": days}}, upsert=True)
+    await udb.calendar_weeks.update_one({"start_date": req.week_start}, {"$set": {"days": days}}, upsert=True)
     doc.pop("_id", None)
     return doc
 
@@ -2578,8 +2645,10 @@ async def get_community():
 
 
 api_router.include_router(plans_admin.plans_router)
+api_router.include_router(auth.auth_router)
 app.include_router(api_router)
 
+app.add_middleware(auth.AuthMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
@@ -2603,9 +2672,20 @@ async def _seed_plans_on_startup():
             "build-and-climb": {**BUILD_AND_CLIMB, "type": "roadmap"},
         })
         await _reload_ctr_from_db()
+        # Tag the shipped plans with their target rider level (idempotent) so the
+        # onboarding recommender can match by level.
+        await plans_admin._db.plans.update_one({"id": "couch-to-road"}, {"$set": {"level": "Beginner"}})
+        await plans_admin._db.plans.update_one({"id": "build-and-climb"}, {"$set": {"level": "Intermediate"}})
         logger.info("Plan definitions seeded/loaded from MongoDB")
     except Exception:
         logging.exception("plan seeding failed")
+    try:
+        await auth.ensure_indexes()
+        migrated = await auth.migrate_singleton("greenlantern@roujaune.app", "rideon9900")
+        if migrated:
+            logger.info(f"Migrated single-user data to demo account {migrated}")
+    except Exception:
+        logging.exception("auth init failed")
 
 
 @app.on_event("shutdown")

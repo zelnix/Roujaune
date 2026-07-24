@@ -102,7 +102,44 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "ROUJAUNE cycling app — fork session: /training date hydration, CalendarCard key fix, Seated Mode toggle, Native BLE sensors feeding WS telemetry."
+user_problem_statement: "ROUJAUNE cycling app — MULTI-USER: auth (email/password + Emergent Google + Apple), per-user data scoping, onboarding that classifies rider level + recommends a plan (or ride free), account sign-out. Green Lantern is a real user migrated to a demo account (greenlantern@roujaune.app / rideon9900)."
+
+multi_user_backend:
+  - task: "Multi-user auth + per-user scoping + Green Lantern migration"
+    implemented: true
+    working: true
+    file: "backend/auth.py, backend/server.py"
+    needs_retesting: true
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "users+user_sessions, bcrypt email/password, Emergent Google (/api/auth/google {session_id}), Apple (/api/auth/apple, iOS-only), /me, /logout. AuthMiddleware resolves Bearer→ContextVar; all /api/* require auth except /api/auth/{register,login,google,apple}. udb proxy auto-injects user_id into 14 collections. Startup migrated single-user data to demo account. Self-tested via curl."
+  - task: "Onboarding recommend + level classifier + ride-free + assign"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    needs_retesting: true
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "POST /api/onboarding/recommend classifies level + recommends plan; POST /api/rider/plan assigns (plan_id 'none' = ride free) + marks onboarded. couch-to-road=Beginner, build-and-climb=Intermediate."
+
+multi_user_frontend:
+  - task: "Auth UI + route guard + onboarding + sign-out"
+    implemented: true
+    working: "NA"
+    file: "frontend/app/_layout.tsx, login.tsx, onboarding.tsx, profile.tsx, src/lib/auth-context.tsx, src/lib/session.ts"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "AuthGate redirects: no user→/login, !onboarded→/onboarding, else app. Global fetch patched to attach Bearer. login (email/pw+Google+Apple), onboarding (5-Q→recommend→pick/ride-free), profile sign-out. Verified via screenshot: demo login → Green Lantern dashboard."
+
+multi_user_agent_comm:
+    -agent: "main"
+    -comment: "Demo: greenlantern@roujaune.app / rideon9900. All /api/* need Bearer except 4 public auth endpoints. TEST: register NEW user via UI → /onboarding → pick plan or ride-free → home with isolated empty data (vs Green Lantern's data). Green Lantern login → migrated couch-to-road. Sign out from Profile → login. Backend: 401 w/o token; 409 dup register; 401 bad pw; two-user data isolation. Apple = iOS-BUILD-ONLY. Google needs real redirect — just verify button initiates. CLEANUP after: mongosh mongodb://localhost:27017/test_database --eval 'db.users.deleteMany({user_id:{$ne:\"user_greenlantern\"}}); db.user_sessions.deleteMany({user_id:{$ne:\"user_greenlantern\"}})'. NEVER delete user_greenlantern."
+
+user_problem_statement_prev: "ROUJAUNE cycling app — fork session: /training date hydration, CalendarCard key fix, Seated Mode toggle, Native BLE sensors feeding WS telemetry."
 
 backend:
   - task: "Companion plan editing — chat-driven edits (Part A) + adaptive auto-ease on low compliance (Part B)"
