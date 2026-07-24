@@ -57,9 +57,6 @@ function buildCue(t: { power: number; hr: number; cadence: number; speed: number
   const m = Math.floor(t.elapsed / 60);
   return seated ? `${m} minutes in — stay planted in the saddle, upper body relaxed.` : `${m} minutes in at ${t.speed} kilometres per hour — strong and steady.`;
 }
-// Fixed design width for the tablet/TV layout; the whole screen is scaled from
-// this so it fits (and fills) any large display.
-const DESIGN_W = 1024;
 
 const CONTROLS = [
   { key: "skip", label: "Skip Interval", icon: "play-skip-forward" as const },
@@ -151,9 +148,7 @@ export default function LiveWorkout() {
   const rightW = compact ? 150 : 188;
 
   const [centerW, setCenterW] = React.useState(560);
-  const [availH, setAvailH] = React.useState(0);
-  const [availW, setAvailW] = React.useState(0);
-  const [contentH, setContentH] = React.useState(0);
+  const [videoSlotH, setVideoSlotH] = React.useState(0);
   const [paused, setPaused] = React.useState(false);
   const [expanded, setExpanded] = React.useState(false);
   const [virtualMode, setVirtualMode] = React.useState(false);
@@ -437,53 +432,52 @@ export default function LiveWorkout() {
     showToast(`Surprise route: ${routeVideos[i].title}`);
   };
 
-  // Tablet/TV (landscape): the fixed-width design is scaled on BOTH axes — X to
-  // fill the full screen width (no side letterboxing), Y to fit the height so it
-  // always stays on one screen. Phones keep scrolling.
+  // Tablet/TV (landscape): the layout fills the screen with a responsive
+  // flexbox column — the route video expands to take the remaining vertical
+  // space so nothing is stretched or squashed on any display size. Phones keep
+  // a scrolling layout with a fixed 16:9 video sized from the column width.
   const tablet = !compact;
-  const fitScaleX = tablet && availW > 0 ? Math.max(0.4, Math.min(4.0, availW / DESIGN_W)) : 1;
-  const fitScaleY = tablet && contentH > 0 && availH > 0 ? Math.max(0.4, Math.min(2.2, availH / contentH)) : 1;
-  // The design is scaled non-uniformly (X fills width, Y fits height), which
-  // would stretch the 16:9 route video horizontally. Counter-stretch the video's
-  // pre-scale aspect so it *displays* close to 16:9. Clamped for stability.
-  const videoAspect = React.useMemo(() => {
-    if (!tablet || fitScaleY <= 0) return 16 / 9;
-    const stretch = fitScaleX / fitScaleY;
-    return Math.max(0.85, Math.min(16 / 9, (16 / 9) / stretch));
-  }, [tablet, fitScaleX, fitScaleY]);
-  const videoHeight = Math.round(centerW / videoAspect);
+  const phoneVideoH = Math.round((centerW * 9) / 16);
+  // On tablets the video fills its slot; use the measured slot height for the
+  // virtual-route canvas so it matches exactly. Falls back to 16:9 before layout.
+  const videoRenderH = tablet ? (videoSlotH || phoneVideoH) : phoneVideoH;
 
   const body = (
     <>
       <AlbertoLiveCue message={liveCue} seated={settings.seatedMode} />
       <WorkoutTopBar elapsed={fmt(telemetry.elapsed)} connectionState={connectionState} stale={stale} onPress={(m) => (m === "Settings" ? setShowSettings(true) : showToast(m))} routeName={routeInfo.title} riddenKm={riddenKm} totalKm={routeInfo.km} demoMode={settings.demoMode} onToggleDemo={() => setSetting("demoMode", !settings.demoMode)} />
 
-      <View style={styles.bodyRow}>
-        <View style={styles.innerRow}>
-          <View style={[styles.leftCol, { width: leftW }]}>
+      <View style={[styles.bodyRow, tablet && styles.flex1]}>
+        <View style={[styles.innerRow, tablet && styles.flex1]}>
+          <View style={[styles.leftCol, { width: leftW }, tablet && styles.leftColFill]}>
             <PowerCard power={telemetry.power} wkg={(telemetry.power / (getRiderProfile().weight_kg || 78)).toFixed(1)} connected={trainerOn} target={targetW} zoneLabel={activeSeg?.segment.zoneLabel} zoneIdx={activeSeg?.segment.zoneIdx} />
             <HeartRateCard hr={telemetry.hr} connected={wearableOn} />
             <CadenceCard cadence={telemetry.cadence} connected={trainerOn} />
           </View>
           <View style={styles.centerCol} onLayout={onCenterLayout}>
             <WorkoutTimelineCard width={centerW} onPress={() => showToast("Workout timeline")} title={workoutTitle} color={workoutColor} profile={workoutProfile} step={stepLabel} timeLeft={timeLeftLabel} activeIndex={activeSeg?.index} />
-            {expanded ? (
-              <VideoPlaceholder width={centerW} onRestore={() => setExpanded(false)} />
-            ) : virtualMode ? (
-              <View style={{ position: "relative" }}>
-                <VirtualRoute width={centerW} height={videoHeight} speed={trainerOn ? telemetry.speed : 0} cadence={trainerOn ? telemetry.cadence : 88} gender={getRiderProfile().gender} paused={paused || !trainerOn} />
-                <View style={[styles.inlineRoutes, { pointerEvents: "box-none" }]}>
-                  <RoutesButton onPress={() => setVirtualMode(false)} testID="switch-video" label="Video" icon="videocam" />
+            <View
+              style={[styles.videoSlot, tablet && styles.flex1]}
+              onLayout={tablet ? (e) => setVideoSlotH(Math.round(e.nativeEvent.layout.height)) : undefined}
+            >
+              {expanded ? (
+                <VideoPlaceholder width={centerW} onRestore={() => setExpanded(false)} />
+              ) : virtualMode ? (
+                <View style={[tablet ? styles.flex1 : null, { position: "relative" }]}>
+                  <VirtualRoute width={centerW} height={videoRenderH} speed={trainerOn ? telemetry.speed : 0} cadence={trainerOn ? telemetry.cadence : 88} gender={getRiderProfile().gender} paused={paused || !trainerOn} />
+                  <View style={[styles.inlineRoutes, { pointerEvents: "box-none" }]}>
+                    <RoutesButton onPress={() => setVirtualMode(false)} testID="switch-video" label="Video" icon="videocam" />
+                  </View>
                 </View>
-              </View>
-            ) : (
-              <RouteVideo source={activeRoute.url} title={`${activeRoute.title}${routeAuto ? " · Auto-matched" : activeRoute.id === lastRouteId ? " · Last ride" : ""}`} playing={!paused} muted width={centerW} aspectRatio={videoAspect} onToggleExpand={() => setExpanded(true)} expanded={false}>
-                <View style={[styles.inlineRoutes, { pointerEvents: "box-none" }]}>
-                  <RoutesButton onPress={() => setShowRoutes(true)} testID="inline-routes" />
-                  <RoutesButton onPress={() => setVirtualMode(true)} testID="switch-virtual" label="Virtual" icon="bicycle" />
-                </View>
-              </RouteVideo>
-            )}
+              ) : (
+                <RouteVideo source={activeRoute.url} title={`${activeRoute.title}${routeAuto ? " · Auto-matched" : activeRoute.id === lastRouteId ? " · Last ride" : ""}`} playing={!paused} muted width={tablet ? undefined : centerW} aspectRatio={16 / 9} fill={tablet} onToggleExpand={() => setExpanded(true)} expanded={false}>
+                  <View style={[styles.inlineRoutes, { pointerEvents: "box-none" }]}>
+                    <RoutesButton onPress={() => setShowRoutes(true)} testID="inline-routes" />
+                    <RoutesButton onPress={() => setVirtualMode(true)} testID="switch-virtual" label="Virtual" icon="bicycle" />
+                  </View>
+                </RouteVideo>
+              )}
+            </View>
             <NextUpStrip next={nextSeg} />
             <SafetyNote />
           </View>
@@ -520,14 +514,9 @@ export default function LiveWorkout() {
       <StatusBar hidden />
       <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
         {tablet ? (
-          <View style={styles.fitOuter} onLayout={(e) => { setAvailH(e.nativeEvent.layout.height); setAvailW(e.nativeEvent.layout.width); }} testID="workout-fit">
-            <View
-              style={[styles.content, styles.fitInner, { transform: [{ scaleX: fitScaleX }, { scaleY: fitScaleY }] }]}
-              onLayout={(e) => setContentH(e.nativeEvent.layout.height)}
-            >
-              {body}
-            </View>
-          </View>
+          <ScrollView style={styles.flex1} contentContainerStyle={styles.tabletContent} showsVerticalScrollIndicator={false} testID="workout-fit">
+            {body}
+          </ScrollView>
         ) : (
           <ScrollView contentContainerStyle={[styles.content, { padding: spacing.sm, gap: spacing.sm }]} showsVerticalScrollIndicator={false} testID="workout-scroll">
             {body}
@@ -719,8 +708,9 @@ export default function LiveWorkout() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.md, gap: spacing.md },
-  fitOuter: { flex: 1, alignItems: "center", justifyContent: "center" },
-  fitInner: { width: DESIGN_W },
+  tabletContent: { flexGrow: 1, padding: spacing.md, gap: spacing.md },
+  flex1: { flex: 1 },
+  videoSlot: { minHeight: 150 },
   mediaBar: { position: "absolute", bottom: 24, left: 20, flexDirection: "row", alignItems: "center", gap: 10, zIndex: 20 },
   immersive: { ...StyleSheet.absoluteFillObject, backgroundColor: "#000", zIndex: 50 },
   hudEye: { position: "absolute", top: 12, left: 12, width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center", zIndex: 5 },
@@ -732,6 +722,7 @@ const styles = StyleSheet.create({
   innerRow: { flexDirection: "row", gap: spacing.md, alignItems: "stretch" },
   bottomRow: { flexDirection: "row", gap: spacing.md, alignItems: "stretch" },
   leftCol: { gap: spacing.md },
+  leftColFill: { justifyContent: "space-between" },
   centerCol: { flex: 1, gap: spacing.md },
   rightCol: { gap: spacing.md },
 
