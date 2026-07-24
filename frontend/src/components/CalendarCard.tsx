@@ -99,7 +99,7 @@ export function CalendarCard({ onToast, onOpenCalendar, scope = "today" }: { onT
     if (!today) return todayPlan;
     return [today.cycling, today.fb50, today.wellness]
       .filter((s): s is NonNullable<typeof s> => !!s)
-      .map((s) => ({ key: s.id, label: s.title, time: s.duration || "—", state: state(s.status) }));
+      .map((s, i) => ({ key: `${s.type ?? "session"}-${s.id ?? i}`, label: s.title, time: s.duration || "—", state: state(s.status) }));
   }, [week, scope]);
 
   return (

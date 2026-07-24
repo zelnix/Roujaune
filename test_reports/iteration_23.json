@@ -1,0 +1,33 @@
+{
+  "summary": "Iter 23 — validated all 4 items in the fork. BACKEND (3/3 pytest pass): (1) POST /api/coach/cue with seated:true returns a cue that does NOT reference standing/out-of-saddle (regex-checked against 'stand', 'standing', 'out.of.saddle', 'lift.off.the.saddle'); seated:false still returns a normal cue. (2) WS /api/ws/telemetry — after sending {type:'sensor', power:222, cadence:77, hr:155}, telemetry frames for ~2s all carry source='sensor' with those exact three values; ~2.5s after send, frames revert to source='trainer' (freshness window is 4s). Verified via /app/backend/tests/test_iter23_seated_and_sensor.py. FRONTEND: (3) /training?workoutId=ctr-ride-1 header now displays 'Tuesday, 28 July 2026' (hydrated from calendar week by workout_id match) instead of the old hardcoded 'Wednesday, 12 May 2025'. (4) Home '/' console — CalendarCard emits NO 'unique key prop' warning (zero React warnings captured on load). (5) /workout: dispatch-clicking testID menu-button opens the menu; testID menu-sensors exists — tapping it opens BleSensorsPanel (testID ble-panel visible) which on web shows the 'needs a native build' notice (testID ble-unsupported visible). (6) /workout Workout settings (menu → Workout Settings): testID toggle-seatedMode present; toggling ON works, closing + reopening the settings panel shows checked=true (AsyncStorage-backed persistence via /app/frontend/src/lib/settings.ts); when ON, the live coach cue area renders the 'SEATED' pill (testID seated-pill visible).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter23_seated_and_sensor.py",
+    "/app/test_reports/pytest/iter23.xml"
+  ],
+  "action_items": [
+    "Nothing blocking for this fork — all 4 items verified pass. Note: previous iter22 HIGH bug (get_calendar_week mutates module-level _CTR_WEEK1) was NOT re-verified in this iter; still recommend fixing with copy.deepcopy in _ctr_calendar_week if not already patched."
+  ],
+  "critical_code_review_comments": [
+    "training.tsx L69-72: rideDate uses week.days.find(d.cycling?.workout_id === activeId) — solid; falls back correctly to activePlanRide.footer / activeWorkout.focus / 'Today'. Good defensive chain.",
+    "settings.ts adds seatedMode with default false and persists via AsyncStorage — clean addition. useSettings still spreads DEFAULTS so seatedMode has a safe default for existing riders whose stored blob predates it.",
+    "server.py TrainerSim.step: sensor override is applied AFTER the simulated draw, so the emitted sample carries the exact BLE value (verified in test). sensor_fresh flips false 4s after the last sensor push and 'source' correctly falls back to 'trainer'.",
+    "coach_cue prompt seated block strongly instructs 'Never cue standing or out-of-the-saddle efforts' — LLM (claude-sonnet-4-6) respected the constraint across the runs sampled."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter23_seated_and_sensor.py (new)",
+    "/app/test_reports/pytest/iter23.xml (new)"
+  ],
+  "success_rate": {"backend": "100% (3/3 pytest)", "frontend": "100% (5/5 checks)"},
+  "seed_data_creation": "None. Rider 'Green Lantern' in zero-state was used throughout; no ride_history or supplementary_log writes made by the tests (the WS test only pushes sensor frames to the in-memory TrainerSim, and coach/cue does not persist).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend BASE_URL from EXPO_PUBLIC_BACKEND_URL in /app/frontend/.env. To reproduce this run: EXPO_PUBLIC_BACKEND_URL=<url> pytest backend/tests/test_iter23_seated_and_sensor.py -v. Frontend: React Native Switch renders as a <div data-testid> with an inner <input>. To toggle it in Playwright web, dispatchEvent('click') on the div does NOT change state — call querySelector('[data-testid=\"toggle-...\"]').querySelector('input').click() instead. menu-button on /workout is overlapped by the media bar on web; use el.dispatchEvent(MouseEvent('click')) or click(force=True).",
+  "rca_of_issue": "n/a — no failures observed this iteration."
+}

@@ -102,7 +102,101 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "ROUJAUNE cycling app — fork session: multiple profile/home/audio/connections enhancements."
+user_problem_statement: "ROUJAUNE cycling app — fork session: /training date hydration, CalendarCard key fix, Seated Mode toggle, Native BLE sensors feeding WS telemetry."
+
+backend:
+  - task: "POST /api/coach/cue — seated flag adjusts cue (no standing efforts)"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "Added seated:bool to CoachCueRequest; when true, prompt directs coach to keep rider seated (no out-of-saddle cues). Self-tested via curl: seated cue returned with no standing instruction."
+  - task: "WS /api/ws/telemetry — {type:'sensor'} overrides sim with real BLE readings (4s TTL) then falls back"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "TrainerSim gained sensor_power/cadence/hr with a 4s freshness window; step() overrides sim values while fresh, sample() source flips to 'sensor'. Self-tested with a websockets client: {power:333,cadence:101,hr:149} applied then fell back to 'trainer' after 5s."
+
+frontend:
+  - task: "/training header shows the active workout's real calendar date"
+    implemented: true
+    working: "NA"
+    file: "frontend/app/training.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "dateLabel now derived from useCalendarWeek() day whose cycling.workout_id === activeId, formatted 'dddd, D MMMM YYYY'. Falls back to plan footer. Needs verify for Green Lantern ctr-ride-* (e.g. 'Tuesday, 28 July 2026')."
+  - task: "Home CalendarCard — no React unique-key warning"
+    implemented: true
+    working: "NA"
+    file: "frontend/src/components/CalendarCard.tsx"
+    stuck_count: 0
+    priority: "low"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "today-scope plan rows keyed by `${type}-${id ?? index}` (fb50/wellness have no id). Verify no key warning in console on home."
+  - task: "Seated Mode toggle in workout SettingsPanel → seated cues + SEATED pill"
+    implemented: true
+    working: "NA"
+    file: "frontend/src/lib/settings.ts, frontend/src/components/workout.tsx, frontend/app/workout.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "settings.seatedMode persisted; toggle-seatedMode switch in SettingsPanel (verified visible via screenshot). When on, coachCtx.seated=true (sent to /api/coach/cue), buildCue fallback uses seated variants, and AlbertoLiveCue shows a SEATED pill. Verify toggle persists + pill appears."
+  - task: "Bluetooth Sensors panel (native BLE) — opens from workout menu; web shows needs-native-build notice"
+    implemented: true
+    working: "NA"
+    file: "frontend/src/components/BleSensorsPanel.tsx, frontend/src/hooks/useBleSensors.ts, frontend/src/hooks/useBleSensors.web.ts, frontend/src/lib/ble/parse.ts, frontend/app/workout.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Menu item 'Bluetooth Sensors' opens BleSensorsPanel. On web/Expo Go supported=false → shows 'needs a native build' notice (verified via screenshot, testID ble-unsupported). GATT parsers 11/11 unit tests pass. Actual pairing NOT testable without a native build. sendSensor pushes readings to WS (backend verified)."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.2"
+  test_sequence: 2
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "/training header shows the active workout's real calendar date"
+    - "Home CalendarCard — no React unique-key warning"
+    - "Seated Mode toggle in workout SettingsPanel → seated cues + SEATED pill"
+    - "Bluetooth Sensors panel opens from workout menu; web shows needs-native-build notice"
+    - "POST /api/coach/cue seated flag"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+    -agent: "main"
+    -comment: "Fork tasks: (1) /training header date hydration, (2) CalendarCard key warning fix, (3) Seated Mode toggle (settings + cues + SEATED pill + backend seated flag), (4) Native BLE sensors (react-native-ble-plx) feeding the WS telemetry contract. Backend WS sensor override + coach/cue seated self-tested and pass. GATT parsers 11/11 unit tests pass. Rider 'Green Lantern' drives couch-to-road; cleanup after summarize/supplementary tests: mongosh test_database delete ride_history+supplementary_log AND `sudo supervisorctl restart backend`. IMPORTANT: real Bluetooth pairing CANNOT be tested on web/Expo Go — only verify the panel opens and shows the native-build notice (testID ble-unsupported). To open the workout three-dot menu on web, the ellipsis (testID menu-button) is overlapped by the media bar — dispatch a DOM click or use force. Then click testID menu-sensors."
+
+previous_agent_communication_iter1:
+    -agent: "main"
 
 backend:
   - task: "GET /api/rider/season?days=N — period-filtered aggregates"

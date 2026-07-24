@@ -25,6 +25,8 @@ import {
   RoutesButton, RoutePicker, SettingsPanel, MusicPanel, MusicButton, CastButton, CastPanel,
 } from "@/src/components/workout";
 import { useWorkoutAudio } from "@/src/hooks/useWorkoutAudio";
+import { useBleSensors } from "@/src/hooks/useBleSensors";
+import { BleSensorsPanel } from "@/src/components/BleSensorsPanel";
 import { fetchCoachCue } from "@/src/lib/coach";
 import { useCoach } from "@/src/lib/coach-persona";
 
@@ -34,18 +36,18 @@ import { useCoach } from "@/src/lib/coach-persona";
 const CAD_LOW = 90;         // rpm cadence window
 const CAD_HIGH = 100;
 
-function buildCue(t: { power: number; hr: number; cadence: number; speed: number; elapsed: number }, idx: number, target: number): string {
+function buildCue(t: { power: number; hr: number; cadence: number; speed: number; elapsed: number }, idx: number, target: number, seated = false): string {
   const cat = idx % 4;
   if (cat === 0) {
     const d = t.power - target;
-    if (d < -12) return `You're at ${t.power} watts — lift it toward ${target}.`;
+    if (d < -12) return seated ? `Stay seated and drive smoothly to ${target} watts — let your legs do the work.` : `You're at ${t.power} watts — lift it toward ${target}.`;
     if (d > 12) return `Ease off a touch, you're ${Math.round(d)} watts over target.`;
     return `Nicely done — holding ${t.power} watts right on target.`;
   }
   if (cat === 1) {
-    if (t.cadence < CAD_LOW) return `Spin it up — bring your cadence toward ${CAD_LOW} rpm.`;
+    if (t.cadence < CAD_LOW) return seated ? `Spin it up smoothly — keep your hips still and bring cadence toward ${CAD_LOW} rpm.` : `Spin it up — bring your cadence toward ${CAD_LOW} rpm.`;
     if (t.cadence > CAD_HIGH) return `Cadence is high at ${t.cadence} — settle back near ${CAD_HIGH}.`;
-    return `Great rhythm at ${t.cadence} rpm — keep it smooth.`;
+    return seated ? `Great seated rhythm at ${t.cadence} rpm — relax your shoulders.` : `Great rhythm at ${t.cadence} rpm — keep it smooth.`;
   }
   if (cat === 2) {
     if (t.hr > 170) return `Heart rate is climbing at ${t.hr} — breathe and stay controlled.`;
@@ -53,7 +55,7 @@ function buildCue(t: { power: number; hr: number; cadence: number; speed: number
     return `Heart rate steady at ${t.hr} beats — good work.`;
   }
   const m = Math.floor(t.elapsed / 60);
-  return `${m} minutes in at ${t.speed} kilometres per hour — strong and steady.`;
+  return seated ? `${m} minutes in — stay planted in the saddle, upper body relaxed.` : `${m} minutes in at ${t.speed} kilometres per hour — strong and steady.`;
 }
 // Fixed design width for the tablet/TV layout; the whole screen is scaled from
 // this so it fits (and fills) any large display.
@@ -78,6 +80,7 @@ const MENU = [
   { key: "settings", label: "Workout Settings", icon: "settings" as const },
   { key: "lock", label: "Touch Lock", icon: "lock-closed" as const },
   { key: "peaceful", label: "Peaceful Pause", icon: "leaf" as const },
+  { key: "sensors", label: "Bluetooth Sensors", icon: "bluetooth" as const },
   { key: "save", label: "Save & Exit", icon: "save" as const },
 ];
 
@@ -163,15 +166,24 @@ export default function LiveWorkout() {
   const [showSettings, setShowSettings] = React.useState(false);
   const [showMusic, setShowMusic] = React.useState(false);
   const [showCast, setShowCast] = React.useState(false);
+  const [showBle, setShowBle] = React.useState(false);
   const [endPrompt, setEndPrompt] = React.useState(false);
 
   const [hudVisible, setHudVisible] = React.useState(true);
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
   const [cueIdx] = React.useState(0);
 
-  const { telemetry, connectionState, stale, sendErg, sendTarget, sendInit, pause, resume, simulateDropout } = useTelemetry();
+  const { telemetry, connectionState, stale, sendErg, sendTarget, sendInit, sendSensor, pause, resume, simulateDropout } = useTelemetry();
   const { settings, setSetting, loaded } = useSettings();
+  const ble = useBleSensors();
   const erg = telemetry.erg;
+
+  // Push real Bluetooth sensor readings into the telemetry stream so the backend
+  // records measured power/cadence/HR (falls back to the trainer sim if BLE stops).
+  React.useEffect(() => {
+    if (ble.readings.ts <= 0 || connectionState !== "connected") return;
+    sendSensor({ power: ble.readings.power, cadence: ble.readings.cadence, hr: ble.readings.hr });
+  }, [ble.readings.ts, connectionState, sendSensor]);
 
   // ---- Live segment driven by the chosen workout ----
   const ftp = settings.ftp || 287;
@@ -304,6 +316,7 @@ export default function LiveWorkout() {
     if (item.key === "reconnect") { simulateDropout(); showToast("Simulating trainer dropout…"); return; }
     if (item.key === "music") { setShowMusic(true); return; }
     if (item.key === "settings") { setShowSettings(true); return; }
+    if (item.key === "sensors") { setShowBle(true); return; }
     if (item.key === "save") { router.replace("/training"); return; }
     showToast(item.label);
   };
@@ -311,9 +324,12 @@ export default function LiveWorkout() {
   const activeRoute = routeVideos[routeIdx];
 
   // Live data is only shown for connected devices. "Demo mode" simulates both so
-  // the rider can preview the connected experience.
-  const trainerOn = settings.hasTrainer || settings.demoMode;
-  const wearableOn = settings.hasWearable || settings.demoMode;
+  // the rider can preview the connected experience. A connected BLE power/cadence
+  // sensor counts as a trainer; a BLE heart-rate strap counts as a wearable.
+  const bleTrainer = ble.connected.length > 0 && (ble.readings.power != null || ble.readings.cadence != null);
+  const bleWearable = ble.connected.length > 0 && ble.readings.hr != null;
+  const trainerOn = settings.hasTrainer || settings.demoMode || bleTrainer;
+  const wearableOn = settings.hasWearable || settings.demoMode || bleWearable;
 
   // Terrain + route length derived from the chosen workout (not the video).
   const terrain = React.useMemo(() => {
@@ -339,11 +355,13 @@ export default function LiveWorkout() {
   // Prefers the AI-generated cue; falls back to the local rule-based line while
   // a call is pending or fails.
   const [coachCue, setCoachCue] = React.useState<string | null>(null);
-  const liveCue = paused ? "Workout paused — take a breath." : (coachCue ?? buildCue(telemetry, cueIdx, targetW));
+  const liveCue = paused ? "Workout paused — take a breath." : (coachCue ?? buildCue(telemetry, cueIdx, targetW, settings.seatedMode));
 
   // Keep the current target watts in a ref so cue timers read the live value.
   const targetRef = React.useRef(targetW);
   React.useEffect(() => { targetRef.current = targetW; }, [targetW]);
+  const seatedRef = React.useRef(settings.seatedMode);
+  React.useEffect(() => { seatedRef.current = settings.seatedMode; }, [settings.seatedMode]);
 
   const coachCtx = React.useMemo(() => ({
     power_target: targetW,
@@ -353,9 +371,10 @@ export default function LiveWorkout() {
     cadence_high: CAD_HIGH,
     workout: workoutTitle,
     route: activeRoute.title,
+    seated: settings.seatedMode,
     coach_name: persona.name,
     coach_gender: persona.gender,
-  }), [activeRoute.title, persona.name, persona.gender, workoutTitle, targetW, activeSeg]);
+  }), [activeRoute.title, persona.name, persona.gender, workoutTitle, targetW, activeSeg, settings.seatedMode]);
 
   const cueBusy = React.useRef(false);
   const lastCueAt = React.useRef(0);
@@ -370,7 +389,7 @@ export default function LiveWorkout() {
       setCoachCue(cue);
       speak(cue);
     } catch {
-      const fallback = buildCue(t, Math.floor(Date.now() / 1000) % 4, targetRef.current);
+      const fallback = buildCue(t, Math.floor(Date.now() / 1000) % 4, targetRef.current, seatedRef.current);
       setCoachCue(fallback);
       speak(fallback);
     } finally {
@@ -427,7 +446,7 @@ export default function LiveWorkout() {
 
   const body = (
     <>
-      <AlbertoLiveCue message={liveCue} />
+      <AlbertoLiveCue message={liveCue} seated={settings.seatedMode} />
       <WorkoutTopBar elapsed={fmt(telemetry.elapsed)} connectionState={connectionState} stale={stale} onPress={(m) => (m === "Settings" ? setShowSettings(true) : showToast(m))} routeName={routeInfo.title} riddenKm={riddenKm} totalKm={routeInfo.km} demoMode={settings.demoMode} onToggleDemo={() => setSetting("demoMode", !settings.demoMode)} />
 
       <View style={styles.bodyRow}>
@@ -642,6 +661,24 @@ export default function LiveWorkout() {
 
       {showCast && (
         <CastPanel onClose={() => setShowCast(false)} />
+      )}
+
+      {showBle && (
+        <BleSensorsPanel
+          supported={ble.supported}
+          poweredOn={ble.poweredOn}
+          scanning={ble.scanning}
+          devices={ble.devices}
+          connected={ble.connected}
+          readings={ble.readings}
+          permissionStatus={ble.permissionStatus}
+          error={ble.error}
+          onScan={ble.startScan}
+          onStopScan={ble.stopScan}
+          onConnect={ble.connect}
+          onDisconnect={ble.disconnect}
+          onClose={() => setShowBle(false)}
+        />
       )}
 
       {endPrompt && (

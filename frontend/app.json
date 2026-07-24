@@ -17,7 +17,8 @@
           "_googlecast._tcp",
           "_airplay._tcp"
         ],
-        "NSPhotoLibraryUsageDescription": "Set your rider profile photo"
+        "NSPhotoLibraryUsageDescription": "Set your rider profile photo",
+        "NSBluetoothAlwaysUsageDescription": "Connect your trainer and heart-rate sensor"
       }
     },
     "android": {
@@ -26,6 +27,10 @@
         "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT"
+      ],
       "package": "com.emergent.coachalbertodash.wsjvnf"
     },
     "web": {
@@ -64,6 +69,13 @@
         "expo-image-picker",
         {
           "photosPermission": "Set your rider profile photo"
+        }
+      ],
+      [
+        "react-native-ble-plx",
+        {
+          "neverForLocation": true,
+          "bluetoothAlwaysPermission": "Connect your trainer and heart-rate sensor"
         }
       ]
     ],

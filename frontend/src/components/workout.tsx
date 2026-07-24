@@ -555,11 +555,17 @@ export function TrainerControlBar({ paused, erg, onPauseToggle, onErg, onEnd, on
 }
 
 /* ============================ ALBERTO LIVE CUE ============================ */
-export function AlbertoLiveCue({ message }: { message: string }) {
+export function AlbertoLiveCue({ message, seated = false }: { message: string; seated?: boolean }) {
   return (
     <View testID="alberto-cue" style={[styles.cue, { pointerEvents: "none" }]}>
       <MaterialCommunityIcons name="account-voice" size={16} color={colors.gold} />
       <Text style={styles.cueText}>{message}</Text>
+      {seated ? (
+        <View style={styles.seatedPill} testID="seated-pill">
+          <Ionicons name="body-outline" size={12} color={colors.yellow} />
+          <Text style={styles.seatedPillText}>SEATED</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -773,6 +779,7 @@ export function SettingsPanel({ settings, setSetting, onClose }: {
     { key: "hasTrainer", icon: "bluetooth", label: "Smart trainer connected", sub: "Power, cadence & speed" },
     { key: "hasWearable", icon: "watch-outline", label: "Wearable connected", sub: "Heart rate & wellness" },
     { key: "hudEnabled", icon: "eye", label: "Show on-screen HUD", sub: "Live-data overlay in full screen" },
+    { key: "seatedMode", icon: "body-outline", label: "Seated mode", sub: "Stay in the saddle — cues avoid standing efforts" },
   ];
   return (
     <Pressable style={styles.rpOverlay} onPress={onClose} testID="settings-panel">
@@ -1061,6 +1068,8 @@ const styles = StyleSheet.create({
   /* cue */
   cue: { alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(12,10,9,0.9)", borderWidth: 1, borderColor: "rgba(233,180,76,0.4)", borderRadius: radius.pill, paddingHorizontal: 16, paddingVertical: 8, marginBottom: 10 },
   cueText: { color: colors.white, fontSize: 13, fontWeight: "600" },
+  seatedPill: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(233,180,76,0.15)", borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3, marginLeft: 4 },
+  seatedPillText: { color: colors.yellow, fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
 
   /* next-up + safety */
   nextUp: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: colors.card, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.md, paddingVertical: 10 },

@@ -9,6 +9,7 @@ export type CoachContext = {
   segment?: string | null;
   zone?: string | null;
   route?: string | null;
+  seated?: boolean;
   coach_name?: string;
   coach_gender?: string;
 };

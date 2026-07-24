@@ -8,9 +8,10 @@ export type Settings = {
   hudEnabled: boolean;   // show the on-screen HUD overlay in immersive mode
   ftp: number;           // rider FTP (watts) — drives live ERG target power
   ftpAuto: boolean;      // keep FTP in sync with training-progress FTP
+  seatedMode: boolean;   // ride seated throughout — coach cues avoid standing efforts
 };
 
-const DEFAULTS: Settings = { hasTrainer: false, hasWearable: false, demoMode: false, hudEnabled: true, ftp: 287, ftpAuto: true };
+const DEFAULTS: Settings = { hasTrainer: false, hasWearable: false, demoMode: false, hudEnabled: true, ftp: 287, ftpAuto: true, seatedMode: false };
 const KEY = "roujaune:settings";
 
 // Pull the current FTP from the backend training-progress metrics (e.g. "287 W").

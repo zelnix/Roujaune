@@ -12,7 +12,9 @@ import { BrandHeader } from "@/src/components/BrandHeader";
 import { navItems, navFooter } from "@/src/data";
 import { useCoach } from "@/src/lib/coach-persona";
 import { usePlan } from "@/src/lib/plan";
+import { useCalendarWeek } from "@/src/lib/calendar";
 import { getWorkout } from "@/src/lib/workout-catalog";
+import dayjs from "dayjs";
 import {
   AlbertoTrainingCard,
   MainWorkoutCard,
@@ -63,7 +65,12 @@ export default function TodaysTraining() {
   const activeId = (paramId || nextPlanRide?.id) as string | undefined;
   const activeWorkout = getWorkout(activeId);
   const activePlanRide = (plan.workouts?.find((w: any) => w.id === activeId)) as any;
-  const dateLabel = activePlanRide?.footer ?? (activeWorkout ? `${plan.title ?? "Training"} · ${activeWorkout.focus}` : "Today");
+  const { week } = useCalendarWeek();
+  const rideDate = React.useMemo(() => {
+    const day = (week?.days ?? []).find((d: any) => d.cycling?.workout_id === activeId);
+    return day?.date ? dayjs(day.date).format("dddd, D MMMM YYYY") : undefined;
+  }, [week, activeId]);
+  const dateLabel = rideDate ?? activePlanRide?.footer ?? (activeWorkout ? `${plan.title ?? "Training"} · ${activeWorkout.focus}` : "Today");
   const startRide = () => router.push(activeId ? ({ pathname: "/workout", params: { workoutId: activeId } } as any) : "/workout");
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
   const [leftW, setLeftW] = React.useState(560);

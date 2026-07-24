@@ -668,6 +668,7 @@ class CoachCueRequest(BaseModel):
     segment: Optional[str] = None
     zone: Optional[str] = None
     route: Optional[str] = None
+    seated: bool = False
     coach_name: str = "Alberto"
     coach_gender: str = "male"
 
@@ -681,11 +682,16 @@ async def coach_cue(req: CoachCueRequest):
 
     minutes = req.elapsed // 60
     seg = f" Current segment: {req.segment} ({req.zone})." if req.segment else ""
+    seated = (
+        " The rider is in SEATED MODE for this endurance session — they stay in the saddle throughout. "
+        "Never cue standing or out-of-the-saddle efforts; instead coach relaxed upper body, steady seated cadence, breathing and posture."
+        if req.seated else ""
+    )
     rider = await _rider_line()
     prompt = (
         f"{rider}\n"
         f"Workout: {req.workout}. Route: {req.route or 'indoor'}. "
-        f"Elapsed: {minutes} minutes.{seg}\n"
+        f"Elapsed: {minutes} minutes.{seg}{seated}\n"
         f"Live: power {req.power} W (target {req.power_target} W), "
         f"cadence {req.cadence} rpm (aim {req.cadence_low}-{req.cadence_high}), "
         f"heart rate {req.hr} bpm, speed {req.speed} km/h.\n"
@@ -1415,6 +1421,12 @@ class TrainerSim:
         self.hr = 162.0
         self.speed = 26.4
         self.gradient = 7.8
+        # Real BLE sensor overrides (set via {type:'sensor'} messages).
+        self.sensor_power = None
+        self.sensor_cadence = None
+        self.sensor_hr = None
+        self.sensor_expires = 0.0
+        self.sensor_fresh = False
 
     def is_dropped(self, t: float) -> bool:
         return t < self.dropout_until
@@ -1428,6 +1440,14 @@ class TrainerSim:
         target_hr = 118 + (self.power - 150) * 0.34
         self.hr += (target_hr - self.hr) * 0.15 + random.uniform(-1.5, 1.5)
         self.hr = max(90.0, min(185.0, self.hr))
+        # Real sensor data (BLE) overrides simulated values while it is fresh.
+        if self.sensor_fresh:
+            if self.sensor_power is not None:
+                self.power = float(self.sensor_power)
+            if self.sensor_cadence is not None:
+                self.cadence = float(self.sensor_cadence)
+            if self.sensor_hr is not None:
+                self.hr = float(self.sensor_hr)
         # simplified physics: speed rises with power, falls with gradient
         self.speed = max(0.0, 12 + (self.power - 180) / 14 - self.gradient * 0.4 + random.uniform(-0.4, 0.4))
         self.elapsed += dt
@@ -1444,7 +1464,7 @@ class TrainerSim:
             "gradient": self.gradient,
             "erg": self.erg,
             "paused": self.paused,
-            "source": "trainer",  # measured, not estimated
+            "source": "sensor" if self.sensor_fresh else "trainer",  # measured, not estimated
         }
 
 
@@ -1483,6 +1503,15 @@ async def telemetry_ws(websocket: WebSocket):
                 elif t == "dropout":
                     # emulate a signal loss for a few seconds
                     sim.dropout_until = loop.time() + float(msg.get("seconds", 4))
+                elif t == "sensor":
+                    # real BLE readings pushed from the device
+                    if msg.get("power") is not None:
+                        sim.sensor_power = max(0.0, float(msg.get("power")))
+                    if msg.get("cadence") is not None:
+                        sim.sensor_cadence = max(0.0, float(msg.get("cadence")))
+                    if msg.get("hr") is not None:
+                        sim.sensor_hr = max(0.0, float(msg.get("hr")))
+                    sim.sensor_expires = loop.time() + 4.0
         except WebSocketDisconnect:
             pass
 
@@ -1491,6 +1520,7 @@ async def telemetry_ws(websocket: WebSocket):
     try:
         while True:
             t = loop.time()
+            sim.sensor_fresh = t < sim.sensor_expires
             sim.step(dt)
             if not sim.is_dropped(t):
                 await websocket.send_text(json.dumps({"type": "telemetry", "data": sim.sample()}))
