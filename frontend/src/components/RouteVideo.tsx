@@ -13,8 +13,10 @@ type Props = {
   playing: boolean;
   /** Keep muted (no sound). */
   muted?: boolean;
-  /** Inline width; height is derived from a 16:9 aspect ratio. Ignored when `fill`. */
+  /** Inline width; height is derived from `aspectRatio` (default 16:9). Ignored when `fill`. */
   width?: number;
+  /** Override the inline aspect ratio (width/height). Defaults to 16/9. */
+  aspectRatio?: number;
   /** Fill the parent container (immersive/expanded mode). */
   fill?: boolean;
   title?: string;
@@ -31,7 +33,7 @@ type Props = {
  * overlay slot for live-data HUDs. Falls back gracefully so the rest of the
  * workout keeps working if the video can't load. */
 export function RouteVideo({
-  source, playing, muted = true, width, fill = false, title, onEnded, expanded, onToggleExpand, children,
+  source, playing, muted = true, width, aspectRatio = 16 / 9, fill = false, title, onEnded, expanded, onToggleExpand, children,
 }: Props) {
   const videoId = getYouTubeId(source);
   const [size, setSize] = React.useState({ w: 0, h: 0 });
@@ -49,7 +51,7 @@ export function RouteVideo({
 
   const containerStyle = fill
     ? [styles.fill]
-    : [{ width, aspectRatio: 16 / 9 }];
+    : [{ width, aspectRatio }];
 
   return (
     <View style={[styles.wrap, fill && styles.wrapFill, containerStyle]} onLayout={onLayout} testID="route-video">

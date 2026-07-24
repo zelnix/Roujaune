@@ -147,8 +147,8 @@ export default function LiveWorkout() {
   const segments = React.useMemo(() => (selected ? buildSegments(selected) : []), [selected]);
   const workoutProfile = React.useMemo(() => (segments.length ? segmentProfile(segments) : selectedType?.profile), [segments, selectedType]);
   const compact = height < 620;
-  const leftW = compact ? 120 : 150;
-  const rightW = compact ? 150 : 170;
+  const leftW = compact ? 120 : 168;
+  const rightW = compact ? 150 : 188;
 
   const [centerW, setCenterW] = React.useState(560);
   const [availH, setAvailH] = React.useState(0);
@@ -443,6 +443,15 @@ export default function LiveWorkout() {
   const tablet = !compact;
   const fitScaleX = tablet && availW > 0 ? Math.max(0.4, Math.min(2.2, availW / DESIGN_W)) : 1;
   const fitScaleY = tablet && contentH > 0 && availH > 0 ? Math.max(0.4, Math.min(2.2, availH / contentH)) : 1;
+  // The design is scaled non-uniformly (X fills width, Y fits height), which
+  // would stretch the 16:9 route video horizontally. Counter-stretch the video's
+  // pre-scale aspect so it *displays* close to 16:9. Clamped for stability.
+  const videoAspect = React.useMemo(() => {
+    if (!tablet || fitScaleY <= 0) return 16 / 9;
+    const stretch = fitScaleX / fitScaleY;
+    return Math.max(0.95, Math.min(16 / 9, (16 / 9) / stretch));
+  }, [tablet, fitScaleX, fitScaleY]);
+  const videoHeight = Math.round(centerW / videoAspect);
 
   const body = (
     <>
@@ -462,13 +471,13 @@ export default function LiveWorkout() {
               <VideoPlaceholder width={centerW} onRestore={() => setExpanded(false)} />
             ) : virtualMode ? (
               <View style={{ position: "relative" }}>
-                <VirtualRoute width={centerW} height={Math.round(centerW * 0.5625)} speed={trainerOn ? telemetry.speed : 0} cadence={trainerOn ? telemetry.cadence : 88} gender={getRiderProfile().gender} paused={paused || !trainerOn} />
+                <VirtualRoute width={centerW} height={videoHeight} speed={trainerOn ? telemetry.speed : 0} cadence={trainerOn ? telemetry.cadence : 88} gender={getRiderProfile().gender} paused={paused || !trainerOn} />
                 <View style={[styles.inlineRoutes, { pointerEvents: "box-none" }]}>
                   <RoutesButton onPress={() => setVirtualMode(false)} testID="switch-video" label="Video" icon="videocam" />
                 </View>
               </View>
             ) : (
-              <RouteVideo source={activeRoute.url} title={`${activeRoute.title}${routeAuto ? " · Auto-matched" : activeRoute.id === lastRouteId ? " · Last ride" : ""}`} playing={!paused} muted width={centerW} onToggleExpand={() => setExpanded(true)} expanded={false}>
+              <RouteVideo source={activeRoute.url} title={`${activeRoute.title}${routeAuto ? " · Auto-matched" : activeRoute.id === lastRouteId ? " · Last ride" : ""}`} playing={!paused} muted width={centerW} aspectRatio={videoAspect} onToggleExpand={() => setExpanded(true)} expanded={false}>
                 <View style={[styles.inlineRoutes, { pointerEvents: "box-none" }]}>
                   <RoutesButton onPress={() => setShowRoutes(true)} testID="inline-routes" />
                   <RoutesButton onPress={() => setVirtualMode(true)} testID="switch-virtual" label="Virtual" icon="bicycle" />

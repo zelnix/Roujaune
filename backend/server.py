@@ -860,6 +860,38 @@ async def get_rider_profile():
     return await _rider_doc()
 
 
+class AssignPlanRequest(BaseModel):
+    plan_id: str
+    reset_progress: bool = False
+
+
+@api_router.get("/rider/plan")
+async def get_rider_plan():
+    """The plan the current rider is assigned to (resolved) + all selectable plans."""
+    active = await _active_plan_id()
+    plans = await plans_admin.list_plans()
+    return {"active_plan_id": active, "plans": plans}
+
+
+@api_router.post("/rider/plan")
+async def assign_rider_plan(req: AssignPlanRequest):
+    """Switch which plan the current rider is on. Validates the plan exists in the
+    `plans` collection and persists the choice on the rider profile."""
+    plan = await plans_admin.get_plan_def(req.plan_id)
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    await db.rider_profile.update_one(
+        {"id": "me"}, {"$set": {"id": "me", "assigned_plan_id": req.plan_id}}, upsert=True,
+    )
+    if req.reset_progress and req.plan_id == "couch-to-road":
+        await db.plan_state.update_one(
+            {"id": "couch-to-road"},
+            {"$set": {"current_week": 1}, "$unset": {"eased_weeks": ""}},
+            upsert=True,
+        )
+    return {"active_plan_id": req.plan_id, "title": plan.get("title")}
+
+
 @api_router.put("/rider/profile")
 async def update_rider_profile(req: RiderProfileUpdate):
     upd = {k: v for k, v in req.dict().items() if v is not None}
@@ -1305,15 +1337,18 @@ async def _refresh_adaptation_after_ride(req: "CoachDebriefRequest", plan_id: st
             "target_nudges": nudges,
         }
         # Adaptive plan easing: if this ride's compliance was low, gently ease the
-        # rider's next upcoming week (structured plans only, once per week).
+        # rider's next upcoming week. Applies to any STRUCTURED plan (has weeks[]),
+        # driven by plan metadata rather than a hardcoded id. Once per week.
         try:
-            if plan_id == "couch-to-road" and 0 < req.compliance < 70:
+            plan_def = await plans_admin.get_plan_def(plan_id)
+            structured = bool(plan_def and plan_def.get("weeks"))
+            if structured and 0 < req.compliance < 70:
                 state = await db.plan_state.find_one({"id": plan_id}) or {}
                 cur = int(state.get("current_week", 1))
                 target = cur + 1
                 eased = set(state.get("eased_weeks", []))
-                plan_def = await plans_admin.get_plan_def(plan_id)
-                if plan_def and target <= plan_def.get("duration_weeks", 16) and target not in eased:
+                last_week = plan_def.get("duration_weeks") or len(plan_def.get("weeks", []))
+                if target <= last_week and target not in eased:
                     ops, summary = companion_plan.auto_ease_ops(plan_def, target)
                     applied = await _apply_companion_ops(
                         plan_id, ops, "adaptive",
@@ -1672,9 +1707,13 @@ async def _on_plan_change(plan_id: str):
 
 
 async def _active_plan_id() -> str:
-    """The plan the current rider is on (Green Lantern → couch-to-road)."""
+    """The plan the current rider is on. An explicit `assigned_plan_id` on the rider
+    wins; otherwise Green Lantern → couch-to-road, everyone else → build-and-climb."""
     try:
         rider = await _rider_doc()
+        pid = (rider.get("assigned_plan_id") or "").strip()
+        if pid:
+            return pid
         if (rider.get("name") or "").strip().lower() == "green lantern":
             return "couch-to-road"
     except Exception:
@@ -1918,7 +1957,8 @@ async def get_plan(id: str = "build-and-climb"):
     stays on 'Build & Climb'."""
     try:
         rider = await _rider_doc()
-        if (rider.get("name") or "").strip().lower() == "green lantern" or id == "couch-to-road":
+        active = await _active_plan_id()
+        if active == "couch-to-road" or id == "couch-to-road":
             cur, ride_map, _supp = await _ctr_state()
             prog = await _ctr_progress(ride_map)
             return _ctr_plan_response(cur, ride_map, prog)
@@ -2237,7 +2277,7 @@ async def get_calendar_week(start: str = "2025-05-12"):
     """Return a scheduling week (seeded into Mongo on first read)."""
     try:
         rider = await _rider_doc()
-        is_ctr = (rider.get("name") or "").strip().lower() == "green lantern"
+        is_ctr = (await _active_plan_id()) == "couch-to-road"
         if is_ctr:
             cur, ride_map, supp_dates = await _ctr_state()
             doc = _ctr_calendar_week(CTR_WEEKS[cur], ride_map, supp_dates, _ctr_today())

@@ -26,9 +26,14 @@ _INTENT_KEYWORDS = [
 ]
 
 
+_INTENT_RE = re.compile(
+    r"\b(" + "|".join(re.escape(k) for k in _INTENT_KEYWORDS) + r")\b",
+    re.IGNORECASE,
+)
+
+
 def has_plan_edit_intent(message: str) -> bool:
-    m = (message or "").lower()
-    return any(k in m for k in _INTENT_KEYWORDS)
+    return bool(_INTENT_RE.search(message or ""))
 
 
 def _pm(s: Any) -> int:
