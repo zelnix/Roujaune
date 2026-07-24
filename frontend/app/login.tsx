@@ -1,9 +1,13 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Platform, ScrollView, KeyboardAvoidingView } from "react-native";
+import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Platform, ScrollView, KeyboardAvoidingView, ImageBackground, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/src/lib/auth-context";
-import { colors, radius, spacing } from "@/src/theme";
+import { colors, radius, spacing, shadow, textShadow } from "@/src/theme";
+
+const AUTH_BG = require("../assets/images/auth_bg_sunset.png");
+const LOGO_GLYPH = require("../assets/images/auth_logo_glyph.png");
+const WORDMARK = require("../assets/images/auth_wordmark.png");
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -35,11 +39,17 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <ImageBackground source={AUTH_BG} resizeMode="cover" style={styles.root}>
+      <View style={styles.scrim} />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
-        <ScrollView contentContainerStyle={styles.center} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={[styles.center, { paddingTop: insets.top + spacing.lg }]} keyboardShouldPersistTaps="handled">
+          <View style={styles.brandBlock}>
+            <Image source={LOGO_GLYPH} style={styles.glyph} resizeMode="contain" />
+            <Image source={WORDMARK} style={styles.wordmark} resizeMode="contain" />
+            <Text style={styles.brandTag}>Your strongest ride is your own.</Text>
+          </View>
+
           <View style={styles.card}>
-            <Text style={styles.brand}>ROUJAUNE</Text>
             <Text style={styles.tagline}>{mode === "login" ? "Welcome back — let's ride." : "Create your rider account."}</Text>
 
             {mode === "register" && (
@@ -80,18 +90,22 @@ export default function LoginScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </View>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
+  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(5,5,5,0.62)" },
   flex: { flex: 1 },
-  center: { flexGrow: 1, alignItems: "center", justifyContent: "center", padding: spacing.lg },
-  card: { width: 420, maxWidth: "100%", backgroundColor: colors.cardElevated, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.xl, gap: 12 },
-  brand: { color: colors.yellow, fontSize: 30, fontWeight: "900", letterSpacing: 2, textAlign: "center" },
+  center: { flexGrow: 1, alignItems: "center", justifyContent: "center", padding: spacing.lg, gap: spacing.lg },
+  brandBlock: { alignItems: "center", gap: 6 },
+  glyph: { width: 76, height: 62 },
+  wordmark: { width: 224, height: 34 },
+  brandTag: { color: colors.white, fontSize: 13, fontWeight: "600", letterSpacing: 0.3, opacity: 0.9, ...textShadow("#000", 6) },
+  card: { width: 420, maxWidth: "100%", backgroundColor: "rgba(12,12,11,0.86)", borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.xl, gap: 12, ...shadow.card },
   tagline: { color: colors.textDim, fontSize: 14, textAlign: "center", marginBottom: 8 },
-  input: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 13, color: colors.white, fontSize: 15 },
+  input: { backgroundColor: "rgba(0,0,0,0.35)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 13, color: colors.white, fontSize: 15 },
   error: { color: colors.red, fontSize: 13, fontWeight: "600" },
   primary: { backgroundColor: colors.yellow, borderRadius: radius.md, paddingVertical: 14, alignItems: "center", marginTop: 4 },
   primaryText: { color: "#000", fontWeight: "800", fontSize: 15 },
@@ -99,6 +113,6 @@ const styles = StyleSheet.create({
   divider: { flexDirection: "row", alignItems: "center", gap: 10, marginVertical: 4 },
   line: { flex: 1, height: 1, backgroundColor: colors.border },
   or: { color: colors.textFaint, fontSize: 11, fontWeight: "700" },
-  social: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingVertical: 13 },
+  social: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "rgba(0,0,0,0.35)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingVertical: 13 },
   socialText: { color: colors.white, fontSize: 14.5, fontWeight: "700" },
 });

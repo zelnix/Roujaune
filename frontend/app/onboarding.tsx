@@ -1,10 +1,14 @@
 import React, { useState } from "react";
-import { View, Text, Pressable, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
+import { View, Text, Pressable, StyleSheet, ScrollView, ActivityIndicator, ImageBackground, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/src/lib/auth-context";
-import { colors, radius, spacing } from "@/src/theme";
+import { colors, radius, spacing, textShadow } from "@/src/theme";
+
+const AUTH_BG = require("../assets/images/auth_bg_sunset.png");
+const LOGO_GLYPH = require("../assets/images/auth_logo_glyph.png");
+const WORDMARK = require("../assets/images/auth_wordmark.png");
 
 const API = (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
 
@@ -75,8 +79,13 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top + 12 }]}>
-      <ScrollView contentContainerStyle={styles.scroll}>
+    <ImageBackground source={AUTH_BG} resizeMode="cover" style={styles.root}>
+      <View style={styles.scrim} />
+      <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 16 }]}>
+        <View style={styles.brandRow}>
+          <Image source={LOGO_GLYPH} style={styles.glyph} resizeMode="contain" />
+          <Image source={WORDMARK} style={styles.wordmark} resizeMode="contain" />
+        </View>
         <Text style={styles.hi}>Hi {user?.name?.split(" ")[0] || "rider"} 👋</Text>
         {!reco ? (
           <>
@@ -145,35 +154,39 @@ export default function OnboardingScreen() {
           </>
         )}
       </ScrollView>
-    </View>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
+  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(5,5,5,0.7)" },
   scroll: { padding: spacing.xl, maxWidth: 720, width: "100%", alignSelf: "center", gap: 10 },
+  brandRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 4 },
+  glyph: { width: 44, height: 36 },
+  wordmark: { width: 150, height: 23 },
   hi: { color: colors.textDim, fontSize: 15 },
-  title: { color: colors.white, fontSize: 26, fontWeight: "900" },
+  title: { color: colors.white, fontSize: 26, fontWeight: "900", ...textShadow("#000", 8) },
   sub: { color: colors.textDim, fontSize: 14, marginBottom: 8 },
   qBlock: { marginTop: 12, gap: 8 },
-  qLabel: { color: colors.white, fontSize: 15, fontWeight: "700" },
+  qLabel: { color: colors.white, fontSize: 15, fontWeight: "700", ...textShadow("#000", 6) },
   opts: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  opt: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card },
+  opt: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: "rgba(12,12,11,0.78)" },
   optActive: { backgroundColor: colors.yellow, borderColor: colors.yellow },
   optText: { color: colors.textDim, fontSize: 13.5, fontWeight: "600" },
   optTextActive: { color: "#000", fontWeight: "800" },
   primary: { backgroundColor: colors.yellow, borderRadius: radius.md, paddingVertical: 15, alignItems: "center", marginTop: 22 },
   primaryText: { color: "#000", fontWeight: "800", fontSize: 15 },
   skip: { color: colors.textDim, fontSize: 13, textAlign: "center", paddingVertical: 12, textDecorationLine: "underline" },
-  recoCard: { backgroundColor: "rgba(245,179,1,0.08)", borderWidth: 1, borderColor: colors.yellow, borderRadius: radius.lg, padding: spacing.lg, marginTop: 12, gap: 6 },
+  recoCard: { backgroundColor: "rgba(245,179,1,0.14)", borderWidth: 1, borderColor: colors.yellow, borderRadius: radius.lg, padding: spacing.lg, marginTop: 12, gap: 6 },
   recoTop: { flexDirection: "row", alignItems: "center", gap: 6 },
   recoBadge: { color: colors.yellow, fontSize: 11, fontWeight: "800", letterSpacing: 0.5 },
   recoTitle: { color: colors.white, fontSize: 20, fontWeight: "800" },
   recoNote: { color: colors.textDim, fontSize: 12.5, lineHeight: 17 },
   recoCta: { color: colors.yellow, fontSize: 14, fontWeight: "700", marginTop: 4 },
   pickAnother: { color: colors.textFaint, fontSize: 12, fontWeight: "700", letterSpacing: 0.5, marginTop: 22 },
-  planRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 14, marginTop: 8 },
-  freeRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.borderSoft, borderRadius: radius.md, padding: 14, marginTop: 8 },
+  planRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "rgba(12,12,11,0.82)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 14, marginTop: 8 },
+  freeRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "rgba(12,12,11,0.82)", borderWidth: 1, borderColor: colors.borderSoft, borderRadius: radius.md, padding: 14, marginTop: 8 },
   planTitle: { color: colors.white, fontSize: 15, fontWeight: "700" },
   planLevel: { color: colors.textDim, fontSize: 12.5, marginTop: 2 },
 });
