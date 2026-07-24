@@ -1,0 +1,38 @@
+{
+  "summary": "Iter 25 — Companion plan editing (Phase 2) validated end-to-end. Backend: 3/3 pytest pass in test_companion_plan_edits.py — (A1) POST /api/coach/chat with 'shorten my First Endurance Ride to 20 minutes' returns plan_updated=true + non-empty plan_change; GET /api/plans/couch-to-road shows week1 day5 duration '20 min'; PATCH restores to '30 min'. (A2) Non-edit message 'How is my training going?' returns plan_updated falsy, plan_change absent/empty, and week1 durations unchanged. (B1) POST /api/coach/debrief with compliance=55 returns a debrief; after ~4s the background task easesweek 2 (25→22, 30→27, 35→32) and adds 2 to plan_state.eased_weeks; a SECOND identical debrief does NOT re-ease week 2 (idempotent). Frontend: on /plan the 'Message Alberto' button opens the chat; sending 'make this week easier, shorten my Saturday ride to 20 minutes' surfaces the green testID='chat-plan-notice' pill with the expected 'Plan updated · Shortened Week 1's Saturday ride from 30 to 20 minutes...' text; closing the chat triggers a plan refetch and the /plan page reflects the new '20 min' Saturday duration in both 'THIS WEEK'S PLAN' and Key Workouts. Demo state fully restored (week1 day5 → 30 min, week2 cycling 25/30/35, plan_state.eased_weeks cleared, current_week=1). Non-destructive edit_history retains 3 entries (well below the 30 cap).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_companion_plan_edits.py",
+    "/app/test_reports/pytest/iter25.xml",
+    "/app/test_reports/screens/iter25_plan_before.png",
+    "/app/test_reports/screens/iter25_chat_open.png",
+    "/app/test_reports/screens/iter25_plan_notice.png",
+    "/app/test_reports/screens/iter25_plan_after.png"
+  ],
+  "action_items": [
+    "Nothing blocking — all Phase-2 companion plan editing behaves as specified (chat-driven edit, non-edit no-op, adaptive auto-ease, per-week idempotence, and frontend notice + refetch)."
+  ],
+  "critical_code_review_comments": [
+    "companion_plan.has_plan_edit_intent uses a substring match on the raw lowered message, so a benign question like 'is my plan easier than last time?' would trigger the LLM edit path (LLM would still return ops:[] and no change happens, but it pays an LLM call and adds latency). Consider gating on the LLM's returned ops list only (already sanitized) or tightening the keyword regex with word boundaries.",
+    "server.py L1310 auto-ease is gated by `plan_id == 'couch-to-road'`. If a second structured plan is added later, this hardcode will silently skip easing. Consider moving the eligibility check into plan_def metadata (e.g., plan_def.get('supports_auto_ease')).",
+    "server.py L1310 uses `0 < req.compliance < 70` — a compliance of exactly 0 (missing/degenerate) skips easing, which is correct, but a compliance of exactly 70 also skips. This is a minor threshold choice; if intended cutoff is <=70, use <=70.",
+    "companion_plan.auto_ease_ops floors durations at 15 min but does not touch days whose current duration is <20 min. That's intentional per the docstring; worth calling out in adaptation history text so riders don't wonder why some rides weren't eased.",
+    "coach_chat persists the user+coach messages after the plan edit is applied. If the LLM call fails after a successful plan edit, the applied edit remains but the user sees an error and the messages are not saved — the rider will not see confirmation in chat history on next open. Consider persisting the user message before the LLM call, or rolling back the plan edit on LLM failure."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_companion_plan_edits.py (new)",
+    "/app/test_reports/pytest/iter25.xml (new)"
+  ],
+  "success_rate": {"backend": "100% (3/3 pytest)", "frontend": "100% — chat modal open, plan-edit send, notice pill, plan refetch all verified"},
+  "seed_data_creation": "None. Only PATCH ops on couch-to-road week1 day5 and adaptive ease on week2 (both reverted). plan_state.eased_weeks cleared. edit_history retains 3 non-destructive entries from testing (limit is 30).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend BASE_URL = EXPO_PUBLIC_BACKEND_URL (https://roujaune-train.preview.emergentagent.com). Reproduce: EXPO_PUBLIC_BACKEND_URL=<url> pytest backend/tests/test_companion_plan_edits.py -v. Chat-edit intent is keyword-gated (companion_plan._INTENT_KEYWORDS). Adaptive auto-ease is per-plan-per-week idempotent via plan_state.eased_weeks. To reset the plan cleanly if messy: mongosh mongodb://localhost:27017/test_database --eval 'db.plans.deleteMany({}); db.plan_state.updateOne({id:\"couch-to-road\"},{$set:{current_week:1},$unset:{eased_weeks:\"\"}}); db.training_plans.deleteMany({id:\"couch-to-road\"}); db.coach_chats.deleteMany({})' then `sudo supervisorctl restart backend`. The rider profile MUST remain 'Green Lantern' so _active_plan_id returns 'couch-to-road'.",
+  "rca_of_issue": "n/a — no failures. All backend + frontend acceptance criteria met on first run."
+}

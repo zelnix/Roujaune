@@ -43,7 +43,7 @@ function Toast({ message }: { message: { id: number; text: string } | null }) {
 export default function TrainingPlanScreen() {
   const router = useRouter();
   const persona = useCoach();
-  const { plan } = usePlan();
+  const { plan, refresh: refreshPlan } = usePlan();
   const adaptation = useAdaptation(persona.name, persona.gender);
   const adaptiveTargets = useAdaptiveTargets();
   const { width } = useWindowDimensions();
@@ -175,7 +175,7 @@ export default function TrainingPlanScreen() {
         />
         <ProgressModal visible={showProgress} onClose={() => setShowProgress(false)} />
         <AdaptationsModal visible={showAdaptations} onClose={() => setShowAdaptations(false)} persona={persona} />
-        <CoachChatModal visible={showChat} onClose={() => setShowChat(false)} persona={persona} />
+        <CoachChatModal visible={showChat} onClose={() => setShowChat(false)} persona={persona} onPlanUpdated={refreshPlan} />
       </SafeAreaView>
     </GestureHandlerRootView>
   );

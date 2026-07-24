@@ -105,6 +105,18 @@
 user_problem_statement: "ROUJAUNE cycling app — fork session: /training date hydration, CalendarCard key fix, Seated Mode toggle, Native BLE sensors feeding WS telemetry."
 
 backend:
+  - task: "Companion plan editing — chat-driven edits (Part A) + adaptive auto-ease on low compliance (Part B)"
+    implemented: true
+    working: "NA"
+    file: "backend/companion_plan.py, backend/server.py, frontend/src/components/CoachChatModal.tsx, frontend/src/lib/plan.ts"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Part A: POST /api/coach/chat now detects plan-edit intent (keyword gate), asks the LLM to emit sanitized structured ops (allowlist: day duration/zone/tss/title/rpe, week objective/title; max 8 ops; validated week+day range), applies them via plans_admin.adapt_plan (source='rider-request'), records an adaptation-history note, and returns plan_updated + plan_change. The coach reply confirms the change. Self-tested: 'shorten my First Endurance Ride to 20 minutes' → plan_updated true, week1 day5 30->20 min, reply confirmed; restored to 30. Part B: after a ride debrief with 0<compliance<70 (couch-to-road only), _refresh_adaptation_after_ride eases the NEXT week's cycling days ~10% (floor 15 min) once (plan_state.eased_weeks marker), and the adaptation note mentions it. Self-tested: compliance 55 → week2 25/30/35 -> 22/27/32, eased_weeks=[2]; restored pristine. Frontend: CoachChatModal shows a 'Plan updated · ...' pill (testID chat-plan-notice) and calls onPlanUpdated; /plan passes usePlan().refresh so the plan refetches. NEEDS: retest chat-edit flow end-to-end via UI + confirm pill + plan refresh; confirm non-edit chat messages do NOT set plan_updated."
+
   - task: "Plan definitions in MongoDB — portable plans_admin router + non-destructive seed"
     implemented: true
     working: "NA"

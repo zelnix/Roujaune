@@ -37,6 +37,7 @@ export function usePlan(id = "build-and-climb") {
   const [plan, setPlan] = useState<TrainingPlan>(PLAN);
   const [loading, setLoading] = useState(true);
   const [live, setLive] = useState(false);
+  const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -56,9 +57,10 @@ export function usePlan(id = "build-and-climb") {
       }
     })();
     return () => { alive = false; };
-  }, [id]);
+  }, [id, nonce]);
 
-  return { plan, loading, live };
+  const refresh = () => setNonce((n) => n + 1);
+  return { plan, loading, live, refresh };
 }
 
 /** Fetch the coach's AI-generated plan adaptation. Cached server-side per

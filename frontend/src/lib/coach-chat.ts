@@ -17,7 +17,7 @@ export async function sendChatMessage(
   persona: CoachPersona,
   style: CoachStyle,
   message: string
-): Promise<{ user_message: ChatMessage; coach_message: ChatMessage }> {
+): Promise<{ user_message: ChatMessage; coach_message: ChatMessage; plan_updated?: boolean; plan_change?: string }> {
   const res = await fetch(`${apiBase()}/api/coach/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

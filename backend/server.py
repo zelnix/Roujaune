@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from readiness import compute_readiness
 from rider_level import compute_rider_level
 import plans_admin
+import companion_plan
 
 
 ROOT_DIR = Path(__file__).parent
@@ -802,7 +803,8 @@ async def coach_debrief(req: CoachDebriefRequest):
                 logging.warning("debrief cache write failed")
         # A completed ride makes the plan react: refresh the coach's adaptation
         # note in the background so it reflects this session on the next plan load.
-        asyncio.create_task(_refresh_adaptation_after_ride(req))
+        _plan_id = await _active_plan_id()
+        asyncio.create_task(_refresh_adaptation_after_ride(req, _plan_id))
         return {"debrief": text, "cached": False}
     except Exception as e:
         logging.exception("coach_debrief failed")
@@ -1211,6 +1213,33 @@ async def coach_chat(req: CoachChatRequest):
 
     rider_ctx = await _build_rider_context()
 
+    # Companion plan editing: if the rider asks for a plan change, turn it into
+    # safe structured edits and apply them so the coach can confirm in-reply.
+    applied_note = ""
+    plan_updated = False
+    if companion_plan.has_plan_edit_intent(req.message):
+        try:
+            plan_id = await _active_plan_id()
+            plan_def = await plans_admin.get_plan_def(plan_id)
+            if plan_def and plan_def.get("weeks"):
+                state = await db.plan_state.find_one({"id": plan_id}) or {}
+                cur = int(state.get("current_week", 1))
+                ops, summary = await companion_plan.extract_plan_ops(
+                    req.message, plan_def, cur, req.coach_name, req.coach_gender, key,
+                )
+                applied = await _apply_companion_ops(
+                    plan_id, ops, "rider-request", req.message.strip()[:140],
+                )
+                if applied:
+                    plan_updated = True
+                    applied_note = summary or ("; ".join(applied))
+                    await _record_adaptation(
+                        plan_id, req.coach_name,
+                        f"At your request, I {applied_note}.", "At your request",
+                    )
+        except Exception:
+            logging.warning("chat plan-edit failed")
+
     recent = history[-10:]
     transcript = "\n".join(
         f"{'Rider' if m.get('role') == 'user' else req.coach_name}: {m.get('text')}" for m in recent
@@ -1219,6 +1248,9 @@ async def coach_chat(req: CoachChatRequest):
         f"{rider_ctx}\n\n" if rider_ctx else ""
     ) + (
         f"Conversation so far:\n{transcript}\n\n" if transcript else ""
+    ) + (
+        f"You have just updated the rider's plan at their request: {applied_note}. "
+        "Confirm this change warmly and briefly explain why it helps.\n\n" if applied_note else ""
     ) + f"Rider: {req.message.strip()}\n{req.coach_name}:"
 
     try:
@@ -1248,7 +1280,8 @@ async def coach_chat(req: CoachChatRequest):
     except Exception:
         logging.warning("coach chat persist failed")
 
-    return {"reply": reply, "user_message": user_msg, "coach_message": coach_msg}
+    return {"reply": reply, "user_message": user_msg, "coach_message": coach_msg,
+            "plan_updated": plan_updated, "plan_change": applied_note}
 
 
 async def _refresh_adaptation_after_ride(req: "CoachDebriefRequest", plan_id: str = "build-and-climb"):
@@ -1271,6 +1304,29 @@ async def _refresh_adaptation_after_ride(req: "CoachDebriefRequest", plan_id: st
             "interval_compliance": req.interval_compliance,
             "target_nudges": nudges,
         }
+        # Adaptive plan easing: if this ride's compliance was low, gently ease the
+        # rider's next upcoming week (structured plans only, once per week).
+        try:
+            if plan_id == "couch-to-road" and 0 < req.compliance < 70:
+                state = await db.plan_state.find_one({"id": plan_id}) or {}
+                cur = int(state.get("current_week", 1))
+                target = cur + 1
+                eased = set(state.get("eased_weeks", []))
+                plan_def = await plans_admin.get_plan_def(plan_id)
+                if plan_def and target <= plan_def.get("duration_weeks", 16) and target not in eased:
+                    ops, summary = companion_plan.auto_ease_ops(plan_def, target)
+                    applied = await _apply_companion_ops(
+                        plan_id, ops, "adaptive",
+                        f"Low compliance ({req.compliance}%) — easing week {target}",
+                    )
+                    if applied:
+                        eased.add(target)
+                        await db.plan_state.update_one(
+                            {"id": plan_id}, {"$set": {"eased_weeks": list(eased)}}, upsert=True,
+                        )
+                        recent_ride["plan_adjustment"] = summary
+        except Exception:
+            logging.warning("adaptive plan easing failed")
         text = await _generate_adaptation(plan, req.coach_name, req.coach_gender, recent_ride)
         cache_key = f"adaptation_ai_{req.coach_name.lower()}"
         await db.training_plans.update_one(
@@ -1615,6 +1671,31 @@ async def _on_plan_change(plan_id: str):
         await _reload_ctr_from_db()
 
 
+async def _active_plan_id() -> str:
+    """The plan the current rider is on (Green Lantern → couch-to-road)."""
+    try:
+        rider = await _rider_doc()
+        if (rider.get("name") or "").strip().lower() == "green lantern":
+            return "couch-to-road"
+    except Exception:
+        pass
+    return "build-and-climb"
+
+
+async def _apply_companion_ops(plan_id: str, ops: list, source: str, reason: str) -> list:
+    """Apply sanitized companion ops via the portable plans_admin router."""
+    if not ops:
+        return []
+    res = await plans_admin.adapt_plan(
+        plan_id,
+        plans_admin.AdaptRequest(
+            source=source, reason=reason,
+            ops=[plans_admin.AdaptOp(**o) for o in ops],
+        ),
+    )
+    return res.get("applied", [])
+
+
 def _ctr_today():
     from datetime import date
     return date.today()
@@ -1901,6 +1982,12 @@ async def _generate_adaptation(plan: dict, coach_name: str, coach_gender: str, r
                 " Based on how they executed their intervals you have automatically "
                 + "; ".join(nudges)
                 + ". Mention this target adjustment naturally in your note."
+            )
+        adjust = recent_ride.get("plan_adjustment")
+        if adjust:
+            ride_txt += (
+                f" You have also automatically {adjust} to keep them progressing "
+                "comfortably. Reassure them about this easing in your note."
             )
     prompt = (
         f"The rider is on the '{plan.get('title')}' plan: {plan.get('description')}\n"

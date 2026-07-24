@@ -18,7 +18,7 @@ function TypingDots() {
   );
 }
 
-export function CoachChatModal({ visible, onClose, persona }: { visible: boolean; onClose: () => void; persona: CoachPersona }) {
+export function CoachChatModal({ visible, onClose, persona, onPlanUpdated }: { visible: boolean; onClose: () => void; persona: CoachPersona; onPlanUpdated?: () => void }) {
   const style = useCoachStyle();
   const { speak, stop, speakingId } = useCoachSpeech(persona.id);
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
@@ -26,6 +26,7 @@ export function CoachChatModal({ visible, onClose, persona }: { visible: boolean
   const [loading, setLoading] = React.useState(false);
   const [sending, setSending] = React.useState(false);
   const [latestRide, setLatestRide] = React.useState<LatestRide | null>(null);
+  const [planNotice, setPlanNotice] = React.useState<string | null>(null);
   const scrollRef = React.useRef<ScrollView>(null);
 
   const scrollToEnd = React.useCallback(() => {
@@ -37,6 +38,7 @@ export function CoachChatModal({ visible, onClose, persona }: { visible: boolean
     if (!visible) { stop(); return; }
     let alive = true;
     setLoading(true);
+    setPlanNotice(null);
     fetchLatestRide().then((r) => { if (alive) setLatestRide(r); });
     fetchChatHistory(persona.name)
       .then((m) => { if (alive) { setMessages(m); scrollToEnd(); } })
@@ -56,6 +58,10 @@ export function CoachChatModal({ visible, onClose, persona }: { visible: boolean
     try {
       const res = await sendChatMessage(persona, style, msg);
       setMessages((m) => [...m.filter((x) => x.id !== optimistic.id), res.user_message, res.coach_message]);
+      if (res.plan_updated) {
+        setPlanNotice(res.plan_change || "Your plan was updated");
+        onPlanUpdated?.();
+      }
     } catch {
       setMessages((m) => [...m, { id: `err-${Date.now()}`, role: "coach", text: "I couldn't reach you just now — give me a moment and try again.", at: new Date().toISOString() }]);
     } finally {
@@ -97,6 +103,13 @@ export function CoachChatModal({ visible, onClose, persona }: { visible: boolean
                 <Ionicons name="close" size={20} color={C.white} />
               </Pressable>
             </View>
+
+            {planNotice ? (
+              <View style={s.planNotice} testID="chat-plan-notice">
+                <Ionicons name="checkmark-circle" size={15} color={C.green} />
+                <Text style={s.planNoticeText} numberOfLines={2}>Plan updated · {planNotice}</Text>
+              </View>
+            ) : null}
 
             {/* messages */}
             <ScrollView
@@ -201,6 +214,8 @@ const s = StyleSheet.create({
   headRole: { color: C.dim, fontSize: 11.5 },
   headBtn: { width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   headBtnHover: { backgroundColor: "rgba(255,255,255,0.08)" },
+  planNotice: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: "rgba(85,200,80,0.1)", borderBottomWidth: 1, borderBottomColor: C.borderSoft },
+  planNoticeText: { flex: 1, color: C.green, fontSize: 12.5, fontWeight: "700" },
 
   list: { flex: 1 },
   listContent: { padding: 16, gap: 12 },
