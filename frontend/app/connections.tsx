@@ -187,7 +187,7 @@ export default function ConnectionsScreen() {
       </Card>
 
       {toast ? (
-        <View style={s.toast} pointerEvents="none"><Text style={s.toastText}>{toast}</Text></View>
+        <View style={[s.toast, { pointerEvents: "none" }]}><Text style={s.toastText}>{toast}</Text></View>
       ) : null}
     </AppScaffold>
   );

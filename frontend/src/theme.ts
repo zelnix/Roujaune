@@ -55,3 +55,11 @@ export const shadow = {
     },
   }) as object,
 };
+
+// Cross-platform text shadow: uses the CSS `textShadow` shorthand on web (RN Web
+// deprecated the long-form props) and the native long-form props elsewhere.
+export const textShadow = (color: string, radius: number, offset = { width: 0, height: 1 }) =>
+  (Platform.select({
+    web: { textShadow: `${offset.width}px ${offset.height}px ${radius}px ${color}` },
+    default: { textShadowColor: color, textShadowOffset: offset, textShadowRadius: radius },
+  }) as object);

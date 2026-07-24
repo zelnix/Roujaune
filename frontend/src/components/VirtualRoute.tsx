@@ -123,11 +123,11 @@ export function VirtualRoute({ width, height, speed = 26, cadence = 88, gender =
       })}
 
       {/* rider (from the rear) */}
-      <Animated.View style={[styles.rider, { left: cx - riderW / 2, bottom: -height * 0.02, transform: [{ translateY: bobY }, { translateX: sway }] }]} pointerEvents="none">
+      <Animated.View style={[styles.rider, { left: cx - riderW / 2, bottom: -height * 0.02, transform: [{ translateY: bobY }, { translateX: sway }], pointerEvents: "none" }]}>
         <Image source={riderImg} style={{ width: riderW, height: riderH }} contentFit="contain" />
       </Animated.View>
 
-      <View style={styles.badge} pointerEvents="none">
+      <View style={[styles.badge, { pointerEvents: "none" }]}>
         <Text style={styles.badgeText}>VIRTUAL ROUTE</Text>
       </View>
     </View>

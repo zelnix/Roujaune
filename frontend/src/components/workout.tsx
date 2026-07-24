@@ -4,7 +4,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Svg, { Rect, Path, Polyline, Circle, Line } from "react-native-svg";
-import { colors, radius, spacing, shadow } from "../theme";
+import { colors, radius, spacing, shadow, textShadow } from "../theme";
 import { Touchable, SectionLabel } from "./ui";
 import { posterFor } from "../lib/youtube";
 import { CoachId, COACHES } from "../lib/coach-persona";
@@ -617,10 +617,10 @@ export function ImmersiveHud({
   const conn = connMeta(connectionState, stale);
   const NC = "—";
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none" testID="immersive-hud">
+    <View style={[StyleSheet.absoluteFill, { pointerEvents: "box-none" }]} testID="immersive-hud">
       {/* top scrim + status */}
-      <LinearGradient colors={["rgba(0,0,0,0.7)", "transparent"]} style={styles.hudTopScrim} pointerEvents="none" />
-      <View style={styles.hudTopLeft} pointerEvents="none">
+      <LinearGradient colors={["rgba(0,0,0,0.7)", "transparent"]} style={[styles.hudTopScrim, { pointerEvents: "none" }]} />
+      <View style={[styles.hudTopLeft, { pointerEvents: "none" }]}>
         <Text style={styles.hudElapsed}>{elapsed}</Text>
         <View style={styles.hudElapsedSub}>
           <Text style={styles.hudMicro}>ELAPSED</Text>
@@ -633,20 +633,20 @@ export function ImmersiveHud({
       </View>
 
       {/* routes button (left of the collapse control) */}
-      <View style={styles.hudRoutes} pointerEvents="box-none">
+      <View style={[styles.hudRoutes, { pointerEvents: "box-none" }]}>
         <RoutesButton onPress={onOpenRoutes} testID="hud-routes" />
       </View>
 
       {/* Alberto cue */}
-      <View style={styles.hudCue} pointerEvents="none">
+      <View style={[styles.hudCue, { pointerEvents: "none" }]}>
         <MaterialCommunityIcons name="account-voice" size={15} color={colors.gold} />
         <Text style={styles.hudCueText} numberOfLines={1}>{paused ? "Workout paused — take a breath." : cue}</Text>
       </View>
 
       {/* bottom scrim + metrics + controls */}
-      <LinearGradient colors={["transparent", "rgba(0,0,0,0.82)"]} style={styles.hudBotScrim} pointerEvents="none" />
-      <View style={styles.hudBottom} pointerEvents="box-none">
-        <View style={styles.hudChips} pointerEvents="none">
+      <LinearGradient colors={["transparent", "rgba(0,0,0,0.82)"]} style={[styles.hudBotScrim, { pointerEvents: "none" }]} />
+      <View style={[styles.hudBottom, { pointerEvents: "box-none" }]}>
+        <View style={[styles.hudChips, { pointerEvents: "none" }]}>
           <HudChip icon={<Ionicons name="flash" size={13} color={colors.yellow} />} color={colors.yellow} label="POWER" value={trainerConnected ? power : NC} unit={trainerConnected ? `W · ${wkg} W/kg` : "not connected"} />
           <HudChip icon={<Ionicons name="heart" size={13} color={colors.red} />} color={colors.red} label="HEART RATE" value={wearableConnected ? hr : NC} unit={wearableConnected ? "bpm" : "not connected"} />
           <HudChip icon={<Ionicons name="sync" size={13} color={colors.yellow} />} color={colors.yellow} label="CADENCE" value={trainerConnected ? cadence : NC} unit={trainerConnected ? "rpm" : "not connected"} />
@@ -860,7 +860,7 @@ export function MusicPanel({ musicOn, toggleMusic, volume, setVolume, voiceOn, t
           <Switch testID="toggle-voice" value={voiceOn} onValueChange={toggleVoice} trackColor={{ true: colors.red, false: "rgba(255,255,255,0.2)" }} thumbColor="#fff" />
         </View>
 
-        <View style={[styles.voiceBlock, !voiceOn && { opacity: 0.4 }]} pointerEvents={voiceOn ? "auto" : "none"}>
+        <View style={[styles.voiceBlock, !voiceOn && { opacity: 0.4 }, { pointerEvents: voiceOn ? "auto" : "none" }]}>
           <Text style={styles.voiceHint}>Voice & accent · tap any to hear it, then pick your favourite</Text>
           {voiceOptions.length === 0 ? (
             <Text style={styles.spSub}>Loading device voices…</Text>
@@ -1080,7 +1080,7 @@ const styles = StyleSheet.create({
   /* immersive HUD */
   hudTopScrim: { position: "absolute", top: 0, left: 0, right: 0, height: 110 },
   hudTopLeft: { position: "absolute", top: 16, left: 60 },
-  hudElapsed: { color: "#fff", fontSize: 34, fontWeight: "900", letterSpacing: 0.5, textShadowColor: "rgba(0,0,0,0.6)", textShadowRadius: 6 },
+  hudElapsed: { color: "#fff", fontSize: 34, fontWeight: "900", letterSpacing: 0.5, ...textShadow("rgba(0,0,0,0.6)", 6) },
   hudElapsedSub: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 2 },
   hudMicro: { color: "rgba(255,255,255,0.75)", fontSize: 11, fontWeight: "700", letterSpacing: 0.5 },
   hudConn: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: "rgba(0,0,0,0.35)" },

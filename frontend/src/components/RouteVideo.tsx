@@ -77,7 +77,7 @@ export function RouteVideo({
           )}
 
           {loading && !error && (
-            <View style={styles.state} pointerEvents="none" testID="route-video-loading">
+            <View style={[styles.state, { pointerEvents: "none" }]} testID="route-video-loading">
               <Image source={{ uri: posterFor(videoId) }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
               <View style={styles.posterScrim} />
               <ActivityIndicator size="large" color={colors.red} />
@@ -101,7 +101,7 @@ export function RouteVideo({
 
       {/* Live-data HUD / overlay slot */}
       {children && (
-        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">{children}</View>
+        <View style={[StyleSheet.absoluteFill, { pointerEvents: "box-none" }]}>{children}</View>
       )}
 
       {/* Expand / collapse control */}
@@ -119,7 +119,7 @@ export function RouteVideo({
       )}
 
       {title && !expanded && !error && !loading && (
-        <View style={styles.titleTag} pointerEvents="none">
+        <View style={[styles.titleTag, { pointerEvents: "none" }]}>
           <Ionicons name="navigate" size={12} color={colors.yellow} />
           <Text style={styles.titleText} numberOfLines={1}>{title}</Text>
         </View>

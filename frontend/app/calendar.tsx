@@ -10,7 +10,7 @@ import { Platform } from "react-native";
 
 import { useCoach } from "@/src/lib/coach-persona";
 import {
-  useCalendarWeek, moveSession, requestAlbertoReview, CalendarDay, SessionType, FILTERS,
+  useCalendarWeek, moveSession, requestAlbertoReview, completeSupplementary, CalendarDay, SessionType, FILTERS,
 } from "@/src/lib/calendar";
 import {
   CC, DateControls, RowLabel, DayHeader, FocusCell, TrainingSessionCard, FB50SessionCard,
@@ -109,6 +109,14 @@ export default function CalendarScreen() {
 
   const onQuickAction = (id: string, title: string) => showToast(title);
 
+  const onToggleSupp = React.useCallback(async (session: any, kind: string) => {
+    if (!selDay) return;
+    const done = await completeSupplementary(kind, session.title, selDay.date);
+    if (done === null) { showToast("Couldn't update — try again"); return; }
+    reload();
+    showToast(done ? `${session.title} marked done` : `${session.title} un-marked`);
+  }, [selDay, reload, showToast]);
+
   if (compact) {
     // Phones: keep tablet intent but stacked & scrollable.
     return (
@@ -126,6 +134,7 @@ export default function CalendarScreen() {
               </View>
             </View>
             {selDay ? <SelectedDayPanel day={selDay} onPrev={() => setSelected((s) => (s + 6) % 7)} onMenu={() => showToast("Session options")} onViewWorkout={() => router.push(selDay?.cycling?.workout_id ? { pathname: "/training", params: { workoutId: selDay.cycling.workout_id } } : "/training")} /> : null}
+            {selDay ? <SupplementaryCompleteCard day={selDay} onToggle={onToggleSupp} /> : null}
             {week ? <WeekSummaryCard summary={week.summary} /> : null}
             <QuickActionsCard onAction={onQuickAction} />
             {week ? <CalendarTipFooter tip={week.tip} /> : null}
@@ -260,6 +269,7 @@ export default function CalendarScreen() {
               {/* right panel */}
               <View style={styles.rightCol}>
                 {selDay ? <SelectedDayPanel day={selDay} onPrev={() => setSelected((s) => (s + 6) % 7)} onMenu={() => showToast("Session options")} onViewWorkout={() => router.push(selDay?.cycling?.workout_id ? { pathname: "/training", params: { workoutId: selDay.cycling.workout_id } } : "/training")} /> : null}
+                {selDay ? <SupplementaryCompleteCard day={selDay} onToggle={onToggleSupp} /> : null}
                 {week ? <WeekSummaryCard summary={week.summary} /> : null}
                 <QuickActionsCard onAction={onQuickAction} />
               </View>
@@ -323,6 +333,35 @@ export default function CalendarScreen() {
         <Toast message={toast} onUndo={() => { toast?.undo?.(); setToast(null); }} />
       </SafeAreaView>
     </GestureHandlerRootView>
+  );
+}
+
+function SupplementaryCompleteCard({ day, onToggle }: { day: CalendarDay; onToggle: (session: any, kind: string) => void }) {
+  const items: { s: any; kind: string }[] = [];
+  if (day.fb50) items.push({ s: day.fb50, kind: ((day.fb50 as any).category || "strength").toLowerCase() });
+  if (day.wellness) items.push({ s: day.wellness, kind: "recovery" });
+  if (!items.length) return null;
+  return (
+    <View style={styles.suppCard} testID="supplementary-complete-card">
+      <Text style={styles.suppLabel}>SUPPLEMENTARY</Text>
+      {items.map((it) => {
+        const done = it.s.status === "completed";
+        return (
+          <Pressable
+            key={it.kind}
+            testID={`supp-toggle-${it.kind}`}
+            onPress={() => onToggle(it.s, it.kind)}
+            style={({ hovered }: any) => [styles.suppRow, hovered && styles.hover]}
+          >
+            <Ionicons name={done ? "checkmark-circle" : "ellipse-outline"} size={22} color={done ? CC.green : CC.dim} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.suppName, done && { color: CC.green }]} numberOfLines={1}>{it.s.title}</Text>
+              <Text style={styles.suppMeta}>{it.s.duration || "Session"}{done ? " · Completed" : " · Tap to mark done"}</Text>
+            </View>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
@@ -392,4 +431,10 @@ const styles = StyleSheet.create({
   toast: { position: "absolute", bottom: 30, alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 16, backgroundColor: "rgba(20,22,21,0.96)", borderWidth: 1, borderColor: CC.border, borderRadius: 12, paddingVertical: 11, paddingHorizontal: 18 },
   toastText: { color: CC.white, fontSize: 13, fontWeight: "600" },
   undoText: { color: CC.yellow, fontSize: 13, fontWeight: "800" },
+
+  suppCard: { backgroundColor: CC.card, borderWidth: 1, borderColor: CC.borderSoft, borderRadius: 14, padding: 14, gap: 8 },
+  suppLabel: { color: CC.dim, fontSize: 11, fontWeight: "800", letterSpacing: 0.6 },
+  suppRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 6, borderRadius: 8, minHeight: 44 },
+  suppName: { color: CC.white, fontSize: 13.5, fontWeight: "700" },
+  suppMeta: { color: CC.dim, fontSize: 11.5, fontWeight: "500", marginTop: 1 },
 });

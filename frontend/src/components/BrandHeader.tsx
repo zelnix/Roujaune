@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Image } from "expo-image";
-import { colors } from "../theme";
+import { colors, textShadow } from "../theme";
 import { brand } from "../data";
 import { useCoach } from "../lib/coach-persona";
 
@@ -70,15 +70,13 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginTop: 8,
     letterSpacing: -0.5,
-    textShadowColor: "rgba(0,0,0,0.6)",
-    textShadowRadius: 8,
+    ...textShadow("rgba(0,0,0,0.6)", 8),
   },
   descriptor: {
     color: colors.yellow,
     fontSize: 15,
     fontWeight: "600",
     marginTop: 4,
-    textShadowColor: "rgba(0,0,0,0.6)",
-    textShadowRadius: 6,
+    ...textShadow("rgba(0,0,0,0.6)", 6),
   },
 });

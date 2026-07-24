@@ -117,7 +117,7 @@ export function TrainingSessionCard({ s, selected }: { s: CalendarSession; selec
   const rest = s.status === "rest";
   return (
     <View style={[cs.card, { borderColor: col }, selected && cs.cardSel]} testID={`training-${s.id}`}>
-      {selected && <View style={[cs.cardGlow, { borderColor: CC.yellow }]} pointerEvents="none" />}
+      {selected && <View style={[cs.cardGlow, { borderColor: CC.yellow, pointerEvents: "none" }]} />}
       <View style={cs.cardHead}>
         <Ionicons name={rest ? "bed-outline" : "bicycle"} size={15} color={col} />
       </View>

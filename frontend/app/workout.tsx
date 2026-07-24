@@ -444,13 +444,13 @@ export default function LiveWorkout() {
             ) : virtualMode ? (
               <View style={{ position: "relative" }}>
                 <VirtualRoute width={centerW} height={Math.round(centerW * 0.5625)} speed={trainerOn ? telemetry.speed : 0} cadence={trainerOn ? telemetry.cadence : 88} gender={getRiderProfile().gender} paused={paused || !trainerOn} />
-                <View style={styles.inlineRoutes} pointerEvents="box-none">
+                <View style={[styles.inlineRoutes, { pointerEvents: "box-none" }]}>
                   <RoutesButton onPress={() => setVirtualMode(false)} testID="switch-video" label="Video" icon="videocam" />
                 </View>
               </View>
             ) : (
               <RouteVideo source={activeRoute.url} title={`${activeRoute.title}${routeAuto ? " · Auto-matched" : activeRoute.id === lastRouteId ? " · Last ride" : ""}`} playing={!paused} muted width={centerW} onToggleExpand={() => setExpanded(true)} expanded={false}>
-                <View style={styles.inlineRoutes} pointerEvents="box-none">
+                <View style={[styles.inlineRoutes, { pointerEvents: "box-none" }]}>
                   <RoutesButton onPress={() => setShowRoutes(true)} testID="inline-routes" />
                   <RoutesButton onPress={() => setVirtualMode(true)} testID="switch-virtual" label="Virtual" icon="bicycle" />
                 </View>
@@ -506,7 +506,7 @@ export default function LiveWorkout() {
           </ScrollView>
         )}
 
-        <View style={styles.mediaBar} pointerEvents="box-none">
+        <View style={[styles.mediaBar, { pointerEvents: "box-none" }]}>
           <MusicButton musicOn={musicOn} onPress={() => setShowMusic(true)} />
           <CastButton onPress={() => setShowCast(true)} />
         </View>

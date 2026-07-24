@@ -950,12 +950,16 @@ class SupplementaryLog(BaseModel):
 
 @api_router.post("/rider/supplementary/complete")
 async def complete_supplementary(body: SupplementaryLog):
-    """Log a completed non-cycling session (strength/mobility/recovery/balance)
-    so the home 'Supplementary Training' actual reflects it."""
+    """Toggle a completed non-cycling session (strength/mobility/recovery/balance)
+    for a given date so the home 'Supplementary Training' actual and the calendar
+    both reflect it. Posting the same date+kind again un-marks it."""
+    existing = await db.supplementary_log.find_one({"date": body.date, "kind": body.kind}) if body.date else None
+    if existing:
+        await db.supplementary_log.delete_one({"_id": existing["_id"]})
+        return {"ok": True, "completed": False}
     doc = {"id": str(uuid.uuid4()), "created_at": now_iso(), "kind": body.kind, "title": body.title, "date": body.date}
     await db.supplementary_log.insert_one(doc)
-    doc.pop("_id", None)
-    return {"ok": True, "logged": doc}
+    return {"ok": True, "completed": True}
 
 
 @api_router.get("/rider/achievements")
@@ -2033,6 +2037,15 @@ async def get_calendar_week(start: str = "2025-05-12"):
                         c["tss"] = f"{act['tss']} TSS"
                     if act.get("duration_sec"):
                         c["duration"] = f"{round(act['duration_sec'] / 60)} min"
+            # Reflect completed supplementary (strength/mobility/recovery/balance)
+            # sessions logged against the plan dates.
+            supp = await db.supplementary_log.find({"date": {"$in": [d["date"] for d in doc["days"]]}}).to_list(200)
+            supp_dates = {s.get("date") for s in supp}
+            for day in doc["days"]:
+                if day["date"] in supp_dates:
+                    for slot in ("fb50", "wellness"):
+                        if day.get(slot):
+                            day[slot]["status"] = "completed"
         else:
             doc = await db.calendar_weeks.find_one({"start_date": start})
             if not doc or doc.get("seed_version") != CALENDAR_WEEK["seed_version"]:

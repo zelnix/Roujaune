@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, radius, spacing } from "../theme";
+import { colors, radius, spacing, textShadow } from "../theme";
 import { brand, heroRoute } from "../data";
 import { useCoach } from "../lib/coach-persona";
 import { useRiderProfile } from "../lib/rider-profile";
@@ -152,8 +152,7 @@ const styles = StyleSheet.create({
     fontSize: 34,
     fontStyle: "italic",
     fontWeight: "600",
-    textShadowColor: "rgba(0,0,0,0.5)",
-    textShadowRadius: 8,
+    ...textShadow("rgba(0,0,0,0.5)", 8),
   },
   signatureSub: { color: colors.white, fontSize: 13, marginTop: -2 },
   weatherArea: { position: "absolute", right: spacing.xl, top: "56%", alignItems: "flex-end" },

@@ -6,7 +6,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Svg, {
   Rect, Path, Polyline, Circle, Line, Defs, LinearGradient as SvgGradient, Stop,
 } from "react-native-svg";
-import { colors, radius, spacing, shadow } from "../theme";
+import { colors, radius, spacing, shadow, textShadow } from "../theme";
 import { Touchable, SectionLabel } from "./ui";
 import { summaryContent as C, SummaryStats, IntervalScore, fmtDuration } from "../lib/summary";
 import { useCoach } from "../lib/coach-persona";
@@ -352,7 +352,7 @@ function PowerBarsChart({ stats, width }: { stats: SummaryStats; width: number }
         })}
         <Line x1={padL} y1={targetY} x2={padL + cw} y2={targetY} stroke="#fff" strokeWidth={1.5} strokeDasharray="5,4" opacity={0.85} />
       </Svg>
-      <View style={[styles.yAxis, { height: H }]} pointerEvents="none">
+      <View style={[styles.yAxis, { height: H, pointerEvents: "none" }]}>
         {yLabels.map((v) => <Text key={v} style={[styles.axisLabel, { top: yFor(v) - 6 }]}>{v}</Text>)}
       </View>
       <View style={styles.xAxis}>{xLabels.map((l) => <Text key={l} style={styles.axisLabel}>{l}</Text>)}</View>
@@ -400,7 +400,7 @@ function HRLineChart({ stats, width }: { stats: SummaryStats; width: number }) {
         <Path d={areaPath} fill="url(#hrArea)" />
         <Polyline points={line} fill="none" stroke={colors.red} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
       </Svg>
-      <View style={[styles.yAxis, { height: H }]} pointerEvents="none">
+      <View style={[styles.yAxis, { height: H, pointerEvents: "none" }]}>
         {yLabels.map((v) => <Text key={v} style={[styles.axisLabel, { top: yFor(v) - 6 }]}>{v}</Text>)}
       </View>
       <View style={styles.xAxis}>{xLabels.map((l) => <Text key={l} style={styles.axisLabel}>{l}</Text>)}</View>
@@ -678,7 +678,7 @@ const styles = StyleSheet.create({
   /* hero */
   hero: { ...cardBase, flexDirection: "row", overflow: "hidden", padding: 0 },
   heroImgWrap: { width: "42%", minHeight: 200, backgroundColor: "#000", justifyContent: "flex-end" },
-  heroCallout: { position: "absolute", left: 14, bottom: 12, color: colors.yellow, fontSize: 26, fontWeight: "900", fontStyle: "italic", lineHeight: 26, textShadowColor: "rgba(0,0,0,0.7)", textShadowRadius: 6, transform: [{ rotate: "-4deg" }] },
+  heroCallout: { position: "absolute", left: 14, bottom: 12, color: colors.yellow, fontSize: 26, fontWeight: "900", fontStyle: "italic", lineHeight: 26, ...textShadow("rgba(0,0,0,0.7)", 6), transform: [{ rotate: "-4deg" }] },
   heroBody: { flex: 1, padding: spacing.lg, justifyContent: "center" },
   heroHeadline: { color: colors.white, fontSize: 34, fontWeight: "800", letterSpacing: -0.5 },
   heroSub: { color: colors.white, fontSize: 27, fontWeight: "800", letterSpacing: -0.5, marginTop: 2 },

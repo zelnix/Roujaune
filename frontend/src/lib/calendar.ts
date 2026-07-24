@@ -118,6 +118,21 @@ export async function moveSession(params: {
   }
 }
 
+export async function completeSupplementary(kind: string, title: string, date: string): Promise<boolean | null> {
+  try {
+    const res = await fetch(`${apiBase()}/api/rider/supplementary/complete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, title, date }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const d = await res.json();
+    return !!d.completed;
+  } catch {
+    return null;
+  }
+}
+
 export async function requestAlbertoReview(params: {
   session_title: string; session_type: SessionType; from_day: string; to_day: string;
   to_focus?: string; to_existing?: string; coach_name: string; coach_gender: string;
