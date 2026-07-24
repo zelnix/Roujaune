@@ -75,6 +75,7 @@ def _summary(doc: dict) -> dict:
         "title": doc.get("title"),
         "description": doc.get("description"),
         "type": doc.get("type", "structured" if doc.get("weeks") else "roadmap"),
+        "level": doc.get("level"),
         "duration_weeks": doc.get("duration_weeks"),
         "week_count": len(doc.get("weeks", []) or []),
         "updated_at": doc.get("updated_at"),
