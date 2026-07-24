@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { COUCH_TO_ROAD, ctrRideId, type Interval, type Session } from "./programs/couch-to-road";
+import { RIDE_STRONGER, rsRideId } from "./programs/ride-stronger";
 
 type Ion = keyof typeof Ionicons.glyphMap;
 
@@ -291,8 +292,54 @@ export const CTR_WORKOUTS: Workout[] = (() => {
   return out;
 })();
 
+// Ride Stronger (Intermediate) cycling sessions → runnable Live Workout timelines.
+function rsSessionToWorkout(s: Session): Workout {
+  const intervals: Interval[] = s.intervals ?? [];
+  const spec: SegSpec[] = intervals.map((iv) => {
+    const { zoneIdx, targetPct } = rpeToZone(iv.rpe);
+    return { label: iv.name, zoneIdx, minutes: iv.minutes, targetPct };
+  });
+  const duration = spec.reduce((a, sp) => a + sp.minutes, 0);
+  const isRecovery = /recovery|confidence|reassessment|consolidation/i.test(s.category || s.title || "");
+  const isTempo = /tempo/i.test(s.category || s.title || "");
+  return {
+    id: rsRideId(s),
+    name: s.title,
+    typeId: isTempo ? "tempo" : isRecovery ? "recovery" : "endurance",
+    typeName: isTempo ? "Tempo" : isRecovery ? "Recovery" : "Endurance",
+    color: isTempo ? TEMPO_COLOR : isRecovery ? "#3FBFAE" : END_COLOR,
+    icon: "bicycle",
+    duration,
+    tss: Math.round(duration * 0.62),
+    if: 0.64,
+    difficulty: "Moderate",
+    focus: s.category || "Intermediate endurance",
+    description: s.goal || s.notes || "A Ride Stronger intermediate session.",
+    zones: zones(25, 50, 25, 0, 0, 0),
+    level: "Development",
+    segmentSpec: spec.length ? spec : [wu(6), easy(12), cd(6)],
+  };
+}
+
+export const RS_WORKOUTS: Workout[] = (() => {
+  const out: Workout[] = [];
+  const seen = new Set<string>();
+  for (const phase of RIDE_STRONGER.phases) {
+    for (const week of phase.weeks) {
+      for (const day of week.days) {
+        if (day.type === "cycling") {
+          const w = rsSessionToWorkout(day);
+          if (!seen.has(w.id)) { seen.add(w.id); out.push(w); }
+        }
+      }
+    }
+  }
+  return out;
+})();
+
 export const WORKOUTS: Workout[] = [
   ...CTR_WORKOUTS,
+  ...RS_WORKOUTS,
   ...STRUCTURED,
   // ── Endurance ──
   { id: "endurance-ride", name: "Endurance Ride", typeId: "endurance", typeName: "Endurance", color: "#55C850", icon: "bicycle",

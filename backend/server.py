@@ -892,9 +892,9 @@ async def assign_rider_plan(req: AssignPlanRequest):
         {"user_id": auth.current_user_id()},
         {"$set": {"onboarded": True, "assigned_plan_id": req.plan_id}},
     )
-    if req.reset_progress and req.plan_id == "couch-to-road":
+    if req.reset_progress and req.plan_id in ("couch-to-road", "ride-stronger"):
         await udb.plan_state.update_one(
-            {"id": "couch-to-road"},
+            {"id": req.plan_id},
             {"$set": {"current_week": 1}, "$unset": {"eased_weeks": ""}},
             upsert=True,
         )
@@ -903,7 +903,7 @@ async def assign_rider_plan(req: AssignPlanRequest):
 
 # Which plan is the sensible default for each rider level. Falls back gracefully
 # until intermediate/advanced plans are authored in the admin project.
-LEVEL_PLAN = {"Beginner": "couch-to-road", "Intermediate": "build-and-climb", "Advanced": "build-and-climb"}
+LEVEL_PLAN = {"Beginner": "couch-to-road", "Intermediate": "ride-stronger", "Advanced": "build-and-climb"}
 
 
 async def _plan_for_level(level: str):
@@ -1763,10 +1763,37 @@ async def _reload_ctr_from_db():
     _CTR_PLANNED_TSS = {d["workout_id"]: d.get("tss", 0) for w in doc["weeks"] for d in w["days"] if d.get("kind") == "cycling" and d.get("workout_id")}
 
 
+# ---- Ride Stronger (Intermediate) structured plan ---------------------------
+with open(ROOT_DIR / "ride_stronger_plan.json", encoding="utf-8") as _f:
+    RS_PLAN = json.load(_f)
+RS_WEEKS = {w["number"]: w for w in RS_PLAN["weeks"]}
+_RS_PLANNED_TSS = {d["workout_id"]: d.get("tss", 0) for w in RS_PLAN["weeks"] for d in w["days"] if d.get("kind") == "cycling" and d.get("workout_id")}
+
+
+async def _reload_rs_from_db():
+    global RS_PLAN, RS_WEEKS, _RS_PLANNED_TSS
+    doc = await plans_admin.get_plan_def("ride-stronger")
+    if not doc or not doc.get("weeks"):
+        return
+    RS_PLAN = doc
+    RS_WEEKS = {w["number"]: w for w in doc["weeks"]}
+    _RS_PLANNED_TSS = {d["workout_id"]: d.get("tss", 0) for w in doc["weeks"] for d in w["days"] if d.get("kind") == "cycling" and d.get("workout_id")}
+
+
+# Registry of structured plans driven by the generalized plan engine below.
+def _struct_ctx(plan_id: str):
+    """Return (plan_doc, weeks_map, planned_tss, ride_prefix) for a structured plan."""
+    if plan_id == "ride-stronger":
+        return RS_PLAN, RS_WEEKS, _RS_PLANNED_TSS, "rs-ride-"
+    return CTR_PLAN, CTR_WEEKS, _CTR_PLANNED_TSS, "ctr-ride-"
+
+
 async def _on_plan_change(plan_id: str):
     """Callback fired by plans_admin after any plan edit."""
     if plan_id == "couch-to-road":
         await _reload_ctr_from_db()
+    elif plan_id == "ride-stronger":
+        await _reload_rs_from_db()
 
 
 async def _active_plan_id() -> str:
@@ -1818,9 +1845,9 @@ def _pm(s):
     return int(mm.group()) if mm else 0
 
 
-async def _ctr_completions():
+async def _ctr_completions(ride_prefix="ctr-ride-"):
     try:
-        rides = await udb.ride_history.find({"workout_id": {"$regex": "^ctr-ride-"}}).to_list(3000)
+        rides = await udb.ride_history.find({"workout_id": {"$regex": f"^{ride_prefix}"}}).to_list(3000)
     except Exception:
         rides = []
     ride_map = {}
@@ -1850,37 +1877,40 @@ def _ctr_week_complete(week, ride_ids, supp_dates, today):
     return True
 
 
-async def _ctr_state():
+async def _ctr_state(weeks=None, duration_weeks=None, plan_id="couch-to-road", ride_prefix="ctr-ride-"):
     """Return (current_week, ride_map, supp_dates), advancing the plan whenever the
     current week is fully completed (all rides + all supplementary + past rest days)."""
-    ride_map, supp_dates = await _ctr_completions()
+    weeks = weeks or CTR_WEEKS
+    duration_weeks = duration_weeks or CTR_PLAN["duration_weeks"]
+    ride_map, supp_dates = await _ctr_completions(ride_prefix)
     ride_ids = set(ride_map.keys())
     today = _ctr_today()
-    state = await udb.plan_state.find_one({"id": "couch-to-road"})
+    state = await udb.plan_state.find_one({"id": plan_id})
     cur = int(state["current_week"]) if state and state.get("current_week") else 1
-    cur = max(1, min(cur, CTR_PLAN["duration_weeks"]))
+    cur = max(1, min(cur, duration_weeks))
     changed = state is None
-    while cur < CTR_PLAN["duration_weeks"] and _ctr_week_complete(CTR_WEEKS[cur], ride_ids, supp_dates, today):
+    while cur < duration_weeks and _ctr_week_complete(weeks[cur], ride_ids, supp_dates, today):
         cur += 1
         changed = True
     if changed:
-        await udb.plan_state.update_one({"id": "couch-to-road"}, {"$set": {"current_week": cur, "updated_at": now_iso()}}, upsert=True)
+        await udb.plan_state.update_one({"id": plan_id}, {"$set": {"current_week": cur, "updated_at": now_iso()}}, upsert=True)
     return cur, ride_map, supp_dates
 
 
-async def _ctr_progress(ride_map=None):
+async def _ctr_progress(ride_map=None, ride_prefix="ctr-ride-", planned_tss=None):
+    planned_tss = planned_tss if planned_tss is not None else _CTR_PLANNED_TSS
     if ride_map is None:
-        ride_map, _ = await _ctr_completions()
+        ride_map, _ = await _ctr_completions(ride_prefix)
     total_sec = sum(int(v.get("duration_sec") or 0) for v in ride_map.values())
     total_tss = sum(int(v.get("tss") or 0) for v in ride_map.values())
     adj = ""
     try:
-        recent = await udb.ride_history.find({"workout_id": {"$regex": "^ctr-ride-"}}).sort("created_at", -1).to_list(1)
+        recent = await udb.ride_history.find({"workout_id": {"$regex": f"^{ride_prefix}"}}).sort("created_at", -1).to_list(1)
     except Exception:
         recent = []
     if recent:
         last = recent[0]
-        planned = _CTR_PLANNED_TSS.get(last.get("workout_id"))
+        planned = planned_tss.get(last.get("workout_id"))
         actual = int(last.get("tss") or 0)
         if planned and actual:
             if actual > planned * 1.15:
@@ -1952,8 +1982,11 @@ def _ctr_calendar_week(week, ride_map, supp_dates, today):
             "tip": (week.get("objective") or "")[:140], "seed_version": 2}
 
 
-def _ctr_plan_response(cur, ride_map, prog):
-    week = CTR_WEEKS[cur]
+def _ctr_plan_response(cur, ride_map, prog, weeks=None, plan_doc=None, plan_id="couch-to-road"):
+    weeks_map = weeks or CTR_WEEKS
+    pdoc = plan_doc or CTR_PLAN
+    is_ctr = (plan_id == "couch-to-road")
+    week = weeks_map[cur]
     ride_ids = set(ride_map.keys())
     cyc = [d for d in week["days"] if d["kind"] == "cycling"]
     supp_days = [d for d in week["days"] if d["kind"] in _SUPP_KINDS]
@@ -1975,10 +2008,11 @@ def _ctr_plan_response(cur, ride_map, prog):
             if act.get("duration_sec"):
                 w["actual_duration"] = f"{round(act['duration_sec'] / 60)} min"
         workouts.append(w)
+    dw = int(pdoc.get("duration_weeks") or len(weeks_map))
     phase_idx = (cur - 1) // 4 + 1
     week_in_phase = ((cur - 1) % 4) + 1
     phases = []
-    for p in CTR_PLAN["phases"]:
+    for p in pdoc.get("phases", []):
         n = p["number"]
         if n < phase_idx:
             pct, active = 100, False
@@ -1986,31 +2020,41 @@ def _ctr_plan_response(cur, ride_map, prog):
             pct, active = round((week_in_phase - 1) / 4 * 100), True
         else:
             pct, active = 0, False
-        phases.append({"id": f"p{n}", "number": n, "name": p["name"], "weeks": p["weeks_label"], "pct": pct, "active": active, "points": _PHASE_POINTS.get(n, [])})
+        phases.append({"id": f"p{n}", "number": n, "name": p["name"], "weeks": p.get("weeks_label", ""), "pct": pct, "active": active, "points": _PHASE_POINTS.get(n, [])})
+    level = pdoc.get("level") or ("Beginner" if is_ctr else "Intermediate")
+    if is_ctr:
+        weekly_load = [55, 70, 90, 65, 100, 115, 130, 90, 120, 140, 160, 110, 150, 170, 195, 120]
+        description = "A 16-week beginner plan to build endurance, confidence and cycling skills from your very first ride to a 90-minute achievement ride."
+        goals = [{"id": "g1", "title": "Ride Three Times a Week", "description": "Build a consistent routine", "status": "incomplete"},
+                 {"id": "g2", "title": "Ride 40 Minutes Continuously", "description": "Grow your endurance base", "status": "incomplete"},
+                 {"id": "g3", "title": "Smooth Cadence & Pacing", "description": "Control your effort", "status": "incomplete"}]
+    else:
+        weekly_load = [sum(int(dd.get("tss", 0) or 0) for dd in weeks_map[n]["days"] if dd["kind"] == "cycling") for n in sorted(weeks_map)]
+        description = pdoc.get("description", "")
+        goals = pdoc.get("goals") or []
     plan = {
-        "id": "couch-to-road", "title": CTR_PLAN["title"], "label": CTR_PLAN["title"].upper(),
-        "description": "A 16-week beginner plan to build endurance, confidence and cycling skills from your very first ride to a 90-minute achievement ride.",
-        "duration_weeks": 16, "average_days_per_week": 3, "current_week": cur, "start_date": CTR_PLAN["start_date"],
-        "duration_label": "16 Weeks", "average_label": "3 Rides/Week",
-        "phase": {"name": week["phase_name"], "weeks": week["phase_weeks"],
-                  "description": next((p["objective"] for p in CTR_PLAN["phases"] if p["number"] == week["phase"]), "")},
-        "goals": [{"id": "g1", "title": "Ride Three Times a Week", "description": "Build a consistent routine", "status": "incomplete"},
-                  {"id": "g2", "title": "Ride 40 Minutes Continuously", "description": "Grow your endurance base", "status": "incomplete"},
-                  {"id": "g3", "title": "Smooth Cadence & Pacing", "description": "Control your effort", "status": "incomplete"}],
+        "id": plan_id, "title": pdoc.get("title"), "label": (pdoc.get("title") or "").upper(),
+        "description": description,
+        "duration_weeks": dw, "average_days_per_week": 3, "current_week": cur, "start_date": pdoc.get("start_date"),
+        "duration_label": pdoc.get("duration_label", f"{dw} Weeks"), "average_label": pdoc.get("average_label", "3 Rides/Week"),
+        "phase": {"name": week.get("phase_name", ""), "weeks": week.get("phase_weeks", ""),
+                  "description": next((p["objective"] for p in pdoc.get("phases", []) if p["number"] == week.get("phase")), "")},
+        "goals": goals,
         "phases": phases,
-        "weekly_load": [55, 70, 90, 65, 100, 115, 130, 90, 120, 140, 160, 110, 150, 170, 195, 120],
+        "weekly_load": weekly_load,
         "you_are_here": cur, "workouts": workouts,
         "adaptation": f"Week {cur} \u2014 {week['title']}. {week['objective']}",
-        "adaptation_status": f"Beginner plan \u2014 week {cur} of 16",
+        "adaptation_status": f"{level} plan \u2014 week {cur} of {dw}",
         "week_targets": {"rides": len(cyc), "duration": _fmt_dur(total_min), "distance_km": round(total_min * 0.34), "elevation_m": 50 + cur * 6, "supplementary": len(supp_days)},
-        "progress": {"weeks": f"{cur} / 16", "workouts": str(prog["count"]), "time": f"{prog['hours']} h", "tss": str(prog["tss"]), "ctl": "\u2014", "atl": "\u2014", "tsb": "\u2014"},
-        "progress_pct": min(100, round(prog["count"] / 48 * 100)),
-        "tip": "Your smoothest controllable cadence is more important than matching an exact number.",
-        "created_by": "Alberto",
+        "progress": {"weeks": f"{cur} / {dw}", "workouts": str(prog["count"]), "time": f"{prog['hours']} h", "tss": str(prog["tss"]), "ctl": "\u2014", "atl": "\u2014", "tsb": "\u2014"},
+        "progress_pct": min(100, round(prog["count"] / max(1, dw * 3) * 100)),
+        "tip": pdoc.get("tip", "Your smoothest controllable cadence is more important than matching an exact number."),
+        "created_by": pdoc.get("created_by", "Alberto"),
     }
     if prog["auto_adjustment"]:
         plan["auto_adjustment"] = prog["auto_adjustment"]
     return plan
+
 
 
 @api_router.get("/plan")
@@ -2029,6 +2073,11 @@ async def get_plan(id: str = "build-and-climb"):
             cur, ride_map, _supp = await _ctr_state()
             prog = await _ctr_progress(ride_map)
             return _ctr_plan_response(cur, ride_map, prog)
+        if active == "ride-stronger" or id == "ride-stronger":
+            pdoc, weeks_map, planned, prefix = _struct_ctx("ride-stronger")
+            cur, ride_map, _supp = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id="ride-stronger", ride_prefix=prefix)
+            prog = await _ctr_progress(ride_map, ride_prefix=prefix, planned_tss=planned)
+            return _ctr_plan_response(cur, ride_map, prog, weeks=weeks_map, plan_doc=pdoc, plan_id="ride-stronger")
         doc = await udb.training_plans.find_one({"id": id})
         base = await plans_admin.get_plan_def(id)
         if not base:
@@ -2344,10 +2393,14 @@ async def get_calendar_week(start: str = "2025-05-12"):
     """Return a scheduling week (seeded into Mongo on first read)."""
     try:
         rider = await _rider_doc()
-        is_ctr = (await _active_plan_id()) == "couch-to-road"
-        if is_ctr:
+        active = await _active_plan_id()
+        if active == "couch-to-road":
             cur, ride_map, supp_dates = await _ctr_state()
             doc = _ctr_calendar_week(CTR_WEEKS[cur], ride_map, supp_dates, _ctr_today())
+        elif active == "ride-stronger":
+            pdoc, weeks_map, planned, prefix = _struct_ctx("ride-stronger")
+            cur, ride_map, supp_dates = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id="ride-stronger", ride_prefix=prefix)
+            doc = _ctr_calendar_week(weeks_map[cur], ride_map, supp_dates, _ctr_today())
         else:
             doc = await udb.calendar_weeks.find_one({"start_date": start})
             if not doc or doc.get("seed_version") != CALENDAR_WEEK["seed_version"]:
@@ -2669,13 +2722,17 @@ async def _seed_plans_on_startup():
     try:
         await plans_admin.seed_plans({
             "couch-to-road": {**CTR_PLAN, "type": "structured", "title": CTR_PLAN.get("title", "From Couch to Road")},
+            "ride-stronger": {**RS_PLAN, "type": "structured", "title": RS_PLAN.get("title", "Ride Stronger")},
             "build-and-climb": {**BUILD_AND_CLIMB, "type": "roadmap"},
         })
         await _reload_ctr_from_db()
+        await _reload_rs_from_db()
         # Tag the shipped plans with their target rider level (idempotent) so the
-        # onboarding recommender can match by level.
+        # onboarding recommender can match by level. Ride Stronger is the authored
+        # Intermediate default; build-and-climb reverts to an Advanced roadmap.
         await plans_admin._db.plans.update_one({"id": "couch-to-road"}, {"$set": {"level": "Beginner"}})
-        await plans_admin._db.plans.update_one({"id": "build-and-climb"}, {"$set": {"level": "Intermediate"}})
+        await plans_admin._db.plans.update_one({"id": "ride-stronger"}, {"$set": {"level": "Intermediate"}})
+        await plans_admin._db.plans.update_one({"id": "build-and-climb"}, {"$unset": {"level": ""}})
         logger.info("Plan definitions seeded/loaded from MongoDB")
     except Exception:
         logging.exception("plan seeding failed")
