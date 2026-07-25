@@ -15,6 +15,7 @@ export default function LoginScreen() {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,8 +76,14 @@ export default function LoginScreen() {
             <TextInput style={styles.input} placeholder="Email" placeholderTextColor={colors.textFaint}
               value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address"
               autoComplete="email" testID="email-input" />
-            <TextInput style={styles.input} placeholder="Password" placeholderTextColor={colors.textFaint}
-              value={password} onChangeText={setPassword} secureTextEntry testID="password-input" />
+            <View style={styles.passwordWrap}>
+              <TextInput style={[styles.input, styles.passwordInput]} placeholder="Password" placeholderTextColor={colors.textFaint}
+                value={password} onChangeText={setPassword} secureTextEntry={!showPassword} testID="password-input" />
+              <Pressable style={styles.eyeBtn} onPress={() => setShowPassword((s) => !s)} hitSlop={10}
+                accessibilityRole="button" accessibilityLabel={showPassword ? "Hide password" : "Show password"} testID="toggle-password">
+                <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color={colors.textDim} />
+              </Pressable>
+            </View>
 
             {error ? <Text style={styles.error} testID="auth-error">{error}</Text> : null}
 
@@ -95,7 +102,7 @@ export default function LoginScreen() {
                 {forgotSent ? (
                   <View style={{ gap: 6 }}>
                     <Text style={styles.forgotTitle}>Check your inbox</Text>
-                    <Text style={styles.forgotHint}>If an account exists for {email.trim() || "that email"}, we've sent a reset link. It expires in 60 minutes.</Text>
+                    <Text style={styles.forgotHint}>If an account exists for {email.trim() || "that email"}, we&apos;ve sent a reset link. It expires in 60 minutes.</Text>
                     <Pressable onPress={() => { setForgotOpen(false); setForgotSent(false); }} testID="forgot-done">
                       <Text style={styles.forgotAction}>Back to sign in</Text>
                     </Pressable>
@@ -155,6 +162,9 @@ const styles = StyleSheet.create({
   card: { width: 420, maxWidth: "100%", backgroundColor: "rgba(12,12,11,0.86)", borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.xl, gap: 12, ...shadow.card },
   tagline: { color: colors.textDim, fontSize: 14, textAlign: "center", marginBottom: 8 },
   input: { backgroundColor: "rgba(0,0,0,0.35)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 13, color: colors.white, fontSize: 15 },
+  passwordWrap: { position: "relative", justifyContent: "center" },
+  passwordInput: { paddingRight: 46 },
+  eyeBtn: { position: "absolute", right: 6, height: 40, width: 40, alignItems: "center", justifyContent: "center" },
   error: { color: colors.red, fontSize: 13, fontWeight: "600" },
   primary: { backgroundColor: colors.yellow, borderRadius: radius.md, paddingVertical: 14, alignItems: "center", marginTop: 4 },
   primaryText: { color: "#000", fontWeight: "800", fontSize: 15 },

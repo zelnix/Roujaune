@@ -360,3 +360,10 @@ Home Alberto "Start Today's Ride" & sidebar Workouts → `/training`. Training "
 
 ## Lap-split compliance indicator (2026-07-25 fork)
 - Each Lap Splits row now shows a color-coded compliance indicator (a left accent bar + a TARGET pill with the interval's compliance %), coloured green ≥80% / amber 50–79% / red <50% (grey "—" when no telemetry for that lap). Added a legend ("On target / Slipping / Faded") and the header hint now reads "Where did you fade?". Uses the existing per-interval `compliance` from `computeIntervals`. Verified via screenshot (colors populate on rides with recorded telemetry; grey in the no-telemetry preview).
+
+## Show/hide password on sign-in (2026-07-25 fork)
+- Added an eye toggle inside the password field on the auth screen (`app/login.tsx`): tapping switches `secureTextEntry` and the eye/eye-off icon. Works for both sign-in and create-account modes. (Also fixed a pre-existing unescaped apostrophe in the reset-link hint.) Verified via screenshot.
+
+## Active Controls panel + logo glyph, show/hide password (2026-07-25 fork)
+- **Controls panel is now fully functional** (`app/workout.tsx` `onControlAction`, switched from label→key): Skip Interval (`sendInit` to end of current segment → next step), Extend Recovery (append 3-min easy `extensionSegment`), Reduce/Increase Intensity (`onErg` ∓5%), Toggle ERG Mode (new `ergMode` state/ref — when OFF the per-segment `sendTarget` is suppressed so the rider controls effort), Camera Selection (`setShowRoutes`), Mute Alberto (`toggleVoice`), Trainer Reconnect (`simulateDropout`), Touch Lock (`setLocked`), Peaceful Pause (pauses ride). Each shows a confirming toast. Verified via screenshot.
+- **Logo glyph added above the ROUJAUNE wordmark** in the workout BrandCard (`workout-live.tsx`, `auth_logo_glyph.png` stacked over `auth_wordmark.png`). Verified via screenshot.

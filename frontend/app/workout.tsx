@@ -222,6 +222,11 @@ export default function LiveWorkout() {
   const [erg, setErg] = React.useState(telemetry.erg);
   const ergRef = React.useRef(telemetry.erg);
   const ergPendingUntil = React.useRef(0);
+  // ERG mode: when off, the trainer holds resistance and the rider controls effort
+  // (we stop pushing per-segment target watts).
+  const [ergMode, setErgMode] = React.useState(true);
+  const ergModeRef = React.useRef(true);
+  React.useEffect(() => { ergModeRef.current = ergMode; }, [ergMode]);
   React.useEffect(() => {
     if (Date.now() > ergPendingUntil.current) { ergRef.current = telemetry.erg; setErg(telemetry.erg); }
   }, [telemetry.erg]);
@@ -277,7 +282,7 @@ export default function LiveWorkout() {
     }
     if (targetW !== lastTargetSent.current) {
       lastTargetSent.current = targetW;
-      sendTarget(targetW);
+      if (ergModeRef.current) sendTarget(targetW);
     }
   }, [connectionState, targetW, sendInit, sendTarget]);
 
@@ -371,9 +376,46 @@ export default function LiveWorkout() {
     setPaused((p) => !p);
     showToast(paused ? "Resuming workout" : "Workout paused");
   };
-  const onControlAction = (label: string) => {
+  const onControlAction = (key: string) => {
     setShowControls(false);
-    showToast(label);
+    switch (key) {
+      case "skip":
+        if (activeSeg) { sendInit({ elapsed: telemetry.elapsed + activeSeg.remaining + 1 }); showToast("Skipped to the next interval"); }
+        break;
+      case "extend":
+        if (selected) { setExtraSegments((x) => [...x, extensionSegment(selected, 3)]); showToast("Added 3:00 of easy recovery to your ride"); }
+        break;
+      case "reduce":
+        onErg(-5);
+        break;
+      case "increase":
+        onErg(5);
+        break;
+      case "erg":
+        setErgMode((m) => { const next = !m; showToast(next ? "ERG mode ON — trainer holds your target" : "ERG mode OFF — ride at your own effort"); return next; });
+        break;
+      case "camera":
+        setShowRoutes(true);
+        break;
+      case "mute":
+        toggleVoice();
+        showToast(voiceOn ? `${persona.name} muted` : `${persona.name} unmuted`);
+        break;
+      case "reconnect":
+        simulateDropout();
+        showToast("Reconnecting trainer…");
+        break;
+      case "lock":
+        setLocked(true);
+        showToast("Screen locked — hold the button to unlock.");
+        break;
+      case "peaceful":
+        if (!paused) { pause(); setPaused(true); }
+        showToast("Peaceful pause — breathe deep and reset.");
+        break;
+      default:
+        break;
+    }
   };
   // Ending a ride prompts to save or abandon. On abandon nothing is persisted
   // (the summary screen is what saves), so the ride is never recorded.
@@ -732,7 +774,7 @@ export default function LiveWorkout() {
               </View>
               <View style={styles.panelGrid}>
                 {CONTROLS.map((c) => (
-                  <Pressable key={c.key} testID={`ctrl-${c.key}`} style={styles.panelItem} onPress={() => onControlAction(c.label)}>
+                  <Pressable key={c.key} testID={`ctrl-${c.key}`} style={styles.panelItem} onPress={() => onControlAction(c.key)}>
                     <Ionicons name={c.icon} size={20} color={colors.yellow} />
                     <Text style={styles.panelItemText}>{c.label}</Text>
                   </Pressable>

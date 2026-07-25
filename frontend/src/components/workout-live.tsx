@@ -6,6 +6,7 @@ import Svg, { Polyline, Polygon as SvgPolygon } from "react-native-svg";
 import { colors, radius, spacing } from "@/src/theme";
 
 const WORDMARK = require("../../assets/images/auth_wordmark.png");
+const LOGO_GLYPH = require("../../assets/images/auth_logo_glyph.png");
 
 type Tone = "good" | "warn" | "bad" | "neutral";
 const toneColor = (t: Tone) => (t === "good" ? colors.green : t === "warn" ? colors.yellow : t === "bad" ? colors.red : colors.textDim);
@@ -35,6 +36,7 @@ export function LiveHeader({ elapsed, progress, estFinish }: { elapsed: string; 
 export function BrandCard() {
   return (
     <View style={brand.card} testID="brand-card">
+      <Image source={LOGO_GLYPH} style={brand.glyph} contentFit="contain" />
       <Image source={WORDMARK} style={brand.logo} contentFit="contain" />
     </View>
   );
@@ -441,8 +443,9 @@ const h = StyleSheet.create({
 });
 
 const brand = StyleSheet.create({
-  card: { ...card, flex: 1, minWidth: 120, alignItems: "center", justifyContent: "center", paddingVertical: 18 },
-  logo: { width: "86%", height: 46 },
+  card: { ...card, flex: 1, minWidth: 120, alignItems: "center", justifyContent: "center", paddingVertical: 16, gap: 8 },
+  glyph: { width: 44, height: 44 },
+  logo: { width: "86%", height: 40 },
 });
 
 const m = StyleSheet.create({
