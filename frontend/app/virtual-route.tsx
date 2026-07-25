@@ -9,7 +9,7 @@ import { useTelemetry } from "@/src/hooks/useTelemetry";
 import { useBleSensors } from "@/src/hooks/useBleSensors";
 import { BleSensorsPanel } from "@/src/components/BleSensorsPanel";
 import { VIRTUAL_RIDERS, getRider } from "@/src/lib/virtual-riders";
-import { VIRTUAL_ROUTES, getVRoute, routeStateAt } from "@/src/lib/vroutes";
+import { VIRTUAL_ROUTES, getVRoute, routeStateAt, routeTerrainBias } from "@/src/lib/vroutes";
 import { VirtualRouteScene, SceneTelemetry } from "@/src/components/virtual-route/scene";
 
 type PanelMode = "all" | "min" | "hidden";
@@ -122,15 +122,16 @@ export default function VirtualRouteScreen() {
   }, [telemetry.elapsed, running]);
 
   const route = routeStateAt(vroute, distanceKm);
-  const gradientBucket = Math.round(route.gradient);
+  const terrainBias = routeTerrainBias(vroute.id);
+  // ERG resistance target (%) — steep gradient response + per-route terrain bias.
+  const resistanceTarget = Math.round(Math.max(55, Math.min(150, 100 + route.gradient * 7 + terrainBias)));
 
-  // Auto trainer resistance follows the route gradient (progressive, clamped).
+  // Auto trainer resistance follows the route gradient + terrain (progressive, clamped).
   React.useEffect(() => {
     if (!running || !autoResistance || emergency) return;
-    const target = Math.round(Math.max(60, Math.min(140, 100 + route.gradient * 4)));
-    sendErg(target);
+    sendErg(resistanceTarget);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running, autoResistance, emergency, gradientBucket]);
+  }, [running, autoResistance, emergency, resistanceTarget]);
 
   const sensorsOn = telemetry.source === "trainer" || ble.connected.length > 0;
   const hrOn = telemetry.hr > 0;
@@ -204,7 +205,7 @@ export default function VirtualRouteScreen() {
 
       {/* Telemetry panels */}
       {phase !== "setup" && panel === "all" && (
-        <TelemetryPanel sm={sm} route={route} elapsed={telemetry.elapsed} dist={distanceKm} compact={compact} hrOn={hrOn} />
+        <TelemetryPanel sm={sm} route={route} elapsed={telemetry.elapsed} dist={distanceKm} load={resistanceTarget} compact={compact} hrOn={hrOn} />
       )}
       {phase !== "setup" && panel === "min" && (
         <View style={s.minBar} testID="vr-min-panel">
@@ -212,6 +213,7 @@ export default function VirtualRouteScreen() {
           <MiniStat label="POWER" value={`${sm.power}`} unit="W" />
           <MiniStat label="CAD" value={`${sm.cadence}`} unit="rpm" />
           <MiniStat label="GRADE" value={`${route.gradient}`} unit="%" />
+          <MiniStat label="LOAD" value={`${resistanceTarget}`} unit="%" tone={resistanceTarget >= 120 ? colors.red : resistanceTarget >= 105 ? colors.yellow : colors.green} />
           <View style={s.minProgress}><View style={[s.minFill, { width: `${route.progress * 100}%` }]} /></View>
         </View>
       )}
@@ -383,13 +385,15 @@ function deriveConnection(state: string, stale: boolean, sensorsOn: boolean): { 
   return { label: "Connected", tone: colors.green };
 }
 
-function TelemetryPanel({ sm, route, elapsed, dist, compact, hrOn }: any) {
+function TelemetryPanel({ sm, route, elapsed, dist, load, compact, hrOn }: any) {
+  const loadTone = load >= 120 ? colors.red : load >= 105 ? colors.yellow : colors.green;
   const cells = [
     { label: "POWER", value: `${sm.power}`, unit: "W", icon: "flash" as const, tone: colors.yellow },
     { label: "CADENCE", value: `${sm.cadence}`, unit: "rpm", icon: "sync" as const, tone: colors.green },
     { label: "SPEED", value: `${sm.speed}`, unit: "km/h", icon: "speedometer" as const, tone: "#5AC8FA" },
     { label: "HEART RATE", value: hrOn ? `${sm.hr}` : "—", unit: "bpm", icon: "heart" as const, tone: colors.red },
     { label: "GRADIENT", value: `${route.gradient}`, unit: "%", icon: "trending-up" as const, tone: colors.yellow },
+    { label: "LOAD", value: `${load ?? 100}`, unit: "%", icon: "barbell" as const, tone: loadTone },
     { label: "DISTANCE", value: `${(dist ?? 0).toFixed(1)}`, unit: "km", icon: "navigate" as const, tone: "#5AC8FA" },
     { label: "ELAPSED", value: mmss(elapsed), unit: "", icon: "time-outline" as const, tone: colors.white },
   ];
@@ -413,10 +417,10 @@ function TelemetryPanel({ sm, route, elapsed, dist, compact, hrOn }: any) {
   );
 }
 
-function MiniStat({ label, value, unit }: { label: string; value: string; unit: string }) {
+function MiniStat({ label, value, unit, tone }: { label: string; value: string; unit: string; tone?: string }) {
   return (
     <View style={s.miniStat}>
-      <Text style={s.miniValue}>{value}<Text style={s.miniUnit}> {unit}</Text></Text>
+      <Text style={[s.miniValue, tone ? { color: tone } : null]}>{value}<Text style={s.miniUnit}> {unit}</Text></Text>
       <Text style={s.miniLabel}>{label}</Text>
     </View>
   );

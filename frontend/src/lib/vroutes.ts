@@ -197,6 +197,23 @@ export function getVRoute(id: string | null | undefined): VRoute {
   return VIRTUAL_ROUTES.find((r) => r.id === id) ?? VIRTUAL_ROUTES[0];
 }
 
+/**
+ * Per-route surface/terrain resistance bias (ERG %), added on top of the
+ * gradient response so rough/loose routes feel harder and smooth flat circuits
+ * feel faster — independent of the climbing profile.
+ */
+export function routeTerrainBias(id: string): number {
+  switch (id) {
+    case "rainy-cobbles": return 14;   // wet, rough cobbles — high rolling resistance
+    case "desert-climb": return 6;     // loose, hot, sapping grind
+    case "alpine-sunset-pass": return 2;
+    case "forest-loop": return 0;
+    case "coastal-sprint": return -4;  // smooth fast tarmac
+    case "city-night-crit": return -6; // flat, fast, glassy circuit
+    default: return 0;
+  }
+}
+
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * Math.max(0, Math.min(1, t));
 }
