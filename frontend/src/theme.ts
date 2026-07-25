@@ -20,8 +20,8 @@ export const colors = {
 
   white: "#F4F0E9",
   text: "#F4F0E9",
-  textDim: "rgba(244,240,233,0.60)",
-  textFaint: "rgba(244,240,233,0.34)",
+  textDim: "rgba(244,240,233,0.76)",
+  textFaint: "rgba(244,240,233,0.56)",
 
   green: "#43D17A",
   greenText: "#54DB8B",

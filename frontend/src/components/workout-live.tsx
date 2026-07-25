@@ -422,11 +422,11 @@ const m = StyleSheet.create({
   head: { flexDirection: "row", alignItems: "center", gap: 7 },
   label: { color: colors.textDim, fontSize: 11.5, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase", flex: 1 },
   pill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, borderWidth: 1 },
-  pillText: { fontSize: 9.5, fontWeight: "800", letterSpacing: 0.5 },
+  pillText: { fontSize: 11, fontWeight: "800", letterSpacing: 0.5 },
   valueRow: { flexDirection: "row", alignItems: "flex-end", gap: 6, marginTop: 8 },
   value: { fontSize: 40, fontWeight: "900", fontVariant: ["tabular-nums"], lineHeight: 44 },
   unit: { color: colors.textDim, fontSize: 14, fontWeight: "700", marginBottom: 7 },
-  sub: { color: colors.textFaint, fontSize: 11, fontWeight: "700", marginTop: 4, letterSpacing: 0.5 },
+  sub: { color: colors.textDim, fontSize: 12.5, fontWeight: "700", marginTop: 4, letterSpacing: 0.3 },
 });
 
 const cn = StyleSheet.create({
