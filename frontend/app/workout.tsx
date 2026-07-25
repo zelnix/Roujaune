@@ -1,6 +1,7 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, Animated, useWindowDimensions, LayoutChangeEvent, Pressable, Platform } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Animated, useWindowDimensions, LayoutChangeEvent, Pressable, Platform, ActivityIndicator } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { Image } from "expo-image";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -12,7 +13,7 @@ import { rideRecorder } from "@/src/lib/ride";
 import { getLastRouteId, setLastRouteId } from "@/src/lib/prefs";
 import { useSettings } from "@/src/lib/settings";
 import { routeVideos, currentWorkout } from "@/src/data";
-import { getWorkout, buildSegments, currentSegment, mmss, targetWatts, planDayNumber } from "@/src/lib/workout-catalog";
+import { getWorkout, buildSegments, currentSegment, mmss, targetWatts, planDayNumber, extensionSegment } from "@/src/lib/workout-catalog";
 import { fetchZoneBias, ZoneBias } from "@/src/lib/targets";
 import { usePlan } from "@/src/lib/plan";
 import { getRiderProfile } from "@/src/lib/rider-profile";
@@ -150,7 +151,9 @@ export default function LiveWorkout() {
   const selectedType = selected ? WORKOUT_TYPES.find((t) => t.id === selected.typeId) : undefined;
   const workoutTitle = selected?.name ?? params.title ?? currentWorkout.title;
   // Real interval timeline built from the chosen workout's segments.
-  const segments = React.useMemo(() => (selected ? buildSegments(selected) : []), [selected]);
+  const baseSegments = React.useMemo(() => (selected ? buildSegments(selected) : []), [selected]);
+  const [extraSegments, setExtraSegments] = React.useState<import("@/src/lib/workout-catalog").Segment[]>([]);
+  const segments = React.useMemo(() => [...baseSegments, ...extraSegments], [baseSegments, extraSegments]);
   const compact = height < 620;
   const leftW = compact ? 150 : 212;
   const rightW = compact ? 170 : 236;
@@ -170,6 +173,8 @@ export default function LiveWorkout() {
   const [showCast, setShowCast] = React.useState(false);
   const [showBle, setShowBle] = React.useState(false);
   const [endPrompt, setEndPrompt] = React.useState(false);
+  const [completePrompt, setCompletePrompt] = React.useState(false);
+  const [extendAdvice, setExtendAdvice] = React.useState<string | null>(null);
   const [locked, setLocked] = React.useState(false);
   const [stepDetail, setStepDetail] = React.useState<number | null>(null);
   const videoFellBackRef = React.useRef(false);
@@ -364,6 +369,33 @@ export default function LiveWorkout() {
   };
   const onResumeRide = () => { setEndPrompt(false); if (paused) { resume(); setPaused(false); } };
 
+  // ---- End-of-workout "Workout Complete" popup + ride extension ----
+  const completeShownRef = React.useRef(false);
+  // Ask the companion coach whether extending is a good idea, given live effort.
+  const fetchExtendAdvice = React.useCallback(async () => {
+    setExtendAdvice(null);
+    try {
+      const t = telemetryRef.current;
+      const cue = await fetchCoachCue(t, { ...(coachCtxRef.current as any), cue_kind: "extend_advice" });
+      setExtendAdvice(cue);
+      speak(cue);
+    } catch {
+      setExtendAdvice(
+        "Strong work finishing the session. If your legs feel fresh, a short easy spin adds volume — but if you're fading, finishing here is the smart, safe call.",
+      );
+    }
+  }, [speak]);
+
+  const onFinishComplete = () => { setCompletePrompt(false); router.replace("/summary"); };
+  const onExtendRide = (minutes: number, label: string) => {
+    if (!selected) return;
+    setExtraSegments((x) => [...x, extensionSegment(selected, minutes)]);
+    completeShownRef.current = false;
+    setCompletePrompt(false);
+    if (paused) { resume(); setPaused(false); }
+    showToast(`Ride extended · ${label}`);
+  };
+
   const activeRoute = routeVideos[routeIdx];
 
   // Live data is only shown for connected devices. "Demo mode" simulates both so
@@ -387,7 +419,22 @@ export default function LiveWorkout() {
   // Progress along the route: from the trainer's distance when connected, else
   // estimated on a time basis (elapsed / workout duration) so the terrain & route
   // cards still advance through the session.
-  const totalSec = Math.max(60, (selected?.duration ?? 60) * 60);
+  const segTotalSec = React.useMemo(() => segments.reduce((a, s) => a + Math.max(0, s.durationSec), 0), [segments]);
+  const totalSec = Math.max(60, segTotalSec || (selected?.duration ?? 60) * 60);
+
+  // Detect when every workout step is complete → show the "Workout Complete"
+  // popup once (extension resets the guard so it can fire again).
+  React.useEffect(() => {
+    if (completeShownRef.current || endPrompt) return;
+    if (segTotalSec > 0 && telemetry.elapsed >= segTotalSec) {
+      completeShownRef.current = true;
+      setExpanded(false);
+      if (!paused) { pause(); setPaused(true); }
+      setCompletePrompt(true);
+      fetchExtendAdvice();
+    }
+  }, [telemetry.elapsed, segTotalSec, endPrompt, paused, pause, fetchExtendAdvice]);
+
   const timeProgress = Math.min(1, telemetry.elapsed / totalSec);
   const progress = trainerOn ? (terrain.km > 0 ? Math.min(1, telemetry.distance / terrain.km) : 0) : timeProgress;
   const riddenKm = trainerOn ? Math.min(terrain.km, telemetry.distance) : +(timeProgress * terrain.km).toFixed(1);
@@ -421,27 +468,51 @@ export default function LiveWorkout() {
   const cueBusy = React.useRef(false);
   const lastCueAt = React.useRef(0);
 
-  const generateCue = React.useCallback(async () => {
+  // Refs so cue timers read the live segment/ftp/bias/context without re-firing.
+  const activeSegRef = React.useRef(activeSeg);
+  React.useEffect(() => { activeSegRef.current = activeSeg; }, [activeSeg]);
+  const ftpRef = React.useRef(ftp);
+  React.useEffect(() => { ftpRef.current = ftp; }, [ftp]);
+  const zoneBiasRef = React.useRef(zoneBias);
+  React.useEffect(() => { zoneBiasRef.current = zoneBias; }, [zoneBias]);
+  const coachCtxRef = React.useRef(coachCtx);
+  React.useEffect(() => { coachCtxRef.current = coachCtx; }, [coachCtx]);
+
+  const generateCue = React.useCallback(async (kind: "live" | "intro" | "next_preview" = "live") => {
     if (paused || cueBusy.current) return;
     cueBusy.current = true;
     lastCueAt.current = Date.now();
     const t = telemetryRef.current;
+    const seg = activeSegRef.current;
+    const ctx: any = { ...coachCtxRef.current, cue_kind: kind };
+    if (kind === "next_preview" && seg?.next) {
+      ctx.next_segment = seg.next.label;
+      ctx.next_zone = seg.next.zoneLabel;
+      ctx.next_target = targetWatts(seg.next, ftpRef.current, zoneBiasRef.current);
+    }
     try {
-      const cue = await fetchCoachCue(t, coachCtx);
+      const cue = await fetchCoachCue(t, ctx);
       setCoachCue(cue);
       speak(cue);
     } catch {
-      const fallback = buildCue(t, Math.floor(Date.now() / 1000) % 4, targetRef.current, seatedRef.current);
+      let fallback: string;
+      if (kind === "intro" && seg) {
+        fallback = `Starting ${seg.segment.label} — ${seg.segment.zoneLabel}, aim for about ${targetRef.current} W. Settle in and find your rhythm.`;
+      } else if (kind === "next_preview" && seg?.next) {
+        fallback = `Coming up next: ${seg.next.label} (${seg.next.zoneLabel}). Get ready to adjust your effort.`;
+      } else {
+        fallback = buildCue(t, Math.floor(Date.now() / 1000) % 4, targetRef.current, seatedRef.current);
+      }
       setCoachCue(fallback);
       speak(fallback);
     } finally {
       cueBusy.current = false;
     }
-  }, [paused, coachCtx, speak]);
+  }, [paused, speak]);
 
   // A cue at least every 60 seconds.
   React.useEffect(() => {
-    const id = setInterval(() => generateCue(), 60000);
+    const id = setInterval(() => generateCue("live"), 60000);
     return () => clearInterval(id);
   }, [generateCue]);
 
@@ -450,15 +521,33 @@ export default function LiveWorkout() {
     if (paused) return;
     const offPower = Math.abs(telemetry.power - targetRef.current) > 35;
     const offCadence = telemetry.cadence < CAD_LOW - 8 || telemetry.cadence > CAD_HIGH + 8;
-    if ((offPower || offCadence) && Date.now() - lastCueAt.current > 25000) generateCue();
+    if ((offPower || offCadence) && Date.now() - lastCueAt.current > 25000) generateCue("live");
   }, [telemetry.power, telemetry.cadence, paused, generateCue]);
 
-  // First cue shortly after the ride opens.
+  // Introduce each step as the rider enters it (this also covers the very first
+  // step shortly after the ride opens). Resets the "next step" preview guard.
+  const introducedSegRef = React.useRef<number>(-1);
+  const nextPreviewFiredRef = React.useRef(false);
   React.useEffect(() => {
-    const id = setTimeout(() => generateCue(), 2500);
+    if (paused) return;
+    const idx = activeSeg?.index ?? -1;
+    if (idx < 0 || idx === introducedSegRef.current) return;
+    introducedSegRef.current = idx;
+    nextPreviewFiredRef.current = false;
+    const first = idx === 0;
+    const id = setTimeout(() => generateCue("intro"), first ? 2500 : 0);
     return () => clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [activeSeg?.index, paused, generateCue]);
+
+  // As the rider nears the end of the current step, prepare them for the next.
+  React.useEffect(() => {
+    if (paused || !activeSeg || !activeSeg.next || nextPreviewFiredRef.current) return;
+    const threshold = Math.min(20, Math.max(8, Math.round(activeSeg.segment.durationSec * 0.15)));
+    if (activeSeg.remaining > 0 && activeSeg.remaining <= threshold) {
+      nextPreviewFiredRef.current = true;
+      generateCue("next_preview");
+    }
+  }, [activeSeg?.remaining, paused, generateCue]);
 
   const onSelectRoute = (i: number) => {
     setRouteIdx(i); setRouteAuto(false); setShowRoutes(false);
@@ -753,6 +842,55 @@ export default function LiveWorkout() {
         />
       )}
 
+      {completePrompt && (
+        <View style={styles.overlay}>
+          <View style={styles.completePanel} testID="workout-complete-prompt">
+            <View style={styles.completeBadge}><Ionicons name="checkmark-circle" size={40} color={colors.green} /></View>
+            <Text style={styles.completeTitle}>Workout Complete</Text>
+            <Text style={styles.completeSub}>You finished {workoutTitle}. Nicely done.</Text>
+
+            <View style={styles.adviceCard}>
+              <View style={styles.adviceHead}>
+                <Image source={persona.image} style={styles.adviceAvatar} contentFit="cover" contentPosition="top center" />
+                <Text style={styles.adviceName}>{`${persona.name}'s advice`}</Text>
+              </View>
+              {extendAdvice ? (
+                <Text style={styles.adviceText} testID="extend-advice">{extendAdvice}</Text>
+              ) : (
+                <View style={styles.adviceLoading}>
+                  <ActivityIndicator size="small" color={colors.yellow} />
+                  <Text style={styles.adviceLoadingText}>{persona.name} is reviewing your ride…</Text>
+                </View>
+              )}
+            </View>
+
+            <Text style={styles.extendLabel}>EXTEND YOUR RIDE</Text>
+            <View style={styles.extendRow}>
+              <Pressable testID="extend-10" style={styles.extendChip} onPress={() => onExtendRide(10, "+10 min")}>
+                <Ionicons name="time-outline" size={16} color={colors.yellow} />
+                <Text style={styles.extendChipText}>+10 min</Text>
+              </Pressable>
+              <Pressable testID="extend-20" style={styles.extendChip} onPress={() => onExtendRide(20, "+20 min")}>
+                <Ionicons name="time-outline" size={16} color={colors.yellow} />
+                <Text style={styles.extendChipText}>+20 min</Text>
+              </Pressable>
+              <Pressable testID="extend-5km" style={styles.extendChip} onPress={() => {
+                const kmh = TYPE_SPEED[selected?.typeId ?? "endurance"] ?? 28;
+                onExtendRide(Math.max(6, Math.round((5 / kmh) * 60)), "+5 km");
+              }}>
+                <Ionicons name="navigate-outline" size={16} color={colors.yellow} />
+                <Text style={styles.extendChipText}>+5 km</Text>
+              </Pressable>
+            </View>
+
+            <Pressable testID="complete-finish" onPress={onFinishComplete} style={({ hovered }: any) => [styles.endSave, { backgroundColor: colors.green }, hovered && { opacity: 0.9 }]}>
+              <Ionicons name="checkmark-circle" size={18} color="#fff" />
+              <Text style={styles.endSaveText}>Finish &amp; Save</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
       {endPrompt && (
         <View style={styles.overlay}>
           <View style={styles.endPanel} testID="end-ride-prompt">
@@ -837,4 +975,20 @@ const styles = StyleSheet.create({
   endAbandonText: { color: colors.red, fontSize: 14.5, fontWeight: "700" },
   endResume: { paddingVertical: 8, marginTop: 2 },
   endResumeText: { color: colors.textDim, fontSize: 14, fontWeight: "700" },
+
+  completePanel: { width: 480, maxWidth: "92%", backgroundColor: colors.cardElevated, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, alignItems: "center", gap: 10, ...shadow.card },
+  completeBadge: { width: 66, height: 66, borderRadius: 33, alignItems: "center", justifyContent: "center", backgroundColor: colors.green + "1A", borderWidth: 1, borderColor: colors.green + "55" },
+  completeTitle: { color: colors.white, fontSize: 24, fontWeight: "900", marginTop: 2 },
+  completeSub: { color: colors.textDim, fontSize: 14, textAlign: "center", marginBottom: 4 },
+  adviceCard: { width: "100%", backgroundColor: colors.yellow + "10", borderWidth: 1, borderColor: colors.yellow + "3A", borderRadius: radius.lg, padding: 14, gap: 8 },
+  adviceHead: { flexDirection: "row", alignItems: "center", gap: 9 },
+  adviceAvatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(255,255,255,0.08)" },
+  adviceName: { color: colors.yellow, fontSize: 12, fontWeight: "800", letterSpacing: 0.5 },
+  adviceText: { color: colors.white, fontSize: 14, fontWeight: "600", lineHeight: 20 },
+  adviceLoading: { flexDirection: "row", alignItems: "center", gap: 9 },
+  adviceLoadingText: { color: colors.textDim, fontSize: 13, fontWeight: "600" },
+  extendLabel: { color: colors.textFaint, fontSize: 10.5, fontWeight: "800", letterSpacing: 1, alignSelf: "flex-start", marginTop: 4 },
+  extendRow: { flexDirection: "row", gap: 10, width: "100%" },
+  extendChip: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: colors.yellow + "44", borderRadius: radius.md, paddingVertical: 12 },
+  extendChipText: { color: colors.white, fontSize: 13.5, fontWeight: "800" },
 });

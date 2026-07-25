@@ -12,6 +12,10 @@ export type CoachContext = {
   seated?: boolean;
   coach_name?: string;
   coach_gender?: string;
+  cue_kind?: "live" | "intro" | "next_preview" | "extend_advice";
+  next_segment?: string | null;
+  next_zone?: string | null;
+  next_target?: number | null;
 };
 
 function apiBase(): string {

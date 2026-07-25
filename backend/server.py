@@ -675,6 +675,10 @@ class CoachCueRequest(BaseModel):
     seated: bool = False
     coach_name: str = "Alberto"
     coach_gender: str = "male"
+    cue_kind: str = "live"  # live | intro | next_preview | extend_advice
+    next_segment: Optional[str] = None
+    next_zone: Optional[str] = None
+    next_target: Optional[int] = None
 
 
 @api_router.post("/coach/cue")
@@ -692,6 +696,26 @@ async def coach_cue(req: CoachCueRequest):
         if req.seated else ""
     )
     rider = await _rider_line()
+    if req.cue_kind == "intro":
+        instruction = (
+            f"The rider is just beginning the '{req.segment or 'first'}' step "
+            f"({req.zone or ''}, target {req.power_target} W). "
+            "Introduce this step in one short, motivating sentence — what it is and how to approach it."
+        )
+    elif req.cue_kind == "next_preview":
+        instruction = (
+            f"The rider is about to finish the current step and transition to "
+            f"'{req.next_segment or 'the next step'}' ({req.next_zone or ''}, target {req.next_target or req.power_target} W). "
+            "In one short sentence, prepare them for this upcoming change so they're ready."
+        )
+    elif req.cue_kind == "extend_advice":
+        instruction = (
+            "The rider has just COMPLETED the workout. Based on their live numbers and how the session went, "
+            "advise in 1-2 short sentences whether it is wise to extend the ride with extra easy/endurance time "
+            "or to finish now and recover. Be specific, caring, and decisive."
+        )
+    else:
+        instruction = "Give the rider one short coaching cue right now."
     prompt = (
         f"{rider}\n"
         f"Workout: {req.workout}. Route: {req.route or 'indoor'}. "
@@ -699,7 +723,7 @@ async def coach_cue(req: CoachCueRequest):
         f"Live: power {req.power} W (target {req.power_target} W), "
         f"cadence {req.cadence} rpm (aim {req.cadence_low}-{req.cadence_high}), "
         f"heart rate {req.hr} bpm, speed {req.speed} km/h.\n"
-        "Give the rider one short coaching cue right now."
+        f"{instruction}"
     )
 
     try:

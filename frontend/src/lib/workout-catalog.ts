@@ -687,6 +687,11 @@ export function currentSegment(segs: Segment[], elapsedSec: number): ActiveSegme
   return { index: segs.length - 1, total: segs.length, segment: last, elapsedInSeg: 0, remaining: 0, next: null };
 }
 
+/** An easy Z2 endurance block used to extend a workout past its planned end. */
+export function extensionSegment(w: Workout, minutes: number): Segment {
+  return mkSeg(w, 1, "Extra Endurance", Math.round(minutes * 60));
+}
+
 /** Normalised bar heights (0..1) for the interval profile chart. */
 export function segmentProfile(segs: Segment[]): number[] {
   return segs.map((s) => Math.max(0.12, Math.min(1, s.targetPct / 1.4)));
