@@ -182,21 +182,16 @@ export function TerrainCard({ grade, elevGain, distanceLeft, progress, isClimb }
 
 // ---- Workout card (right column, top) -------------------------------------
 export function WorkoutCard({
-  planName, phase, week, day, workoutName, steps, activeIndex, onStepPress, fill = false,
+  planName, phase, week, day, workoutName, description,
 }: {
-  planName: string; phase?: string; week?: string; day?: string; workoutName: string;
-  steps: TimelineStep[]; activeIndex: number; onStepPress: (index: number) => void; fill?: boolean;
+  planName: string; phase?: string; week?: string; day?: string; workoutName: string; description?: string;
 }) {
-  const scrollRef = React.useRef<ScrollView>(null);
-  React.useEffect(() => {
-    if (activeIndex < 0) return;
-    scrollRef.current?.scrollTo({ y: Math.max(0, activeIndex * 46 - 40), animated: true });
-  }, [activeIndex]);
   const chips = [phase, week, day].filter(Boolean) as string[];
   return (
     <View style={wc.card} testID="workout-card">
+      <Text style={wc.title} numberOfLines={2}>{workoutName}</Text>
       <View style={wc.head}>
-        <Ionicons name="ribbon-outline" size={14} color={colors.yellow} />
+        <Ionicons name="ribbon-outline" size={13} color={colors.yellow} />
         <Text style={wc.plan} numberOfLines={1}>{planName}</Text>
       </View>
       {chips.length ? (
@@ -204,27 +199,12 @@ export function WorkoutCard({
           {chips.map((c, i) => (<View key={i} style={wc.chip}><Text style={wc.chipText}>{c}</Text></View>))}
         </View>
       ) : null}
-      <Text style={wc.title} numberOfLines={2}>{workoutName}</Text>
-      <View style={wc.divider} />
-      <Text style={wc.stepsHead}>WORKOUT STEPS · {steps.length}</Text>
-      <ScrollView ref={scrollRef} style={[wc.list, { maxHeight: fill ? 300 : 200 }]} contentContainerStyle={wc.listContent} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-        {steps.map((s) => {
-          const status: StepStatus = s.index < activeIndex ? "done" : s.index === activeIndex ? "current" : "future";
-          return (
-            <Pressable key={s.index} onPress={() => onStepPress(s.index)} testID={`wc-step-${s.index}`} style={[wc.step, status === "current" && wc.stepCurrent]}>
-              <View style={[wc.stepBar, { backgroundColor: status === "future" ? "rgba(255,255,255,0.18)" : s.color }]} />
-              <View style={{ flex: 1 }}>
-                <Text style={[wc.stepName, status === "future" && { color: colors.textDim }]} numberOfLines={1}>{s.index + 1}. {s.label}</Text>
-                {s.desc ? <Text style={wc.stepDesc} numberOfLines={1}>{s.desc}</Text> : null}
-              </View>
-              <View style={wc.stepRight}>
-                <Text style={[wc.stepDur, status === "current" && { color: colors.yellow }]}>{s.duration}</Text>
-                {status === "done" ? <Ionicons name="checkmark-circle" size={12} color={colors.green} /> : status === "current" ? <View style={wc.liveDot} /> : <View style={{ height: 12 }} />}
-              </View>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      {description ? (
+        <>
+          <View style={wc.divider} />
+          <Text style={wc.desc} numberOfLines={6}>{description}</Text>
+        </>
+      ) : null}
     </View>
   );
 }
@@ -250,13 +230,37 @@ function ProfileSeg({ step, status, widthPct, fill, onPress }: { step: TimelineS
   );
 }
 
+function StepDetailChip({ step, status, onPress }: { step: TimelineStep; status: StepStatus; onPress: () => void }) {
+  const border = status === "current" ? colors.yellow : status === "done" ? colors.green + "55" : colors.border;
+  const bg = status === "current" ? colors.yellow + "14" : status === "done" ? "rgba(67,209,122,0.05)" : "rgba(255,255,255,0.03)";
+  return (
+    <Pressable onPress={onPress} testID={`step-chip-${step.index}`} style={[st.chip, { borderColor: border, backgroundColor: bg }]}>
+      <View style={st.chipTop}>
+        <View style={[st.chipDot, { backgroundColor: status === "future" ? colors.textFaint : step.color }]} />
+        <Text style={[st.chipName, status === "future" && { color: colors.textDim }]} numberOfLines={1}>{step.index + 1}. {step.label}</Text>
+        {status === "done" ? <Ionicons name="checkmark-circle" size={12} color={colors.green} /> : status === "current" ? <View style={st.chipLive} /> : null}
+      </View>
+      {step.desc ? <Text style={st.chipDesc} numberOfLines={1}>{step.desc}</Text> : null}
+      <View style={st.chipMeta}>
+        <Text style={st.chipDur}>{step.duration}</Text>
+        {step.watts > 0 ? <><Text style={st.chipSep}>·</Text><Text style={[st.chipW, status === "current" && { color: colors.yellow }]}>{step.watts} W</Text></> : null}
+      </View>
+    </Pressable>
+  );
+}
+
 export function StepTimeline({
   title, steps, activeIndex, remaining, stepProgress = 0, onStepPress,
 }: {
   title: string; steps: TimelineStep[]; activeIndex: number; remaining?: string; stepProgress?: number; onStepPress: (index: number) => void;
 }) {
   const total = steps.reduce((a, s) => a + Math.max(1, s.durationSec), 0) || 1;
-  const cur = activeIndex >= 0 ? steps[activeIndex] : undefined;
+  const scrollRef = React.useRef<ScrollView>(null);
+  React.useEffect(() => {
+    if (activeIndex < 0) return;
+    const CHIP = 172 + 8; // chip width + gap
+    scrollRef.current?.scrollTo({ x: Math.max(0, activeIndex * CHIP - 40), animated: true });
+  }, [activeIndex]);
   return (
     <View style={st.wrap} testID="interval-timeline">
       <View style={st.head}>
@@ -269,14 +273,6 @@ export function StepTimeline({
           ) : null}
         </View>
       </View>
-      {cur ? (
-        <View style={st.summary}>
-          <View style={[st.summaryDot, { backgroundColor: cur.color }]} />
-          <Text style={st.summaryNow}>NOW</Text>
-          <Text style={st.summaryName} numberOfLines={1}>{cur.label}</Text>
-          {cur.desc ? <Text style={st.summaryDesc} numberOfLines={1}> · {cur.desc}</Text> : null}
-        </View>
-      ) : null}
       <View style={st.chart}>
         {steps.map((s) => (
           <ProfileSeg
@@ -289,6 +285,11 @@ export function StepTimeline({
           />
         ))}
       </View>
+      <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.strip}>
+        {steps.map((s) => (
+          <StepDetailChip key={s.index} step={s} status={s.index < activeIndex ? "done" : s.index === activeIndex ? "current" : "future"} onPress={() => onStepPress(s.index)} />
+        ))}
+      </ScrollView>
     </View>
   );
 }
@@ -466,7 +467,7 @@ const ep = StyleSheet.create({
 });
 
 const tc = StyleSheet.create({
-  card: { ...card, padding: 14, paddingBottom: 34, minHeight: 118, overflow: "hidden" },
+  card: { ...card, padding: 14, paddingBottom: 24, minHeight: 100, overflow: "hidden" },
   head: { flexDirection: "row", alignItems: "center", gap: 7 },
   title: { color: colors.textDim, fontSize: 11, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase" },
   stats: { flexDirection: "row", justifyContent: "space-between", marginTop: 12, gap: 6 },
@@ -493,6 +494,17 @@ const st = StyleSheet.create({
   seg: { height: "100%", justifyContent: "flex-end" },
   segBar: { width: "100%", borderRadius: 4, borderWidth: 1, overflow: "hidden", justifyContent: "center" },
   segFill: { position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 3 },
+  strip: { flexDirection: "row", gap: 8, paddingTop: 2 },
+  chip: { width: 172, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8, gap: 3 },
+  chipTop: { flexDirection: "row", alignItems: "center", gap: 7 },
+  chipDot: { width: 8, height: 8, borderRadius: 4 },
+  chipName: { color: colors.white, fontSize: 12.5, fontWeight: "800", flex: 1 },
+  chipLive: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.yellow },
+  chipDesc: { color: colors.textDim, fontSize: 11, fontWeight: "600" },
+  chipMeta: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 1 },
+  chipDur: { color: colors.textDim, fontSize: 11.5, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  chipSep: { color: colors.textFaint, fontSize: 11 },
+  chipW: { color: colors.textDim, fontSize: 11.5, fontWeight: "800", fontVariant: ["tabular-nums"] },
 });
 
 const sd = StyleSheet.create({
@@ -523,6 +535,7 @@ const wc = StyleSheet.create({
   chipText: { color: colors.textDim, fontSize: 10.5, fontWeight: "800", letterSpacing: 0.3 },
   title: { color: colors.white, fontSize: 18, fontWeight: "900", marginTop: 2 },
   divider: { height: 1, backgroundColor: colors.borderSoft, marginVertical: 2 },
+  desc: { color: colors.textDim, fontSize: 13, fontWeight: "600", lineHeight: 19 },
   stepsHead: { color: colors.textFaint, fontSize: 9.5, fontWeight: "800", letterSpacing: 1 },
   list: { marginTop: 2 },
   listContent: { gap: 5, paddingBottom: 2 },

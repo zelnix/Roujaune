@@ -583,10 +583,7 @@ export default function LiveWorkout() {
             week={weekLabel}
             day={dayLabel}
             workoutName={workoutTitle}
-            steps={stepList}
-            activeIndex={activeSeg?.index ?? -1}
-            onStepPress={(i) => setStepDetail(i)}
-            fill={tablet}
+            description={selected?.description}
           />
           <TerrainCard grade={terrain.grade} elevGain={terrain.elev} distanceLeft={Math.max(0, terrain.km - riddenKm)} progress={progress} isClimb={terrain.isClimb} />
           <RouteMapCard title={routeInfo.title} progress={progress} riddenKm={riddenKm} totalKm={routeInfo.km} timeBased={!trainerOn} fill />

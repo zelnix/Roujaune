@@ -383,7 +383,7 @@ export function RouteMapCard({ title = "Alpe d'Huez", progress = 0, riddenKm = 0
         <View style={[styles.routeDot, { left: `${pct}%` }]} />
       </View>
       <Text style={styles.routeProg}>{riddenKm.toFixed(1)} / {totalKm.toFixed(1)} km · {pct}%{timeBased ? " · time-based" : ""}</Text>
-      <View style={[styles.mapWrap, { height: fill ? 96 : 200 }]}>
+      <View style={[styles.mapWrap, { height: fill ? 52 : 200 }]}>
         <Svg width="100%" height="100%" viewBox="0 0 240 200" preserveAspectRatio="xMidYMid meet">
           <Path d="M40 185 C90 175 60 150 100 145 C140 140 90 120 120 110 C155 98 110 80 150 70 C185 62 150 45 175 35 C195 27 205 22 210 15" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth={3} strokeLinecap="round" />
           <Path d="M40 185 C90 175 60 150 100 145 C140 140 90 120 120 110" fill="none" stroke={colors.yellow} strokeWidth={3} strokeLinecap="round" />
