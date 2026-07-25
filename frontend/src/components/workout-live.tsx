@@ -236,39 +236,27 @@ export type TimelineStep = {
 };
 export type StepStatus = "done" | "current" | "future";
 
-function StepChip({ step, status, onPress }: { step: TimelineStep; status: StepStatus; onPress: () => void }) {
-  const barH = 8 + Math.max(0, Math.min(1, step.intensity)) * 28;
-  const border = status === "current" ? colors.yellow : status === "done" ? colors.green + "55" : colors.border;
-  const bg = status === "current" ? colors.yellow + "16" : status === "done" ? "rgba(67,209,122,0.06)" : "rgba(255,255,255,0.03)";
-  const barColor = status === "future" ? "rgba(255,255,255,0.20)" : status === "done" ? colors.green + "AA" : colors.yellow;
+function ProfileSeg({ step, status, widthPct, fill, onPress }: { step: TimelineStep; status: StepStatus; widthPct: number; fill: number; onPress: () => void }) {
+  const h = 12 + Math.max(0, Math.min(1, step.intensity)) * 44;
+  const base = status === "future" ? "rgba(255,255,255,0.14)" : status === "done" ? colors.yellow + "55" : step.color + "3A";
+  const fillColor = status === "done" ? colors.yellow : colors.yellow;
+  const fillPct = status === "done" ? 100 : status === "current" ? Math.max(0, Math.min(1, fill)) * 100 : 0;
   return (
-    <Pressable onPress={onPress} style={[st.chip, { borderColor: border, backgroundColor: bg }]} testID={`step-chip-${step.index}`}>
-      <View style={st.chipTop}>
-        <Text style={[st.chipNum, status === "current" && { color: colors.yellow }]}>{step.index + 1}</Text>
-        {status === "done" ? <Ionicons name="checkmark-circle" size={13} color={colors.green} /> : status === "current" ? <View style={st.liveDot} /> : <Ionicons name="ellipse-outline" size={11} color={colors.textFaint} />}
-      </View>
-      <View style={st.barRow}><View style={[st.barFill, { height: barH, backgroundColor: barColor }]} /></View>
-      <Text style={[st.chipLabel, status === "future" && { color: colors.textDim }]} numberOfLines={1}>{step.label}</Text>
-      <View style={st.chipMeta}>
-        <Text style={st.chipDur}>{step.duration}</Text>
-        {step.watts > 0 ? <><Text style={st.chipDot}>·</Text><Text style={[st.chipW, status === "current" && { color: colors.yellow }]}>{step.watts} W</Text></> : null}
+    <Pressable onPress={onPress} testID={`step-seg-${step.index}`} style={[st.seg, { width: `${widthPct}%` }]}>
+      <View style={[st.segBar, { height: h, backgroundColor: base, borderColor: status === "current" ? colors.yellow : "transparent" }]}>
+        {fillPct > 0 ? <View style={[st.segFill, { width: `${fillPct}%`, backgroundColor: fillColor }]} /> : null}
       </View>
     </Pressable>
   );
 }
 
 export function StepTimeline({
-  title, steps, activeIndex, remaining, onStepPress,
+  title, steps, activeIndex, remaining, stepProgress = 0, onStepPress,
 }: {
-  title: string; steps: TimelineStep[]; activeIndex: number; remaining?: string; onStepPress: (index: number) => void;
+  title: string; steps: TimelineStep[]; activeIndex: number; remaining?: string; stepProgress?: number; onStepPress: (index: number) => void;
 }) {
-  const scrollRef = React.useRef<ScrollView>(null);
-  // Keep the active step in view as the workout progresses.
-  React.useEffect(() => {
-    if (activeIndex < 0) return;
-    const CHIP = 116 + 8; // chip width + gap
-    scrollRef.current?.scrollTo({ x: Math.max(0, activeIndex * CHIP - 40), animated: true });
-  }, [activeIndex]);
+  const total = steps.reduce((a, s) => a + Math.max(1, s.durationSec), 0) || 1;
+  const cur = activeIndex >= 0 ? steps[activeIndex] : undefined;
   return (
     <View style={st.wrap} testID="interval-timeline">
       <View style={st.head}>
@@ -281,11 +269,26 @@ export function StepTimeline({
           ) : null}
         </View>
       </View>
-      <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.track}>
+      {cur ? (
+        <View style={st.summary}>
+          <View style={[st.summaryDot, { backgroundColor: cur.color }]} />
+          <Text style={st.summaryNow}>NOW</Text>
+          <Text style={st.summaryName} numberOfLines={1}>{cur.label}</Text>
+          {cur.desc ? <Text style={st.summaryDesc} numberOfLines={1}> · {cur.desc}</Text> : null}
+        </View>
+      ) : null}
+      <View style={st.chart}>
         {steps.map((s) => (
-          <StepChip key={s.index} step={s} status={s.index < activeIndex ? "done" : s.index === activeIndex ? "current" : "future"} onPress={() => onStepPress(s.index)} />
+          <ProfileSeg
+            key={s.index}
+            step={s}
+            status={s.index < activeIndex ? "done" : s.index === activeIndex ? "current" : "future"}
+            widthPct={(Math.max(1, s.durationSec) / total) * 100}
+            fill={stepProgress}
+            onPress={() => onStepPress(s.index)}
+          />
         ))}
-      </ScrollView>
+      </View>
     </View>
   );
 }
@@ -481,18 +484,15 @@ const st = StyleSheet.create({
   step: { color: colors.textDim, fontSize: 11, fontWeight: "800", letterSpacing: 0.5 },
   remain: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.yellow + "18", borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 3 },
   remainText: { color: colors.yellow, fontSize: 11, fontWeight: "800" },
-  track: { flexDirection: "row", gap: 8, paddingRight: 4 },
-  chip: { width: 116, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: 10, paddingTop: 8, paddingBottom: 10, gap: 6 },
-  chipTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", height: 16 },
-  chipNum: { color: colors.textDim, fontSize: 11, fontWeight: "900" },
-  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.yellow },
-  barRow: { height: 36, justifyContent: "flex-end", alignItems: "flex-start" },
-  barFill: { width: 26, borderRadius: 4 },
-  chipLabel: { color: colors.white, fontSize: 12, fontWeight: "700" },
-  chipMeta: { flexDirection: "row", alignItems: "center", gap: 5 },
-  chipDur: { color: colors.textDim, fontSize: 11, fontWeight: "700", fontVariant: ["tabular-nums"] },
-  chipDot: { color: colors.textFaint, fontSize: 11 },
-  chipW: { color: colors.textDim, fontSize: 11, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  summary: { flexDirection: "row", alignItems: "center", gap: 8 },
+  summaryDot: { width: 9, height: 9, borderRadius: 5 },
+  summaryNow: { color: colors.yellow, fontSize: 10, fontWeight: "900", letterSpacing: 1 },
+  summaryName: { color: colors.white, fontSize: 13, fontWeight: "800" },
+  summaryDesc: { color: colors.textDim, fontSize: 12, fontWeight: "600", flexShrink: 1 },
+  chart: { flexDirection: "row", alignItems: "flex-end", height: 58, gap: 2 },
+  seg: { height: "100%", justifyContent: "flex-end" },
+  segBar: { width: "100%", borderRadius: 4, borderWidth: 1, overflow: "hidden", justifyContent: "center" },
+  segFill: { position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 3 },
 });
 
 const sd = StyleSheet.create({

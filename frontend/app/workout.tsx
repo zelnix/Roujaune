@@ -12,7 +12,7 @@ import { rideRecorder } from "@/src/lib/ride";
 import { getLastRouteId, setLastRouteId } from "@/src/lib/prefs";
 import { useSettings } from "@/src/lib/settings";
 import { routeVideos, currentWorkout } from "@/src/data";
-import { getWorkout, buildSegments, currentSegment, mmss, targetWatts } from "@/src/lib/workout-catalog";
+import { getWorkout, buildSegments, currentSegment, mmss, targetWatts, planDayNumber } from "@/src/lib/workout-catalog";
 import { fetchZoneBias, ZoneBias } from "@/src/lib/targets";
 import { usePlan } from "@/src/lib/plan";
 import { getRiderProfile } from "@/src/lib/rider-profile";
@@ -202,7 +202,8 @@ export default function LiveWorkout() {
     const cur = w ? parseInt(String(w).split("/")[0].trim(), 10) : (plan as any)?.youAreHere;
     return cur && !Number.isNaN(cur) ? `Week ${cur}` : undefined;
   })();
-  const dayLabel = new Date().toLocaleDateString("en-US", { weekday: "short" });
+  const dayInfo = params.workoutId ? planDayNumber(String(params.workoutId)) : null;
+  const dayLabel = dayInfo ? `Day ${dayInfo.day}` : undefined;
 
   // ERG intensity: optimistic local value so +/- feels instant, then reconciles
   // with the trainer sim once taps settle (~1.5s of no local changes).
@@ -575,7 +576,7 @@ export default function LiveWorkout() {
           </View>
         </View>
 
-        <View style={[styles.rightCol, { width: rightW }, tablet && styles.flex1]}>
+        <View style={[styles.rightCol, { width: rightW }]}>
           <WorkoutCard
             planName={planName}
             phase={phaseLabel}
@@ -592,7 +593,7 @@ export default function LiveWorkout() {
         </View>
       </View>
 
-      <StepTimeline title={workoutTitle} steps={stepList} activeIndex={activeSeg?.index ?? -1} remaining={timeLeftLabel} onStepPress={(i) => setStepDetail(i)} />
+      <StepTimeline title={workoutTitle} steps={stepList} activeIndex={activeSeg?.index ?? -1} remaining={timeLeftLabel} stepProgress={activeSeg ? activeSeg.elapsedInSeg / Math.max(1, activeSeg.segment.durationSec) : 0} onStepPress={(i) => setStepDetail(i)} />
 
       <LiveControlBar
         paused={paused}

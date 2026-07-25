@@ -389,6 +389,33 @@ export const RB_WORKOUTS: Workout[] = (() => {
   return out;
 })();
 
+// Sequential "day number" of a cycling workout within its training plan,
+// counting EVERY session type (strength, cycling, recovery, balance, rest) in
+// plan order. Day 1 = the first scheduled session of the program. Returns the
+// day number (and plan total) or null if the workout isn't part of a plan.
+export function planDayNumber(workoutId: string): { day: number; total: number } | null {
+  const programs: { phases: any[]; rideId: (s: any) => string }[] = [
+    { phases: (COUCH_TO_ROAD as any).phases, rideId: ctrRideId },
+    { phases: (RIDE_STRONGER as any).phases, rideId: rsRideId },
+    { phases: (RIDE_BEYOND as any).phases, rideId: rbRideId },
+  ];
+  for (const { phases, rideId } of programs) {
+    let counter = 0;
+    let match = -1;
+    for (const phase of phases) {
+      for (const week of phase.weeks) {
+        for (const session of week.days) {
+          counter++;
+          if (match < 0 && session.type === "cycling" && rideId(session) === workoutId) match = counter;
+        }
+      }
+    }
+    if (match > 0) return { day: match, total: counter };
+  }
+  return null;
+}
+
+
 export const WORKOUTS: Workout[] = [
   ...CTR_WORKOUTS,
   ...RS_WORKOUTS,
