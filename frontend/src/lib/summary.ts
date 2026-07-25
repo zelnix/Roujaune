@@ -178,6 +178,7 @@ export function useSummary() {
   const [stats, setStats] = useState<SummaryStats>(FALLBACK_STATS);
   const [loading, setLoading] = useState(true);
   const [route] = useState<RideRoute>(() => rideRecorder.snapshot().route);
+  const [adjustments] = useState<{ t: string; label: string }[]>(() => rideRecorder.snapshot().adjustments);
   const [needsManual, setNeedsManual] = useState(false);
   const [saved, setSaved] = useState(false);
   const [recordedElapsed] = useState<number>(() => rideRecorder.snapshot().elapsed);
@@ -230,7 +231,7 @@ export function useSummary() {
     return () => { alive = false; };
   }, [post]);
 
-  return { stats, loading, route, needsManual, saved, recordedElapsed, submitManual: (fields: Record<string, any>) => post(fields) };
+  return { stats, loading, route, adjustments, needsManual, saved, recordedElapsed, submitManual: (fields: Record<string, any>) => post(fields) };
 }
 
 /** Fetch Alberto's AI post-ride debrief once the ride stats are computed.
@@ -274,6 +275,7 @@ export function useCoachDebrief(stats: SummaryStats, route: RideRoute) {
             interval_compliance: overall ?? 0,
             intervals: measured,
             extended_min: rec.extendedMin ?? 0,
+            adjustments: (rec.adjustments ?? []).slice(0, 12).map((a) => `${a.t} ${a.label}`),
             zones: stats.zones?.map((z) => ({ z: z.z, pct: z.pct })) ?? [],
             coach_name: persona.name,
             coach_gender: persona.gender,

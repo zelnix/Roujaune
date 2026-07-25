@@ -358,7 +358,9 @@ export default function LiveWorkout() {
   // Record ride-affecting adjustments (skip/extend/intensity/ERG/pause) with the
   // ride time so the rider can see why a lap's numbers changed.
   const logControl = React.useCallback((label: string) => {
-    setControlLog((prev) => [{ id: Date.now(), t: mmss(Math.round(telemetryRef.current.elapsed)), label }, ...prev].slice(0, 8));
+    const t = mmss(Math.round(telemetryRef.current.elapsed));
+    setControlLog((prev) => [{ id: Date.now(), t, label }, ...prev].slice(0, 8));
+    rideRecorder.addAdjustment(t, label);
   }, []);
 
   // If the route video can't load, gracefully fall back to the Virtual route
@@ -679,6 +681,23 @@ export default function LiveWorkout() {
   const finishAt = new Date(Date.now() + remainingSec * 1000);
   const estFinish = `${String(finishAt.getHours()).padStart(2, "0")}:${String(finishAt.getMinutes()).padStart(2, "0")}`;
   const isLive = !settings.demoMode && (trainerOn || wearableOn);
+  // Time-based ride: no live sensors connected → show duration metrics (elapsed,
+  // interval remaining, calories, workout step) instead of blank telemetry cards.
+  const timeBased = !trainerOn && !wearableOn;
+  const elapsedShort = telemetry.elapsed >= 3600 ? fmt(telemetry.elapsed) : mmss(Math.round(telemetry.elapsed));
+  // Rough energy estimate from the planned target watts ridden so far
+  // (work in kJ ≈ dietary kcal for cycling at ~24% efficiency).
+  const kcal = React.useMemo(() => {
+    let acc = 0;
+    let t = telemetry.elapsed;
+    for (const s of segments) {
+      if (t <= 0) break;
+      const d = Math.min(t, s.durationSec);
+      acc += targetWatts(s, ftp, zoneBias) * d;
+      t -= d;
+    }
+    return Math.round(acc / 1000);
+  }, [segments, telemetry.elapsed, ftp, zoneBias]);
 
   const body = (
     <>
@@ -686,10 +705,21 @@ export default function LiveWorkout() {
         <View style={[styles.leftCenter, tablet && styles.flex1]}>
           <View style={styles.metricRow}>
             <BrandCard />
-            <MetricCard icon="heart" label="Heart Rate" value={wearableOn ? String(telemetry.hr) : "—"} unit="bpm" status={wearableOn ? `ZONE ${hrZone(telemetry.hr)}` : undefined} statusTone="neutral" accent={colors.red} />
-            <MetricCard icon="speedometer" label="Speed" value={trainerOn ? String(Math.round(telemetry.speed)) : "—"} unit="km/h" accent="#5AC8FA" />
-            <MetricCard icon="sync" label="Cadence" value={trainerOn ? String(telemetry.cadence) : "—"} unit="rpm" status={cadStatus} statusTone={cadInRange ? "good" : "warn"} sub={`TARGET ${CAD_LOW}–${CAD_HIGH}`} accent={colors.green} />
-            <MetricCard icon="flash" label="Power" value={trainerOn ? String(powerVal) : "—"} unit="W" status={powerStatus} statusTone={powerTone} sub={`TARGET ${Math.max(0, targetW - 8)}–${targetW + 8} W`} accent={colors.yellow} />
+            {timeBased ? (
+              <>
+                <MetricCard icon="stopwatch-outline" label="Elapsed" value={elapsedShort} sub={`TOTAL SESSION ${mmss(totalSec)}`} accent={colors.yellow} />
+                <MetricCard icon="timer-outline" label="Interval" value={timeLeftLabel ?? "—"} status="REMAINING" statusTone="neutral" sub="CURRENT BLOCK" accent="#5AC8FA" />
+                <MetricCard icon="flame" label="Calories" value={String(kcal)} unit="kcal" sub="ESTIMATED" accent={colors.red} />
+                <MetricCard icon="flag" label="Workout Step" value={`Step ${(activeSeg?.index ?? 0) + 1}`} unit={`of ${segments.length}`} sub="CURRENT STEP" accent={colors.green} />
+              </>
+            ) : (
+              <>
+                <MetricCard icon="heart" label="Heart Rate" value={wearableOn ? String(telemetry.hr) : "—"} unit="bpm" status={wearableOn ? `ZONE ${hrZone(telemetry.hr)}` : undefined} statusTone="neutral" accent={colors.red} />
+                <MetricCard icon="speedometer" label="Speed" value={trainerOn ? String(Math.round(telemetry.speed)) : "—"} unit="km/h" accent="#5AC8FA" />
+                <MetricCard icon="sync" label="Cadence" value={trainerOn ? String(telemetry.cadence) : "—"} unit="rpm" status={cadStatus} statusTone={cadInRange ? "good" : "warn"} sub={`TARGET ${CAD_LOW}–${CAD_HIGH}`} accent={colors.green} />
+                <MetricCard icon="flash" label="Power" value={trainerOn ? String(powerVal) : "—"} unit="W" status={powerStatus} statusTone={powerTone} sub={`TARGET ${Math.max(0, targetW - 8)}–${targetW + 8} W`} accent={colors.yellow} />
+              </>
+            )}
           </View>
 
           <View style={[styles.innerRow, tablet && styles.flex1]}>

@@ -42,7 +42,7 @@ export default function WorkoutComplete() {
   const rightW = compact ? 300 : 344;
   const pad = phone ? spacing.sm : compact ? spacing.md : spacing.lg;
 
-  const { stats, route, needsManual, saved, submitManual, recordedElapsed } = useSummary();
+  const { stats, route, needsManual, saved, submitManual, recordedElapsed, adjustments } = useSummary();
   const { debrief, loading: debriefLoading } = useCoachDebrief(stats, route);
   const { intervals, overall: intervalOverall, hasData: intervalHasData, ftp: intervalFtp } = useIntervals();
   const persona = useCoach();
@@ -120,6 +120,7 @@ export default function WorkoutComplete() {
           overall={intervalOverall}
           hasData={intervalHasData}
           ftp={intervalFtp}
+          adjustments={adjustments}
           routeName={route.name}
           onClose={() => setShowAnalysis(false)}
         />
@@ -144,7 +145,7 @@ function RightColumn({ score, phone, route }: { score: number; phone: boolean; r
 
 // Deeper post-ride analysis: full-ride power/HR curves, time-in-zones and a
 // lap-by-lap interval breakdown — for data-focused riders.
-function FullAnalysisModal({ stats, intervals, overall, hasData, ftp, routeName, onClose }: { stats: any; intervals: any[]; overall: number | null; hasData: boolean; ftp: number; routeName?: string; onClose: () => void }) {
+function FullAnalysisModal({ stats, intervals, overall, hasData, ftp, adjustments = [], routeName, onClose }: { stats: any; intervals: any[]; overall: number | null; hasData: boolean; ftp: number; adjustments?: { t: string; label: string }[]; routeName?: string; onClose: () => void }) {
   const [w, setW] = React.useState(600);
   const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
   return (
@@ -212,6 +213,22 @@ function FullAnalysisModal({ stats, intervals, overall, hasData, ftp, routeName,
               );
             })}
           </View>
+
+          {adjustments.length > 0 && (
+            <View style={styles.lapCard} testID="adjustments-log">
+              <View style={styles.lapHeadRow}>
+                <Ionicons name="options" size={15} color={colors.yellow} />
+                <Text style={styles.lapTitle}>Ride Adjustments</Text>
+                <Text style={styles.lapHint}>What you changed mid-ride</Text>
+              </View>
+              {adjustments.map((a, i) => (
+                <View key={i} style={[styles.adjRow, i % 2 === 1 && styles.lapRowAlt]}>
+                  <Text style={styles.adjTime}>{a.t}</Text>
+                  <Text style={styles.adjLabel}>{a.label}</Text>
+                </View>
+              ))}
+            </View>
+          )}
         </ScrollView>
       </View>
     </View>
@@ -370,6 +387,9 @@ const styles = StyleSheet.create({
   lapName: { color: colors.white, fontSize: 13, fontWeight: "700", flexShrink: 1 },
   lapVal: { color: colors.white, fontSize: 13.5, fontWeight: "800", fontVariant: ["tabular-nums"] },
   lapCompCell: { alignItems: "flex-end" },
+  adjRow: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 8, paddingHorizontal: 10, borderRadius: radius.sm },
+  adjTime: { color: colors.yellow, fontSize: 13, fontWeight: "800", fontVariant: ["tabular-nums"], minWidth: 48 },
+  adjLabel: { color: colors.white, fontSize: 13.5, fontWeight: "700" },
   compPill: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 },
   compDot: { width: 8, height: 8, borderRadius: 4 },
   compText: { fontSize: 11.5, fontWeight: "800", fontVariant: ["tabular-nums"] },
