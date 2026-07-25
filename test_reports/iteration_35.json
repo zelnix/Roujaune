@@ -1,0 +1,41 @@
+{
+  "summary": "BUG FIX VERIFIED. Tapping the 'Virtual' pill (testID='switch-virtual', label 'VIRTUAL', icon 'bicycle') in the Live Workout HUD now routes to /virtual-route via router.push('/virtual-route') as expected. The Virtual Route screen loads its cinematic 2.5D scene (rider silhouette on landscape road + connection pill 'Connected'), the setup card with rider selection ('Alpine Sunset Pass · Dolomites, Italy · 20 km', rider-male / rider-female / mature variants) renders, START RIDE begins the ride and the full telemetry panel (vr-full-panel: POWER, CADENCE, SPEED, HR, GRADIENT, DISTANCE, ELAPSED) appears without errors. Browser back navigation returns cleanly to /workout. All 3 requested flows pass.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/workout (HUD)", "issues": ["The 'Virtual' pill inside the RouteVideo overlay measures ~106×38 px — height is below the 44pt minimum touch target. Acceptable for landscape tablet with mouse/touch but should be enlarged (min-height 44) for phone/small-tablet parity with 'Routes' pill."]},
+      {"screen": "/workout (HUD)", "issues": ["RouteVideo YouTube embed shows 'Video unavailable — This content isn't available' in the preview environment (YouTube geo/embed block). Not caused by this bug fix, but the graceful fallback to Virtual mode (onVideoError) does NOT auto-fire for YouTube's inline 'unavailable' state — only for hard load errors — so users may only see the fallback if they tap Virtual manually. Consider detecting YouTube's 'unavailable' postMessage and triggering the same virtual-mode fallback."]}
+    ],
+    "react_native_issues": [
+      {"component": "styles (shadow*/textShadow*)", "issue": "Console warns: '\"shadow*\" style props are deprecated. Use \"boxShadow\".' and '\"textShadow*\" style props are deprecated. Use \"textShadow\".' — react-native-web upgrade required. Reference: repo-wide (theme shadows/glow used across /app/frontend/src/theme and workout/virtual-route styles)."},
+      {"component": "props.pointerEvents", "issue": "Console warns: 'props.pointerEvents is deprecated. Use style.pointerEvents' — move pointerEvents='box-none' props into style. Reference: /app/frontend/app/workout.tsx:760, /app/frontend/app/workout.tsx:766 (inlineRoutes uses `style={[..., {pointerEvents:'box-none'}]}` OK) and /app/frontend/app/virtual-route.tsx:101, :115, :130 (SafeAreaView pointerEvents='box-none' prop)."},
+      {"component": "expo-av / video autoplay", "issue": "PAGEERROR: 'play() failed because the user didn't interact with the document first.' and 'this.api.isExternalMethodAvailable is not a function' fired while YouTube iframe was mid-init on /workout and /virtual-route. Not blocking but noisy. Consider gating video play() on user gesture on web."}
+    ]
+  },
+  "test_report_links": [
+    "/tmp/vr_a1_home.jpeg (post-login home)",
+    "/tmp/vr_a2_workout.jpeg (workout HUD with Virtual pill)",
+    "/tmp/vr_a3_virtual_route.jpeg (Virtual Route setup)",
+    "/tmp/vr_a4_riding.jpeg (Virtual Route riding + telemetry)",
+    "/tmp/vr_a5_back.jpeg (back to /workout)"
+  ],
+  "action_items": [
+    "Optional: bump the 'Virtual' HUD pill min-height to 44pt for consistent touch targets across form factors.",
+    "Optional: detect YouTube 'Video unavailable' state and auto-switch to VirtualRoute (extend existing onVideoError path).",
+    "Cleanup: migrate deprecated shadow*/textShadow* style props to boxShadow/textShadow and move pointerEvents from props to style (react-native-web upgrade compliance)."
+  ],
+  "critical_code_review_comments": [
+    "workout.tsx:768 — router.push('/virtual-route') is wired correctly; testID 'switch-virtual', label 'Virtual', icon 'bicycle' all match spec.",
+    "virtual-route.tsx:90 — endRide uses router.canGoBack() then router.back() fallback to router.replace('/'), which is the right graceful exit pattern.",
+    "virtual-route.tsx:47-65 — telemetry EMA smoothing and distance integration effect looks correct, no obvious jitter."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only)", "frontend": "100% (3/3 flows)"},
+  "seed_data_creation": "None. Used existing test credentials from /app/memory/test_credentials.md (greenlantern@roujaune.app).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login: greenlantern@roujaune.app / rideon9900 (testIDs: email-input, password-input, submit-btn). Direct route /workout renders HUD in landscape (1366x900) with testID='switch-virtual' inside the RouteVideo overlay; clicking it navigates to /virtual-route. On /virtual-route: testID='rider-male|female|mature-male|mature-female' + testID='start-ride' + testID='vr-full-panel' after ride starts. Note YouTube video embed is unavailable in preview but does not block virtual-route flow.",
+  "rca_of_issue": "N/A — bug was already fixed by E1 in workout.tsx:768. Testing confirmed the onPress handler navigates via expo-router as intended, /virtual-route mounts cleanly, and Expo Router history allows back-navigation to /workout without state loss."
+}
