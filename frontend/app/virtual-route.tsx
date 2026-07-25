@@ -8,6 +8,7 @@ import { colors, radius, spacing, shadow } from "@/src/theme";
 import { useTelemetry } from "@/src/hooks/useTelemetry";
 import { useBleSensors } from "@/src/hooks/useBleSensors";
 import { BleSensorsPanel } from "@/src/components/BleSensorsPanel";
+import { RouteProfile } from "@/src/components/virtual-route/RouteProfile";
 import { VIRTUAL_RIDERS, getRider } from "@/src/lib/virtual-riders";
 import { VIRTUAL_ROUTES, getVRoute, routeStateAt, routeTerrainBias } from "@/src/lib/vroutes";
 import { VirtualRouteScene, SceneTelemetry } from "@/src/components/virtual-route/scene";
@@ -205,7 +206,7 @@ export default function VirtualRouteScreen() {
 
       {/* Telemetry panels */}
       {phase !== "setup" && panel === "all" && (
-        <TelemetryPanel sm={sm} route={route} elapsed={telemetry.elapsed} dist={distanceKm} load={resistanceTarget} compact={compact} hrOn={hrOn} />
+        <TelemetryPanel sm={sm} route={route} vroute={vroute} elapsed={telemetry.elapsed} dist={distanceKm} load={resistanceTarget} compact={compact} hrOn={hrOn} />
       )}
       {phase !== "setup" && panel === "min" && (
         <View style={s.minBar} testID="vr-min-panel">
@@ -259,6 +260,7 @@ export default function VirtualRouteScreen() {
             <View style={s.setupCard}>
               <Text style={s.routeName}>{vroute.name}</Text>
               <Text style={s.routePlace}>{vroute.place} · {vroute.distanceKm} km · {vroute.tag}</Text>
+              <RouteProfile vroute={vroute} progress={0} height={46} />
 
               <Text style={s.sectionLabel}>CHOOSE YOUR ROUTE</Text>
               <View style={s.routeList}>
@@ -385,7 +387,7 @@ function deriveConnection(state: string, stale: boolean, sensorsOn: boolean): { 
   return { label: "Connected", tone: colors.green };
 }
 
-function TelemetryPanel({ sm, route, elapsed, dist, load, compact, hrOn }: any) {
+function TelemetryPanel({ sm, route, vroute, elapsed, dist, load, compact, hrOn }: any) {
   const loadTone = load >= 120 ? colors.red : load >= 105 ? colors.yellow : colors.green;
   const cells = [
     { label: "POWER", value: `${sm.power}`, unit: "W", icon: "flash" as const, tone: colors.yellow },
@@ -403,6 +405,7 @@ function TelemetryPanel({ sm, route, elapsed, dist, load, compact, hrOn }: any) 
         <Ionicons name="location" size={13} color={colors.yellow} />
         <Text style={s.panelRoute} numberOfLines={1}>Next: {route.segmentLabel} · {route.remainingKm.toFixed(1)} km to go</Text>
       </View>
+      {vroute && <RouteProfile vroute={vroute} progress={route.progress} height={compact ? 34 : 44} />}
       <View style={s.progressTrack}><View style={[s.progressFill, { width: `${route.progress * 100}%` }]} /></View>
       <View style={s.panelGrid}>
         {cells.map((c) => (
