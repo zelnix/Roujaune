@@ -49,6 +49,17 @@ export default function RoutesScreen() {
             </Pressable>
           </Card>
 
+          <Pressable testID="start-virtual-ride" onPress={() => router.push("/virtual-route")}
+            style={({ pressed }) => [s.vrLaunch, pressed && { opacity: 0.9 }]}>
+            <LinearGradient colors={["rgba(245,179,1,0.22)", "rgba(16,18,17,0.1)"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill as any} />
+            <View style={s.vrLaunchIcon}><Ionicons name="bicycle" size={22} color={CC.yellow} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.vrLaunchTitle}>Start a Virtual Ride</Text>
+              <Text style={s.vrLaunchSub}>Immersive 2.5D routes · ride with a companion · no equipment needed</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={CC.dim} />
+          </Pressable>
+
           <View style={s.cats}>
             {d.categories.map((c) => <Pill key={c} testID={`cat-${c}`} label={c} active={cat === c} onPress={() => setCat(c)} />)}
           </View>
@@ -101,6 +112,10 @@ const s = StyleSheet.create({
   rideBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, alignSelf: "flex-start", marginTop: 22, backgroundColor: CC.rouge, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 24, minHeight: 46 },
   rideBtnText: { color: "#fff", fontSize: 14, fontWeight: "800" },
   cats: { flexDirection: "row", gap: 10, flexWrap: "wrap" },
+  vrLaunch: { flexDirection: "row", alignItems: "center", gap: 14, overflow: "hidden", borderRadius: 16, borderWidth: 1, borderColor: "rgba(245,179,1,0.35)", backgroundColor: "rgba(16,18,17,0.6)", paddingHorizontal: 16, paddingVertical: 16, marginBottom: 4 },
+  vrLaunchIcon: { width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(245,179,1,0.14)", borderWidth: 1, borderColor: "rgba(245,179,1,0.4)" },
+  vrLaunchTitle: { color: "#fff", fontSize: 16, fontWeight: "900" },
+  vrLaunchSub: { color: CC.dim, fontSize: 12, fontWeight: "600", marginTop: 2 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 16 },
   routeCard: { width: 300, borderRadius: 16, borderWidth: 1, borderColor: CC.border, backgroundColor: CC.card, overflow: "hidden" },
   routeHover: { borderColor: "rgba(255,255,255,0.28)" },

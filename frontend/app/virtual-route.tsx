@@ -7,7 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing, shadow } from "@/src/theme";
 import { useTelemetry } from "@/src/hooks/useTelemetry";
 import { VIRTUAL_RIDERS, getRider } from "@/src/lib/virtual-riders";
-import { VIRTUAL_ROUTE, routeStateAt } from "@/src/lib/vroutes";
+import { VIRTUAL_ROUTES, getVRoute, routeStateAt } from "@/src/lib/vroutes";
 import { VirtualRouteScene, SceneTelemetry } from "@/src/components/virtual-route/scene";
 
 type PanelMode = "all" | "min" | "hidden";
@@ -19,6 +19,44 @@ const PRESETS = [
   { label: "Climb", w: 295, icon: "trending-up-outline" as const },
 ];
 
+type RideSummary = {
+  distanceKm: number;
+  durationSec: number;
+  avgPower: number;
+  avgSpeed: number;
+  avgCadence: number;
+  avgHr: number;
+  calories: number;
+  reached: number;
+  total: number;
+  routeName: string;
+};
+
+function buildSummary(
+  samples: { power: number; hr: number; cadence: number; speed: number }[],
+  distanceKm: number,
+  rawDurationSec: number,
+  vroute: ReturnType<typeof getVRoute>,
+): RideSummary {
+  const n = samples.length;
+  const mean = (k: "power" | "cadence" | "speed") => (n ? samples.reduce((a, x) => a + (x[k] || 0), 0) / n : 0);
+  const hrs = samples.filter((x) => x.hr > 0);
+  const avgPower = Math.round(mean("power"));
+  const durationSec = Math.max(0, Math.round(rawDurationSec));
+  return {
+    distanceKm: Math.round(distanceKm * 10) / 10,
+    durationSec,
+    avgPower,
+    avgSpeed: Math.round(mean("speed") * 10) / 10,
+    avgCadence: Math.round(mean("cadence")),
+    avgHr: hrs.length ? Math.round(hrs.reduce((a, x) => a + x.hr, 0) / hrs.length) : 0,
+    calories: Math.round((avgPower * durationSec / 1000) * 0.7),
+    reached: vroute.checkpoints.filter((c) => c.km <= distanceKm).length,
+    total: vroute.checkpoints.length,
+    routeName: vroute.name,
+  };
+}
+
 export default function VirtualRouteScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -26,12 +64,20 @@ export default function VirtualRouteScreen() {
   const { telemetry, connectionState, stale, sendErg, sendTarget, simulateDropout, pause, resume } = useTelemetry();
 
   const [riderId, setRiderId] = React.useState("male");
+  const [routeId, setRouteId] = React.useState(VIRTUAL_ROUTES[0].id);
   const [phase, setPhase] = React.useState<"setup" | "riding" | "paused">("setup");
   const [panel, setPanel] = React.useState<PanelMode>("all");
   const [reducedMotion, setReducedMotion] = React.useState(false);
   const [autoResistance, setAutoResistance] = React.useState(true);
   const [emergency, setEmergency] = React.useState(false);
   const rider = getRider(riderId);
+  const vroute = getVRoute(routeId);
+
+  // Recorded telemetry + ride-relative timing for the end-of-ride summary/save.
+  const samplesRef = React.useRef<{ power: number; hr: number; cadence: number; speed: number }[]>([]);
+  const startElapsedRef = React.useRef(0);
+  const [summary, setSummary] = React.useState<null | RideSummary>(null);
+  const [saving, setSaving] = React.useState(false);
 
   // Local route distance integrated from speed while riding.
   const distRef = React.useRef(0);
@@ -54,17 +100,18 @@ export default function VirtualRouteScreen() {
     setSm({ power: Math.round(s.power), cadence: Math.round(s.cadence), speed: Math.round(s.speed * 10) / 10, hr: Math.round(s.hr) });
 
     if (running) {
+      samplesRef.current.push({ power: telemetry.power, hr: telemetry.hr, cadence: telemetry.cadence, speed: telemetry.speed });
       const prev = lastElRef.current;
       lastElRef.current = telemetry.elapsed;
       const dt = prev == null ? 0 : telemetry.elapsed - prev;
       if (dt > 0 && dt < 5) {
-        distRef.current = Math.min(VIRTUAL_ROUTE.distanceKm, distRef.current + (telemetry.speed / 3600) * dt);
+        distRef.current = Math.min(vroute.distanceKm, distRef.current + (telemetry.speed / 3600) * dt);
         setDistanceKm(distRef.current);
       }
     }
   }, [telemetry.elapsed, running]);
 
-  const route = routeStateAt(VIRTUAL_ROUTE, distanceKm);
+  const route = routeStateAt(vroute, distanceKm);
   const gradientBucket = Math.round(route.gradient);
 
   // Auto trainer resistance follows the route gradient (progressive, clamped).
@@ -84,10 +131,44 @@ export default function VirtualRouteScreen() {
 
   const conn = deriveConnection(connectionState, stale, sensorsOn);
 
-  const startRide = () => { distRef.current = 0; lastElRef.current = null; setDistanceKm(0); resume(); setPhase("riding"); };
+  const startRide = () => {
+    distRef.current = 0; lastElRef.current = null; setDistanceKm(0);
+    samplesRef.current = []; startElapsedRef.current = telemetry.elapsed;
+    setSummary(null); resume(); setPhase("riding");
+  };
   const pauseRide = () => { pause(); setPhase("paused"); };
   const resumeRide = () => { resume(); setPhase("riding"); };
-  const endRide = () => { pause(); if (router.canGoBack()) router.back(); else router.replace("/"); };
+  const endRide = () => {
+    pause();
+    setPhase("paused");
+    setSummary(buildSummary(samplesRef.current, distRef.current, telemetry.elapsed - startElapsedRef.current, vroute));
+  };
+  const exitRide = () => { if (router.canGoBack()) router.back(); else router.replace("/"); };
+  const saveRide = async () => {
+    if (!summary || saving) return;
+    setSaving(true);
+    try {
+      const base = (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
+      await fetch(`${base}/api/workouts/summarize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workout: `Virtual Ride · ${vroute.name}`,
+          workout_id: `virtual-${vroute.id}`,
+          route: { id: vroute.id, name: vroute.name, place: vroute.place, distance: `${summary.distanceKm} km`, elevation: `${vroute.elevationM} m`, tag: vroute.tag },
+          elapsed: summary.durationSec,
+          ftp: 250,
+          samples: samplesRef.current,
+          est_calories: summary.calories,
+        }),
+      });
+    } catch {
+      /* history save is best-effort — never block the exit */
+    } finally {
+      setSaving(false);
+      exitRide();
+    }
+  };
   const emergencyStop = () => { setEmergency(true); setAutoResistance(false); sendErg(50); };
   const cyclePanel = () => setPanel((p) => (p === "all" ? "min" : p === "min" ? "hidden" : "all"));
 
@@ -113,7 +194,7 @@ export default function VirtualRouteScreen() {
 
       {/* Telemetry panels */}
       {phase !== "setup" && panel === "all" && (
-        <TelemetryPanel sm={sm} route={route} elapsed={telemetry.elapsed} compact={compact} hrOn={hrOn} />
+        <TelemetryPanel sm={sm} route={route} elapsed={telemetry.elapsed} dist={distanceKm} compact={compact} hrOn={hrOn} />
       )}
       {phase !== "setup" && panel === "min" && (
         <View style={s.minBar} testID="vr-min-panel">
@@ -161,8 +242,24 @@ export default function VirtualRouteScreen() {
         <SafeAreaView style={s.setup} edges={["top", "bottom", "right"]}>
           <ScrollView contentContainerStyle={s.setupScroll} showsVerticalScrollIndicator={false}>
             <View style={s.setupCard}>
-              <Text style={s.routeName}>{VIRTUAL_ROUTE.name}</Text>
-              <Text style={s.routePlace}>{VIRTUAL_ROUTE.place} · {VIRTUAL_ROUTE.distanceKm} km</Text>
+              <Text style={s.routeName}>{vroute.name}</Text>
+              <Text style={s.routePlace}>{vroute.place} · {vroute.distanceKm} km · {vroute.tag}</Text>
+
+              <Text style={s.sectionLabel}>CHOOSE YOUR ROUTE</Text>
+              <View style={s.routeList}>
+                {VIRTUAL_ROUTES.map((rt) => {
+                  const sel = rt.id === routeId;
+                  return (
+                    <Pressable key={rt.id} onPress={() => setRouteId(rt.id)} testID={`route-${rt.id}`} style={[s.routeOpt, sel && s.routeOptSel]} accessibilityRole="button" accessibilityLabel={`Select ${rt.name}`}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.routeOptName} numberOfLines={1}>{rt.name}</Text>
+                        <Text style={s.routeOptMeta} numberOfLines={1}>{rt.distanceKm} km · {rt.tag}</Text>
+                      </View>
+                      <Ionicons name={sel ? "checkmark-circle" : "chevron-forward"} size={18} color={sel ? colors.yellow : colors.textFaint} />
+                    </Pressable>
+                  );
+                })}
+              </View>
 
               <Text style={s.sectionLabel}>CHOOSE YOUR RIDER</Text>
               <View style={s.riderGrid}>
@@ -197,6 +294,46 @@ export default function VirtualRouteScreen() {
           </ScrollView>
         </SafeAreaView>
       )}
+
+      {/* End-of-ride summary + save prompt */}
+      {summary && (
+        <View style={s.summaryOverlay}>
+          <View style={s.summaryCard} testID="vr-summary">
+            <View style={s.summaryHead}>
+              <Ionicons name="flag" size={20} color={colors.yellow} />
+              <Text style={s.summaryTitle}>Ride Summary</Text>
+            </View>
+            <Text style={s.summarySub}>{summary.routeName} · {summary.reached}/{summary.total} checkpoints</Text>
+
+            <View style={s.summaryGrid}>
+              <SumCell label="DISTANCE" value={`${summary.distanceKm}`} unit="km" />
+              <SumCell label="TIME" value={mmss(summary.durationSec)} unit="" />
+              <SumCell label="AVG POWER" value={`${summary.avgPower}`} unit="W" />
+              <SumCell label="AVG SPEED" value={`${summary.avgSpeed}`} unit="km/h" />
+              <SumCell label="AVG CADENCE" value={`${summary.avgCadence}`} unit="rpm" />
+              <SumCell label="AVG HR" value={summary.avgHr ? `${summary.avgHr}` : "—"} unit="bpm" />
+              <SumCell label="CALORIES" value={`${summary.calories}`} unit="kcal" />
+            </View>
+
+            <Pressable onPress={saveRide} disabled={saving} testID="vr-save-ride" style={[s.summarySave, saving && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel="Save ride">
+              <Ionicons name="save" size={18} color={colors.bg} />
+              <Text style={s.summarySaveText}>{saving ? "Saving…" : "Save Ride"}</Text>
+            </Pressable>
+            <Pressable onPress={exitRide} disabled={saving} testID="vr-discard-ride" style={s.summaryDiscard} accessibilityRole="button" accessibilityLabel="Discard ride">
+              <Text style={s.summaryDiscardText}>Discard</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function SumCell({ label, value, unit }: { label: string; value: string; unit: string }) {
+  return (
+    <View style={s.sumCell}>
+      <Text style={s.sumValue}>{value}<Text style={s.sumUnit}> {unit}</Text></Text>
+      <Text style={s.sumLabel}>{label}</Text>
     </View>
   );
 }
@@ -210,14 +347,14 @@ function deriveConnection(state: string, stale: boolean, sensorsOn: boolean): { 
   return { label: "Connected", tone: colors.green };
 }
 
-function TelemetryPanel({ sm, route, elapsed, compact, hrOn }: any) {
+function TelemetryPanel({ sm, route, elapsed, dist, compact, hrOn }: any) {
   const cells = [
     { label: "POWER", value: `${sm.power}`, unit: "W", icon: "flash" as const, tone: colors.yellow },
     { label: "CADENCE", value: `${sm.cadence}`, unit: "rpm", icon: "sync" as const, tone: colors.green },
     { label: "SPEED", value: `${sm.speed}`, unit: "km/h", icon: "speedometer" as const, tone: "#5AC8FA" },
     { label: "HEART RATE", value: hrOn ? `${sm.hr}` : "—", unit: "bpm", icon: "heart" as const, tone: colors.red },
     { label: "GRADIENT", value: `${route.gradient}`, unit: "%", icon: "trending-up" as const, tone: colors.yellow },
-    { label: "DISTANCE", value: `${(route.progress * VIRTUAL_ROUTE.distanceKm).toFixed(1)}`, unit: "km", icon: "navigate" as const, tone: "#5AC8FA" },
+    { label: "DISTANCE", value: `${(dist ?? 0).toFixed(1)}`, unit: "km", icon: "navigate" as const, tone: "#5AC8FA" },
     { label: "ELAPSED", value: mmss(elapsed), unit: "", icon: "time-outline" as const, tone: colors.white },
   ];
   return (
@@ -314,4 +451,25 @@ const s = StyleSheet.create({
   simNote: { color: colors.textFaint, fontSize: 12, fontWeight: "600" },
   startBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.yellow, borderRadius: radius.md, paddingVertical: 14, marginTop: 4, ...(shadow.glow as any) },
   startText: { color: colors.bg, fontSize: 15, fontWeight: "900", letterSpacing: 0.5 },
+
+  routeList: { gap: 8 },
+  routeOpt: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "rgba(255,255,255,0.04)", borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 10, minHeight: 48 },
+  routeOptSel: { borderColor: colors.yellow, backgroundColor: colors.yellow + "14" },
+  routeOptName: { color: colors.white, fontSize: 13, fontWeight: "800" },
+  routeOptMeta: { color: colors.textFaint, fontSize: 11, fontWeight: "600", marginTop: 2 },
+
+  summaryOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.72)", alignItems: "center", justifyContent: "center", padding: 20 },
+  summaryCard: { width: 440, maxWidth: "94%", backgroundColor: "rgba(14,15,19,0.98)", borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, gap: 12, ...(shadow.card as any) },
+  summaryHead: { flexDirection: "row", alignItems: "center", gap: 8 },
+  summaryTitle: { color: colors.white, fontSize: 20, fontWeight: "900" },
+  summarySub: { color: colors.textDim, fontSize: 13, fontWeight: "600", marginTop: -6 },
+  summaryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  sumCell: { width: "30%", flexGrow: 1, backgroundColor: "rgba(255,255,255,0.04)", borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 10, gap: 2 },
+  sumValue: { color: colors.white, fontSize: 18, fontWeight: "900", fontVariant: ["tabular-nums"] },
+  sumUnit: { color: colors.textFaint, fontSize: 11, fontWeight: "700" },
+  sumLabel: { color: colors.textFaint, fontSize: 9, fontWeight: "800", letterSpacing: 0.8 },
+  summarySave: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.yellow, borderRadius: radius.md, paddingVertical: 14, marginTop: 2, ...(shadow.glow as any) },
+  summarySaveText: { color: colors.bg, fontSize: 15, fontWeight: "900", letterSpacing: 0.5 },
+  summaryDiscard: { alignItems: "center", justifyContent: "center", paddingVertical: 12, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
+  summaryDiscardText: { color: colors.textDim, fontSize: 14, fontWeight: "800" },
 });
