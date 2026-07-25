@@ -609,7 +609,7 @@ export function RecoveryCard({ score }: { score: number }) {
 }
 
 /* ======================= BOTTOM ACTION BAR ======================= */
-export function BottomActionBar({ onView, onSave, onShare, onPlan, compact = false }: { onView: () => void; onSave: () => void; onShare: () => void; onPlan: () => void; compact?: boolean }) {
+export function BottomActionBar({ onView, onSave, onShare, compact = false }: { onView: () => void; onSave: () => void; onShare: () => void; compact?: boolean }) {
   const btn = [styles.actBtn, compact && { height: 46 }];
   const txt = [styles.actText, compact && { fontSize: 12 }];
   return (
@@ -630,12 +630,6 @@ export function BottomActionBar({ onView, onSave, onShare, onPlan, compact = fal
         <View style={[btn, { backgroundColor: colors.red }]}>
           <Ionicons name="share-social" size={compact ? 16 : 18} color="#fff" />
           <Text style={txt} numberOfLines={1}>SHARE RIDE</Text>
-        </View>
-      </Touchable>
-      <Touchable testID="action-plan" onPress={onPlan} scaleTo={0.97} style={{ flex: 1.1 }} containerStyle={{ flex: 1.1 }}>
-        <View style={[btn, styles.actDark]}>
-          <Ionicons name="calendar-outline" size={compact ? 16 : 18} color={colors.white} />
-          <Text style={txt} numberOfLines={1}>{compact ? "PLAN RIDE" : "PLAN TOMORROW'S RIDE"}</Text>
         </View>
       </Touchable>
     </View>

@@ -866,6 +866,7 @@ class CoachDebriefRequest(BaseModel):
     interval_compliance: int = 0
     intervals: List[Dict[str, Any]] = Field(default_factory=list)
     zones: List[Dict[str, Any]] = Field(default_factory=list)
+    extended_min: int = 0
     coach_name: str = "Alberto"
     coach_gender: str = "male"
 
@@ -889,6 +890,11 @@ async def coach_debrief(req: CoachDebriefRequest):
 
     mins = req.duration_sec // 60
     zones_txt = ", ".join(f"{z.get('z')} {z.get('pct', 0)}%" for z in req.zones) if req.zones else "n/a"
+    extended_txt = (
+        f"\nThe rider CHOSE TO EXTEND the ride by an extra {req.extended_min} min beyond the planned session — "
+        "acknowledge this extra volume, credit their commitment, and factor it into their weekly load."
+        if req.extended_min > 0 else ""
+    )
     intervals_txt = ""
     if req.intervals:
         parts = [
@@ -906,7 +912,7 @@ async def coach_debrief(req: CoachDebriefRequest):
         f"Avg power {req.avg_power} W (normalised {req.norm_power} W, target {req.power_target} W), "
         f"avg cadence {req.avg_cadence} rpm, avg HR {req.avg_hr} bpm (max {req.max_hr}).\n"
         f"TSS {req.tss}, intensity {req.intensity}, calories {req.calories}, "
-        f"plan compliance {req.compliance}%. Time in zones: {zones_txt}.{intervals_txt}\n"
+        f"plan compliance {req.compliance}%. Time in zones: {zones_txt}.{intervals_txt}{extended_txt}\n"
         "Give a warm, personal post-ride debrief: 2 to 3 short sentences. "
         "Praise what went well, reference how well they held their interval power targets "
         "(call out a specific strong or weak segment if notable), and end with "

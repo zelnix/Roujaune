@@ -267,6 +267,7 @@ export function useCoachDebrief(stats: SummaryStats, route: RideRoute) {
             compliance: stats.compliance?.overall ?? 0,
             interval_compliance: overall ?? 0,
             intervals: measured,
+            extended_min: rec.extendedMin ?? 0,
             zones: stats.zones?.map((z) => ({ z: z.z, pct: z.pct })) ?? [],
             coach_name: persona.name,
             coach_gender: persona.gender,

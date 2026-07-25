@@ -106,7 +106,6 @@ export default function WorkoutComplete() {
               onView={() => showToast("Opening full analysis")}
               onSave={() => router.replace("/")}
               onShare={() => showToast("Preparing shareable ride card")}
-              onPlan={() => router.replace("/training")}
             />
           </View>
         </View>

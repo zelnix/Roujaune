@@ -21,19 +21,23 @@ type RideRecord = {
   route: RideRoute;
   elapsed: number;
   samples: RideSample[];
+  extendedMin: number;   // total extra minutes the rider added after completing
+  extensions: number;    // how many times they extended
 };
 
 const DEFAULT_ROUTE: RideRoute = {
   id: "XlwjMjyU410", name: "Alpe d'Huez", place: "France", distance: "13.8 km", elevation: "1,120 m", tag: "Climb",
 };
 
-const store: RideRecord = { workout: "Threshold Climb", workoutId: undefined, ftp: 287, zoneBias: {}, route: { ...DEFAULT_ROUTE }, elapsed: 0, samples: [] };
+const store: RideRecord = { workout: "Threshold Climb", workoutId: undefined, ftp: 287, zoneBias: {}, route: { ...DEFAULT_ROUTE }, elapsed: 0, samples: [], extendedMin: 0, extensions: 0 };
 const MAX = 4000; // cap memory (~13 min at 5 Hz is plenty for aggregates)
 
 export const rideRecorder = {
   reset(meta?: { workout?: string; workoutId?: string; ftp?: number; zoneBias?: Record<string, number>; route?: RideRoute }) {
     store.samples = [];
     store.elapsed = 0;
+    store.extendedMin = 0;
+    store.extensions = 0;
     if (meta?.workout) store.workout = meta.workout;
     if (meta && "workoutId" in meta) store.workoutId = meta.workoutId;
     if (meta?.ftp) store.ftp = meta.ftp;
@@ -48,6 +52,10 @@ export const rideRecorder = {
   },
   setZoneBias(bias: Record<string, number>) {
     store.zoneBias = bias || {};
+  },
+  /** Credit an extension block the rider added after completing the workout. */
+  addExtension(minutes: number) {
+    if (minutes > 0) { store.extendedMin += Math.round(minutes); store.extensions += 1; }
   },
   push(sample: RideSample, elapsed: number) {
     store.elapsed = elapsed;

@@ -423,10 +423,11 @@ export default function LiveWorkout() {
   const onExtendRide = (minutes: number, label: string) => {
     if (!selected) return;
     setExtraSegments((x) => [...x, extensionSegment(selected, minutes)]);
+    rideRecorder.addExtension(minutes);
     completeShownRef.current = false;
     setCompletePrompt(false);
     if (paused) { resume(); setPaused(false); }
-    showToast(`Ride extended · ${label}`);
+    showToast(`Ride extended · ${label} · added to your ride`);
   };
 
   const activeRoute = routeVideos[routeIdx];
