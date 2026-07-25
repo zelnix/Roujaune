@@ -11,8 +11,8 @@ import { useTelemetry } from "@/src/hooks/useTelemetry";
 import { rideRecorder } from "@/src/lib/ride";
 import { getLastRouteId, setLastRouteId } from "@/src/lib/prefs";
 import { useSettings } from "@/src/lib/settings";
-import { routeVideos, nextInterval, currentWorkout } from "@/src/data";
-import { getWorkout, buildSegments, currentSegment, segmentProfile, mmss, targetWatts } from "@/src/lib/workout-catalog";
+import { routeVideos, currentWorkout } from "@/src/data";
+import { getWorkout, buildSegments, currentSegment, mmss, targetWatts } from "@/src/lib/workout-catalog";
 import { fetchZoneBias, ZoneBias } from "@/src/lib/targets";
 import { getRiderProfile } from "@/src/lib/rider-profile";
 import { WORKOUT_TYPES } from "@/src/lib/workouts";
@@ -22,7 +22,7 @@ import {
   VideoPlaceholder, RoutesButton, RoutePicker, SettingsPanel, MusicPanel, CastPanel, ImmersiveHud, RouteMapCard,
 } from "@/src/components/workout";
 import {
-  LiveHeader, MetricCard, ConnectionsPanel, CoachBanner, TerrainCard, IntervalTimeline, LiveControlBar,
+  LiveHeader, MetricCard, ConnectionsPanel, CoachBanner, TerrainCard, StepTimeline, StepDetailModal, LiveControlBar,
 } from "@/src/components/workout-live";
 import { useWorkoutAudio } from "@/src/hooks/useWorkoutAudio";
 import { useBleSensors } from "@/src/hooks/useBleSensors";
@@ -150,7 +150,6 @@ export default function LiveWorkout() {
   const workoutTitle = selected?.name ?? params.title ?? currentWorkout.title;
   // Real interval timeline built from the chosen workout's segments.
   const segments = React.useMemo(() => (selected ? buildSegments(selected) : []), [selected]);
-  const workoutProfile = React.useMemo(() => (segments.length ? segmentProfile(segments) : selectedType?.profile), [segments, selectedType]);
   const compact = height < 620;
   const leftW = compact ? 150 : 212;
   const rightW = compact ? 170 : 236;
@@ -171,6 +170,8 @@ export default function LiveWorkout() {
   const [showCast, setShowCast] = React.useState(false);
   const [showBle, setShowBle] = React.useState(false);
   const [endPrompt, setEndPrompt] = React.useState(false);
+  const [stepDetail, setStepDetail] = React.useState<number | null>(null);
+  const videoFellBackRef = React.useRef(false);
 
   const [hudVisible, setHudVisible] = React.useState(true);
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
@@ -208,9 +209,24 @@ export default function LiveWorkout() {
   const targetW = activeSeg ? targetWatts(activeSeg.segment, ftp, zoneBias) : 251;
   const stepLabel = activeSeg ? `${activeSeg.index + 1} / ${activeSeg.total}` : undefined;
   const timeLeftLabel = activeSeg ? mmss(activeSeg.remaining) : undefined;
-  const nextSeg = activeSeg?.next
-    ? { label: activeSeg.next.label, time: mmss(activeSeg.next.durationSec), target: activeSeg.next.durationSec > 0 ? `${targetWatts(activeSeg.next, ftp, zoneBias)} W` : "—", rpe: `RPE ${activeSeg.next.rpe}` }
-    : nextInterval;
+  // Full step list for the bottom timeline — each segment with its summary
+  // detail (duration, target watts, %FTP, RPE) so past/current/future steps and
+  // the tap-through detail popup all read from the same source.
+  const stepList = React.useMemo(
+    () => segments.map((s, i) => ({
+      index: i,
+      label: s.label,
+      zoneLabel: s.zoneLabel,
+      duration: mmss(s.durationSec),
+      durationSec: s.durationSec,
+      watts: s.durationSec > 0 ? targetWatts(s, ftp, zoneBias) : 0,
+      targetPct: s.targetPct,
+      rpe: s.rpe,
+      color: s.color,
+      intensity: Math.max(0.12, Math.min(1, s.targetPct / 1.4)),
+    })),
+    [segments, ftp, zoneBias],
+  );
 
   // Start the ride at the beginning of the chosen session and keep the trainer
   // sim tracking the current segment's target watts (true end-to-end execution).
@@ -297,6 +313,15 @@ export default function LiveWorkout() {
   React.useEffect(() => { telemetryRef.current = telemetry; }, [telemetry]);
 
   const onCenterLayout = (e: LayoutChangeEvent) => setCenterW(e.nativeEvent.layout.width);
+
+  // If the route video can't load, gracefully fall back to the Virtual route
+  // once (the rider can still switch back to Video manually afterwards).
+  const onVideoError = React.useCallback(() => {
+    if (videoFellBackRef.current) return;
+    videoFellBackRef.current = true;
+    setVirtualMode(true);
+    showToast("Route video unavailable — switched to your Virtual ride.");
+  }, [showToast]);
 
   const onErg = (d: number) => {
     const next = Math.max(50, Math.min(150, ergRef.current + d));
@@ -515,7 +540,7 @@ export default function LiveWorkout() {
                 </View>
               </View>
             ) : (
-              <RouteVideo source={activeRoute.url} title={`${activeRoute.title}${routeAuto ? " · Auto-matched" : activeRoute.id === lastRouteId ? " · Last ride" : ""}`} playing={!paused} muted width={tablet ? undefined : centerW} aspectRatio={16 / 9} fill={tablet} onToggleExpand={() => setExpanded(true)} expanded={false}>
+              <RouteVideo source={activeRoute.url} title={`${activeRoute.title}${routeAuto ? " · Auto-matched" : activeRoute.id === lastRouteId ? " · Last ride" : ""}`} playing={!paused} muted width={tablet ? undefined : centerW} aspectRatio={16 / 9} fill={tablet} onToggleExpand={() => setExpanded(true)} expanded={false} onError={onVideoError}>
                 <View style={[styles.inlineRoutes, { pointerEvents: "box-none" }]}>
                   <RoutesButton onPress={() => setShowRoutes(true)} testID="inline-routes" />
                   <RoutesButton onPress={() => setVirtualMode(true)} testID="switch-virtual" label="Virtual" icon="bicycle" />
@@ -530,7 +555,7 @@ export default function LiveWorkout() {
         </View>
       </View>
 
-      <IntervalTimeline title={workoutTitle} profile={workoutProfile} activeIndex={activeSeg?.index} remaining={timeLeftLabel} step={stepLabel} next={nextSeg} />
+      <StepTimeline title={workoutTitle} steps={stepList} activeIndex={activeSeg?.index ?? -1} remaining={timeLeftLabel} onStepPress={(i) => setStepDetail(i)} />
 
       <LiveControlBar
         paused={paused}
@@ -730,6 +755,19 @@ export default function LiveWorkout() {
             </Pressable>
           </View>
         </View>
+      )}
+
+      {stepDetail != null && stepList[stepDetail] && (
+        <Pressable style={styles.overlay} testID="step-detail-overlay" onPress={() => setStepDetail(null)}>
+          <Pressable onPress={(e) => e.stopPropagation()}>
+            <StepDetailModal
+              step={stepList[stepDetail]}
+              activeIndex={activeSeg?.index ?? -1}
+              total={stepList.length}
+              onClose={() => setStepDetail(null)}
+            />
+          </Pressable>
+        </Pressable>
       )}
 
       <Toast message={toast} />

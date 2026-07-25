@@ -21,6 +21,8 @@ type Props = {
   fill?: boolean;
   title?: string;
   onEnded?: () => void;
+  /** Fires when the video fails to load (invalid id or player error). */
+  onError?: () => void;
   /** Show an expand/collapse control and report taps. */
   expanded?: boolean;
   onToggleExpand?: () => void;
@@ -33,7 +35,7 @@ type Props = {
  * overlay slot for live-data HUDs. Falls back gracefully so the rest of the
  * workout keeps working if the video can't load. */
 export function RouteVideo({
-  source, playing, muted = true, width, aspectRatio = 16 / 9, fill = false, title, onEnded, expanded, onToggleExpand, children,
+  source, playing, muted = true, width, aspectRatio = 16 / 9, fill = false, title, onEnded, onError: onErrorProp, expanded, onToggleExpand, children,
 }: Props) {
   const videoId = getYouTubeId(source);
   const [size, setSize] = React.useState({ w: 0, h: 0 });
@@ -42,12 +44,16 @@ export function RouteVideo({
   const [retryKey, setRetryKey] = React.useState(0);
 
   const onReady = React.useCallback(() => setLoading(false), []);
-  const onError = React.useCallback(() => { setError(true); setLoading(false); }, []);
+  const onError = React.useCallback(() => { setError(true); setLoading(false); onErrorProp?.(); }, [onErrorProp]);
   const retry = () => { setError(false); setLoading(true); setRetryKey((k) => k + 1); };
   const onLayout = (e: LayoutChangeEvent) => {
     const { width: w, height: h } = e.nativeEvent.layout;
     setSize({ w: Math.round(w), h: Math.round(h) });
   };
+
+  // An invalid/unresolvable source is also treated as an error so the parent
+  // can fall back gracefully (e.g. switch to the Virtual route).
+  React.useEffect(() => { if (!videoId) onErrorProp?.(); }, [videoId, onErrorProp]);
 
   const containerStyle = fill
     ? [styles.fill]

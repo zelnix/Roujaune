@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Polyline, Polygon as SvgPolygon } from "react-native-svg";
@@ -180,43 +180,110 @@ export function TerrainCard({ grade, elevGain, distanceLeft, progress, isClimb }
   );
 }
 
-// ---- Interval timeline (bottom) -------------------------------------------
-export function IntervalTimeline({
-  title, profile, activeIndex, remaining, step, next,
-}: {
-  title: string; profile?: number[]; activeIndex?: number; remaining?: string; step?: string;
-  next?: { label: string; time: string; target: string; rpe: string };
-}) {
-  const bars = profile && profile.length ? profile : [0.5, 0.7, 0.9, 0.7, 0.5];
-  const n = bars.length;
-  const activeBar = typeof activeIndex === "number" ? Math.round((activeIndex / Math.max(1, n)) * n) : -1;
+// ---- Step timeline (bottom) -----------------------------------------------
+export type TimelineStep = {
+  index: number; label: string; zoneLabel: string; duration: string; durationSec: number;
+  watts: number; targetPct: number; rpe: number; color: string; intensity: number;
+};
+export type StepStatus = "done" | "current" | "future";
+
+function StepChip({ step, status, onPress }: { step: TimelineStep; status: StepStatus; onPress: () => void }) {
+  const barH = 8 + Math.max(0, Math.min(1, step.intensity)) * 28;
+  const border = status === "current" ? colors.yellow : status === "done" ? colors.green + "55" : colors.border;
+  const bg = status === "current" ? colors.yellow + "16" : status === "done" ? "rgba(67,209,122,0.06)" : "rgba(255,255,255,0.03)";
+  const barColor = status === "future" ? "rgba(255,255,255,0.20)" : status === "done" ? colors.green + "AA" : colors.yellow;
   return (
-    <View style={tl.wrap} testID="interval-timeline">
-      <View style={tl.main}>
-        <View style={tl.head}>
-          <Text style={tl.title} numberOfLines={1}>{title}</Text>
-          {step ? <Text style={tl.step}>STEP {step}</Text> : null}
+    <Pressable onPress={onPress} style={[st.chip, { borderColor: border, backgroundColor: bg }]} testID={`step-chip-${step.index}`}>
+      <View style={st.chipTop}>
+        <Text style={[st.chipNum, status === "current" && { color: colors.yellow }]}>{step.index + 1}</Text>
+        {status === "done" ? <Ionicons name="checkmark-circle" size={13} color={colors.green} /> : status === "current" ? <View style={st.liveDot} /> : <Ionicons name="ellipse-outline" size={11} color={colors.textFaint} />}
+      </View>
+      <View style={st.barRow}><View style={[st.barFill, { height: barH, backgroundColor: barColor }]} /></View>
+      <Text style={[st.chipLabel, status === "future" && { color: colors.textDim }]} numberOfLines={1}>{step.label}</Text>
+      <View style={st.chipMeta}>
+        <Text style={st.chipDur}>{step.duration}</Text>
+        {step.watts > 0 ? <><Text style={st.chipDot}>·</Text><Text style={[st.chipW, status === "current" && { color: colors.yellow }]}>{step.watts} W</Text></> : null}
+      </View>
+    </Pressable>
+  );
+}
+
+export function StepTimeline({
+  title, steps, activeIndex, remaining, onStepPress,
+}: {
+  title: string; steps: TimelineStep[]; activeIndex: number; remaining?: string; onStepPress: (index: number) => void;
+}) {
+  return (
+    <View style={st.wrap} testID="interval-timeline">
+      <View style={st.head}>
+        <Ionicons name="stats-chart" size={15} color={colors.yellow} />
+        <Text style={st.title} numberOfLines={1}>{title}</Text>
+        <View style={st.headRight}>
+          {steps.length ? <Text style={st.step}>STEP {Math.min(activeIndex + 1, steps.length)} / {steps.length}</Text> : null}
           {remaining ? (
-            <View style={tl.remain}><Ionicons name="time-outline" size={13} color={colors.yellow} /><Text style={tl.remainText}>{remaining} REMAINING</Text></View>
+            <View style={st.remain}><Ionicons name="time-outline" size={13} color={colors.yellow} /><Text style={st.remainText}>{remaining} REMAINING</Text></View>
           ) : null}
         </View>
-        <View style={tl.bars}>
-          {bars.map((b, i) => (
-            <View key={i} style={[tl.bar, { height: 8 + Math.max(0, Math.min(1, b)) * 26 }, i === activeBar && tl.barActive, i < activeBar && tl.barDone]} />
-          ))}
-        </View>
       </View>
-      {next ? (
-        <View style={tl.next}>
-          <Text style={tl.nextLabel}>NEXT UP</Text>
-          <Text style={tl.nextName} numberOfLines={1}>{next.label}</Text>
-          <View style={tl.nextRow}>
-            <Text style={tl.nextMeta}>{next.time}</Text>
-            <Text style={tl.nextDot}>·</Text>
-            <Text style={[tl.nextMeta, { color: colors.yellow }]}>{next.target}</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.track}>
+        {steps.map((s) => (
+          <StepChip key={s.index} step={s} status={s.index < activeIndex ? "done" : s.index === activeIndex ? "current" : "future"} onPress={() => onStepPress(s.index)} />
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+// ---- Step detail popup ----------------------------------------------------
+const ZONE_TIP: Record<string, string> = {
+  Z1: "Very easy — active recovery. Keep it light and spin the legs.",
+  Z2: "Aerobic endurance. Conversational effort you can sustain for hours.",
+  Z3: "Tempo. Comfortably hard — controlled breathing, steady rhythm.",
+  Z4: "Threshold. Sustainably hard; hold your target and stay composed.",
+  Z5: "VO2 max. Very hard intervals — commit fully, then recover well.",
+  Z6: "Anaerobic. All-out efforts to sharpen top-end power.",
+};
+export function StepDetailModal({
+  step, activeIndex, total, onClose,
+}: {
+  step: TimelineStep; activeIndex: number; total: number; onClose: () => void;
+}) {
+  const status: StepStatus = step.index < activeIndex ? "done" : step.index === activeIndex ? "current" : "future";
+  const statusLabel = status === "done" ? "Completed" : status === "current" ? "In progress" : "Upcoming";
+  const statusTone = status === "done" ? colors.green : status === "current" ? colors.yellow : colors.textDim;
+  const stats: { label: string; value: string }[] = [
+    { label: "ZONE", value: step.zoneLabel },
+    { label: "DURATION", value: step.duration },
+    { label: "TARGET", value: step.watts > 0 ? `${step.watts} W` : "—" },
+    { label: "% FTP", value: `${Math.round(step.targetPct * 100)}%` },
+    { label: "RPE", value: `${step.rpe} / 10` },
+  ];
+  return (
+    <View style={sd.panel} testID="step-detail-modal">
+      <View style={sd.head}>
+        <View style={sd.badge}><Text style={sd.badgeText}>STEP {step.index + 1} / {total}</Text></View>
+        <Pressable onPress={onClose} hitSlop={10} testID="step-detail-close"><Ionicons name="close" size={22} color={colors.white} /></Pressable>
+      </View>
+      <View style={sd.titleRow}>
+        <View style={[sd.zoneDot, { backgroundColor: step.color }]} />
+        <Text style={sd.title} numberOfLines={2}>{step.label}</Text>
+      </View>
+      <View style={[sd.statusPill, { borderColor: statusTone + "66", backgroundColor: statusTone + "1A" }]}>
+        <View style={[sd.statusDot, { backgroundColor: statusTone }]} />
+        <Text style={[sd.statusText, { color: statusTone }]}>{statusLabel}</Text>
+      </View>
+      <View style={sd.grid}>
+        {stats.map((s) => (
+          <View key={s.label} style={sd.stat}>
+            <Text style={sd.statLabel}>{s.label}</Text>
+            <Text style={sd.statValue}>{s.value}</Text>
           </View>
-        </View>
-      ) : null}
+        ))}
+      </View>
+      <View style={sd.tipBox}>
+        <Ionicons name="bulb-outline" size={15} color={colors.yellow} />
+        <Text style={sd.tipText}>{ZONE_TIP[step.zoneLabel] ?? "Hold your target and keep a smooth, steady effort."}</Text>
+      </View>
     </View>
   );
 }
@@ -350,24 +417,45 @@ const tc = StyleSheet.create({
   profileWrap: { position: "absolute", left: 12, right: 12, bottom: 6 },
 });
 
-const tl = StyleSheet.create({
-  wrap: { flexDirection: "row", gap: spacing.sm, alignItems: "stretch" },
-  main: { ...card, flex: 1, paddingHorizontal: 16, paddingVertical: 12 },
+const st = StyleSheet.create({
+  wrap: { ...card, paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
   head: { flexDirection: "row", alignItems: "center", gap: 10 },
   title: { color: colors.white, fontSize: 13.5, fontWeight: "800", flex: 1 },
+  headRight: { flexDirection: "row", alignItems: "center", gap: 10 },
   step: { color: colors.textDim, fontSize: 11, fontWeight: "800", letterSpacing: 0.5 },
   remain: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.yellow + "18", borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 3 },
   remainText: { color: colors.yellow, fontSize: 11, fontWeight: "800" },
-  bars: { flexDirection: "row", alignItems: "flex-end", gap: 4, height: 34, marginTop: 10 },
-  bar: { flex: 1, backgroundColor: "rgba(255,255,255,0.14)", borderRadius: 3 },
-  barActive: { backgroundColor: colors.yellow },
-  barDone: { backgroundColor: colors.yellow + "66" },
-  next: { ...card, width: 168, paddingHorizontal: 14, paddingVertical: 12, justifyContent: "center" },
-  nextLabel: { color: colors.textFaint, fontSize: 9.5, fontWeight: "800", letterSpacing: 1 },
-  nextName: { color: colors.white, fontSize: 14, fontWeight: "800", marginTop: 4 },
-  nextRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
-  nextMeta: { color: colors.textDim, fontSize: 12, fontWeight: "700" },
-  nextDot: { color: colors.textFaint, fontSize: 12 },
+  track: { flexDirection: "row", gap: 8, paddingRight: 4 },
+  chip: { width: 116, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: 10, paddingTop: 8, paddingBottom: 10, gap: 6 },
+  chipTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", height: 16 },
+  chipNum: { color: colors.textDim, fontSize: 11, fontWeight: "900" },
+  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.yellow },
+  barRow: { height: 36, justifyContent: "flex-end", alignItems: "flex-start" },
+  barFill: { width: 26, borderRadius: 4 },
+  chipLabel: { color: colors.white, fontSize: 12, fontWeight: "700" },
+  chipMeta: { flexDirection: "row", alignItems: "center", gap: 5 },
+  chipDur: { color: colors.textDim, fontSize: 11, fontWeight: "700", fontVariant: ["tabular-nums"] },
+  chipDot: { color: colors.textFaint, fontSize: 11 },
+  chipW: { color: colors.textDim, fontSize: 11, fontWeight: "800", fontVariant: ["tabular-nums"] },
+});
+
+const sd = StyleSheet.create({
+  panel: { width: 440, maxWidth: "92%", backgroundColor: colors.cardElevated, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, gap: 12 },
+  head: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  badge: { backgroundColor: colors.yellow + "1E", borderRadius: radius.pill, paddingHorizontal: 11, paddingVertical: 5 },
+  badgeText: { color: colors.yellow, fontSize: 11, fontWeight: "800", letterSpacing: 0.5 },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  zoneDot: { width: 12, height: 12, borderRadius: 6 },
+  title: { color: colors.white, fontSize: 22, fontWeight: "800", flex: 1 },
+  statusPill: { flexDirection: "row", alignItems: "center", gap: 7, alignSelf: "flex-start", borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 11, paddingVertical: 5 },
+  statusDot: { width: 7, height: 7, borderRadius: 4 },
+  statusText: { fontSize: 12, fontWeight: "800", letterSpacing: 0.5 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 2 },
+  stat: { width: "30%", minWidth: 110, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10 },
+  statLabel: { color: colors.textFaint, fontSize: 9.5, fontWeight: "800", letterSpacing: 1 },
+  statValue: { color: colors.white, fontSize: 18, fontWeight: "900", marginTop: 4, fontVariant: ["tabular-nums"] },
+  tipBox: { flexDirection: "row", gap: 9, alignItems: "flex-start", backgroundColor: colors.yellow + "10", borderWidth: 1, borderColor: colors.yellow + "33", borderRadius: radius.md, padding: 12, marginTop: 2 },
+  tipText: { color: colors.white, fontSize: 13, fontWeight: "600", lineHeight: 18, flex: 1 },
 });
 
 const bc = StyleSheet.create({
