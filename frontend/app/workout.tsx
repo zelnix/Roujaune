@@ -23,7 +23,7 @@ import {
   VideoPlaceholder, RoutesButton, RoutePicker, SettingsPanel, MusicPanel, CastPanel, ImmersiveHud, RouteMapCard,
 } from "@/src/components/workout";
 import {
-  LiveHeader, MetricCard, ConnectionsPanel, CoachBanner, TerrainCard, WorkoutCard, StepTimeline, StepDetailModal, LiveControlBar,
+  LiveHeader, MetricCard, ConnectionsPanel, CoachBanner, TerrainCard, WorkoutCard, BrandCard, StepTimeline, StepDetailModal, LiveControlBar,
 } from "@/src/components/workout-live";
 import { useWorkoutAudio } from "@/src/hooks/useWorkoutAudio";
 import { useBleSensors } from "@/src/hooks/useBleSensors";
@@ -70,16 +70,6 @@ const CONTROLS = [
   { key: "reconnect", label: "Trainer Reconnect", icon: "bluetooth" as const },
   { key: "lock", label: "Touch Lock", icon: "lock-closed" as const },
   { key: "peaceful", label: "Peaceful Pause", icon: "leaf" as const },
-];
-
-const MENU = [
-  { key: "reconnect", label: "Reconnect Trainer", icon: "bluetooth" as const },
-  { key: "music", label: "Music & Audio", icon: "musical-notes" as const },
-  { key: "settings", label: "Workout Settings", icon: "settings" as const },
-  { key: "lock", label: "Touch Lock", icon: "lock-closed" as const },
-  { key: "peaceful", label: "Peaceful Pause", icon: "leaf" as const },
-  { key: "sensors", label: "Bluetooth Sensors", icon: "bluetooth" as const },
-  { key: "save", label: "Save & Exit", icon: "save" as const },
 ];
 
 function fmt(sec: number) {
@@ -175,12 +165,12 @@ export default function LiveWorkout() {
   const [lastRouteId, setLastRouteIdState] = React.useState<string | null>(null);
   const [showRoutes, setShowRoutes] = React.useState(false);
   const [showControls, setShowControls] = React.useState(false);
-  const [showMenu, setShowMenu] = React.useState(false);
   const [showSettings, setShowSettings] = React.useState(false);
   const [showMusic, setShowMusic] = React.useState(false);
   const [showCast, setShowCast] = React.useState(false);
   const [showBle, setShowBle] = React.useState(false);
   const [endPrompt, setEndPrompt] = React.useState(false);
+  const [locked, setLocked] = React.useState(false);
   const [stepDetail, setStepDetail] = React.useState<number | null>(null);
   const videoFellBackRef = React.useRef(false);
 
@@ -232,7 +222,6 @@ export default function LiveWorkout() {
   );
   const targetW = activeSeg ? targetWatts(activeSeg.segment, ftp, zoneBias) : 251;
   const timeLeftLabel = activeSeg ? mmss(activeSeg.remaining) : undefined;
-  const stepLabel = activeSeg ? `${activeSeg.index + 1} / ${activeSeg.total}` : undefined;
   // Full step list for the bottom timeline + Workout card — each segment with
   // its summary detail (duration, target watts, %FTP, RPE, one-line description).
   const stepList = React.useMemo(
@@ -374,15 +363,6 @@ export default function LiveWorkout() {
     router.replace("/");
   };
   const onResumeRide = () => { setEndPrompt(false); if (paused) { resume(); setPaused(false); } };
-  const onMenuAction = (item: { key: string; label: string }) => {
-    setShowMenu(false);
-    if (item.key === "reconnect") { simulateDropout(); showToast("Simulating trainer dropout…"); return; }
-    if (item.key === "music") { setShowMusic(true); return; }
-    if (item.key === "settings") { setShowSettings(true); return; }
-    if (item.key === "sensors") { setShowBle(true); return; }
-    if (item.key === "save") { router.replace("/training"); return; }
-    showToast(item.label);
-  };
 
   const activeRoute = routeVideos[routeIdx];
 
@@ -524,27 +504,19 @@ export default function LiveWorkout() {
   const body = (
     <>
       <LiveHeader
-        onMenu={() => setShowMenu(true)}
-        routeName={routeInfo.title}
-        workoutName={workoutTitle}
         elapsed={fmt(telemetry.elapsed)}
         progress={progress}
         estFinish={estFinish}
-        live={isLive}
-        onLive={() => setSetting("demoMode", !settings.demoMode)}
-        onAudio={() => setShowMusic(true)}
-        onSettings={() => setShowSettings(true)}
-        audioOn={musicOn}
       />
 
       <View style={[styles.mainRow, tablet && styles.flex1]}>
         <View style={[styles.leftCenter, tablet && styles.flex1]}>
           <View style={styles.metricRow}>
+            <BrandCard />
             <MetricCard icon="heart" label="Heart Rate" value={wearableOn ? String(telemetry.hr) : "—"} unit="bpm" status={wearableOn ? `ZONE ${hrZone(telemetry.hr)}` : undefined} statusTone="neutral" accent={colors.red} />
             <MetricCard icon="speedometer" label="Speed" value={trainerOn ? String(Math.round(telemetry.speed)) : "—"} unit="km/h" accent="#5AC8FA" />
             <MetricCard icon="sync" label="Cadence" value={trainerOn ? String(telemetry.cadence) : "—"} unit="rpm" status={cadStatus} statusTone={cadInRange ? "good" : "warn"} sub={`TARGET ${CAD_LOW}–${CAD_HIGH}`} accent={colors.green} />
             <MetricCard icon="flash" label="Power" value={trainerOn ? String(powerVal) : "—"} unit="W" status={powerStatus} statusTone={powerTone} sub={`TARGET ${Math.max(0, targetW - 8)}–${targetW + 8} W`} accent={colors.yellow} />
-            <MetricCard icon="timer-outline" label="Interval" value={timeLeftLabel ?? "—"} sub={stepLabel ? `remaining · STEP ${stepLabel}` : "remaining"} status={activeSeg?.segment.label} statusTone="neutral" accent={colors.white} />
           </View>
 
           <View style={[styles.innerRow, tablet && styles.flex1]}>
@@ -599,10 +571,17 @@ export default function LiveWorkout() {
         paused={paused}
         erg={erg}
         audioOn={musicOn}
+        live={isLive}
+        onLive={() => setSetting("demoMode", !settings.demoMode)}
         onAudio={() => setShowMusic(true)}
         onMirror={() => setShowCast(true)}
         onErg={onErg}
         onControls={() => setShowControls(true)}
+        onReconnect={() => { simulateDropout(); showToast("Reconnecting trainer…"); }}
+        onSettings={() => setShowSettings(true)}
+        onBluetooth={() => setShowBle(true)}
+        onLock={() => { setLocked(true); showToast("Screen locked — hold the button to unlock."); }}
+        locked={locked}
         onPauseToggle={onPauseToggle}
         onEnd={requestEnd}
       />
@@ -642,21 +621,21 @@ export default function LiveWorkout() {
           </Pressable>
         )}
 
-        {showMenu && (
-          <Pressable style={styles.overlay} testID="menu-overlay" onPress={() => setShowMenu(false)}>
-            <Pressable style={styles.menuPanel} onPress={(e) => e.stopPropagation()}>
-              <View style={styles.panelHead}>
-                <Text style={styles.panelTitle}>Menu</Text>
-                <Pressable testID="menu-close" onPress={() => setShowMenu(false)} hitSlop={10}><Ionicons name="close" size={22} color={colors.white} /></Pressable>
-              </View>
-              {MENU.map((m) => (
-                <Pressable key={m.key} testID={`menu-${m.key}`} style={styles.menuItem} onPress={() => onMenuAction(m)}>
-                  <Ionicons name={m.icon} size={20} color={colors.yellow} />
-                  <Text style={styles.panelItemText}>{m.label}</Text>
-                </Pressable>
-              ))}
+        {locked && (
+          <View style={styles.lockOverlay} testID="lock-overlay">
+            <Ionicons name="lock-closed" size={34} color={colors.yellow} />
+            <Text style={styles.lockTitle}>Screen locked</Text>
+            <Pressable
+              style={styles.lockBtn}
+              testID="lock-unlock"
+              delayLongPress={600}
+              onLongPress={() => { setLocked(false); showToast("Screen unlocked."); }}
+              onPress={() => showToast("Hold the button to unlock.")}
+            >
+              <Ionicons name="lock-open-outline" size={18} color={colors.bg} />
+              <Text style={styles.lockBtnText}>Hold to unlock</Text>
             </Pressable>
-          </Pressable>
+          </View>
         )}
       </SafeAreaView>
 
@@ -820,6 +799,10 @@ const styles = StyleSheet.create({
   flex1: { flex: 1 },
   videoSlot: { minHeight: 150 },
   immersive: { ...StyleSheet.absoluteFillObject, backgroundColor: "#000", zIndex: 50 },
+  lockOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.82)", alignItems: "center", justifyContent: "center", gap: 14, zIndex: 60 },
+  lockTitle: { color: colors.white, fontSize: 18, fontWeight: "800" },
+  lockBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.yellow, borderRadius: radius.pill, paddingHorizontal: 20, paddingVertical: 12 },
+  lockBtnText: { color: colors.bg, fontSize: 14, fontWeight: "800" },
   hudEye: { position: "absolute", top: 12, left: 12, width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center", zIndex: 5 },
   hudCast: { position: "absolute", top: 56, left: 12, width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center", zIndex: 5 },
   hudCastOn: { backgroundColor: colors.yellow, borderColor: colors.yellow },

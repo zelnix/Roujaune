@@ -10,54 +10,32 @@ const WORDMARK = require("../../assets/images/auth_wordmark.png");
 type Tone = "good" | "warn" | "bad" | "neutral";
 const toneColor = (t: Tone) => (t === "good" ? colors.green : t === "warn" ? colors.yellow : t === "bad" ? colors.red : colors.textDim);
 
-// ---- Header ---------------------------------------------------------------
-export function LiveHeader({
-  onMenu, routeName, workoutName, elapsed, progress, estFinish, live, onLive, onAudio, onSettings, audioOn,
-}: {
-  onMenu: () => void; routeName: string; workoutName: string; elapsed: string; progress: number;
-  estFinish: string; live: boolean; onLive: () => void; onAudio: () => void; onSettings: () => void; audioOn: boolean;
-}) {
+// ---- Header (slim progress bar) -------------------------------------------
+export function LiveHeader({ elapsed, progress, estFinish }: { elapsed: string; progress: number; estFinish: string }) {
   const pct = Math.round(Math.max(0, Math.min(1, progress)) * 100);
   return (
     <View style={h.bar}>
-      <Pressable onPress={onMenu} style={h.iconBtn} hitSlop={8} testID="live-menu" accessibilityLabel="Menu">
-        <Ionicons name="menu" size={22} color={colors.white} />
-      </Pressable>
-      <Image source={WORDMARK} style={h.logo} contentFit="contain" />
-      <View style={h.titleWrap}>
-        <Text style={h.route} numberOfLines={1}>{routeName}</Text>
-        <Text style={h.workout} numberOfLines={1}>{workoutName}</Text>
+      <View style={h.stat}>
+        <Text style={h.statLabel}>ELAPSED</Text>
+        <Text style={h.statValue}>{elapsed}</Text>
       </View>
+      <View style={[h.progressWrap, { flex: 1 }]}>
+        <View style={h.progressTop}><Text style={h.progressPct}>{pct}% complete</Text></View>
+        <View style={h.track}><View style={[h.fill, { width: `${pct}%` }]} /></View>
+      </View>
+      <View style={h.stat}>
+        <Text style={h.statLabel}>EST. FINISH</Text>
+        <Text style={h.statValue}>{estFinish}</Text>
+      </View>
+    </View>
+  );
+}
 
-      <View style={h.center}>
-        <View style={h.stat}>
-          <Text style={h.statLabel}>ELAPSED</Text>
-          <Text style={h.statValue}>{elapsed}</Text>
-        </View>
-        <View style={h.progressWrap}>
-          <View style={h.progressTop}>
-            <Text style={h.progressPct}>{pct}%</Text>
-          </View>
-          <View style={h.track}><View style={[h.fill, { width: `${pct}%` }]} /></View>
-        </View>
-        <View style={h.stat}>
-          <Text style={h.statLabel}>EST. FINISH</Text>
-          <Text style={h.statValue}>{estFinish}</Text>
-        </View>
-      </View>
-
-      <View style={h.right}>
-        <Pressable onPress={onLive} style={[h.livePill, live ? h.liveOn : h.liveOff]} testID="live-pill">
-          <View style={[h.dot, { backgroundColor: live ? colors.green : colors.textDim }]} />
-          <Text style={[h.liveText, { color: live ? colors.green : colors.textDim }]}>{live ? "LIVE" : "DEMO"}</Text>
-        </Pressable>
-        <Pressable onPress={onAudio} style={h.iconBtn} hitSlop={8} testID="live-audio" accessibilityLabel="Audio">
-          <Ionicons name={audioOn ? "volume-high" : "volume-mute"} size={20} color={colors.white} />
-        </Pressable>
-        <Pressable onPress={onSettings} style={h.iconBtn} hitSlop={8} testID="live-settings" accessibilityLabel="Settings">
-          <Ionicons name="settings-outline" size={20} color={colors.white} />
-        </Pressable>
-      </View>
+// ---- Brand card (metric row) ----------------------------------------------
+export function BrandCard() {
+  return (
+    <View style={brand.card} testID="brand-card">
+      <Image source={WORDMARK} style={brand.logo} contentFit="contain" />
     </View>
   );
 }
@@ -347,19 +325,24 @@ export function StepDetailModal({
 
 // ---- Bottom controls ------------------------------------------------------
 export function LiveControlBar({
-  paused, erg, audioOn, onAudio, onMirror, onErg, onControls, onPauseToggle, onEnd,
+  paused, erg, audioOn, live, onLive, onAudio, onMirror, onErg, onControls, onReconnect, onSettings, onBluetooth, onLock, locked, onPauseToggle, onEnd,
 }: {
-  paused: boolean; erg: number; audioOn: boolean; onAudio: () => void; onMirror: () => void;
-  onErg: (d: number) => void; onControls: () => void; onPauseToggle: () => void; onEnd: () => void;
+  paused: boolean; erg: number; audioOn: boolean; live: boolean; onLive: () => void; onAudio: () => void; onMirror: () => void;
+  onErg: (d: number) => void; onControls: () => void; onReconnect: () => void; onSettings: () => void; onBluetooth: () => void; onLock: () => void; locked: boolean;
+  onPauseToggle: () => void; onEnd: () => void;
 }) {
   return (
     <View style={bc.bar}>
+      <Pressable onPress={onLive} style={[bc.pill, live ? bc.pillOn : bc.pillOff]} testID="bc-live">
+        <View style={[bc.pillDot, { backgroundColor: live ? colors.green : colors.textDim }]} />
+        <Text style={[bc.pillText, { color: live ? colors.green : colors.textDim }]}>{live ? "LIVE" : "DEMO"}</Text>
+      </Pressable>
       <Pressable onPress={onAudio} style={bc.round} testID="bc-audio" accessibilityLabel="Audio">
-        <Ionicons name={audioOn ? "volume-high" : "volume-mute"} size={20} color={colors.white} />
+        <Ionicons name={audioOn ? "volume-high" : "volume-mute"} size={19} color={colors.white} />
         <Text style={bc.roundText}>Audio</Text>
       </Pressable>
       <Pressable onPress={onMirror} style={bc.round} testID="bc-mirror" accessibilityLabel="Mirror">
-        <Ionicons name="tv-outline" size={20} color={colors.white} />
+        <Ionicons name="tv-outline" size={19} color={colors.white} />
         <Text style={bc.roundText}>Mirror</Text>
       </Pressable>
 
@@ -372,8 +355,24 @@ export function LiveControlBar({
         </View>
       </View>
 
+      <Pressable onPress={onReconnect} style={bc.round} testID="bc-reconnect" accessibilityLabel="Reconnect Trainer">
+        <Ionicons name="refresh" size={19} color={colors.white} />
+        <Text style={bc.roundText}>Reconnect</Text>
+      </Pressable>
+      <Pressable onPress={onSettings} style={bc.round} testID="bc-settings" accessibilityLabel="Workout Settings">
+        <Ionicons name="settings-outline" size={19} color={colors.white} />
+        <Text style={bc.roundText}>Settings</Text>
+      </Pressable>
+      <Pressable onPress={onBluetooth} style={bc.round} testID="bc-bluetooth" accessibilityLabel="Bluetooth Sensors">
+        <Ionicons name="bluetooth" size={19} color={colors.white} />
+        <Text style={bc.roundText}>Sensors</Text>
+      </Pressable>
+      <Pressable onPress={onLock} style={bc.round} testID="bc-lock" accessibilityLabel="Touch Lock">
+        <Ionicons name={locked ? "lock-closed" : "lock-open-outline"} size={19} color={locked ? colors.yellow : colors.white} />
+        <Text style={bc.roundText}>Lock</Text>
+      </Pressable>
       <Pressable onPress={onControls} style={bc.round} testID="bc-controls" accessibilityLabel="Controls">
-        <Ionicons name="options-outline" size={20} color={colors.white} />
+        <Ionicons name="options-outline" size={19} color={colors.white} />
         <Text style={bc.roundText}>Controls</Text>
       </Pressable>
 
@@ -385,7 +384,7 @@ export function LiveControlBar({
       </Pressable>
       <Pressable onPress={onEnd} style={bc.end} testID="bc-end">
         <Ionicons name="stop" size={18} color="#fff" />
-        <Text style={bc.endText}>End Workout</Text>
+        <Text style={bc.endText}>End</Text>
       </Pressable>
     </View>
   );
@@ -415,6 +414,11 @@ const h = StyleSheet.create({
   liveOff: { borderColor: colors.border, backgroundColor: colors.card },
   dot: { width: 7, height: 7, borderRadius: 4 },
   liveText: { fontSize: 12, fontWeight: "800", letterSpacing: 1 },
+});
+
+const brand = StyleSheet.create({
+  card: { ...card, flex: 1, minWidth: 120, alignItems: "center", justifyContent: "center", paddingVertical: 18 },
+  logo: { width: "86%", height: 46 },
 });
 
 const m = StyleSheet.create({
@@ -535,9 +539,14 @@ const wc = StyleSheet.create({
 });
 
 const bc = StyleSheet.create({
-  bar: { flexDirection: "row", alignItems: "center", gap: 10, ...card, backgroundColor: colors.nav, paddingHorizontal: 14, paddingVertical: 10 },
-  round: { alignItems: "center", justifyContent: "center", gap: 3, minWidth: 62, height: 54, borderRadius: radius.md, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10 },
+  bar: { flexDirection: "row", alignItems: "center", gap: 8, ...card, backgroundColor: colors.nav, paddingHorizontal: 12, paddingVertical: 10 },
+  round: { alignItems: "center", justifyContent: "center", gap: 3, minWidth: 58, height: 54, borderRadius: radius.md, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 8 },
   roundText: { color: colors.textDim, fontSize: 10.5, fontWeight: "700" },
+  pill: { flexDirection: "row", alignItems: "center", gap: 6, height: 54, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: 12 },
+  pillOn: { backgroundColor: "rgba(67,209,122,0.14)", borderColor: colors.green + "66" },
+  pillOff: { backgroundColor: colors.card, borderColor: colors.border },
+  pillDot: { width: 8, height: 8, borderRadius: 4 },
+  pillText: { fontSize: 12, fontWeight: "800", letterSpacing: 0.5 },
   erg: { alignItems: "center", justifyContent: "center", height: 54, borderRadius: radius.md, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12 },
   ergLabel: { color: colors.textFaint, fontSize: 9, fontWeight: "800", letterSpacing: 1 },
   ergRow: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 3 },
