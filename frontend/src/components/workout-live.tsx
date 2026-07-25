@@ -242,29 +242,37 @@ export function StepTimeline({
   return (
     <View style={st.wrap} testID="interval-timeline">
       <View style={st.head}>
-        <Ionicons name="stats-chart" size={15} color={colors.yellow} />
-        <Text style={st.title} numberOfLines={1}>{title}</Text>
-        {(elapsed || estFinish || pct != null) ? (
-          <View style={st.timing} testID="timeline-timing">
-            {elapsed ? (
-              <View style={st.timeStat}><Text style={st.timeLabel}>ELAPSED</Text><Text style={st.timeValue}>{elapsed}</Text></View>
-            ) : null}
-            {pct != null ? (
-              <View style={st.pctPill}><Text style={st.pctText}>{pct}% complete</Text></View>
-            ) : null}
-            {estFinish ? (
-              <View style={st.timeStat}><Text style={st.timeLabel}>EST. FINISH</Text><Text style={st.timeValue}>{estFinish}</Text></View>
-            ) : null}
+        <View style={st.titleWrap}>
+          <Ionicons name="stats-chart" size={15} color={colors.yellow} />
+          <Text style={st.title} numberOfLines={1}>{title}</Text>
+        </View>
+
+        <View style={st.laps} testID="laps-timer">
+          <Ionicons name="time-outline" size={22} color={colors.yellow} />
+          <Text style={st.lapsTime}>{remaining ?? "--:--"}</Text>
+          <View style={st.lapsMeta}>
+            <Text style={st.lapsLabel}>REMAINING</Text>
+            {steps.length ? <Text style={st.lapsStep}>STEP {Math.min(activeIndex + 1, steps.length)} / {steps.length}</Text> : null}
           </View>
-        ) : null}
-        <View style={st.headSpacer} />
-        <View style={st.headRight}>
-          {steps.length ? <Text style={st.step}>STEP {Math.min(activeIndex + 1, steps.length)} / {steps.length}</Text> : null}
-          {remaining ? (
-            <View style={st.remain}><Ionicons name="time-outline" size={13} color={colors.yellow} /><Text style={st.remainText}>{remaining} REMAINING</Text></View>
+        </View>
+
+        <View style={st.timingRight} testID="timeline-timing">
+          {elapsed ? (
+            <View style={st.timeStat}><Text style={st.timeLabel}>ELAPSED</Text><Text style={st.timeValue}>{elapsed}</Text></View>
+          ) : null}
+          {estFinish ? (
+            <View style={st.timeStat}><Text style={st.timeLabel}>EST. FINISH</Text><Text style={st.timeValue}>{estFinish}</Text></View>
           ) : null}
         </View>
       </View>
+
+      {pct != null ? (
+        <View style={st.progressRow}>
+          <View style={st.progressTrack}><View style={[st.progressFill, { width: `${pct}%` }]} /></View>
+          <Text style={st.progressPct}>{pct}%</Text>
+        </View>
+      ) : null}
+
       <View onLayout={(e) => setChartW(Math.round(e.nativeEvent.layout.width))}>
         <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} scrollEnabled={scrollable}>
           <View style={[st.chart, { width: chartW ? contentW : "100%" }]}>
@@ -496,19 +504,22 @@ const tc = StyleSheet.create({
 
 const st = StyleSheet.create({
   wrap: { ...card, paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
-  head: { flexDirection: "row", alignItems: "center", gap: 10 },
-  title: { color: colors.white, fontSize: 13.5, fontWeight: "800", flexShrink: 1 },
-  timing: { flexDirection: "row", alignItems: "center", gap: 12, marginLeft: 4 },
-  timeStat: { alignItems: "flex-start" },
+  head: { flexDirection: "row", alignItems: "center", gap: 14 },
+  titleWrap: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 },
+  title: { color: colors.white, fontSize: 15, fontWeight: "800", flexShrink: 1 },
+  laps: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: colors.yellow + "12", borderWidth: 1, borderColor: colors.yellow + "33", borderRadius: radius.lg, paddingVertical: 8, paddingHorizontal: 16 },
+  lapsTime: { color: colors.yellow, fontSize: 32, fontWeight: "900", fontVariant: ["tabular-nums"], letterSpacing: 0.5 },
+  lapsMeta: { alignItems: "flex-start" },
+  lapsLabel: { color: colors.yellow, fontSize: 10, fontWeight: "800", letterSpacing: 1.5 },
+  lapsStep: { color: colors.textDim, fontSize: 11, fontWeight: "800", letterSpacing: 0.5, marginTop: 1 },
+  timingRight: { flexDirection: "row", alignItems: "center", gap: 16 },
+  timeStat: { alignItems: "flex-end" },
   timeLabel: { color: colors.textFaint, fontSize: 8.5, fontWeight: "800", letterSpacing: 1 },
-  timeValue: { color: colors.white, fontSize: 14, fontWeight: "800", fontVariant: ["tabular-nums"] },
-  pctPill: { backgroundColor: colors.yellow + "18", borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 3 },
-  pctText: { color: colors.yellow, fontSize: 11, fontWeight: "800" },
-  headSpacer: { flex: 1 },
-  headRight: { flexDirection: "row", alignItems: "center", gap: 10 },
-  step: { color: colors.textDim, fontSize: 11, fontWeight: "800", letterSpacing: 0.5 },
-  remain: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.yellow + "18", borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 3 },
-  remainText: { color: colors.yellow, fontSize: 11, fontWeight: "800" },
+  timeValue: { color: colors.white, fontSize: 16, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  progressRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  progressTrack: { flex: 1, height: 7, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.1)", overflow: "hidden" },
+  progressFill: { height: "100%", backgroundColor: colors.yellow, borderRadius: 4 },
+  progressPct: { color: colors.yellow, fontSize: 11, fontWeight: "800", minWidth: 34, textAlign: "right" },
   chart: { flexDirection: "row", alignItems: "flex-end", height: 104, gap: 0 },
   seg: { height: "100%", justifyContent: "flex-end", paddingHorizontal: 1 },
   segBar: { width: "100%", borderRadius: 5, borderWidth: 1, overflow: "hidden", justifyContent: "flex-end" },

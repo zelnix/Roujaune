@@ -36,7 +36,7 @@ export function SummaryHeader({ brandWidth, phone = false, onToast }: { brandWid
       <View style={styles.titleCol}>
         <View style={styles.titleRow}>
           <Sparkle x={-6} y={2} />
-          <Text style={[styles.title, phone && { fontSize: 24 }]}>Workout Complete</Text>
+          <Text style={[styles.title, phone && { fontSize: 24 }]}>Workout Summary</Text>
           <View style={[styles.titleCheck, phone && { width: 22, height: 22, borderRadius: 11 }]}>
             <Ionicons name="checkmark" size={phone ? 14 : 17} color={colors.yellow} />
           </View>

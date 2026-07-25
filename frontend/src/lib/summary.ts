@@ -112,16 +112,17 @@ export type IntervalScore = {
   color: string;
   targetW: number;
   avgW: number | null;      // null when no telemetry was recorded for this segment
+  avgHr: number | null;     // avg heart rate over the segment (null when none)
   compliance: number | null; // % of segment time within ±8% of target
   durationSec: number;
 };
 
-export type IntervalResult = { intervals: IntervalScore[]; overall: number | null; hasData: boolean };
+export type IntervalResult = { intervals: IntervalScore[]; overall: number | null; hasData: boolean; ftp: number };
 
 export function computeIntervals(): IntervalResult {
   const rec = rideRecorder.snapshot();
   const w = getWorkout(rec.workoutId) ?? getWorkout("threshold-climb");
-  if (!w) return { intervals: [], overall: null, hasData: false };
+  if (!w) return { intervals: [], overall: null, hasData: false, ftp: rec.ftp || 287 };
   const segs = buildSegments(w);
   const ftp = rec.ftp || 287;
   const bias = rec.zoneBias || {};
@@ -141,6 +142,7 @@ export function computeIntervals(): IntervalResult {
   for (const s of segs) {
     const tW = targetWatts(s, ftp, bias);
     let avgW: number | null = null;
+    let avgHr: number | null = null;
     let compliance: number | null = null;
     const segStart = acc;
     const segEnd = acc + s.durationSec;
@@ -151,16 +153,18 @@ export function computeIntervals(): IntervalResult {
       const slice = samples.slice(i0, i1);
       if (slice.length) {
         avgW = Math.round(slice.reduce((a, x) => a + x.power, 0) / slice.length);
+        const hrs = slice.filter((x) => x.hr > 0);
+        avgHr = hrs.length ? Math.round(hrs.reduce((a, x) => a + x.hr, 0) / hrs.length) : null;
         const inBand = slice.filter((x) => Math.abs(x.power - tW) <= tW * 0.08).length;
         compliance = Math.round((inBand / slice.length) * 100);
         compAcc += compliance;
         compN += 1;
       }
     }
-    intervals.push({ label: s.label, zoneLabel: s.zoneLabel, color: s.color, targetW: tW, avgW, compliance, durationSec: s.durationSec });
+    intervals.push({ label: s.label, zoneLabel: s.zoneLabel, color: s.color, targetW: tW, avgW, avgHr, compliance, durationSec: s.durationSec });
     acc += s.durationSec;
   }
-  return { intervals, overall: compN ? Math.round(compAcc / compN) : null, hasData };
+  return { intervals, overall: compN ? Math.round(compAcc / compN) : null, hasData, ftp };
 }
 
 /** Memoised interval scores for the summary screen. */

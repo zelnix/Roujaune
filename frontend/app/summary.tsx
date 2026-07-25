@@ -44,7 +44,7 @@ export default function WorkoutComplete() {
 
   const { stats, route, needsManual, saved, submitManual, recordedElapsed } = useSummary();
   const { debrief, loading: debriefLoading } = useCoachDebrief(stats, route);
-  const { intervals, overall: intervalOverall, hasData: intervalHasData } = useIntervals();
+  const { intervals, overall: intervalOverall, hasData: intervalHasData, ftp: intervalFtp } = useIntervals();
   const persona = useCoach();
   const [showChat, setShowChat] = React.useState(false);
   const [showAnalysis, setShowAnalysis] = React.useState(false);
@@ -119,6 +119,7 @@ export default function WorkoutComplete() {
           intervals={intervals}
           overall={intervalOverall}
           hasData={intervalHasData}
+          ftp={intervalFtp}
           routeName={route.name}
           onClose={() => setShowAnalysis(false)}
         />
@@ -143,8 +144,9 @@ function RightColumn({ score, phone, route }: { score: number; phone: boolean; r
 
 // Deeper post-ride analysis: full-ride power/HR curves, time-in-zones and a
 // lap-by-lap interval breakdown — for data-focused riders.
-function FullAnalysisModal({ stats, intervals, overall, hasData, routeName, onClose }: { stats: any; intervals: any[]; overall: number | null; hasData: boolean; routeName?: string; onClose: () => void }) {
+function FullAnalysisModal({ stats, intervals, overall, hasData, ftp, routeName, onClose }: { stats: any; intervals: any[]; overall: number | null; hasData: boolean; ftp: number; routeName?: string; onClose: () => void }) {
   const [w, setW] = React.useState(600);
+  const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
   return (
     <View style={styles.overlay}>
       <View style={styles.analysisCard} testID="full-analysis-modal">
@@ -166,6 +168,36 @@ function FullAnalysisModal({ stats, intervals, overall, hasData, routeName, onCl
           <MetricsGrid stats={stats} routeName={routeName} />
           <ChartsRow stats={stats} width={w} vertical />
           <IntervalTargetsCard intervals={intervals} overall={overall} hasData={hasData} />
+
+          <View style={styles.lapCard} testID="lap-split-table">
+            <View style={styles.lapHeadRow}>
+              <Ionicons name="list" size={15} color={colors.yellow} />
+              <Text style={styles.lapTitle}>Lap Splits</Text>
+              <Text style={styles.lapHint}>Compare each interval side-by-side</Text>
+            </View>
+            <View style={[styles.lapRow, styles.lapHeaderRow]}>
+              <Text style={[styles.lapCell, styles.lapCol0, styles.lapHeadText]}>LAP</Text>
+              <Text style={[styles.lapCell, styles.lapHeadText]}>TIME</Text>
+              <Text style={[styles.lapCell, styles.lapHeadText]}>AVG W</Text>
+              <Text style={[styles.lapCell, styles.lapHeadText]}>% FTP</Text>
+              <Text style={[styles.lapCell, styles.lapHeadText]}>AVG HR</Text>
+            </View>
+            {intervals.map((it, i) => {
+              const pctFtp = it.avgW != null && ftp > 0 ? Math.round((it.avgW / ftp) * 100) : null;
+              return (
+                <View key={i} style={[styles.lapRow, i % 2 === 1 && styles.lapRowAlt]}>
+                  <View style={[styles.lapCell, styles.lapCol0, styles.lapNameCell]}>
+                    <View style={[styles.lapDot, { backgroundColor: it.color }]} />
+                    <Text style={styles.lapName} numberOfLines={1}>{i + 1}. {it.label}</Text>
+                  </View>
+                  <Text style={[styles.lapCell, styles.lapVal]}>{mmss(it.durationSec)}</Text>
+                  <Text style={[styles.lapCell, styles.lapVal]}>{it.avgW != null ? `${it.avgW}` : "—"}</Text>
+                  <Text style={[styles.lapCell, styles.lapVal, pctFtp != null && { color: colors.yellow }]}>{pctFtp != null ? `${pctFtp}%` : "—"}</Text>
+                  <Text style={[styles.lapCell, styles.lapVal]}>{it.avgHr != null ? `${it.avgHr}` : "—"}</Text>
+                </View>
+              );
+            })}
+          </View>
         </ScrollView>
       </View>
     </View>
@@ -305,4 +337,18 @@ const styles = StyleSheet.create({
   analysisTitleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   analysisTitle: { color: colors.white, fontSize: 20, fontWeight: "900" },
   analysisScroll: { paddingBottom: spacing.md, gap: spacing.md },
+  lapCard: { backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md },
+  lapHeadRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
+  lapTitle: { color: colors.white, fontSize: 15, fontWeight: "800" },
+  lapHint: { color: colors.textFaint, fontSize: 11, fontWeight: "600", marginLeft: 4 },
+  lapRow: { flexDirection: "row", alignItems: "center", paddingVertical: 9, paddingHorizontal: 8, borderRadius: radius.sm },
+  lapRowAlt: { backgroundColor: "rgba(255,255,255,0.03)" },
+  lapHeaderRow: { borderBottomWidth: 1, borderBottomColor: colors.borderSoft, paddingBottom: 8, marginBottom: 2 },
+  lapCell: { flex: 1, textAlign: "right" },
+  lapCol0: { flex: 2.4, textAlign: "left" },
+  lapHeadText: { color: colors.textFaint, fontSize: 10, fontWeight: "800", letterSpacing: 0.8 },
+  lapNameCell: { flexDirection: "row", alignItems: "center", gap: 8 },
+  lapDot: { width: 9, height: 9, borderRadius: 5 },
+  lapName: { color: colors.white, fontSize: 13, fontWeight: "700", flexShrink: 1 },
+  lapVal: { color: colors.white, fontSize: 13.5, fontWeight: "800", fontVariant: ["tabular-nums"] },
 });
