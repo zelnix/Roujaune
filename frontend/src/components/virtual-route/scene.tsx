@@ -27,7 +27,7 @@ export type SceneTelemetry = {
  * markers, drifting particles, camera bob, bike lean, dynamic light & motion
  * blur) driven by smoothed telemetry via a rAF phase loop.
  */
-export function VirtualRouteScene({ rider, telemetry, showBrand = true }: { rider: VirtualRider; telemetry: SceneTelemetry; showBrand?: boolean }) {
+export function VirtualRouteScene({ rider, backdrop, telemetry, showBrand = true }: { rider: VirtualRider; backdrop?: any; telemetry: SceneTelemetry; showBrand?: boolean }) {
   const tRef = React.useRef(telemetry);
   tRef.current = telemetry;
 
@@ -122,17 +122,36 @@ export function VirtualRouteScene({ rider, telemetry, showBrand = true }: { ride
 
   return (
     <View style={st.wrap}>
-      {/* Rider + world plate (camera bob / weight-shift sway / lean / effort scale). */}
-      <AView style={[st.plateWrap, { transform: [{ translateX: swayX }, { translateY: bobY }, { rotate: leanDeg }, { scale }] }]}>
-        <Image source={rider.image} style={st.plate} resizeMode="cover" />
-      </AView>
+      {backdrop ? (
+        <>
+          {/* Route scenery backdrop (AI-generated, per route). */}
+          <Image source={backdrop} style={st.bg} resizeMode="cover" />
 
-      {/* Road-direction speed streaks + center markers (forward motion). */}
-      <View style={st.roadLayer} pointerEvents="none">
-        {edgeStreaks("left")}
-        {edgeStreaks("right")}
-        <View style={st.centerLane}>{dashes}</View>
-      </View>
+          {/* Road-direction speed streaks + center markers (forward motion). */}
+          <View style={st.roadLayer} pointerEvents="none">
+            {edgeStreaks("left")}
+            {edgeStreaks("right")}
+            <View style={st.centerLane}>{dashes}</View>
+          </View>
+
+          {/* Rider sprite composited on top (camera bob / weight-shift sway / lean). */}
+          <AView style={[st.riderWrap, { transform: [{ translateX: swayX }, { translateY: bobY }, { rotate: leanDeg }, { scale }] }]}>
+            <Image source={rider.sprite} style={st.riderImg} resizeMode="contain" />
+          </AView>
+        </>
+      ) : (
+        <>
+          {/* Fallback: single baked plate (camera bob / sway / lean / effort scale). */}
+          <AView style={[st.plateWrap, { transform: [{ translateX: swayX }, { translateY: bobY }, { rotate: leanDeg }, { scale }] }]}>
+            <Image source={rider.image} style={st.plate} resizeMode="cover" />
+          </AView>
+          <View style={st.roadLayer} pointerEvents="none">
+            {edgeStreaks("left")}
+            {edgeStreaks("right")}
+            <View style={st.centerLane}>{dashes}</View>
+          </View>
+        </>
+      )}
 
       {/* Speed haze / motion blur intensifying with speed. */}
       <AView pointerEvents="none" style={[st.blur, { opacity: blur.interpolate({ inputRange: [0, 1], outputRange: [0, 0.45] }) }]} />
@@ -178,6 +197,9 @@ export function VirtualRouteScene({ rider, telemetry, showBrand = true }: { ride
 
 const st = StyleSheet.create({
   wrap: { flex: 1, overflow: "hidden", backgroundColor: "#05060a" },
+  bg: { ...StyleSheet.absoluteFillObject, width: "100%", height: "100%" },
+  riderWrap: { position: "absolute", left: 0, right: 0, bottom: 0, top: "6%", alignItems: "center", justifyContent: "flex-end" },
+  riderImg: { width: "100%", height: "100%" },
   plateWrap: { ...StyleSheet.absoluteFillObject },
   plate: { width: "100%", height: "100%" },
   roadLayer: { ...StyleSheet.absoluteFillObject },

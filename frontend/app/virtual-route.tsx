@@ -6,6 +6,8 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing, shadow } from "@/src/theme";
 import { useTelemetry } from "@/src/hooks/useTelemetry";
+import { useBleSensors } from "@/src/hooks/useBleSensors";
+import { BleSensorsPanel } from "@/src/components/BleSensorsPanel";
 import { VIRTUAL_RIDERS, getRider } from "@/src/lib/virtual-riders";
 import { VIRTUAL_ROUTES, getVRoute, routeStateAt } from "@/src/lib/vroutes";
 import { VirtualRouteScene, SceneTelemetry } from "@/src/components/virtual-route/scene";
@@ -61,7 +63,15 @@ export default function VirtualRouteScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const compact = width < 820;
-  const { telemetry, connectionState, stale, sendErg, sendTarget, simulateDropout, pause, resume } = useTelemetry();
+  const { telemetry, connectionState, stale, sendErg, sendTarget, sendSensor, simulateDropout, pause, resume } = useTelemetry();
+  const ble = useBleSensors();
+  const [showBle, setShowBle] = React.useState(false);
+
+  // Push real Bluetooth sensor readings into the telemetry stream (overrides sim).
+  React.useEffect(() => {
+    if (ble.readings.ts <= 0 || connectionState !== "connected") return;
+    sendSensor({ power: ble.readings.power, cadence: ble.readings.cadence, hr: ble.readings.hr });
+  }, [ble.readings.ts, connectionState, sendSensor]);
 
   const [riderId, setRiderId] = React.useState("male");
   const [routeId, setRouteId] = React.useState(VIRTUAL_ROUTES[0].id);
@@ -122,7 +132,7 @@ export default function VirtualRouteScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, autoResistance, emergency, gradientBucket]);
 
-  const sensorsOn = telemetry.source === "trainer";
+  const sensorsOn = telemetry.source === "trainer" || ble.connected.length > 0;
   const hrOn = telemetry.hr > 0;
   const scene: SceneTelemetry = {
     power: sm.power, cadence: sm.cadence, speed: sm.speed, gradient: route.gradient, curve: route.curve,
@@ -176,7 +186,7 @@ export default function VirtualRouteScreen() {
     <View style={s.root}>
       <StatusBar hidden />
       {/* Cinematic wide scene */}
-      <VirtualRouteScene rider={rider} telemetry={scene} showBrand={phase !== "setup"} />
+      <VirtualRouteScene rider={rider} backdrop={vroute.backdrop} telemetry={scene} showBrand={phase !== "setup"} />
 
       {/* Connection status pill (top-right) */}
       <SafeAreaView style={s.topRight} pointerEvents="box-none" edges={["top", "right"]}>
@@ -233,6 +243,9 @@ export default function VirtualRouteScreen() {
             <Pressable onPress={emergencyStop} style={[s.iconBtnDark, { borderColor: colors.red }]} accessibilityLabel="Emergency stop resistance">
               <Ionicons name="warning-outline" size={16} color={colors.red} />
             </Pressable>
+            <Pressable onPress={() => setShowBle(true)} style={[s.iconBtnDark, ble.connected.length > 0 && s.iconBtnOn]} testID="vr-sensors" accessibilityLabel="Pair Bluetooth sensors">
+              <Ionicons name="bluetooth" size={16} color={ble.connected.length > 0 ? colors.bg : colors.white} />
+            </Pressable>
           </View>
         </SafeAreaView>
       )}
@@ -286,6 +299,11 @@ export default function VirtualRouteScreen() {
                 <Text style={s.simNote}>Simulated ride mode available — no equipment required.</Text>
               </View>
 
+              <Pressable onPress={() => setShowBle(true)} testID="vr-pair-sensors" style={s.pairBtn} accessibilityRole="button" accessibilityLabel="Pair Bluetooth sensors">
+                <Ionicons name="bluetooth" size={16} color={ble.connected.length > 0 ? colors.green : colors.white} />
+                <Text style={s.pairText}>{ble.connected.length > 0 ? `${ble.connected.length} sensor${ble.connected.length > 1 ? "s" : ""} connected` : "Pair Bluetooth sensors"}</Text>
+              </Pressable>
+
               <Pressable onPress={startRide} testID="start-ride" style={s.startBtn} accessibilityRole="button" accessibilityLabel="Start ride">
                 <Ionicons name="play" size={20} color={colors.bg} />
                 <Text style={s.startText}>START RIDE</Text>
@@ -324,6 +342,24 @@ export default function VirtualRouteScreen() {
             </Pressable>
           </View>
         </View>
+      )}
+      {/* Bluetooth sensor pairing */}
+      {showBle && (
+        <BleSensorsPanel
+          supported={ble.supported}
+          poweredOn={ble.poweredOn}
+          scanning={ble.scanning}
+          devices={ble.devices}
+          connected={ble.connected}
+          readings={ble.readings}
+          permissionStatus={ble.permissionStatus}
+          error={ble.error}
+          onScan={ble.startScan}
+          onStopScan={ble.stopScan}
+          onConnect={ble.connect}
+          onDisconnect={ble.disconnect}
+          onClose={() => setShowBle(false)}
+        />
       )}
     </View>
   );
@@ -449,6 +485,8 @@ const s = StyleSheet.create({
   riderCheck: { position: "absolute", top: 8, right: 8, width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center" },
   setupRow: { gap: 8, marginTop: 4 },
   simNote: { color: colors.textFaint, fontSize: 12, fontWeight: "600" },
+  pairBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, paddingVertical: 12, marginTop: 4 },
+  pairText: { color: colors.white, fontSize: 13, fontWeight: "800" },
   startBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.yellow, borderRadius: radius.md, paddingVertical: 14, marginTop: 4, ...(shadow.glow as any) },
   startText: { color: colors.bg, fontSize: 15, fontWeight: "900", letterSpacing: 0.5 },
 

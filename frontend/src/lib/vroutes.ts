@@ -12,6 +12,7 @@ export type VRoute = {
   distanceKm: number;
   tag: string;           // short difficulty/character label for the picker
   elevationM: number;    // approx total climb (for summary/history)
+  backdrop: any;         // AI-generated cinematic route scenery (rider composited on top)
   points: VPoint[];
   checkpoints: VCheckpoint[];
 };
@@ -28,6 +29,7 @@ export type RouteState = {
 export const VIRTUAL_ROUTES: VRoute[] = [
   {
     id: "alpine-sunset-pass",
+    backdrop: require("../../assets/images/route_bg_alpine-sunset-pass.jpg"),
     name: "Alpine Sunset Pass",
     place: "Dolomites, Italy",
     distanceKm: 20,
@@ -59,6 +61,7 @@ export const VIRTUAL_ROUTES: VRoute[] = [
   },
   {
     id: "coastal-sprint",
+    backdrop: require("../../assets/images/route_bg_coastal-sprint.jpg"),
     name: "Coastal Sprint",
     place: "Amalfi Coast, Italy",
     distanceKm: 12,
@@ -84,6 +87,7 @@ export const VIRTUAL_ROUTES: VRoute[] = [
   },
   {
     id: "forest-loop",
+    backdrop: require("../../assets/images/route_bg_forest-loop.jpg"),
     name: "Forest Loop",
     place: "Black Forest, Germany",
     distanceKm: 15,
@@ -109,6 +113,7 @@ export const VIRTUAL_ROUTES: VRoute[] = [
   },
   {
     id: "desert-climb",
+    backdrop: require("../../assets/images/route_bg_desert-climb.jpg"),
     name: "Desert Climb",
     place: "Atacama, Chile",
     distanceKm: 18,
