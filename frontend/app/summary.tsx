@@ -11,7 +11,7 @@ import { useSummary, useCoachDebrief, useIntervals } from "@/src/lib/summary";
 import { useCoach } from "@/src/lib/coach-persona";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
 import {
-  SummaryHeader, SummarySidebar, HeroSummaryCard, MetricsGrid, ComplianceCard,
+  SummaryHeader, HeroSummaryCard, MetricsGrid, ComplianceCard,
   ChartsRow, SyncExportRow, RouteSummaryCard, AchievementsCard, RecoveryCard, BottomActionBar,
   IntervalTargetsCard,
 } from "@/src/components/summary";
@@ -34,7 +34,7 @@ function Toast({ message }: { message: { id: number; text: string } | null }) {
 }
 
 export default function WorkoutComplete() {
-  const { width, height } = useWindowDimensions();
+  const { height } = useWindowDimensions();
   const router = useRouter();
   const phone = height < 500;             // phone landscape
   const compact = height < 620;           // small tablet / large phone
@@ -53,34 +53,23 @@ export default function WorkoutComplete() {
 
   const onMainLayout = (e: LayoutChangeEvent) => setMainW(e.nativeEvent.layout.width);
 
-  const onSideSelect = (key: string) => {
-    if (key === "overview") return;
-    const routes: Record<string, string> = {
-      home: "/", training: "/plan", workouts: "/workouts", calendar: "/calendar",
-      routes: "/routes", progress: "/progress", wellness: "/wellness",
-      community: "/community", connections: "/connections", settings: "/settings", help: "/help",
-    };
-    const to = routes[key];
-    if (to) { router.replace(to as any); return; }
-    showToast(key.charAt(0).toUpperCase() + key.slice(1));
-  };
+  const onClose = () => router.replace("/");
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#050506" }}>
       <StatusBar hidden />
-      <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
-        <View style={{ paddingHorizontal: pad, paddingTop: spacing.sm }}>
-          <SummaryHeader brandWidth={navW} phone={phone} onToast={showToast} />
-        </View>
-
-        <View style={styles.body}>
-          <View style={{ paddingLeft: pad }}>
-            <SummarySidebar active="overview" onSelect={onSideSelect} width={navW} iconOnly={phone} />
+      <SafeAreaView style={styles.backdrop} edges={["top", "bottom", "left", "right"]}>
+        <View style={[styles.modalCard, { padding: pad }]} testID="summary-modal">
+          <View style={styles.modalHead}>
+            <SummaryHeader brandWidth={navW} phone={phone} onToast={showToast} />
+            <Pressable testID="summary-close" onPress={onClose} style={styles.closeBtn} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close summary">
+              <Ionicons name="close" size={22} color={colors.white} />
+            </Pressable>
           </View>
 
           <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={[styles.scroll, { paddingHorizontal: pad }]}
+            style={styles.modalBody}
+            contentContainerStyle={styles.scroll}
             showsVerticalScrollIndicator={false}
             testID="summary-scroll"
           >
@@ -110,16 +99,16 @@ export default function WorkoutComplete() {
               )}
             </View>
           </ScrollView>
-        </View>
 
-        <View style={{ paddingHorizontal: pad, paddingBottom: spacing.sm }}>
-          <BottomActionBar
-            compact={phone}
-            onView={() => showToast("Opening full analysis")}
-            onSave={() => router.replace("/")}
-            onShare={() => showToast("Preparing shareable ride card")}
-            onPlan={() => router.replace("/training")}
-          />
+          <View style={styles.modalFooter}>
+            <BottomActionBar
+              compact={phone}
+              onView={() => showToast("Opening full analysis")}
+              onSave={() => router.replace("/")}
+              onShare={() => showToast("Preparing shareable ride card")}
+              onPlan={() => router.replace("/training")}
+            />
+          </View>
         </View>
       </SafeAreaView>
 
@@ -250,6 +239,12 @@ const mStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
+  backdrop: { flex: 1, backgroundColor: "rgba(4,4,6,0.82)", alignItems: "center", justifyContent: "center", padding: spacing.md },
+  modalCard: { width: "100%", maxWidth: 1060, flex: 1, maxHeight: "100%", backgroundColor: colors.cardElevated, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, overflow: "hidden", ...shadow.card },
+  modalHead: { position: "relative" },
+  closeBtn: { position: "absolute", top: 0, right: 0, width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: colors.border },
+  modalBody: { flex: 1 },
+  modalFooter: { paddingTop: spacing.xs },
   body: { flex: 1, flexDirection: "row" },
   scroll: { paddingTop: spacing.xs, paddingBottom: spacing.md, gap: spacing.md },
   contentRow: { flexDirection: "row", gap: spacing.md },
