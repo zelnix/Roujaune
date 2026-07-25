@@ -765,7 +765,7 @@ export default function LiveWorkout() {
                   <RouteVideo source={activeRoute.url} title={`${activeRoute.title}${routeAuto ? " · Auto-matched" : activeRoute.id === lastRouteId ? " · Last ride" : ""}`} playing={!paused} muted width={tablet ? undefined : centerW} aspectRatio={16 / 9} fill={tablet} onToggleExpand={() => setExpanded(true)} expanded={false} onError={onVideoError}>
                     <View style={[styles.inlineRoutes, { pointerEvents: "box-none" }]}>
                       <RoutesButton onPress={() => setShowRoutes(true)} testID="inline-routes" />
-                      <RoutesButton onPress={() => setVirtualMode(true)} testID="switch-virtual" label="Virtual" icon="bicycle" />
+                      <RoutesButton onPress={() => router.push("/virtual-route")} testID="switch-virtual" label="Virtual" icon="bicycle" />
                     </View>
                   </RouteVideo>
                 )}
