@@ -405,6 +405,7 @@ async def _save_ride_history(body: SummarizeRequest, result: dict) -> Optional[s
             "elevation_m": result.get("elevation_m"),
             "avg_power": result.get("avg_power"),
             "tss": result.get("tss"),
+            "calories": result.get("calories", 0),
             "computed": result.get("computed", False),
             "debrief": None,
         }
@@ -421,6 +422,52 @@ async def ride_history(limit: int = 20):
     for d in docs:
         d.pop("_id", None)
     return docs
+
+
+@api_router.get("/stats/energy")
+async def energy_rollup():
+    """Roll up ride calories into today's + this-week's energy totals and a
+    day-streak, for the home dashboard."""
+    from datetime import date, timedelta
+    rides = await udb.ride_history.find().sort("created_at", -1).to_list(length=5000)
+    today = date.today()
+    monday = today - timedelta(days=today.weekday())  # start of ISO week
+    monday_str = monday.isoformat()
+    today_str = today.isoformat()
+
+    per_day: Dict[str, int] = {}
+    week_kcal = 0
+    today_kcal = 0
+    week_rides = 0
+    for r in rides:
+        day = str(r.get("created_at") or "")[:10]
+        if not day:
+            continue
+        kcal = int(r.get("calories") or 0)
+        per_day[day] = per_day.get(day, 0) + kcal
+        if day == today_str:
+            today_kcal += kcal
+        if day >= monday_str:
+            week_kcal += kcal
+            week_rides += 1
+
+    # Streak: consecutive days (ending today, or yesterday if nothing yet today)
+    # that have at least one ride.
+    ride_days = {str(r.get("created_at") or "")[:10] for r in rides if r.get("created_at")}
+    streak = 0
+    cursor = today
+    if today_str not in ride_days:
+        cursor = today - timedelta(days=1)
+    while cursor.isoformat() in ride_days:
+        streak += 1
+        cursor = cursor - timedelta(days=1)
+
+    return {
+        "today_kcal": today_kcal,
+        "week_kcal": week_kcal,
+        "week_rides": week_rides,
+        "streak_days": streak,
+    }
 
 
 # ----------------------- Outdoor ride syncing (connections) -----------------------
