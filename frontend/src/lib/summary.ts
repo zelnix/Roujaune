@@ -175,6 +175,7 @@ export function useSummary() {
   const [loading, setLoading] = useState(true);
   const [route] = useState<RideRoute>(() => rideRecorder.snapshot().route);
   const [needsManual, setNeedsManual] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [recordedElapsed] = useState<number>(() => rideRecorder.snapshot().elapsed);
 
   const post = useCallback(async (manual?: Record<string, any>) => {
@@ -198,6 +199,7 @@ export function useSummary() {
       const data = (await res.json()) as SummaryStats;
       setStats(data);
       setNeedsManual(false);
+      setSaved(true);
       return true;
     } catch {
       return false;
@@ -224,7 +226,7 @@ export function useSummary() {
     return () => { alive = false; };
   }, [post]);
 
-  return { stats, loading, route, needsManual, recordedElapsed, submitManual: (fields: Record<string, any>) => post(fields) };
+  return { stats, loading, route, needsManual, saved, recordedElapsed, submitManual: (fields: Record<string, any>) => post(fields) };
 }
 
 /** Fetch Alberto's AI post-ride debrief once the ride stats are computed.

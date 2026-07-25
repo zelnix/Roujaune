@@ -42,11 +42,12 @@ export default function WorkoutComplete() {
   const rightW = compact ? 300 : 344;
   const pad = phone ? spacing.sm : compact ? spacing.md : spacing.lg;
 
-  const { stats, route, needsManual, submitManual, recordedElapsed } = useSummary();
+  const { stats, route, needsManual, saved, submitManual, recordedElapsed } = useSummary();
   const { debrief, loading: debriefLoading } = useCoachDebrief(stats, route);
   const { intervals, overall: intervalOverall, hasData: intervalHasData } = useIntervals();
   const persona = useCoach();
   const [showChat, setShowChat] = React.useState(false);
+  const [showAnalysis, setShowAnalysis] = React.useState(false);
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
   const [mainW, setMainW] = React.useState(600);
   const showToast = React.useCallback((text: string) => setToast({ id: Date.now(), text }), []);
@@ -103,13 +104,25 @@ export default function WorkoutComplete() {
           <View style={styles.modalFooter}>
             <BottomActionBar
               compact={phone}
-              onView={() => showToast("Opening full analysis")}
+              saved={saved}
+              onView={() => setShowAnalysis(true)}
               onSave={() => router.replace("/")}
               onShare={() => showToast("Preparing shareable ride card")}
             />
           </View>
         </View>
       </SafeAreaView>
+
+      {showAnalysis && (
+        <FullAnalysisModal
+          stats={stats}
+          intervals={intervals}
+          overall={intervalOverall}
+          hasData={intervalHasData}
+          routeName={route.name}
+          onClose={() => setShowAnalysis(false)}
+        />
+      )}
 
       <Toast message={toast} />
       <CoachChatModal visible={showChat} onClose={() => setShowChat(false)} persona={persona} />
@@ -124,6 +137,37 @@ function RightColumn({ score, phone, route }: { score: number; phone: boolean; r
       <View style={phone && styles.rightWrapItemWide}><RouteSummaryCard route={route} /></View>
       <View style={phone && styles.rightWrapItem}><AchievementsCard /></View>
       <View style={phone && styles.rightWrapItem}><RecoveryCard score={score} /></View>
+    </View>
+  );
+}
+
+// Deeper post-ride analysis: full-ride power/HR curves, time-in-zones and a
+// lap-by-lap interval breakdown — for data-focused riders.
+function FullAnalysisModal({ stats, intervals, overall, hasData, routeName, onClose }: { stats: any; intervals: any[]; overall: number | null; hasData: boolean; routeName?: string; onClose: () => void }) {
+  const [w, setW] = React.useState(600);
+  return (
+    <View style={styles.overlay}>
+      <View style={styles.analysisCard} testID="full-analysis-modal">
+        <View style={styles.analysisHead}>
+          <View style={styles.analysisTitleRow}>
+            <Ionicons name="analytics" size={20} color={colors.yellow} />
+            <Text style={styles.analysisTitle}>Full Ride Analysis</Text>
+          </View>
+          <Pressable testID="analysis-close" onPress={onClose} style={styles.closeBtn} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close analysis">
+            <Ionicons name="close" size={22} color={colors.white} />
+          </Pressable>
+        </View>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.analysisScroll}
+          showsVerticalScrollIndicator={false}
+          onLayout={(e: LayoutChangeEvent) => setW(e.nativeEvent.layout.width)}
+        >
+          <MetricsGrid stats={stats} routeName={routeName} />
+          <ChartsRow stats={stats} width={w} vertical />
+          <IntervalTargetsCard intervals={intervals} overall={overall} hasData={hasData} />
+        </ScrollView>
+      </View>
     </View>
   );
 }
@@ -255,4 +299,10 @@ const styles = StyleSheet.create({
   rightWrapItem: { flex: 1, flexBasis: 0, minWidth: 220 },
   toast: { position: "absolute", bottom: 90, alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(20,18,16,0.96)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 18, paddingVertical: 11 },
   toastText: { color: colors.white, fontWeight: "700", fontSize: 14 },
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(4,4,6,0.82)", alignItems: "center", justifyContent: "center", padding: spacing.md, zIndex: 40 },
+  analysisCard: { width: "100%", maxWidth: 980, flex: 1, maxHeight: "100%", backgroundColor: colors.cardElevated, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, overflow: "hidden", padding: spacing.lg, ...shadow.card },
+  analysisHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.sm },
+  analysisTitleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  analysisTitle: { color: colors.white, fontSize: 20, fontWeight: "900" },
+  analysisScroll: { paddingBottom: spacing.md, gap: spacing.md },
 });

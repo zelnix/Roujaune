@@ -214,9 +214,10 @@ function ProfileSeg({ step, status, width, fill, onPress }: { step: TimelineStep
 }
 
 export function StepTimeline({
-  title, steps, activeIndex, remaining, stepProgress = 0, onStepPress,
+  title, steps, activeIndex, remaining, stepProgress = 0, onStepPress, elapsed, progress, estFinish,
 }: {
   title: string; steps: TimelineStep[]; activeIndex: number; remaining?: string; stepProgress?: number; onStepPress: (index: number) => void;
+  elapsed?: string; progress?: number; estFinish?: string;
 }) {
   const MIN = 104;
   const total = steps.reduce((a, s) => a + Math.max(1, s.durationSec), 0) || 1;
@@ -230,6 +231,7 @@ export function StepTimeline({
   const scale = sumF > 0 ? contentW / sumF : 1;
   const widths = floored.map((w) => w * scale);
   const scrollable = contentW > chartW + 1;
+  const pct = typeof progress === "number" ? Math.round(Math.max(0, Math.min(1, progress)) * 100) : null;
   React.useEffect(() => {
     if (activeIndex < 0 || !chartW) return;
     let x = 0;
@@ -242,6 +244,20 @@ export function StepTimeline({
       <View style={st.head}>
         <Ionicons name="stats-chart" size={15} color={colors.yellow} />
         <Text style={st.title} numberOfLines={1}>{title}</Text>
+        {(elapsed || estFinish || pct != null) ? (
+          <View style={st.timing} testID="timeline-timing">
+            {elapsed ? (
+              <View style={st.timeStat}><Text style={st.timeLabel}>ELAPSED</Text><Text style={st.timeValue}>{elapsed}</Text></View>
+            ) : null}
+            {pct != null ? (
+              <View style={st.pctPill}><Text style={st.pctText}>{pct}% complete</Text></View>
+            ) : null}
+            {estFinish ? (
+              <View style={st.timeStat}><Text style={st.timeLabel}>EST. FINISH</Text><Text style={st.timeValue}>{estFinish}</Text></View>
+            ) : null}
+          </View>
+        ) : null}
+        <View style={st.headSpacer} />
         <View style={st.headRight}>
           {steps.length ? <Text style={st.step}>STEP {Math.min(activeIndex + 1, steps.length)} / {steps.length}</Text> : null}
           {remaining ? (
@@ -481,7 +497,14 @@ const tc = StyleSheet.create({
 const st = StyleSheet.create({
   wrap: { ...card, paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
   head: { flexDirection: "row", alignItems: "center", gap: 10 },
-  title: { color: colors.white, fontSize: 13.5, fontWeight: "800", flex: 1 },
+  title: { color: colors.white, fontSize: 13.5, fontWeight: "800", flexShrink: 1 },
+  timing: { flexDirection: "row", alignItems: "center", gap: 12, marginLeft: 4 },
+  timeStat: { alignItems: "flex-start" },
+  timeLabel: { color: colors.textFaint, fontSize: 8.5, fontWeight: "800", letterSpacing: 1 },
+  timeValue: { color: colors.white, fontSize: 14, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  pctPill: { backgroundColor: colors.yellow + "18", borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 3 },
+  pctText: { color: colors.yellow, fontSize: 11, fontWeight: "800" },
+  headSpacer: { flex: 1 },
   headRight: { flexDirection: "row", alignItems: "center", gap: 10 },
   step: { color: colors.textDim, fontSize: 11, fontWeight: "800", letterSpacing: 0.5 },
   remain: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.yellow + "18", borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 3 },

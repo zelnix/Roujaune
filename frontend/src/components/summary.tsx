@@ -609,11 +609,17 @@ export function RecoveryCard({ score }: { score: number }) {
 }
 
 /* ======================= BOTTOM ACTION BAR ======================= */
-export function BottomActionBar({ onView, onSave, onShare, compact = false }: { onView: () => void; onSave: () => void; onShare: () => void; compact?: boolean }) {
+export function BottomActionBar({ onView, onSave, onShare, saved = false, compact = false }: { onView: () => void; onSave: () => void; onShare: () => void; saved?: boolean; compact?: boolean }) {
   const btn = [styles.actBtn, compact && { height: 46 }];
   const txt = [styles.actText, compact && { fontSize: 12 }];
   return (
     <View style={styles.actionBar} testID="bottom-action-bar">
+      {saved ? (
+        <View style={[btn, styles.savedPill, { flex: 1.1 }]} testID="workout-saved-pill">
+          <Ionicons name="checkmark-circle" size={compact ? 16 : 18} color={colors.green} />
+          <Text style={[txt, { color: colors.green }]} numberOfLines={1}>WORKOUT SAVED</Text>
+        </View>
+      ) : null}
       <Touchable testID="action-view" onPress={onView} scaleTo={0.97} style={{ flex: 1.2 }} containerStyle={{ flex: 1.2 }}>
         <View style={[btn, { backgroundColor: colors.yellow }]}>
           <MaterialCommunityIcons name="chart-line" size={compact ? 16 : 18} color="#1a1300" />
@@ -622,8 +628,8 @@ export function BottomActionBar({ onView, onSave, onShare, compact = false }: { 
       </Touchable>
       <Touchable testID="action-save" onPress={onSave} scaleTo={0.97} style={{ flex: 1.5 }} containerStyle={{ flex: 1.5 }}>
         <View style={[btn, { backgroundColor: colors.green, borderWidth: 0 }, shadow.glow]}>
-          <Ionicons name="save" size={compact ? 18 : 20} color="#0b1a10" />
-          <Text style={[txt, { color: "#0b1a10", fontWeight: "900" }]} numberOfLines={1}>SAVE & EXIT</Text>
+          <Ionicons name={saved ? "exit-outline" : "save"} size={compact ? 18 : 20} color="#0b1a10" />
+          <Text style={[txt, { color: "#0b1a10", fontWeight: "900" }]} numberOfLines={1}>{saved ? "EXIT" : "SAVE & EXIT"}</Text>
         </View>
       </Touchable>
       <Touchable testID="action-share" onPress={onShare} scaleTo={0.97} style={{ flex: 1 }} containerStyle={{ flex: 1 }}>
@@ -803,5 +809,6 @@ const styles = StyleSheet.create({
   actionBar: { flexDirection: "row", gap: spacing.md, paddingTop: spacing.sm },
   actBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9, height: 54, borderRadius: radius.md },
   actDark: { backgroundColor: colors.cardElevated, borderWidth: 1, borderColor: colors.border },
+  savedPill: { backgroundColor: colors.green + "1A", borderWidth: 1, borderColor: colors.green + "55" },
   actText: { color: colors.white, fontSize: 14, fontWeight: "800", letterSpacing: 0.3 },
 });

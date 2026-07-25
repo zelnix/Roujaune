@@ -24,7 +24,7 @@ import {
   VideoPlaceholder, RoutesButton, RoutePicker, SettingsPanel, MusicPanel, CastPanel, ImmersiveHud, RouteMapCard,
 } from "@/src/components/workout";
 import {
-  LiveHeader, MetricCard, ConnectionsPanel, CoachBanner, TerrainCard, WorkoutCard, BrandCard, StepTimeline, StepDetailModal, LiveControlBar,
+  MetricCard, ConnectionsPanel, CoachBanner, TerrainCard, WorkoutCard, BrandCard, StepTimeline, StepDetailModal, LiveControlBar,
 } from "@/src/components/workout-live";
 import { useWorkoutAudio } from "@/src/hooks/useWorkoutAudio";
 import { useBleSensors } from "@/src/hooks/useBleSensors";
@@ -630,12 +630,6 @@ export default function LiveWorkout() {
 
   const body = (
     <>
-      <LiveHeader
-        elapsed={fmt(telemetry.elapsed)}
-        progress={progress}
-        estFinish={estFinish}
-      />
-
       <View style={[styles.mainRow, tablet && styles.flex1]}>
         <View style={[styles.leftCenter, tablet && styles.flex1]}>
           <View style={styles.metricRow}>
@@ -692,7 +686,7 @@ export default function LiveWorkout() {
         </View>
       </View>
 
-      <StepTimeline title={workoutTitle} steps={stepList} activeIndex={activeSeg?.index ?? -1} remaining={timeLeftLabel} stepProgress={activeSeg ? activeSeg.elapsedInSeg / Math.max(1, activeSeg.segment.durationSec) : 0} onStepPress={(i) => setStepDetail(i)} />
+      <StepTimeline title={workoutTitle} steps={stepList} activeIndex={activeSeg?.index ?? -1} remaining={timeLeftLabel} stepProgress={activeSeg ? activeSeg.elapsedInSeg / Math.max(1, activeSeg.segment.durationSec) : 0} onStepPress={(i) => setStepDetail(i)} elapsed={fmt(telemetry.elapsed)} progress={progress} estFinish={estFinish} />
 
       <LiveControlBar
         paused={paused}
