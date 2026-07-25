@@ -19,11 +19,11 @@ import { WORKOUT_TYPES } from "@/src/lib/workouts";
 import { RouteVideo } from "@/src/components/RouteVideo";
 import { VirtualRoute } from "@/src/components/VirtualRoute";
 import {
-  WorkoutTopBar, PowerCard, HeartRateCard, CadenceCard, WorkoutTimelineCard,
-  ClimbCard, RouteMapCard, WearableDataCard, RideSummaryStrip,
-  TrainerControlBar, AlbertoLiveCue, NextUpStrip, SafetyNote, ImmersiveHud, VideoPlaceholder,
-  RoutesButton, RoutePicker, SettingsPanel, MusicPanel, MusicButton, CastButton, CastPanel,
+  VideoPlaceholder, RoutesButton, RoutePicker, SettingsPanel, MusicPanel, MusicButton, CastButton, CastPanel, ImmersiveHud,
 } from "@/src/components/workout";
+import {
+  LiveHeader, MetricCard, ConnectionsPanel, CoachBanner, InfoCard, ElevationProfile, IntervalTimeline, LiveControlBar,
+} from "@/src/components/workout-live";
 import { useWorkoutAudio } from "@/src/hooks/useWorkoutAudio";
 import { useBleSensors } from "@/src/hooks/useBleSensors";
 import { BleSensorsPanel } from "@/src/components/BleSensorsPanel";
