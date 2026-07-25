@@ -29,7 +29,7 @@ import {
 import { useWorkoutAudio } from "@/src/hooks/useWorkoutAudio";
 import { useBleSensors } from "@/src/hooks/useBleSensors";
 import { BleSensorsPanel } from "@/src/components/BleSensorsPanel";
-import { fetchCoachCue } from "@/src/lib/coach";
+import { fetchCoachCue, fetchExtendPlan, ExtendPlan } from "@/src/lib/coach";
 import { useCoach } from "@/src/lib/coach-persona";
 
 // Alberto's cues are generated live from the rider's real telemetry so the
@@ -142,6 +142,21 @@ function Toast({ message }: { message: { id: number; text: string } | null }) {
   );
 }
 
+// One extension option in the Workout Complete popup. The coach's recommended
+// option is highlighted with an accent border + "Coach pick" badge.
+function ExtendChip({ testID, icon, label, pick, onPress }: { testID: string; icon: any; label: string; pick: boolean; onPress: () => void }) {
+  return (
+    <Pressable testID={testID} onPress={onPress} style={[styles.extendChip, pick && styles.extendChipPick]}>
+      {pick ? (
+        <View style={styles.pickBadge}><Text style={styles.pickBadgeText}>COACH PICK</Text></View>
+      ) : null}
+      <Ionicons name={icon} size={16} color={colors.yellow} />
+      <Text style={styles.extendChipText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+
 export default function LiveWorkout() {
   const { height } = useWindowDimensions();
   const router = useRouter();
@@ -175,6 +190,8 @@ export default function LiveWorkout() {
   const [endPrompt, setEndPrompt] = React.useState(false);
   const [completePrompt, setCompletePrompt] = React.useState(false);
   const [extendAdvice, setExtendAdvice] = React.useState<string | null>(null);
+  const [extendRec, setExtendRec] = React.useState<ExtendPlan["recommend"] | null>(null);
+  const [extendPick, setExtendPick] = React.useState<ExtendPlan["suggested"]>(null);
   const [locked, setLocked] = React.useState(false);
   const [stepDetail, setStepDetail] = React.useState<number | null>(null);
   const videoFellBackRef = React.useRef(false);
@@ -371,18 +388,34 @@ export default function LiveWorkout() {
 
   // ---- End-of-workout "Workout Complete" popup + ride extension ----
   const completeShownRef = React.useRef(false);
-  // Ask the companion coach whether extending is a good idea, given live effort.
+  const extendMetaRef = React.useRef<{ type_id: string; wearable_on: boolean }>({ type_id: "endurance", wearable_on: false });
+  // Ask the companion coach whether extending is wise (and by how much), given
+  // the rider's effort/HR, the workout type and how long they've ridden.
   const fetchExtendAdvice = React.useCallback(async () => {
     setExtendAdvice(null);
+    setExtendRec(null);
+    setExtendPick(null);
     try {
       const t = telemetryRef.current;
-      const cue = await fetchCoachCue(t, { ...(coachCtxRef.current as any), cue_kind: "extend_advice" });
-      setExtendAdvice(cue);
-      speak(cue);
+      const ctx = coachCtxRef.current as any;
+      const plan = await fetchExtendPlan(t, {
+        workout: ctx.workout,
+        type_id: extendMetaRef.current.type_id,
+        route: ctx.route,
+        wearable_on: extendMetaRef.current.wearable_on,
+        coach_name: ctx.coach_name,
+        coach_gender: ctx.coach_gender,
+      });
+      setExtendAdvice(plan.advice);
+      setExtendRec(plan.recommend);
+      setExtendPick(plan.suggested);
+      if (plan.advice) speak(plan.advice);
     } catch {
       setExtendAdvice(
         "Strong work finishing the session. If your legs feel fresh, a short easy spin adds volume — but if you're fading, finishing here is the smart, safe call.",
       );
+      setExtendRec("extend");
+      setExtendPick("10min");
     }
   }, [speak]);
 
@@ -405,6 +438,10 @@ export default function LiveWorkout() {
   const bleWearable = ble.connected.length > 0 && ble.readings.hr != null;
   const trainerOn = settings.hasTrainer || settings.demoMode || bleTrainer;
   const wearableOn = settings.hasWearable || settings.demoMode || bleWearable;
+  // Keep the extend-advice context (workout type + wearable state) current.
+  React.useEffect(() => {
+    extendMetaRef.current = { type_id: selected?.typeId ?? "endurance", wearable_on: wearableOn };
+  }, [selected, wearableOn]);
 
   // Terrain + route length derived from the chosen workout (not the video).
   const terrain = React.useMemo(() => {
@@ -864,28 +901,39 @@ export default function LiveWorkout() {
               )}
             </View>
 
-            <Text style={styles.extendLabel}>EXTEND YOUR RIDE</Text>
-            <View style={styles.extendRow}>
-              <Pressable testID="extend-10" style={styles.extendChip} onPress={() => onExtendRide(10, "+10 min")}>
-                <Ionicons name="time-outline" size={16} color={colors.yellow} />
-                <Text style={styles.extendChipText}>+10 min</Text>
-              </Pressable>
-              <Pressable testID="extend-20" style={styles.extendChip} onPress={() => onExtendRide(20, "+20 min")}>
-                <Ionicons name="time-outline" size={16} color={colors.yellow} />
-                <Text style={styles.extendChipText}>+20 min</Text>
-              </Pressable>
-              <Pressable testID="extend-5km" style={styles.extendChip} onPress={() => {
-                const kmh = TYPE_SPEED[selected?.typeId ?? "endurance"] ?? 28;
-                onExtendRide(Math.max(6, Math.round((5 / kmh) * 60)), "+5 km");
-              }}>
-                <Ionicons name="navigate-outline" size={16} color={colors.yellow} />
-                <Text style={styles.extendChipText}>+5 km</Text>
-              </Pressable>
-            </View>
+            {extendRec === "finish" ? (
+              <View style={styles.recoverNote} testID="recover-note">
+                <Ionicons name="bed-outline" size={16} color={colors.green} />
+                <Text style={styles.recoverNoteText}>{persona.name} recommends finishing here and recovering.</Text>
+              </View>
+            ) : (
+              <>
+                <Text style={styles.extendLabel}>
+                  EXTEND YOUR RIDE{extendPick ? " · COACH PICK HIGHLIGHTED" : ""}
+                </Text>
+                <View style={styles.extendRow}>
+                  <ExtendChip
+                    testID="extend-10" icon="time-outline" label="+10 min" pick={extendPick === "10min"}
+                    onPress={() => onExtendRide(10, "+10 min")}
+                  />
+                  <ExtendChip
+                    testID="extend-20" icon="time-outline" label="+20 min" pick={extendPick === "20min"}
+                    onPress={() => onExtendRide(20, "+20 min")}
+                  />
+                  <ExtendChip
+                    testID="extend-5km" icon="navigate-outline" label="+5 km" pick={extendPick === "5km"}
+                    onPress={() => {
+                      const kmh = TYPE_SPEED[selected?.typeId ?? "endurance"] ?? 28;
+                      onExtendRide(Math.max(6, Math.round((5 / kmh) * 60)), "+5 km");
+                    }}
+                  />
+                </View>
+              </>
+            )}
 
             <Pressable testID="complete-finish" onPress={onFinishComplete} style={({ hovered }: any) => [styles.endSave, { backgroundColor: colors.green }, hovered && { opacity: 0.9 }]}>
               <Ionicons name="checkmark-circle" size={18} color="#fff" />
-              <Text style={styles.endSaveText}>Finish &amp; Save</Text>
+              <Text style={styles.endSaveText}>OK</Text>
             </Pressable>
           </View>
         </View>
@@ -990,5 +1038,10 @@ const styles = StyleSheet.create({
   extendLabel: { color: colors.textFaint, fontSize: 10.5, fontWeight: "800", letterSpacing: 1, alignSelf: "flex-start", marginTop: 4 },
   extendRow: { flexDirection: "row", gap: 10, width: "100%" },
   extendChip: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: colors.yellow + "44", borderRadius: radius.md, paddingVertical: 12 },
+  extendChipPick: { borderColor: colors.yellow, backgroundColor: colors.yellow + "1E", ...(shadow.glow || {}) },
   extendChipText: { color: colors.white, fontSize: 13.5, fontWeight: "800" },
+  pickBadge: { position: "absolute", top: -9, alignSelf: "center", backgroundColor: colors.yellow, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2 },
+  pickBadgeText: { color: colors.bg, fontSize: 8.5, fontWeight: "900", letterSpacing: 0.5 },
+  recoverNote: { flexDirection: "row", alignItems: "center", gap: 8, width: "100%", backgroundColor: colors.green + "12", borderWidth: 1, borderColor: colors.green + "44", borderRadius: radius.md, paddingVertical: 12, paddingHorizontal: 14 },
+  recoverNoteText: { color: colors.white, fontSize: 13.5, fontWeight: "600", flex: 1 },
 });

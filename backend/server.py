@@ -743,6 +743,109 @@ async def coach_cue(req: CoachCueRequest):
         raise HTTPException(status_code=502, detail=f"Coaching generation failed: {e}")
 
 
+class ExtendAdviceRequest(BaseModel):
+    power: int = 0
+    hr: int = 0
+    cadence: int = 0
+    elapsed: int = 0            # seconds ridden
+    workout: str = "Threshold Climb"
+    type_id: str = "endurance"  # workout type: endurance/tempo/threshold/vo2max/sprints/climbing/recovery/restday/fb50
+    route: Optional[str] = None
+    wearable_on: bool = False
+    coach_name: str = "Alberto"
+    coach_gender: str = "male"
+
+
+HARD_TYPES = {"threshold", "vo2max", "sprints", "climbing"}
+EASY_TYPES = {"recovery", "restday"}
+STEADY_TYPES = {"endurance", "tempo"}
+
+
+def _extend_decision(req: ExtendAdviceRequest) -> Dict[str, Any]:
+    """Rule-based call on whether extending the ride is wise, and by how much,
+    from the rider's effort/HR, the workout type and how long they've ridden."""
+    minutes = req.elapsed // 60
+    score = 0
+    if req.type_id in HARD_TYPES:
+        score -= 1
+    if req.type_id in EASY_TYPES:
+        score -= 1  # keep an easy/recovery ride easy — don't turn it into a session
+    if req.type_id in STEADY_TYPES:
+        score += 1
+    if req.wearable_on and req.hr > 0:
+        if req.hr >= 165:
+            score -= 2
+        elif req.hr >= 150:
+            score -= 1
+        elif req.hr <= 130:
+            score += 1
+    if minutes >= 75:
+        score -= 2
+    elif minutes <= 45:
+        score += 1
+
+    if score >= 1:
+        recommend = "extend"
+        if req.type_id in STEADY_TYPES:
+            suggested = "5km"
+        elif score >= 2:
+            suggested = "20min"
+        else:
+            suggested = "10min"
+    else:
+        recommend = "finish"
+        suggested = None
+    return {"recommend": recommend, "suggested": suggested, "score": score, "minutes": minutes}
+
+
+@api_router.post("/coach/extend-advice")
+async def coach_extend_advice(req: ExtendAdviceRequest):
+    """After the rider completes the workout, decide whether extending is wise
+    and return the coach's advice aligned to that decision (with the best option)."""
+    decision = _extend_decision(req)
+    recommend = decision["recommend"]
+    suggested = decision["suggested"]
+    label = {"10min": "about 10 more easy minutes", "20min": "about 20 more endurance minutes", "5km": "an extra ~5 km easy"}.get(suggested or "", "a short easy spin")
+
+    key = os.environ.get("EMERGENT_LLM_KEY")
+    # Rule-based fallback advice, used if the model isn't available/fails.
+    if recommend == "extend":
+        fallback = f"Nice work — you still look strong, so if you're keen, add {label} at an easy pace. Otherwise finishing here is perfectly good."
+    else:
+        fallback = "That was a solid, complete effort — the smart call now is to finish, spin down and recover so you're fresh for the next ride."
+
+    advice = fallback
+    if key:
+        rider = await _rider_line()
+        if recommend == "extend":
+            steer = f"We ADVISE the rider they can extend with {label} at an easy pace if they feel good. Encourage it lightly but leave the choice open."
+        else:
+            steer = "We ADVISE the rider to FINISH NOW and recover rather than extend. Be caring and decisive about why recovery is the right call."
+        prompt = (
+            f"{rider}\n"
+            f"The rider just COMPLETED: {req.workout} ({req.type_id}). "
+            f"Time ridden {decision['minutes']} min. Final live numbers: power {req.power} W, "
+            f"heart rate {req.hr if req.wearable_on else 'n/a'} bpm, cadence {req.cadence} rpm.\n"
+            f"{steer}\n"
+            "Reply with 1-2 short, caring sentences in your voice. No preamble."
+        )
+        try:
+            from emergentintegrations.llm.chat import LlmChat, UserMessage
+            chat = LlmChat(
+                api_key=key,
+                session_id=f"{req.coach_name.lower()}-extend-advice",
+                system_message=coach_system(req.coach_name, req.coach_gender),
+            ).with_model("anthropic", "claude-sonnet-4-6")
+            reply = await chat.send_message(UserMessage(text=prompt))
+            txt = (reply or "").strip().strip('"')
+            if txt:
+                advice = txt
+        except Exception:
+            logging.exception("coach_extend_advice generation failed (using fallback)")
+
+    return {"advice": advice, "recommend": recommend, "suggested": suggested}
+
+
 class CoachDebriefRequest(BaseModel):
     ride_id: Optional[str] = None
     workout: str = "Threshold Climb"

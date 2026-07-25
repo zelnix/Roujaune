@@ -620,10 +620,10 @@ export function BottomActionBar({ onView, onSave, onShare, onPlan, compact = fal
           <Text style={[txt, { color: "#1a1300" }]} numberOfLines={1}>{compact ? "ANALYSIS" : "VIEW FULL ANALYSIS"}</Text>
         </View>
       </Touchable>
-      <Touchable testID="action-save" onPress={onSave} scaleTo={0.97} style={{ flex: 1 }} containerStyle={{ flex: 1 }}>
-        <View style={[btn, styles.actDark]}>
-          <Ionicons name="save-outline" size={compact ? 16 : 18} color={colors.white} />
-          <Text style={txt} numberOfLines={1}>SAVE & EXIT</Text>
+      <Touchable testID="action-save" onPress={onSave} scaleTo={0.97} style={{ flex: 1.5 }} containerStyle={{ flex: 1.5 }}>
+        <View style={[btn, { backgroundColor: colors.green, borderWidth: 0 }, shadow.glow]}>
+          <Ionicons name="save" size={compact ? 18 : 20} color="#0b1a10" />
+          <Text style={[txt, { color: "#0b1a10", fontWeight: "900" }]} numberOfLines={1}>SAVE & EXIT</Text>
         </View>
       </Touchable>
       <Touchable testID="action-share" onPress={onShare} scaleTo={0.97} style={{ flex: 1 }} containerStyle={{ flex: 1 }}>

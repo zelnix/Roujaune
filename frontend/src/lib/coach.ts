@@ -50,3 +50,42 @@ export async function fetchCoachCue(t: Telemetry, ctx: CoachContext, timeoutMs =
     clearTimeout(timer);
   }
 }
+
+export type ExtendPlan = {
+  advice: string;
+  recommend: "extend" | "finish";
+  suggested: "10min" | "20min" | "5km" | null;
+};
+
+/** After completing a workout, ask the coach whether to extend and by how much. */
+export async function fetchExtendPlan(
+  t: Telemetry,
+  ctx: { workout: string; type_id: string; route?: string | null; wearable_on: boolean; coach_name?: string; coach_gender?: string },
+  timeoutMs = 8000,
+): Promise<ExtendPlan> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${apiBase()}/api/coach/extend-advice`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        power: Math.round(t.power),
+        hr: Math.round(t.hr),
+        cadence: Math.round(t.cadence),
+        elapsed: Math.round(t.elapsed),
+        ...ctx,
+      }),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`extend ${res.status}`);
+    const data = await res.json();
+    return {
+      advice: (data?.advice ?? "").toString().trim(),
+      recommend: data?.recommend === "finish" ? "finish" : "extend",
+      suggested: ["10min", "20min", "5km"].includes(data?.suggested) ? data.suggested : null,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
