@@ -87,7 +87,7 @@ export default function VirtualRouteScreen() {
   const startRide = () => { distRef.current = 0; lastElRef.current = null; setDistanceKm(0); resume(); setPhase("riding"); };
   const pauseRide = () => { pause(); setPhase("paused"); };
   const resumeRide = () => { resume(); setPhase("riding"); };
-  const endRide = () => { pause(); router.back(); };
+  const endRide = () => { pause(); if (router.canGoBack()) router.back(); else router.replace("/"); };
   const emergencyStop = () => { setEmergency(true); setAutoResistance(false); sendErg(50); };
   const cyclePanel = () => setPanel((p) => (p === "all" ? "min" : p === "min" ? "hidden" : "all"));
 
@@ -95,7 +95,7 @@ export default function VirtualRouteScreen() {
     <View style={s.root}>
       <StatusBar hidden />
       {/* Cinematic wide scene */}
-      <VirtualRouteScene rider={rider} telemetry={scene} />
+      <VirtualRouteScene rider={rider} telemetry={scene} showBrand={phase !== "setup"} />
 
       {/* Connection status pill (top-right) */}
       <SafeAreaView style={s.topRight} pointerEvents="box-none" edges={["top", "right"]}>

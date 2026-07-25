@@ -27,7 +27,7 @@ export type SceneTelemetry = {
  * markers, drifting particles, camera bob, bike lean, dynamic light & motion
  * blur) driven by smoothed telemetry via a rAF phase loop.
  */
-export function VirtualRouteScene({ rider, telemetry }: { rider: VirtualRider; telemetry: SceneTelemetry }) {
+export function VirtualRouteScene({ rider, telemetry, showBrand = true }: { rider: VirtualRider; telemetry: SceneTelemetry; showBrand?: boolean }) {
   const tRef = React.useRef(telemetry);
   tRef.current = telemetry;
 
@@ -156,10 +156,12 @@ export function VirtualRouteScene({ rider, telemetry }: { rider: VirtualRider; t
       </View>
 
       {/* Brand lockup, upper-left (never baked into artwork). */}
-      <View pointerEvents="none" style={st.brand}>
-        <Image source={LOGO_GLYPH} style={st.brandGlyph} resizeMode="contain" />
-        <Image source={WORDMARK} style={st.brandWord} resizeMode="contain" />
-      </View>
+      {showBrand && (
+        <View pointerEvents="none" style={st.brand}>
+          <Image source={LOGO_GLYPH} style={st.brandGlyph} resizeMode="contain" />
+          <Image source={WORDMARK} style={st.brandWord} resizeMode="contain" />
+        </View>
+      )}
 
       {!telemetry.connected && (
         <View pointerEvents="none" style={st.pausedBadge}>
