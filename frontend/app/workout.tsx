@@ -163,7 +163,7 @@ export default function LiveWorkout() {
   const segments = React.useMemo(() => (selected ? buildSegments(selected) : []), [selected]);
   const compact = height < 620;
   const leftW = compact ? 150 : 212;
-  const rightW = compact ? 232 : 312;
+  const rightW = compact ? 170 : 236;
 
   const [centerW, setCenterW] = React.useState(560);
   const [videoSlotH, setVideoSlotH] = React.useState(0);
