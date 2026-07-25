@@ -1,0 +1,45 @@
+{
+  "summary": "Virtual Routes feature (/virtual-route) tested end-to-end at 1280x800 landscape after logging in as greenlantern@roujaune.app. Every requested flow works. Setup overlay renders 'Alpine Sunset Pass' + 'Dolomites, Italy · 20 km', 'CHOOSE YOUR RIDER' label, all 4 rider cards (rider-male / rider-female / rider-mature_male / rider-mature_female), an inline connection pill and the START RIDE button (testID start-ride). Tapping each rider selects it (check overlay in accent colour). Tapping start-ride enters the riding phase: the cinematic scene renders the chosen rider plate + animated road streaks/dashes/wheel badge, vr-full-panel is shown containing POWER / CADENCE / SPEED / HEART RATE / GRADIENT / DISTANCE / ELAPSED cells plus the 'Next: <checkpoint> · X km to go' header and a yellow progress bar. Values update over time (elapsed went 24:46 -> 25:04, power/cadence/speed/hr all changing, distance ticking from 0.0 -> 0.1 km, telemetry text diffed frame-to-frame confirming streaming). Panel cycle: eye/grid button (accessibilityLabel 'Toggle telemetry visibility') cycles all -> min (vr-min-panel with SPEED/POWER/CAD/GRADE + progress bar) -> hidden (neither panel) -> back to all, verified via visibility checks and screenshots. Bottom controls: Pause -> Resume -> Pause round trip works; End Ride returns to the dashboard when the screen is reached through the normal in-app sidebar link (URL becomes '/'). Sim effort presets Recovery/Endurance/Tempo/Climb are all tappable without error. Auto-resistance toggle and Emergency stop resistance buttons both tap cleanly. Reduced-motion toggle flips on/off and the scene keeps rendering. Signal drop test: tapping 'Simulate signal drop' does flip the connection pill from 'Connected' to 'Signal temporarily lost' at t≈3s and recovers to 'Connected' at t≈5s (verified by 8-second polling of pill text). Zero React red-box errors; only pre-existing RN-Web deprecation warnings (shadow*/textShadow*/pointerEvents) that are already tracked from iteration 33.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "End Ride button", "issue": "endRide() uses router.back(); when the screen is opened via a direct URL (no history) it emits 'GO_BACK was not handled by any navigator' and the user stays on /virtual-route. Natural sidebar navigation works. Safer to use router.replace('/') or a fallback. Reference: /app/frontend/app/virtual-route.tsx:90.", "testID": "n/a (accessibilityLabel 'End Ride')", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "virtual-route setup", "issues": ["ROUJAUNE brand lockup in the scene sits directly beneath the top-left ROUJAUNE header of the app shell, producing a duplicated wordmark on the setup screen (visible in i34_setup.jpeg). Consider hiding the in-scene brand lockup while the setup overlay is shown, or moving it lower on the plate."]}
+    ],
+    "react_native_issues": [
+      {"component": "shadow*/textShadow* style props", "issue": "Pre-existing RN-Web deprecation warnings ('shadow*' style props are deprecated. Use 'boxShadow'. / 'textShadow*' style props are deprecated. Use 'textShadow'.) still emitted from src/theme.shadow helpers used by virtual-route.tsx (setupCard, startBtn glow) and other screens. Reference: /app/frontend/src/theme.ts."},
+      {"component": "props.pointerEvents", "issue": "Deprecation warning 'props.pointerEvents is deprecated. Use style.pointerEvents' emitted by virtual-route.tsx / scene.tsx layers that use `pointerEvents=\"box-none\"` / `pointerEvents=\"none\"` as component props. Migrate to `style={{ pointerEvents: 'none' }}` on RN Web for parity. Reference: /app/frontend/app/virtual-route.tsx:101,130 and /app/frontend/src/components/virtual-route/scene.tsx:100,127,134,137,138,141,159,165."}
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/screens/i34_after_login.jpeg",
+    "/app/test_reports/screens/i34_setup.jpeg",
+    "/app/test_reports/screens/i34_riding_all.jpeg",
+    "/app/test_reports/screens/i34_min_panel.jpeg",
+    "/app/test_reports/screens/i34_hidden_panel.jpeg",
+    "/app/test_reports/screens/i34_after_flows.jpeg",
+    "/app/test_reports/screens/i34_after_endride_natural.jpeg"
+  ],
+  "action_items": [
+    "(LOW) Harden endRide(): fall back to router.replace('/') when there is no back-stack so the button always works even if the screen is opened via deep-link/URL. Currently only fails when someone lands on /virtual-route directly (not the typical user flow, but caught in scripted testing).",
+    "(POLISH) Hide the in-scene ROUJAUNE brand lockup while phase === 'setup' (or dim it) — it currently overlaps the app-shell wordmark in the top-left when the setup card is visible.",
+    "(OPTIONAL) Migrate deprecated RN-Web style props: shadow*/textShadow* -> boxShadow/textShadow in src/theme.ts; component-prop pointerEvents -> style.pointerEvents in virtual-route.tsx and scene.tsx. Purely warning-level, no functional impact."
+  ],
+  "critical_code_review_comments": [
+    "virtual-route.tsx (317 lines) is well under the 700-line budget and cleanly composes the setup overlay, telemetry panels, controls and scene. Good use of testIDs (rider-*, start-ride, vr-full-panel, vr-min-panel) and accessibilityLabels for all secondary buttons.",
+    "useTelemetry hook: stale watchdog (2.2s) correctly promoted the pill to 'Signal temporarily lost' during simulateDropout and cleared once frames resumed — verified in-app. Reconnect backoff logic looks sound (retries capped at 5000ms). Might want a small `simulateDropout` UI-side hint (e.g. optimistic setStale(true)) so the transition is not gated purely on backend behaviour.",
+    "scene.tsx rAF loop is stable, EMA smoothing in virtual-route.tsx prevents jitter; the auto-resistance sendErg() effect is correctly keyed on gradientBucket (rounded gradient) to avoid firing every frame.",
+    "endRide relies on router.back(); consider a safer fallback (router.canGoBack ? router.back() : router.replace('/')). Not a blocker for the normal in-app flow.",
+    "All interactive elements use RN Pressable/View/Text (no HTML tags), styles via StyleSheet.create; no MongoDB _id / env-hardcoding issues in this feature."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "N/A (skipped per request)", "frontend": "100% (9/9 requested checkpoints pass — signal-drop verified after re-sampling; end-ride verified through natural nav)" },
+  "seed_data_creation": "None — reused demo account greenlantern@roujaune.app.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login: input[placeholder='Email'/'Password'] + get_by_text('Sign in'). To reach virtual-route via natural nav (needed for End Ride to route back), click sidebar 'Virtual Routes' text; direct page.goto('/virtual-route') works for the ride flow itself but router.back() will no-op when leaving because there's no history. Signal-drop UI change is brief (~2-3 seconds window): sample pill text at t=3-4s after tapping 'Simulate signal drop' to see 'Signal temporarily lost'. Auth token is stored in localStorage under 'roujaune_token'.",
+  "rca_of_issue": "End-Ride 'stuck on /virtual-route' during scripted test was NOT a genuine bug — it was caused by using page.goto('/virtual-route') which bypasses the SPA history stack, so router.back() had nothing to pop and emitted the 'GO_BACK was not handled' warning. When the screen is reached via the sidebar 'Virtual Routes' link (the actual user path), router.back() correctly returns to /. Recommended mitigation is still to guard endRide() with router.canGoBack()/router.replace('/') so deep-linked users are not stranded."
+}
