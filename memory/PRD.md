@@ -328,3 +328,8 @@ Home Alberto "Start Today's Ride" & sidebar Workouts → `/training`. Training "
 
 ## Live Workout — step text overlaid on the profile bars (COMPLETE)
 - Removed the separate horizontal step-detail chip strip. Step details (step # + name, one-line zone description, duration · watts) are now overlaid directly onto each profile bar (ProfileSeg), bottom-aligned with a text shadow for contrast. Bars made taller (chart 104px, bar h 40–92) and min base opacity so text is readable. Current segment keeps yellow border + dynamic left-to-right fill; bars remain tappable (step-seg-N) → StepDetailModal. Narrow (short-duration) segments truncate with ellipsis. Removed unused ScrollView import + StepDetailChip.
+
+## Live Workout — metric reorder, min-width bars, interval remaining (COMPLETE)
+- Metric row order changed to: Heart Rate, Speed, Cadence, Power, Interval.
+- Interval card confirmed to show the current step's time REMAINING (mmss(activeSeg.remaining)); counts down as the workout timer runs.
+- Bottom profile bars: each bar now has a MIN width (104px) so overlaid step text (name/desc/duration·W) stays readable; bars remain duration-proportional above the floor. If total width exceeds the container it scrolls horizontally, with the current step auto-scrolled into view. Bars contiguous (gap 0). ProfileSeg now takes px width; chart measures its width via onLayout.

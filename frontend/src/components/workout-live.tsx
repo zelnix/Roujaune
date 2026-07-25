@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Polyline, Polygon as SvgPolygon } from "react-native-svg";
@@ -216,13 +216,13 @@ export type TimelineStep = {
 };
 export type StepStatus = "done" | "current" | "future";
 
-function ProfileSeg({ step, status, widthPct, fill, onPress }: { step: TimelineStep; status: StepStatus; widthPct: number; fill: number; onPress: () => void }) {
+function ProfileSeg({ step, status, width, fill, onPress }: { step: TimelineStep; status: StepStatus; width: number; fill: number; onPress: () => void }) {
   const h = 40 + Math.max(0, Math.min(1, step.intensity)) * 52;
   const base = status === "future" ? "rgba(255,255,255,0.12)" : status === "done" ? colors.yellow + "44" : step.color + "33";
   const fillPct = status === "done" ? 100 : status === "current" ? Math.max(0, Math.min(1, fill)) * 100 : 0;
   const dim = status === "future";
   return (
-    <Pressable onPress={onPress} testID={`step-seg-${step.index}`} style={[st.seg, { width: `${widthPct}%` }]}>
+    <Pressable onPress={onPress} testID={`step-seg-${step.index}`} style={[st.seg, { width }]}>
       <View style={[st.segBar, { height: h, backgroundColor: base, borderColor: status === "current" ? colors.yellow : "rgba(255,255,255,0.10)" }]}>
         {fillPct > 0 ? <View style={[st.segFill, { width: `${fillPct}%` }]} /> : null}
         <View style={st.segLabel} pointerEvents="none">
@@ -240,7 +240,25 @@ export function StepTimeline({
 }: {
   title: string; steps: TimelineStep[]; activeIndex: number; remaining?: string; stepProgress?: number; onStepPress: (index: number) => void;
 }) {
+  const MIN = 104;
   const total = steps.reduce((a, s) => a + Math.max(1, s.durationSec), 0) || 1;
+  const [chartW, setChartW] = React.useState(0);
+  const scrollRef = React.useRef<ScrollView>(null);
+  // Each bar is duration-proportional but never narrower than MIN so its
+  // overlaid text stays readable; if the total exceeds the width we scroll.
+  const floored = steps.map((s) => Math.max(MIN, (Math.max(1, s.durationSec) / total) * (chartW || 1)));
+  const sumF = floored.reduce((a, b) => a + b, 0) || 1;
+  const contentW = Math.max(chartW, sumF);
+  const scale = sumF > 0 ? contentW / sumF : 1;
+  const widths = floored.map((w) => w * scale);
+  const scrollable = contentW > chartW + 1;
+  React.useEffect(() => {
+    if (activeIndex < 0 || !chartW) return;
+    let x = 0;
+    for (let i = 0; i < activeIndex; i++) x += widths[i];
+    scrollRef.current?.scrollTo({ x: Math.max(0, x - 40), animated: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeIndex, chartW]);
   return (
     <View style={st.wrap} testID="interval-timeline">
       <View style={st.head}>
@@ -253,17 +271,21 @@ export function StepTimeline({
           ) : null}
         </View>
       </View>
-      <View style={st.chart}>
-        {steps.map((s) => (
-          <ProfileSeg
-            key={s.index}
-            step={s}
-            status={s.index < activeIndex ? "done" : s.index === activeIndex ? "current" : "future"}
-            widthPct={(Math.max(1, s.durationSec) / total) * 100}
-            fill={stepProgress}
-            onPress={() => onStepPress(s.index)}
-          />
-        ))}
+      <View onLayout={(e) => setChartW(Math.round(e.nativeEvent.layout.width))}>
+        <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} scrollEnabled={scrollable}>
+          <View style={[st.chart, { width: chartW ? contentW : "100%" }]}>
+            {steps.map((s, i) => (
+              <ProfileSeg
+                key={s.index}
+                step={s}
+                status={s.index < activeIndex ? "done" : s.index === activeIndex ? "current" : "future"}
+                width={chartW ? widths[i] : MIN}
+                fill={stepProgress}
+                onPress={() => onStepPress(s.index)}
+              />
+            ))}
+          </View>
+        </ScrollView>
       </View>
     </View>
   );
@@ -460,8 +482,8 @@ const st = StyleSheet.create({
   step: { color: colors.textDim, fontSize: 11, fontWeight: "800", letterSpacing: 0.5 },
   remain: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.yellow + "18", borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 3 },
   remainText: { color: colors.yellow, fontSize: 11, fontWeight: "800" },
-  chart: { flexDirection: "row", alignItems: "flex-end", height: 104, gap: 3 },
-  seg: { height: "100%", justifyContent: "flex-end" },
+  chart: { flexDirection: "row", alignItems: "flex-end", height: 104, gap: 0 },
+  seg: { height: "100%", justifyContent: "flex-end", paddingHorizontal: 1 },
   segBar: { width: "100%", borderRadius: 5, borderWidth: 1, overflow: "hidden", justifyContent: "flex-end" },
   segFill: { position: "absolute", left: 0, top: 0, bottom: 0, backgroundColor: colors.yellow + "3A", borderRightWidth: 2, borderRightColor: colors.yellow },
   segLabel: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, paddingHorizontal: 6, paddingVertical: 5, justifyContent: "flex-end", gap: 1 },
