@@ -165,6 +165,21 @@ export function ElevationProfile({ progress, grade }: { progress: number; grade:
   );
 }
 
+// ---- Terrain card (right column) ------------------------------------------
+export function TerrainCard({ grade, elevGain, distanceLeft, progress, isClimb }: { grade: number; elevGain: number; distanceLeft: number; progress: number; isClimb: boolean }) {
+  return (
+    <View style={tc.card} testID="terrain-card">
+      <View style={tc.head}><Ionicons name="trail-sign-outline" size={14} color={colors.yellow} /><Text style={tc.title}>TERRAIN</Text></View>
+      <View style={tc.stats}>
+        <View style={tc.stat}><Text style={tc.statVal}>{Math.abs(grade).toFixed(1)}%</Text><Text style={tc.statLbl}>{isClimb ? "GRADE" : "AVG GRADE"}</Text></View>
+        <View style={tc.stat}><Text style={tc.statVal}>{Math.round(elevGain)} m</Text><Text style={tc.statLbl}>ELEV GAIN</Text></View>
+        <View style={tc.stat}><Text style={tc.statVal}>{Math.max(0, distanceLeft).toFixed(1)} km</Text><Text style={tc.statLbl}>DIST LEFT</Text></View>
+      </View>
+      <View style={tc.profileWrap}><ElevationProfile progress={progress} grade={grade} /></View>
+    </View>
+  );
+}
+
 // ---- Interval timeline (bottom) -------------------------------------------
 export function IntervalTimeline({
   title, profile, activeIndex, remaining, step, next,
@@ -322,6 +337,17 @@ const ic = StyleSheet.create({
 
 const ep = StyleSheet.create({
   wrap: { position: "absolute", left: 0, right: 0, bottom: 0, height: 30, paddingHorizontal: 2 },
+});
+
+const tc = StyleSheet.create({
+  card: { ...card, padding: 14, paddingBottom: 34, minHeight: 118, overflow: "hidden" },
+  head: { flexDirection: "row", alignItems: "center", gap: 7 },
+  title: { color: colors.textDim, fontSize: 11, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase" },
+  stats: { flexDirection: "row", justifyContent: "space-between", marginTop: 12, gap: 6 },
+  stat: { alignItems: "flex-start" },
+  statVal: { color: colors.white, fontSize: 17, fontWeight: "900", fontVariant: ["tabular-nums"] },
+  statLbl: { color: colors.textFaint, fontSize: 8.5, fontWeight: "800", letterSpacing: 0.6, marginTop: 2 },
+  profileWrap: { position: "absolute", left: 12, right: 12, bottom: 6 },
 });
 
 const tl = StyleSheet.create({
