@@ -33,6 +33,7 @@ export function VirtualRouteScene({ rider, telemetry, showBrand = true }: { ride
 
   // Animated outputs.
   const bobY = React.useRef(new Animated.Value(0)).current;
+  const swayX = React.useRef(new Animated.Value(0)).current;  // side-to-side weight shift
   const lean = React.useRef(new Animated.Value(0)).current;      // degrees
   const scale = React.useRef(new Animated.Value(1)).current;
   const streak = React.useRef(new Animated.Value(0)).current;    // 0..1 scroll phase
@@ -53,9 +54,12 @@ export function VirtualRouteScene({ rider, telemetry, showBrand = true }: { ride
 
       // Cadence → pedal/bob frequency (bob at ~2× pedal stroke). Power → amplitude.
       const cadHz = moving ? (Math.max(0, t.cadence) / 60) : 0;
-      const amp = t.reducedMotion ? 0 : (2 + Math.min(6, t.power / 60));
+      const amp = t.reducedMotion ? 0 : (3 + Math.min(9, t.power / 45));
       p.bob += cadHz * 2 * Math.PI * 2 * dt;
       bobY.setValue(Math.sin(p.bob) * amp);
+      // Weight shift left↔right once per full crank revolution (half bob freq).
+      const swayAmp = t.reducedMotion ? 0 : (2.5 + Math.min(4, t.power / 90));
+      swayX.setValue(Math.sin(p.bob / 2) * swayAmp);
 
       // Speed → forward motion (streaks + wheel + road markers).
       const spd = moving ? Math.max(0, t.speed) : 0;
@@ -83,7 +87,7 @@ export function VirtualRouteScene({ rider, telemetry, showBrand = true }: { ride
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [bobY, lean, scale, streak, wheelDeg, blur]);
+  }, [bobY, swayX, lean, scale, streak, wheelDeg, blur]);
 
   const leanDeg = lean.interpolate({ inputRange: [-4, 4], outputRange: ["-4deg", "4deg"] });
 
@@ -118,8 +122,8 @@ export function VirtualRouteScene({ rider, telemetry, showBrand = true }: { ride
 
   return (
     <View style={st.wrap}>
-      {/* Rider + world plate (camera bob / lean / effort scale). */}
-      <AView style={[st.plateWrap, { transform: [{ translateY: bobY }, { rotate: leanDeg }, { scale }] }]}>
+      {/* Rider + world plate (camera bob / weight-shift sway / lean / effort scale). */}
+      <AView style={[st.plateWrap, { transform: [{ translateX: swayX }, { translateY: bobY }, { rotate: leanDeg }, { scale }] }]}>
         <Image source={rider.image} style={st.plate} resizeMode="cover" />
       </AView>
 
