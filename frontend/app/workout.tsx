@@ -24,7 +24,7 @@ import {
   VideoPlaceholder, RoutesButton, RoutePicker, SettingsPanel, MusicPanel, CastPanel, ImmersiveHud, RouteMapCard,
 } from "@/src/components/workout";
 import {
-  MetricCard, ConnectionsPanel, CoachBanner, TerrainCard, WorkoutCard, BrandCard, StepTimeline, StepDetailModal, LiveControlBar,
+  MetricCard, ConnectionsPanel, CoachBanner, TerrainCard, WorkoutCard, BrandCard, StepTimeline, StepDetailModal, LiveControlBar, AdjustmentsStrip,
 } from "@/src/components/workout-live";
 import { useWorkoutAudio } from "@/src/hooks/useWorkoutAudio";
 import { useBleSensors } from "@/src/hooks/useBleSensors";
@@ -193,6 +193,7 @@ export default function LiveWorkout() {
   const [extendRec, setExtendRec] = React.useState<ExtendPlan["recommend"] | null>(null);
   const [extendPick, setExtendPick] = React.useState<ExtendPlan["suggested"]>(null);
   const [locked, setLocked] = React.useState(false);
+  const [controlLog, setControlLog] = React.useState<{ id: number; t: string; label: string }[]>([]);
   const [stepDetail, setStepDetail] = React.useState<number | null>(null);
   const videoFellBackRef = React.useRef(false);
 
@@ -354,6 +355,12 @@ export default function LiveWorkout() {
 
   const onCenterLayout = (e: LayoutChangeEvent) => setCenterW(e.nativeEvent.layout.width);
 
+  // Record ride-affecting adjustments (skip/extend/intensity/ERG/pause) with the
+  // ride time so the rider can see why a lap's numbers changed.
+  const logControl = React.useCallback((label: string) => {
+    setControlLog((prev) => [{ id: Date.now(), t: mmss(Math.round(telemetryRef.current.elapsed)), label }, ...prev].slice(0, 8));
+  }, []);
+
   // If the route video can't load, gracefully fall back to the Virtual route
   // once (the rider can still switch back to Video manually afterwards).
   const onVideoError = React.useCallback(() => {
@@ -370,20 +377,22 @@ export default function LiveWorkout() {
     ergPendingUntil.current = Date.now() + 1500;
     sendErg(next);
     showToast(`ERG intensity ${next}%`);
+    logControl(`ERG ${d > 0 ? "+" : "−"}${Math.abs(d)}% → ${next}%`);
   };
   const onPauseToggle = () => {
     if (paused) { resume(); } else { pause(); }
     setPaused((p) => !p);
     showToast(paused ? "Resuming workout" : "Workout paused");
+    logControl(paused ? "Resumed" : "Paused");
   };
   const onControlAction = (key: string) => {
     setShowControls(false);
     switch (key) {
       case "skip":
-        if (activeSeg) { sendInit({ elapsed: telemetry.elapsed + activeSeg.remaining + 1 }); showToast("Skipped to the next interval"); }
+        if (activeSeg) { sendInit({ elapsed: telemetry.elapsed + activeSeg.remaining + 1 }); showToast("Skipped to the next interval"); logControl("Skipped interval"); }
         break;
       case "extend":
-        if (selected) { setExtraSegments((x) => [...x, extensionSegment(selected, 3)]); showToast("Added 3:00 of easy recovery to your ride"); }
+        if (selected) { setExtraSegments((x) => [...x, extensionSegment(selected, 3)]); showToast("Added 3:00 of easy recovery to your ride"); logControl("+3:00 recovery"); }
         break;
       case "reduce":
         onErg(-5);
@@ -392,7 +401,7 @@ export default function LiveWorkout() {
         onErg(5);
         break;
       case "erg":
-        setErgMode((m) => { const next = !m; showToast(next ? "ERG mode ON — trainer holds your target" : "ERG mode OFF — ride at your own effort"); return next; });
+        setErgMode((m) => { const next = !m; showToast(next ? "ERG mode ON — trainer holds your target" : "ERG mode OFF — ride at your own effort"); logControl(next ? "ERG mode ON" : "ERG mode OFF"); return next; });
         break;
       case "camera":
         setShowRoutes(true);
@@ -412,6 +421,7 @@ export default function LiveWorkout() {
       case "peaceful":
         if (!paused) { pause(); setPaused(true); }
         showToast("Peaceful pause — breathe deep and reset.");
+        logControl("Peaceful pause");
         break;
       default:
         break;
@@ -729,6 +739,8 @@ export default function LiveWorkout() {
       </View>
 
       <StepTimeline title={workoutTitle} steps={stepList} activeIndex={activeSeg?.index ?? -1} remaining={timeLeftLabel} stepProgress={activeSeg ? activeSeg.elapsedInSeg / Math.max(1, activeSeg.segment.durationSec) : 0} onStepPress={(i) => setStepDetail(i)} elapsed={fmt(telemetry.elapsed)} progress={progress} estFinish={estFinish} />
+
+      <AdjustmentsStrip entries={controlLog} />
 
       <LiveControlBar
         paused={paused}

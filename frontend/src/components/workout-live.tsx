@@ -42,6 +42,27 @@ export function BrandCard() {
   );
 }
 
+// Compact history of ride-affecting adjustments made during the session.
+export function AdjustmentsStrip({ entries }: { entries: { id: number; t: string; label: string }[] }) {
+  if (!entries.length) return null;
+  return (
+    <View style={aj.wrap} testID="adjustments-strip">
+      <View style={aj.head}>
+        <Ionicons name="options" size={13} color={colors.yellow} />
+        <Text style={aj.title}>ADJUSTMENTS</Text>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={aj.row}>
+        {entries.map((e) => (
+          <View key={e.id} style={aj.chip}>
+            <Text style={aj.chipTime}>{e.t}</Text>
+            <Text style={aj.chipText}>{e.label}</Text>
+          </View>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
 // ---- Metric card ----------------------------------------------------------
 export function MetricCard({
   icon, label, value, unit, status, statusTone = "neutral", sub, accent = colors.yellow,
@@ -446,6 +467,16 @@ const brand = StyleSheet.create({
   card: { ...card, flex: 1, minWidth: 120, alignItems: "center", justifyContent: "center", paddingVertical: 16, gap: 8 },
   glyph: { width: 44, height: 44 },
   logo: { width: "86%", height: 40 },
+});
+
+const aj = StyleSheet.create({
+  wrap: { ...card, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 12, paddingVertical: 8 },
+  head: { flexDirection: "row", alignItems: "center", gap: 6 },
+  title: { color: colors.textDim, fontSize: 10.5, fontWeight: "800", letterSpacing: 1 },
+  row: { flexDirection: "row", alignItems: "center", gap: 8, paddingRight: 4 },
+  chip: { flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 5 },
+  chipTime: { color: colors.yellow, fontSize: 11, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  chipText: { color: colors.white, fontSize: 12, fontWeight: "700" },
 });
 
 const m = StyleSheet.create({
