@@ -1,0 +1,317 @@
+import React from "react";
+import { View, Text, StyleSheet, Pressable, ScrollView, Image, useWindowDimensions } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
+import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { colors, radius, spacing, shadow } from "@/src/theme";
+import { useTelemetry } from "@/src/hooks/useTelemetry";
+import { VIRTUAL_RIDERS, getRider } from "@/src/lib/virtual-riders";
+import { VIRTUAL_ROUTE, routeStateAt } from "@/src/lib/vroutes";
+import { VirtualRouteScene, SceneTelemetry } from "@/src/components/virtual-route/scene";
+
+type PanelMode = "all" | "min" | "hidden";
+const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+const PRESETS = [
+  { label: "Recovery", w: 120, icon: "leaf-outline" as const },
+  { label: "Endurance", w: 185, icon: "bicycle-outline" as const },
+  { label: "Tempo", w: 235, icon: "flame-outline" as const },
+  { label: "Climb", w: 295, icon: "trending-up-outline" as const },
+];
+
+export default function VirtualRouteScreen() {
+  const router = useRouter();
+  const { width } = useWindowDimensions();
+  const compact = width < 820;
+  const { telemetry, connectionState, stale, sendErg, sendTarget, simulateDropout, pause, resume } = useTelemetry();
+
+  const [riderId, setRiderId] = React.useState("male");
+  const [phase, setPhase] = React.useState<"setup" | "riding" | "paused">("setup");
+  const [panel, setPanel] = React.useState<PanelMode>("all");
+  const [reducedMotion, setReducedMotion] = React.useState(false);
+  const [autoResistance, setAutoResistance] = React.useState(true);
+  const [emergency, setEmergency] = React.useState(false);
+  const rider = getRider(riderId);
+
+  // Local route distance integrated from speed while riding.
+  const distRef = React.useRef(0);
+  const lastElRef = React.useRef<number | null>(null);
+  const [distanceKm, setDistanceKm] = React.useState(0);
+
+  // Smoothed telemetry (EMA) so the animation never jitters.
+  const smRef = React.useRef({ power: 0, cadence: 0, speed: 0, hr: 0 });
+  const [sm, setSm] = React.useState({ power: 0, cadence: 0, speed: 0, hr: 0 });
+
+  const running = phase === "riding";
+
+  React.useEffect(() => {
+    const a = 0.16;
+    const s = smRef.current;
+    s.power += (telemetry.power - s.power) * a;
+    s.cadence += (telemetry.cadence - s.cadence) * a;
+    s.speed += (telemetry.speed - s.speed) * a;
+    s.hr += (telemetry.hr - s.hr) * a;
+    setSm({ power: Math.round(s.power), cadence: Math.round(s.cadence), speed: Math.round(s.speed * 10) / 10, hr: Math.round(s.hr) });
+
+    if (running) {
+      const prev = lastElRef.current;
+      lastElRef.current = telemetry.elapsed;
+      const dt = prev == null ? 0 : telemetry.elapsed - prev;
+      if (dt > 0 && dt < 5) {
+        distRef.current = Math.min(VIRTUAL_ROUTE.distanceKm, distRef.current + (telemetry.speed / 3600) * dt);
+        setDistanceKm(distRef.current);
+      }
+    }
+  }, [telemetry.elapsed, running]);
+
+  const route = routeStateAt(VIRTUAL_ROUTE, distanceKm);
+  const gradientBucket = Math.round(route.gradient);
+
+  // Auto trainer resistance follows the route gradient (progressive, clamped).
+  React.useEffect(() => {
+    if (!running || !autoResistance || emergency) return;
+    const target = Math.round(Math.max(60, Math.min(140, 100 + route.gradient * 4)));
+    sendErg(target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [running, autoResistance, emergency, gradientBucket]);
+
+  const sensorsOn = telemetry.source === "trainer";
+  const hrOn = telemetry.hr > 0;
+  const scene: SceneTelemetry = {
+    power: sm.power, cadence: sm.cadence, speed: sm.speed, gradient: route.gradient, curve: route.curve,
+    moving: running, connected: connectionState === "connected", reducedMotion,
+  };
+
+  const conn = deriveConnection(connectionState, stale, sensorsOn);
+
+  const startRide = () => { distRef.current = 0; lastElRef.current = null; setDistanceKm(0); resume(); setPhase("riding"); };
+  const pauseRide = () => { pause(); setPhase("paused"); };
+  const resumeRide = () => { resume(); setPhase("riding"); };
+  const endRide = () => { pause(); router.back(); };
+  const emergencyStop = () => { setEmergency(true); setAutoResistance(false); sendErg(50); };
+  const cyclePanel = () => setPanel((p) => (p === "all" ? "min" : p === "min" ? "hidden" : "all"));
+
+  return (
+    <View style={s.root}>
+      <StatusBar hidden />
+      {/* Cinematic wide scene */}
+      <VirtualRouteScene rider={rider} telemetry={scene} />
+
+      {/* Connection status pill (top-right) */}
+      <SafeAreaView style={s.topRight} pointerEvents="box-none" edges={["top", "right"]}>
+        <View style={[s.connPill, { borderColor: conn.tone + "88", backgroundColor: conn.tone + "22" }]}>
+          <View style={[s.connDot, { backgroundColor: conn.tone }]} />
+          <Text style={s.connText}>{conn.label}</Text>
+        </View>
+        <Pressable onPress={cyclePanel} style={s.iconBtn} accessibilityRole="button" accessibilityLabel="Toggle telemetry visibility">
+          <Ionicons name={panel === "hidden" ? "eye-off-outline" : panel === "min" ? "contract-outline" : "grid-outline"} size={18} color={colors.white} />
+        </Pressable>
+        <Pressable onPress={() => setReducedMotion((r) => !r)} style={[s.iconBtn, reducedMotion && s.iconBtnOn]} accessibilityRole="button" accessibilityLabel="Toggle reduced motion">
+          <Ionicons name="accessibility-outline" size={18} color={reducedMotion ? colors.bg : colors.white} />
+        </Pressable>
+      </SafeAreaView>
+
+      {/* Telemetry panels */}
+      {phase !== "setup" && panel === "all" && (
+        <TelemetryPanel sm={sm} route={route} elapsed={telemetry.elapsed} compact={compact} hrOn={hrOn} />
+      )}
+      {phase !== "setup" && panel === "min" && (
+        <View style={s.minBar} testID="vr-min-panel">
+          <MiniStat label="SPEED" value={`${sm.speed}`} unit="km/h" />
+          <MiniStat label="POWER" value={`${sm.power}`} unit="W" />
+          <MiniStat label="CAD" value={`${sm.cadence}`} unit="rpm" />
+          <MiniStat label="GRADE" value={`${route.gradient}`} unit="%" />
+          <View style={s.minProgress}><View style={[s.minFill, { width: `${route.progress * 100}%` }]} /></View>
+        </View>
+      )}
+
+      {/* Bottom control bar */}
+      {phase !== "setup" && (
+        <SafeAreaView style={s.controls} edges={["bottom"]} pointerEvents="box-none">
+          <View style={s.controlRow}>
+            {running ? (
+              <CtrlBtn icon="pause" label="Pause" onPress={pauseRide} />
+            ) : (
+              <CtrlBtn icon="play" label="Resume" tone={colors.green} onPress={resumeRide} />
+            )}
+            <CtrlBtn icon="stop" label="End Ride" tone={colors.red} onPress={endRide} />
+            <View style={s.spacer} />
+            {/* Simulation presets */}
+            {PRESETS.map((p) => (
+              <Pressable key={p.label} onPress={() => sendTarget(p.w)} style={s.presetChip} accessibilityLabel={`Set ${p.label} effort`}>
+                <Ionicons name={p.icon} size={14} color={colors.yellow} />
+                <Text style={s.presetText}>{p.label}</Text>
+              </Pressable>
+            ))}
+            <Pressable onPress={simulateDropout} style={s.iconBtnDark} accessibilityLabel="Simulate signal drop">
+              <Ionicons name="cellular-outline" size={16} color={colors.white} />
+            </Pressable>
+            <Pressable onPress={() => setAutoResistance((a) => !a)} style={[s.iconBtnDark, autoResistance && !emergency && s.iconBtnOn]} accessibilityLabel="Toggle auto resistance">
+              <Ionicons name="options-outline" size={16} color={autoResistance && !emergency ? colors.bg : colors.white} />
+            </Pressable>
+            <Pressable onPress={emergencyStop} style={[s.iconBtnDark, { borderColor: colors.red }]} accessibilityLabel="Emergency stop resistance">
+              <Ionicons name="warning-outline" size={16} color={colors.red} />
+            </Pressable>
+          </View>
+        </SafeAreaView>
+      )}
+
+      {/* Setup overlay: rider selection + start */}
+      {phase === "setup" && (
+        <SafeAreaView style={s.setup} edges={["top", "bottom", "right"]}>
+          <ScrollView contentContainerStyle={s.setupScroll} showsVerticalScrollIndicator={false}>
+            <View style={s.setupCard}>
+              <Text style={s.routeName}>{VIRTUAL_ROUTE.name}</Text>
+              <Text style={s.routePlace}>{VIRTUAL_ROUTE.place} · {VIRTUAL_ROUTE.distanceKm} km</Text>
+
+              <Text style={s.sectionLabel}>CHOOSE YOUR RIDER</Text>
+              <View style={s.riderGrid}>
+                {VIRTUAL_RIDERS.map((r) => {
+                  const sel = r.id === riderId;
+                  return (
+                    <Pressable key={r.id} onPress={() => setRiderId(r.id)} testID={`rider-${r.id}`} style={[s.riderCard, sel && { borderColor: r.accent, borderWidth: 2 }]} accessibilityRole="button" accessibilityLabel={`Select ${r.name}`}>
+                      <Image source={r.image} style={s.riderThumb} resizeMode="cover" />
+                      <View style={s.riderMeta}>
+                        <Text style={s.riderName} numberOfLines={1}>{r.name}</Text>
+                        <Text style={s.riderTag} numberOfLines={1}>{r.tag}</Text>
+                      </View>
+                      {sel && <View style={[s.riderCheck, { backgroundColor: r.accent }]}><Ionicons name="checkmark" size={13} color="#fff" /></View>}
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <View style={s.setupRow}>
+                <View style={[s.connPill, s.connPillInline, { borderColor: conn.tone + "88", backgroundColor: conn.tone + "22" }]}>
+                  <View style={[s.connDot, { backgroundColor: conn.tone }]} />
+                  <Text style={s.connText}>{conn.label}</Text>
+                </View>
+                <Text style={s.simNote}>Simulated ride mode available — no equipment required.</Text>
+              </View>
+
+              <Pressable onPress={startRide} testID="start-ride" style={s.startBtn} accessibilityRole="button" accessibilityLabel="Start ride">
+                <Ionicons name="play" size={20} color={colors.bg} />
+                <Text style={s.startText}>START RIDE</Text>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      )}
+    </View>
+  );
+}
+
+function deriveConnection(state: string, stale: boolean, sensorsOn: boolean): { label: string; tone: string } {
+  if (state === "connecting") return { label: "Connecting…", tone: colors.yellow };
+  if (state === "reconnecting") return { label: "Signal lost — reconnecting", tone: colors.yellow };
+  if (state === "disconnected") return { label: "Device disconnected", tone: colors.red };
+  if (stale) return { label: "Signal temporarily lost", tone: colors.yellow };
+  if (!sensorsOn) return { label: "Simulated ride mode", tone: "#5AC8FA" };
+  return { label: "Connected", tone: colors.green };
+}
+
+function TelemetryPanel({ sm, route, elapsed, compact, hrOn }: any) {
+  const cells = [
+    { label: "POWER", value: `${sm.power}`, unit: "W", icon: "flash" as const, tone: colors.yellow },
+    { label: "CADENCE", value: `${sm.cadence}`, unit: "rpm", icon: "sync" as const, tone: colors.green },
+    { label: "SPEED", value: `${sm.speed}`, unit: "km/h", icon: "speedometer" as const, tone: "#5AC8FA" },
+    { label: "HEART RATE", value: hrOn ? `${sm.hr}` : "—", unit: "bpm", icon: "heart" as const, tone: colors.red },
+    { label: "GRADIENT", value: `${route.gradient}`, unit: "%", icon: "trending-up" as const, tone: colors.yellow },
+    { label: "DISTANCE", value: `${(route.progress * VIRTUAL_ROUTE.distanceKm).toFixed(1)}`, unit: "km", icon: "navigate" as const, tone: "#5AC8FA" },
+    { label: "ELAPSED", value: mmss(elapsed), unit: "", icon: "time-outline" as const, tone: colors.white },
+  ];
+  return (
+    <View style={[s.panel, compact && s.panelCompact]} pointerEvents="box-none" testID="vr-full-panel">
+      <View style={s.panelHead}>
+        <Ionicons name="location" size={13} color={colors.yellow} />
+        <Text style={s.panelRoute} numberOfLines={1}>Next: {route.segmentLabel} · {route.remainingKm.toFixed(1)} km to go</Text>
+      </View>
+      <View style={s.progressTrack}><View style={[s.progressFill, { width: `${route.progress * 100}%` }]} /></View>
+      <View style={s.panelGrid}>
+        {cells.map((c) => (
+          <View key={c.label} style={s.panelCell}>
+            <Ionicons name={c.icon} size={13} color={c.tone} />
+            <Text style={s.panelValue}>{c.value}<Text style={s.panelUnit}> {c.unit}</Text></Text>
+            <Text style={s.panelLabel}>{c.label}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function MiniStat({ label, value, unit }: { label: string; value: string; unit: string }) {
+  return (
+    <View style={s.miniStat}>
+      <Text style={s.miniValue}>{value}<Text style={s.miniUnit}> {unit}</Text></Text>
+      <Text style={s.miniLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function CtrlBtn({ icon, label, tone, onPress }: { icon: any; label: string; tone?: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={[s.ctrlBtn, tone ? { backgroundColor: tone } : null]} accessibilityRole="button" accessibilityLabel={label}>
+      <Ionicons name={icon} size={16} color={tone ? "#0b0b0b" : colors.white} />
+      <Text style={[s.ctrlText, tone ? { color: "#0b0b0b" } : null]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: "#05060a" },
+  topRight: { position: "absolute", top: 0, right: 0, flexDirection: "row", alignItems: "center", gap: 8, padding: 12 },
+  connPill: { flexDirection: "row", alignItems: "center", gap: 7, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6 },
+  connPillInline: { alignSelf: "flex-start" },
+  connDot: { width: 8, height: 8, borderRadius: 4 },
+  connText: { color: colors.white, fontSize: 12, fontWeight: "800" },
+  iconBtn: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.5)", borderWidth: 1, borderColor: colors.border },
+  iconBtnOn: { backgroundColor: colors.yellow, borderColor: colors.yellow },
+  iconBtnDark: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: colors.border },
+
+  panel: { position: "absolute", left: 12, bottom: 78, width: 360, backgroundColor: "rgba(10,11,14,0.72)", borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 12, gap: 10, ...(shadow.card as any) },
+  panelCompact: { width: 300 },
+  panelHead: { flexDirection: "row", alignItems: "center", gap: 6 },
+  panelRoute: { color: colors.textDim, fontSize: 12, fontWeight: "700", flex: 1 },
+  progressTrack: { height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.12)", overflow: "hidden" },
+  progressFill: { height: "100%", backgroundColor: colors.yellow, borderRadius: 3 },
+  panelGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  panelCell: { width: "30%", flexGrow: 1, gap: 2 },
+  panelValue: { color: colors.white, fontSize: 18, fontWeight: "900", fontVariant: ["tabular-nums"] },
+  panelUnit: { color: colors.textFaint, fontSize: 11, fontWeight: "700" },
+  panelLabel: { color: colors.textFaint, fontSize: 9, fontWeight: "800", letterSpacing: 0.8 },
+
+  minBar: { position: "absolute", left: 12, right: 12, bottom: 78, flexDirection: "row", alignItems: "center", gap: 18, backgroundColor: "rgba(10,11,14,0.7)", borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 16, paddingVertical: 10 },
+  miniStat: {},
+  miniValue: { color: colors.white, fontSize: 17, fontWeight: "900", fontVariant: ["tabular-nums"] },
+  miniUnit: { color: colors.textFaint, fontSize: 10, fontWeight: "700" },
+  miniLabel: { color: colors.textFaint, fontSize: 8.5, fontWeight: "800", letterSpacing: 0.8 },
+  minProgress: { flex: 1, height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.12)", overflow: "hidden" },
+  minFill: { height: "100%", backgroundColor: colors.yellow, borderRadius: 3 },
+
+  controls: { position: "absolute", left: 0, right: 0, bottom: 0 },
+  controlRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 10, flexWrap: "wrap" },
+  spacer: { flex: 1, minWidth: 8 },
+  ctrlBtn: { flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: "rgba(0,0,0,0.6)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 10 },
+  ctrlText: { color: colors.white, fontSize: 13, fontWeight: "800" },
+  presetChip: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: colors.yellow + "44", borderRadius: radius.pill, paddingHorizontal: 11, paddingVertical: 7 },
+  presetText: { color: colors.white, fontSize: 12, fontWeight: "800" },
+
+  setup: { position: "absolute", top: 0, right: 0, bottom: 0, width: 460, maxWidth: "94%" },
+  setupScroll: { padding: 16, flexGrow: 1, justifyContent: "center" },
+  setupCard: { backgroundColor: "rgba(10,11,14,0.82)", borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, gap: 12, ...(shadow.card as any) },
+  routeName: { color: colors.white, fontSize: 24, fontWeight: "900" },
+  routePlace: { color: colors.textDim, fontSize: 13, fontWeight: "600", marginTop: -6 },
+  sectionLabel: { color: colors.textFaint, fontSize: 10.5, fontWeight: "800", letterSpacing: 1, marginTop: 4 },
+  riderGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  riderCard: { width: "47%", flexGrow: 1, backgroundColor: "rgba(255,255,255,0.04)", borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, overflow: "hidden" },
+  riderThumb: { width: "100%", height: 90, backgroundColor: "#000" },
+  riderMeta: { padding: 8 },
+  riderName: { color: colors.white, fontSize: 13, fontWeight: "800" },
+  riderTag: { color: colors.textFaint, fontSize: 11, fontWeight: "600" },
+  riderCheck: { position: "absolute", top: 8, right: 8, width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  setupRow: { gap: 8, marginTop: 4 },
+  simNote: { color: colors.textFaint, fontSize: 12, fontWeight: "600" },
+  startBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.yellow, borderRadius: radius.md, paddingVertical: 14, marginTop: 4, ...(shadow.glow as any) },
+  startText: { color: colors.bg, fontSize: 15, fontWeight: "900", letterSpacing: 0.5 },
+});
