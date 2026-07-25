@@ -232,6 +232,7 @@ export default function LiveWorkout() {
   );
   const targetW = activeSeg ? targetWatts(activeSeg.segment, ftp, zoneBias) : 251;
   const timeLeftLabel = activeSeg ? mmss(activeSeg.remaining) : undefined;
+  const stepLabel = activeSeg ? `${activeSeg.index + 1} / ${activeSeg.total}` : undefined;
   // Full step list for the bottom timeline + Workout card — each segment with
   // its summary detail (duration, target watts, %FTP, RPE, one-line description).
   const stepList = React.useMemo(
@@ -542,6 +543,8 @@ export default function LiveWorkout() {
             <MetricCard icon="flash" label="Power" value={trainerOn ? String(powerVal) : "—"} unit="W" status={powerStatus} statusTone={powerTone} sub={`TARGET ${Math.max(0, targetW - 8)}–${targetW + 8} W`} accent={colors.yellow} />
             <MetricCard icon="heart" label="Heart Rate" value={wearableOn ? String(telemetry.hr) : "—"} unit="bpm" status={wearableOn ? `ZONE ${hrZone(telemetry.hr)}` : undefined} statusTone="neutral" accent={colors.red} />
             <MetricCard icon="sync" label="Cadence" value={trainerOn ? String(telemetry.cadence) : "—"} unit="rpm" status={cadStatus} statusTone={cadInRange ? "good" : "warn"} sub={`TARGET ${CAD_LOW}–${CAD_HIGH}`} accent={colors.green} />
+            <MetricCard icon="speedometer" label="Speed" value={trainerOn ? String(Math.round(telemetry.speed)) : "—"} unit="km/h" accent="#5AC8FA" />
+            <MetricCard icon="timer-outline" label="Interval" value={timeLeftLabel ?? "—"} sub={stepLabel ? `STEP ${stepLabel}` : undefined} status={activeSeg?.segment.label} statusTone="neutral" accent={colors.white} />
           </View>
 
           <View style={[styles.innerRow, tablet && styles.flex1]}>

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView, Switch, Platform } from 
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import Svg, { Rect, Path, Polyline, Circle, Line } from "react-native-svg";
+import Svg, { Rect, Polyline, Circle, Line } from "react-native-svg";
 import { colors, radius, spacing, shadow, textShadow } from "../theme";
 import { Touchable, SectionLabel } from "./ui";
 import { posterFor } from "../lib/youtube";
@@ -372,24 +372,55 @@ function ClimbMini({ width, height = 64, climb = true, descent = false, progress
   );
 }
 
+// Fixed switch-backing climb shape (viewBox 240x200, y down). The ride marker
+// moves along this polyline as progress advances — mirrors the terrain graphic.
+const ROUTE_PTS = [
+  { x: 40, y: 185 }, { x: 96, y: 172 }, { x: 70, y: 150 }, { x: 112, y: 140 },
+  { x: 86, y: 120 }, { x: 126, y: 110 }, { x: 100, y: 88 }, { x: 150, y: 78 },
+  { x: 120, y: 58 }, { x: 172, y: 48 }, { x: 150, y: 30 }, { x: 210, y: 16 },
+];
+function routeAt(progress: number) {
+  const pts = ROUTE_PTS;
+  const seg: number[] = [];
+  let totalLen = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const d = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    seg.push(d); totalLen += d;
+  }
+  const target = Math.max(0, Math.min(1, progress)) * totalLen;
+  const traveled = [{ ...pts[0] }];
+  let acc = 0;
+  let cur = { x: pts[0].x, y: pts[0].y };
+  for (let i = 1; i < pts.length; i++) {
+    if (acc + seg[i - 1] >= target) {
+      const t = seg[i - 1] > 0 ? (target - acc) / seg[i - 1] : 0;
+      cur = { x: pts[i - 1].x + (pts[i].x - pts[i - 1].x) * t, y: pts[i - 1].y + (pts[i].y - pts[i - 1].y) * t };
+      traveled.push(cur);
+      break;
+    }
+    acc += seg[i - 1];
+    traveled.push({ ...pts[i] });
+    cur = { x: pts[i].x, y: pts[i].y };
+  }
+  return { full: pts, traveled, cur };
+}
+
 export function RouteMapCard({ title = "Alpe d'Huez", progress = 0, riddenKm = 0, totalKm = 0, timeBased = false, fill = false }: { title?: string; progress?: number; riddenKm?: number; totalKm?: number; timeBased?: boolean; fill?: boolean }) {
   const pct = Math.round(progress * 100);
+  const { full, traveled, cur } = routeAt(progress);
+  const toStr = (arr: { x: number; y: number }[]) => arr.map((p) => `${p.x},${p.y}`).join(" ");
   return (
     <View style={styles.sideCard} testID="route-map-card">
       <View style={styles.metricHead}><Ionicons name="location" size={15} color={colors.yellow} /><SectionLabel color={colors.yellow}>ROUTE</SectionLabel></View>
       <Text style={styles.routeMapTitle} numberOfLines={1}>{title}</Text>
-      <View style={styles.routeTrack}>
-        <View style={[styles.routeFill, { width: `${pct}%` }]} />
-        <View style={[styles.routeDot, { left: `${pct}%` }]} />
-      </View>
       <Text style={styles.routeProg}>{riddenKm.toFixed(1)} / {totalKm.toFixed(1)} km · {pct}%{timeBased ? " · time-based" : ""}</Text>
-      <View style={[styles.mapWrap, { height: fill ? 52 : 200 }]}>
+      <View style={[styles.mapWrap, { height: fill ? 64 : 200 }]}>
         <Svg width="100%" height="100%" viewBox="0 0 240 200" preserveAspectRatio="xMidYMid meet">
-          <Path d="M40 185 C90 175 60 150 100 145 C140 140 90 120 120 110 C155 98 110 80 150 70 C185 62 150 45 175 35 C195 27 205 22 210 15" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth={3} strokeLinecap="round" />
-          <Path d="M40 185 C90 175 60 150 100 145 C140 140 90 120 120 110" fill="none" stroke={colors.yellow} strokeWidth={3} strokeLinecap="round" />
-          <Circle cx={40} cy={185} r={6} fill={colors.red} />
-          <Circle cx={120} cy={110} r={5} fill="#fff" />
-          <Rect x={205} y={8} width={12} height={12} fill="#fff" />
+          <Polyline points={toStr(full)} fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+          <Polyline points={toStr(traveled)} fill="none" stroke={colors.yellow} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+          <Circle cx={full[0].x} cy={full[0].y} r={6} fill={colors.red} />
+          <Rect x={full[full.length - 1].x - 6} y={full[full.length - 1].y - 6} width={12} height={12} fill="#fff" />
+          <Circle cx={cur.x} cy={cur.y} r={6.5} fill="#fff" stroke={colors.yellow} strokeWidth={2.5} />
         </Svg>
       </View>
     </View>
