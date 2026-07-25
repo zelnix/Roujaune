@@ -4,6 +4,8 @@ import { Ionicons } from "@expo/vector-icons";
 import Svg, { Circle, Line, G } from "react-native-svg";
 import { colors } from "@/src/theme";
 import type { VirtualRider } from "@/src/lib/virtual-riders";
+// eslint-disable-next-line import/no-unresolved -- resolved by Metro via RiveRider.native/.web
+import { RiveRider } from "./RiveRider";
 
 const WORDMARK = require("../../../assets/images/auth_wordmark.png");
 const LOGO_GLYPH = require("../../../assets/images/auth_logo_glyph.png");
@@ -134,9 +136,15 @@ export function VirtualRouteScene({ rider, backdrop, telemetry, showBrand = true
             <View style={st.centerLane}>{dashes}</View>
           </View>
 
-          {/* Rider sprite composited on top (camera bob / weight-shift sway / lean). */}
+          {/* Rider composited on top — Rive bone-rig on native, sprite on web (camera bob / weight-shift sway / lean). */}
           <AView style={[st.riderWrap, { transform: [{ translateX: swayX }, { translateY: bobY }, { rotate: leanDeg }, { scale }] }]}>
-            <Image source={rider.sprite} style={st.riderImg} resizeMode="contain" />
+            <RiveRider
+              sprite={rider.sprite}
+              cadence={telemetry.cadence}
+              speed={telemetry.speed}
+              effort={Math.max(0, Math.min(100, Math.round((telemetry.power / 300) * 100)))}
+              style={st.riderImg}
+            />
           </AView>
         </>
       ) : (

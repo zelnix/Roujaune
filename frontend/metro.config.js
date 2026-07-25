@@ -22,4 +22,7 @@ config.cacheStores = [
 // Reduce the number of workers to decrease resource usage
 config.maxWorkers = 2;
 
+// Allow bundling Rive animation files (.riv) as assets.
+config.resolver.assetExts.push('riv');
+
 module.exports = config;
