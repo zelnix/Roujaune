@@ -280,7 +280,7 @@ export default function VirtualRouteScreen() {
                   const sel = r.id === riderId;
                   return (
                     <Pressable key={r.id} onPress={() => setRiderId(r.id)} testID={`rider-${r.id}`} style={[s.riderCard, sel && { borderColor: r.accent, borderWidth: 2 }]} accessibilityRole="button" accessibilityLabel={`Select ${r.name}`}>
-                      <Image source={r.image} style={s.riderThumb} resizeMode="cover" />
+                      <Image source={r.sprite} style={s.riderThumb} resizeMode="contain" />
                       <View style={s.riderMeta}>
                         <Text style={s.riderName} numberOfLines={1}>{r.name}</Text>
                         <Text style={s.riderTag} numberOfLines={1}>{r.tag}</Text>
@@ -478,7 +478,7 @@ const s = StyleSheet.create({
   sectionLabel: { color: colors.textFaint, fontSize: 10.5, fontWeight: "800", letterSpacing: 1, marginTop: 4 },
   riderGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   riderCard: { width: "47%", flexGrow: 1, backgroundColor: "rgba(255,255,255,0.04)", borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, overflow: "hidden" },
-  riderThumb: { width: "100%", height: 90, backgroundColor: "#000" },
+  riderThumb: { width: "100%", height: 96, backgroundColor: "#0d0f14" },
   riderMeta: { padding: 8 },
   riderName: { color: colors.white, fontSize: 13, fontWeight: "800" },
   riderTag: { color: colors.textFaint, fontSize: 11, fontWeight: "600" },
