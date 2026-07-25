@@ -173,19 +173,27 @@ function FullAnalysisModal({ stats, intervals, overall, hasData, ftp, routeName,
             <View style={styles.lapHeadRow}>
               <Ionicons name="list" size={15} color={colors.yellow} />
               <Text style={styles.lapTitle}>Lap Splits</Text>
-              <Text style={styles.lapHint}>Compare each interval side-by-side</Text>
+              <Text style={styles.lapHint}>Where did you fade?</Text>
+              <View style={{ flex: 1 }} />
+              <View style={styles.legendItem}><View style={[styles.compDot, { backgroundColor: colors.green }]} /><Text style={styles.legendText}>On target</Text></View>
+              <View style={styles.legendItem}><View style={[styles.compDot, { backgroundColor: colors.yellow }]} /><Text style={styles.legendText}>Slipping</Text></View>
+              <View style={styles.legendItem}><View style={[styles.compDot, { backgroundColor: colors.red }]} /><Text style={styles.legendText}>Faded</Text></View>
             </View>
             <View style={[styles.lapRow, styles.lapHeaderRow]}>
+              <View style={styles.lapAccentSpacer} />
               <Text style={[styles.lapCell, styles.lapCol0, styles.lapHeadText]}>LAP</Text>
               <Text style={[styles.lapCell, styles.lapHeadText]}>TIME</Text>
               <Text style={[styles.lapCell, styles.lapHeadText]}>AVG W</Text>
               <Text style={[styles.lapCell, styles.lapHeadText]}>% FTP</Text>
               <Text style={[styles.lapCell, styles.lapHeadText]}>AVG HR</Text>
+              <Text style={[styles.lapCell, styles.lapHeadText]}>TARGET</Text>
             </View>
             {intervals.map((it, i) => {
               const pctFtp = it.avgW != null && ftp > 0 ? Math.round((it.avgW / ftp) * 100) : null;
+              const tone = it.compliance == null ? colors.textFaint : it.compliance >= 80 ? colors.green : it.compliance >= 50 ? colors.yellow : colors.red;
               return (
                 <View key={i} style={[styles.lapRow, i % 2 === 1 && styles.lapRowAlt]}>
+                  <View style={[styles.lapAccent, { backgroundColor: tone }]} />
                   <View style={[styles.lapCell, styles.lapCol0, styles.lapNameCell]}>
                     <View style={[styles.lapDot, { backgroundColor: it.color }]} />
                     <Text style={styles.lapName} numberOfLines={1}>{i + 1}. {it.label}</Text>
@@ -194,6 +202,12 @@ function FullAnalysisModal({ stats, intervals, overall, hasData, ftp, routeName,
                   <Text style={[styles.lapCell, styles.lapVal]}>{it.avgW != null ? `${it.avgW}` : "—"}</Text>
                   <Text style={[styles.lapCell, styles.lapVal, pctFtp != null && { color: colors.yellow }]}>{pctFtp != null ? `${pctFtp}%` : "—"}</Text>
                   <Text style={[styles.lapCell, styles.lapVal]}>{it.avgHr != null ? `${it.avgHr}` : "—"}</Text>
+                  <View style={[styles.lapCell, styles.lapCompCell]}>
+                    <View style={[styles.compPill, { borderColor: tone + "88", backgroundColor: tone + "22" }]}>
+                      <View style={[styles.compDot, { backgroundColor: tone }]} />
+                      <Text style={[styles.compText, { color: tone }]}>{it.compliance != null ? `${it.compliance}%` : "—"}</Text>
+                    </View>
+                  </View>
                 </View>
               );
             })}
@@ -341,9 +355,13 @@ const styles = StyleSheet.create({
   lapHeadRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
   lapTitle: { color: colors.white, fontSize: 15, fontWeight: "800" },
   lapHint: { color: colors.textFaint, fontSize: 11, fontWeight: "600", marginLeft: 4 },
-  lapRow: { flexDirection: "row", alignItems: "center", paddingVertical: 9, paddingHorizontal: 8, borderRadius: radius.sm },
+  legendItem: { flexDirection: "row", alignItems: "center", gap: 5, marginLeft: 12 },
+  legendText: { color: colors.textDim, fontSize: 10.5, fontWeight: "700" },
+  lapRow: { flexDirection: "row", alignItems: "center", paddingVertical: 9, paddingRight: 8, borderRadius: radius.sm },
   lapRowAlt: { backgroundColor: "rgba(255,255,255,0.03)" },
   lapHeaderRow: { borderBottomWidth: 1, borderBottomColor: colors.borderSoft, paddingBottom: 8, marginBottom: 2 },
+  lapAccent: { width: 4, alignSelf: "stretch", borderRadius: 2, marginRight: 8, minHeight: 24 },
+  lapAccentSpacer: { width: 4, marginRight: 8 },
   lapCell: { flex: 1, textAlign: "right" },
   lapCol0: { flex: 2.4, textAlign: "left" },
   lapHeadText: { color: colors.textFaint, fontSize: 10, fontWeight: "800", letterSpacing: 0.8 },
@@ -351,4 +369,8 @@ const styles = StyleSheet.create({
   lapDot: { width: 9, height: 9, borderRadius: 5 },
   lapName: { color: colors.white, fontSize: 13, fontWeight: "700", flexShrink: 1 },
   lapVal: { color: colors.white, fontSize: 13.5, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  lapCompCell: { alignItems: "flex-end" },
+  compPill: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 },
+  compDot: { width: 8, height: 8, borderRadius: 4 },
+  compText: { fontSize: 11.5, fontWeight: "800", fontVariant: ["tabular-nums"] },
 });
