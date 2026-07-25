@@ -198,6 +198,7 @@ export function useSummary() {
           ftp: rec.ftp,
           samples: manual ? [] : rec.samples,
           manual: manual ?? null,
+          est_calories: rec.estCalories ?? 0,
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

@@ -24,13 +24,14 @@ type RideRecord = {
   extendedMin: number;   // total extra minutes the rider added after completing
   extensions: number;    // how many times they extended
   adjustments: { t: string; label: string }[]; // mid-ride control changes
+  estCalories: number;   // live in-ride kcal estimate (actual watts when available)
 };
 
 const DEFAULT_ROUTE: RideRoute = {
   id: "XlwjMjyU410", name: "Alpe d'Huez", place: "France", distance: "13.8 km", elevation: "1,120 m", tag: "Climb",
 };
 
-const store: RideRecord = { workout: "Threshold Climb", workoutId: undefined, ftp: 287, zoneBias: {}, route: { ...DEFAULT_ROUTE }, elapsed: 0, samples: [], extendedMin: 0, extensions: 0, adjustments: [] };
+const store: RideRecord = { workout: "Threshold Climb", workoutId: undefined, ftp: 287, zoneBias: {}, route: { ...DEFAULT_ROUTE }, elapsed: 0, samples: [], extendedMin: 0, extensions: 0, adjustments: [], estCalories: 0 };
 const MAX = 4000; // cap memory (~13 min at 5 Hz is plenty for aggregates)
 
 export const rideRecorder = {
@@ -40,6 +41,7 @@ export const rideRecorder = {
     store.extendedMin = 0;
     store.extensions = 0;
     store.adjustments = [];
+    store.estCalories = 0;
     if (meta?.workout) store.workout = meta.workout;
     if (meta && "workoutId" in meta) store.workoutId = meta.workoutId;
     if (meta?.ftp) store.ftp = meta.ftp;
@@ -54,6 +56,10 @@ export const rideRecorder = {
   },
   setZoneBias(bias: Record<string, number>) {
     store.zoneBias = bias || {};
+  },
+  /** Store the live in-ride calorie estimate so the saved summary matches it. */
+  setEstCalories(kcal: number) {
+    if (kcal >= 0) store.estCalories = Math.round(kcal);
   },
   /** Credit an extension block the rider added after completing the workout. */
   addExtension(minutes: number) {

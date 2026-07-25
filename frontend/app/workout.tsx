@@ -306,6 +306,8 @@ export default function LiveWorkout() {
 
   React.useEffect(() => {
     rideRecorder.reset({ workout: workoutTitle, workoutId: selected?.id, ftp });
+    energyRef.current = 0;
+    lastEnergyElapsedRef.current = null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -335,9 +337,17 @@ export default function LiveWorkout() {
     })();
   }, [showToast]);
 
-  // Record live telemetry so the summary screen can compute real aggregates.
+  // Record live telemetry so the summary screen can compute real aggregates,
+  // and integrate ACTUAL watts into a running energy total (joules) for an
+  // accurate calorie estimate whenever a trainer/power meter is streaming.
+  const energyRef = React.useRef(0);
+  const lastEnergyElapsedRef = React.useRef<number | null>(null);
   React.useEffect(() => {
     if (telemetry.source === "trainer") {
+      const prev = lastEnergyElapsedRef.current;
+      lastEnergyElapsedRef.current = telemetry.elapsed;
+      const dt = prev == null ? 0 : telemetry.elapsed - prev;
+      if (dt > 0 && dt < 5) energyRef.current += telemetry.power * dt;
       rideRecorder.push(
         { power: telemetry.power, hr: telemetry.hr, cadence: telemetry.cadence, speed: telemetry.speed },
         telemetry.elapsed,
@@ -685,19 +695,29 @@ export default function LiveWorkout() {
   // interval remaining, calories, workout step) instead of blank telemetry cards.
   const timeBased = !trainerOn && !wearableOn;
   const elapsedShort = telemetry.elapsed >= 3600 ? fmt(telemetry.elapsed) : mmss(Math.round(telemetry.elapsed));
-  // Rough energy estimate from the planned target watts ridden so far
-  // (work in kJ ≈ dietary kcal for cycling at ~24% efficiency).
+  // Calorie estimate: integrate ACTUAL watts when a power meter is streaming,
+  // otherwise integrate the planned target watts (time-based ride). Work in kJ ×
+  // ~0.7 (≈24% efficiency) — the same formula the saved summary uses, so the
+  // number the rider sees live matches their saved ride total.
   const kcal = React.useMemo(() => {
-    let acc = 0;
-    let t = telemetry.elapsed;
-    for (const s of segments) {
-      if (t <= 0) break;
-      const d = Math.min(t, s.durationSec);
-      acc += targetWatts(s, ftp, zoneBias) * d;
-      t -= d;
+    let kj: number;
+    if (!timeBased && energyRef.current > 0) {
+      kj = energyRef.current / 1000;
+    } else {
+      let acc = 0;
+      let t = telemetry.elapsed;
+      for (const s of segments) {
+        if (t <= 0) break;
+        const d = Math.min(t, s.durationSec);
+        acc += targetWatts(s, ftp, zoneBias) * d;
+        t -= d;
+      }
+      kj = acc / 1000;
     }
-    return Math.round(acc / 1000);
-  }, [segments, telemetry.elapsed, ftp, zoneBias]);
+    return Math.round(kj * 0.7);
+  }, [timeBased, segments, telemetry.elapsed, ftp, zoneBias]);
+  // Persist so the saved summary carries the exact figure shown live.
+  React.useEffect(() => { rideRecorder.setEstCalories(kcal); }, [kcal]);
 
   const body = (
     <>

@@ -156,6 +156,7 @@ class SummarizeRequest(BaseModel):
     weight: float = 78        # kg
     manual: Optional[Dict[str, Any]] = None  # user-entered metrics when no telemetry
     samples: List[TelemetrySample] = Field(default_factory=list)
+    est_calories: int = 0     # live in-ride kcal estimate (used when no telemetry)
 
 
 # Polished reference dataset — matches the design mock. Returned when a ride
@@ -239,8 +240,13 @@ async def summarize_workout(body: SummarizeRequest):
         return {**result, "id": rid}
     powers = [s.power for s in body.samples if s.power is not None]
     if len(body.samples) < 30 or not powers:
-        rid = await _save_ride_history(body, REFERENCE_SUMMARY)
-        return {**REFERENCE_SUMMARY, "id": rid}
+        ref = dict(REFERENCE_SUMMARY)
+        # Carry the live in-ride kcal estimate so a no-telemetry (time-based) ride's
+        # saved calories match exactly what the rider saw during the session.
+        if body.est_calories > 0:
+            ref["calories"] = body.est_calories
+        rid = await _save_ride_history(body, ref)
+        return {**ref, "id": rid}
 
     hrs = [s.hr for s in body.samples if s.hr]
     cads = [s.cadence for s in body.samples if s.cadence]
@@ -351,11 +357,11 @@ def _manual_summary(body: SummarizeRequest) -> dict:
         if_map = {1: 0.40, 2: 0.50, 3: 0.60, 4: 0.68, 5: 0.75, 6: 0.82, 7: 0.88, 8: 0.94, 9: 1.0, 10: 1.05}
         intensity = if_map.get(int(round(rpe)), 0.60)
         tss = round((dur / 3600.0) * intensity * intensity * 100)
-        calories = round((dur / 60.0) * (6 + rpe))
+        calories = body.est_calories if body.est_calories > 0 else round((dur / 60.0) * (6 + rpe))
     else:
         intensity = 0.0
         tss = 0
-        calories = 0
+        calories = body.est_calories if body.est_calories > 0 else 0
 
     return {
         "computed": True,
