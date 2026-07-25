@@ -179,7 +179,15 @@ export default function LiveWorkout() {
   const { telemetry, connectionState, stale, sendErg, sendTarget, sendInit, sendSensor, pause, resume, simulateDropout } = useTelemetry();
   const { settings, setSetting, loaded } = useSettings();
   const ble = useBleSensors();
-  const erg = telemetry.erg;
+
+  // ERG intensity: optimistic local value so +/- feels instant, then reconciles
+  // with the trainer sim once taps settle (~1.5s of no local changes).
+  const [erg, setErg] = React.useState(telemetry.erg);
+  const ergRef = React.useRef(telemetry.erg);
+  const ergPendingUntil = React.useRef(0);
+  React.useEffect(() => {
+    if (Date.now() > ergPendingUntil.current) { ergRef.current = telemetry.erg; setErg(telemetry.erg); }
+  }, [telemetry.erg]);
 
   // Push real Bluetooth sensor readings into the telemetry stream so the backend
   // records measured power/cadence/HR (falls back to the trainer sim if BLE stops).
@@ -291,7 +299,10 @@ export default function LiveWorkout() {
   const onCenterLayout = (e: LayoutChangeEvent) => setCenterW(e.nativeEvent.layout.width);
 
   const onErg = (d: number) => {
-    const next = Math.max(50, Math.min(150, erg + d));
+    const next = Math.max(50, Math.min(150, ergRef.current + d));
+    ergRef.current = next;
+    setErg(next);
+    ergPendingUntil.current = Date.now() + 1500;
     sendErg(next);
     showToast(`ERG intensity ${next}%`);
   };
