@@ -11,13 +11,15 @@ const WORDMARK = require("../assets/images/auth_wordmark.png");
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
-  const { signIn, signUp, signInGoogle, signInApple } = useAuth();
+  const { signIn, signUp, signInGoogle, signInApple, forgotPassword } = useAuth();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
 
   const submit = async () => {
     setError(null);
@@ -28,6 +30,20 @@ export default function LoginScreen() {
       else await signUp(email.trim(), password, name.trim() || undefined);
     } catch (e: any) {
       setError(e?.message || "Something went wrong");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sendReset = async () => {
+    setError(null);
+    if (!email.trim()) { setError("Enter your email above first"); return; }
+    setBusy(true);
+    try {
+      await forgotPassword(email.trim());
+      setForgotSent(true);
+    } catch (e: any) {
+      setError(e?.message || "Couldn't send the reset email");
     } finally {
       setBusy(false);
     }
@@ -67,6 +83,39 @@ export default function LoginScreen() {
             <Pressable style={[styles.primary, busy && { opacity: 0.6 }]} onPress={submit} disabled={busy} testID="submit-btn">
               {busy ? <ActivityIndicator color="#000" /> : <Text style={styles.primaryText}>{mode === "login" ? "Sign in" : "Create account"}</Text>}
             </Pressable>
+
+            {mode === "login" && !forgotOpen && (
+              <Pressable onPress={() => { setForgotOpen(true); setForgotSent(false); setError(null); }} testID="forgot-open">
+                <Text style={styles.forgotLink}>Forgot password?</Text>
+              </Pressable>
+            )}
+
+            {mode === "login" && forgotOpen && (
+              <View style={styles.forgotBox}>
+                {forgotSent ? (
+                  <View style={{ gap: 6 }}>
+                    <Text style={styles.forgotTitle}>Check your inbox</Text>
+                    <Text style={styles.forgotHint}>If an account exists for {email.trim() || "that email"}, we've sent a reset link. It expires in 60 minutes.</Text>
+                    <Pressable onPress={() => { setForgotOpen(false); setForgotSent(false); }} testID="forgot-done">
+                      <Text style={styles.forgotAction}>Back to sign in</Text>
+                    </Pressable>
+                  </View>
+                ) : (
+                  <View style={{ gap: 8 }}>
+                    <Text style={styles.forgotTitle}>Reset your password</Text>
+                    <Text style={styles.forgotHint}>Enter your email above, then send yourself a reset link.</Text>
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      <Pressable style={[styles.forgotBtn, busy && { opacity: 0.6 }]} onPress={sendReset} disabled={busy} testID="forgot-send">
+                        {busy ? <ActivityIndicator color="#000" /> : <Text style={styles.forgotBtnText}>Send reset link</Text>}
+                      </Pressable>
+                      <Pressable style={styles.forgotCancel} onPress={() => { setForgotOpen(false); setError(null); }} testID="forgot-cancel">
+                        <Text style={styles.forgotCancelText}>Cancel</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
 
             <Pressable onPress={() => { setMode(mode === "login" ? "register" : "login"); setError(null); }} testID="toggle-mode">
               <Text style={styles.toggle}>
@@ -110,6 +159,15 @@ const styles = StyleSheet.create({
   primary: { backgroundColor: colors.yellow, borderRadius: radius.md, paddingVertical: 14, alignItems: "center", marginTop: 4 },
   primaryText: { color: "#000", fontWeight: "800", fontSize: 15 },
   toggle: { color: colors.gold, fontSize: 13.5, textAlign: "center", paddingVertical: 6 },
+  forgotLink: { color: colors.textDim, fontSize: 13, textAlign: "center", paddingVertical: 4, textDecorationLine: "underline" },
+  forgotBox: { backgroundColor: "rgba(0,0,0,0.3)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 14, marginTop: 4 },
+  forgotTitle: { color: colors.white, fontSize: 14.5, fontWeight: "800" },
+  forgotHint: { color: colors.textDim, fontSize: 12.5, lineHeight: 18 },
+  forgotBtn: { flex: 1, backgroundColor: colors.yellow, borderRadius: radius.md, paddingVertical: 12, alignItems: "center" },
+  forgotBtnText: { color: "#000", fontWeight: "800", fontSize: 14 },
+  forgotCancel: { paddingVertical: 12, paddingHorizontal: 16, alignItems: "center", justifyContent: "center", borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
+  forgotCancelText: { color: colors.textDim, fontSize: 14, fontWeight: "600" },
+  forgotAction: { color: colors.gold, fontSize: 13.5, fontWeight: "700", paddingTop: 4 },
   divider: { flexDirection: "row", alignItems: "center", gap: 10, marginVertical: 4 },
   line: { flex: 1, height: 1, backgroundColor: colors.border },
   or: { color: colors.textFaint, fontSize: 11, fontWeight: "700" },

@@ -19,6 +19,7 @@
           "_airplay._tcp"
         ],
         "NSPhotoLibraryUsageDescription": "Set your rider profile photo",
+        "NSPhotoLibraryAddUsageDescription": "Save your achievement cards to Photos",
         "NSBluetoothAlwaysUsageDescription": "Connect your trainer and heart-rate sensor"
       }
     },

@@ -15,6 +15,7 @@ export type AuthUser = {
   provider: string;
   assigned_plan_id?: string | null;
   onboarded?: boolean;
+  email_verified?: boolean;
 };
 
 type AuthCtx = {
@@ -26,6 +27,8 @@ type AuthCtx = {
   signInApple: () => Promise<void>;
   signOut: () => Promise<void>;
   refresh: () => Promise<AuthUser | null>;
+  forgotPassword: (email: string) => Promise<void>;
+  resendVerification: () => Promise<void>;
 };
 
 const Ctx = createContext<AuthCtx | null>(null);
@@ -142,8 +145,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
+  const forgotPassword = useCallback(async (email: string) => {
+    await post("/api/auth/forgot-password", { email });
+  }, []);
+
+  const resendVerification = useCallback(async () => {
+    const r = await fetch(`${API}/api/auth/resend-verification`, { method: "POST" });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d?.detail || "Couldn't send the email right now");
+  }, []);
+
   return (
-    <Ctx.Provider value={{ user, loading, signIn, signUp, signInGoogle, signInApple, signOut, refresh }}>
+    <Ctx.Provider value={{ user, loading, signIn, signUp, signInGoogle, signInApple, signOut, refresh, forgotPassword, resendVerification }}>
       {children}
     </Ctx.Provider>
   );

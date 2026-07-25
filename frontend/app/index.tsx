@@ -20,6 +20,7 @@ import { useCoach } from "@/src/lib/coach-persona";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
 import { ProgressPanel } from "@/src/components/ProgressPanel";
 import { NotificationsModal } from "@/src/components/NotificationsModal";
+import { VerifyEmailBanner } from "@/src/components/VerifyEmailBanner";
 import { CC } from "@/src/components/calendar";
 
 function Toast({ message }: { message: { id: number; text: string } | null }) {
@@ -117,6 +118,8 @@ export default function Dashboard() {
             />
 
             <MetricSummaryStrip />
+
+            <VerifyEmailBanner />
 
             <ReadinessGate />
 

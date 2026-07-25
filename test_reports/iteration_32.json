@@ -1,0 +1,42 @@
+{
+  "summary": "Soft email verification + forgot/reset password flows tested end-to-end. Backend: 16/16 pytest assertions passed for /register, /me, /verify-email (HTML page + DB flip), /resend-verification (auth-guard, already-verified, 502-in-preview expected), /forgot-password (no enumeration, writes reset_token), /reset-password (HTML form page, short-pw 400, invalid-token 400, success + new-login + session invalidation). Frontend (tablet 1024x768): /login 'Forgot password?' panel opens, empty-email guard fires, sending returns 'Check your inbox' + 'Back to sign in' works. Dashboard VerifyEmailBanner CORRECTLY HIDDEN for verified demo (greenlantern) and CORRECTLY VISIBLE for an unverified password user; Resend surfaces graceful 'Couldn't send the email right now' on the expected 502; dismiss hides the banner. All testIDs (forgot-open, forgot-send, forgot-done, verify-email-banner, verify-resend, verify-dismiss) resolve. Note: newly registered users are routed to /onboarding first (onboarded=false), so the banner is only reachable after onboarding completes and the user lands on '/'.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "shadow* style props", "issue": "Console warning: '\"shadow*\" style props are deprecated. Use \"boxShadow\".' — appears on /login (and likely global via src/theme shadow helper). Reference: /app/frontend/src/theme (shadow.card / shadow.glow usage across screens including /app/frontend/app/login.tsx, /app/frontend/app/index.tsx)."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_auth_verify_reset.py",
+    "/app/test_reports/pytest/iter32.xml",
+    "/app/test_reports/screens/i32_login_forgot.jpeg",
+    "/app/test_reports/screens/i32_demo_dashboard.jpeg",
+    "/app/test_reports/screens/i32_banner_visible.jpeg",
+    "/app/test_reports/screens/i32_banner_after_resend.jpeg"
+  ],
+  "action_items": [
+    "(Optional) Migrate the theme's shadow.* style props to boxShadow for React Native Web to eliminate deprecation warnings.",
+    "(Optional UX) Consider whether the VerifyEmailBanner should also appear during /onboarding for new password users — currently they only see it after they land on '/' post-onboarding."
+  ],
+  "critical_code_review_comments": [
+    "auth.py: forgot-password uses password-provider-only gating and always returns 200 (good — no account enumeration).",
+    "auth.py: reset-password invalidates all existing sessions on success (good — prevents stale-session hijack after a leaked password reset).",
+    "auth.py: verify-email is idempotent-safe — bad/missing/expired tokens all render a friendly HTML page with 200, never a 500.",
+    "emailer.py: send_email correctly returns False on integration proxy 401/HTTPStatusError; callers wrap in try/except so email-send failures never leak to clients (except /resend-verification which converts to 502 by design)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_auth_verify_reset.py (new pytest module for verify + forgot/reset flows)"
+  ],
+  "success_rate": {"backend": "100% (16/16)", "frontend": "100% (all critical banner + forgot flows pass)"},
+  "seed_data_creation": "Created 3 ephemeral test users (test_verify_*, test_resend_*, test_reset_*, test_banner_*) during pytest and browser testing — ALL deleted at end. Demo account greenlantern@roujaune.app confirmed intact: assigned_plan_id='couch-to-road', email_verified=true, provider=password.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "In PREVIEW the EMERGENT_EMAIL_KEY is invalid, so real email sends return 502. That is EXPECTED. To validate flows, read verify_token/reset_token directly from Mongo (test_database.users) then hit the GET pages / POST endpoints. Web token localStorage key is 'roujaune_token'. New password users land on /onboarding first — flip onboarded=true in Mongo (or complete onboarding) to reach the '/' dashboard where VerifyEmailBanner renders.",
+  "rca_of_issue": "N/A — no bugs found. The observed 502 from /resend-verification and 401 from the Emergent email proxy are by design in the preview environment (email key injected at deploy time)."
+}

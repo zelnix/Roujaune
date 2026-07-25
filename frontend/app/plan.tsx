@@ -20,6 +20,8 @@ import { CalendarCard } from "@/src/components/CalendarCard";
 import { ReadinessGate } from "@/src/components/ReadinessGate";
 import { EditGoalsModal, ProgressModal, AdaptationsModal } from "@/src/components/plan-modals";
 import { PhaseCelebrationModal } from "@/src/components/PhaseCelebrationModal";
+import { ShareCardModal } from "@/src/components/ShareCardModal";
+import type { AchievementCardData } from "@/src/components/AchievementCard";
 import { usePhaseCelebration, usePlanCompletion } from "@/src/lib/phase-complete";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
 import type { EditableGoal } from "@/src/lib/plan";
@@ -50,6 +52,31 @@ export default function TrainingPlanScreen() {
   const adaptiveTargets = useAdaptiveTargets();
   const { celebration, dismiss: dismissCelebration } = usePhaseCelebration(plan);
   const { completion, dismiss: dismissCompletion } = usePlanCompletion(plan);
+  const [shareData, setShareData] = React.useState<AchievementCardData | null>(null);
+
+  const buildCard = React.useCallback((c: any): AchievementCardData => {
+    const prog = (plan as any)?.progress || {};
+    const isPlanEnd = !!c.isPlanEnd;
+    const weeksNum = String(c.weeks || "").replace(/[^0-9–-]/g, "") || String(c.weeks || "");
+    return {
+      isPlanEnd,
+      kicker: isPlanEnd ? "PROGRAMME COMPLETE" : `PHASE ${c.number} COMPLETE`,
+      title: c.name,
+      subtitle: c.weeks,
+      stats: isPlanEnd
+        ? [
+            { label: "Weeks", value: weeksNum },
+            { label: "Rides", value: String(prog.workouts ?? "—") },
+            { label: "Hours", value: String(prog.time ?? "—").replace(/\s*h$/i, "h") },
+          ]
+        : [
+            { label: "Phase", value: String(c.number) },
+            { label: "Weeks", value: weeksNum },
+            { label: "Rides", value: String(prog.workouts ?? "—") },
+          ],
+      coachName: persona.name,
+    };
+  }, [plan, persona.name]);
   const { width } = useWindowDimensions();
   const compact = width < 700; // phones scroll; tablets fill
 
@@ -186,6 +213,7 @@ export default function TrainingPlanScreen() {
           celebration={celebration}
           persona={persona}
           onClose={dismissCelebration}
+          onShare={(c) => setShareData(buildCard(c))}
           onChat={(c) => {
             setChatSeed(`I just finished ${c.name} (${c.weeks}) of my plan. What should I focus on next?`);
             dismissCelebration();
@@ -197,12 +225,14 @@ export default function TrainingPlanScreen() {
           celebration={completion}
           persona={persona}
           onClose={dismissCompletion}
+          onShare={(c) => setShareData(buildCard(c))}
           onChat={(c) => {
             setChatSeed(`I just completed the entire ${c.name} programme! What would you suggest for my next goal?`);
             dismissCompletion();
             setShowChat(true);
           }}
         />
+        <ShareCardModal visible={!!shareData} data={shareData} onClose={() => setShareData(null)} />
       </SafeAreaView>
     </GestureHandlerRootView>
   );
