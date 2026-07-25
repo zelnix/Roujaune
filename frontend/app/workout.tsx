@@ -14,6 +14,7 @@ import { useSettings } from "@/src/lib/settings";
 import { routeVideos, currentWorkout } from "@/src/data";
 import { getWorkout, buildSegments, currentSegment, mmss, targetWatts } from "@/src/lib/workout-catalog";
 import { fetchZoneBias, ZoneBias } from "@/src/lib/targets";
+import { usePlan } from "@/src/lib/plan";
 import { getRiderProfile } from "@/src/lib/rider-profile";
 import { WORKOUT_TYPES } from "@/src/lib/workouts";
 import { RouteVideo } from "@/src/components/RouteVideo";
@@ -22,7 +23,7 @@ import {
   VideoPlaceholder, RoutesButton, RoutePicker, SettingsPanel, MusicPanel, CastPanel, ImmersiveHud, RouteMapCard,
 } from "@/src/components/workout";
 import {
-  LiveHeader, MetricCard, ConnectionsPanel, CoachBanner, TerrainCard, StepTimeline, StepDetailModal, LiveControlBar,
+  LiveHeader, MetricCard, ConnectionsPanel, CoachBanner, TerrainCard, WorkoutCard, StepTimeline, StepDetailModal, LiveControlBar,
 } from "@/src/components/workout-live";
 import { useWorkoutAudio } from "@/src/hooks/useWorkoutAudio";
 import { useBleSensors } from "@/src/hooks/useBleSensors";
@@ -97,6 +98,16 @@ function hrZone(hr: number) {
   return 5;
 }
 
+// One-line effort description per training zone (used on the Workout card).
+const ZONE_DESC: Record<string, string> = {
+  Z1: "Very easy · active recovery",
+  Z2: "Aerobic endurance · conversational",
+  Z3: "Tempo · comfortably hard",
+  Z4: "Threshold · sustainably hard",
+  Z5: "VO2 max · very hard intervals",
+  Z6: "Anaerobic · all-out effort",
+};
+
 // Pick the route whose terrain best matches the chosen workout's type.
 const ROUTE_TAGS: Record<string, string[]> = {
   endurance: ["Flat", "Easy", "Scenic", "Coastal", "Forest", "Rolling"],
@@ -152,7 +163,7 @@ export default function LiveWorkout() {
   const segments = React.useMemo(() => (selected ? buildSegments(selected) : []), [selected]);
   const compact = height < 620;
   const leftW = compact ? 150 : 212;
-  const rightW = compact ? 170 : 236;
+  const rightW = compact ? 232 : 312;
 
   const [centerW, setCenterW] = React.useState(560);
   const [videoSlotH, setVideoSlotH] = React.useState(0);
@@ -180,6 +191,18 @@ export default function LiveWorkout() {
   const { telemetry, connectionState, stale, sendErg, sendTarget, sendInit, sendSensor, pause, resume, simulateDropout } = useTelemetry();
   const { settings, setSetting, loaded } = useSettings();
   const ble = useBleSensors();
+  const { plan } = usePlan();
+
+  // Plan context for the Workout card: plan name + current phase + week, with
+  // the day shown as today's weekday (best-effort for catalog-launched rides).
+  const planName = plan?.title ?? "Training Plan";
+  const phaseLabel = plan?.phase?.name ? (/phase/i.test(plan.phase.name) ? plan.phase.name : `${plan.phase.name} Phase`) : undefined;
+  const weekLabel = (() => {
+    const w = plan?.progress?.weeks; // e.g. "3 / 12"
+    const cur = w ? parseInt(String(w).split("/")[0].trim(), 10) : (plan as any)?.youAreHere;
+    return cur && !Number.isNaN(cur) ? `Week ${cur}` : undefined;
+  })();
+  const dayLabel = new Date().toLocaleDateString("en-US", { weekday: "short" });
 
   // ERG intensity: optimistic local value so +/- feels instant, then reconciles
   // with the trainer sim once taps settle (~1.5s of no local changes).
@@ -207,11 +230,9 @@ export default function LiveWorkout() {
     [segments, telemetry.elapsed],
   );
   const targetW = activeSeg ? targetWatts(activeSeg.segment, ftp, zoneBias) : 251;
-  const stepLabel = activeSeg ? `${activeSeg.index + 1} / ${activeSeg.total}` : undefined;
   const timeLeftLabel = activeSeg ? mmss(activeSeg.remaining) : undefined;
-  // Full step list for the bottom timeline — each segment with its summary
-  // detail (duration, target watts, %FTP, RPE) so past/current/future steps and
-  // the tap-through detail popup all read from the same source.
+  // Full step list for the bottom timeline + Workout card — each segment with
+  // its summary detail (duration, target watts, %FTP, RPE, one-line description).
   const stepList = React.useMemo(
     () => segments.map((s, i) => ({
       index: i,
@@ -224,6 +245,7 @@ export default function LiveWorkout() {
       rpe: s.rpe,
       color: s.color,
       intensity: Math.max(0.12, Math.min(1, s.targetPct / 1.4)),
+      desc: ZONE_DESC[s.zoneLabel] ?? "Steady effort",
     })),
     [segments, ftp, zoneBias],
   );
@@ -513,43 +535,58 @@ export default function LiveWorkout() {
         audioOn={musicOn}
       />
 
-      <View style={styles.metricRow}>
-        <MetricCard icon="flash" label="Power" value={trainerOn ? String(powerVal) : "—"} unit="W" status={powerStatus} statusTone={powerTone} sub={`TARGET ${Math.max(0, targetW - 8)}–${targetW + 8} W`} accent={colors.yellow} />
-        <MetricCard icon="heart" label="Heart Rate" value={wearableOn ? String(telemetry.hr) : "—"} unit="bpm" status={wearableOn ? `ZONE ${hrZone(telemetry.hr)}` : undefined} statusTone="neutral" accent={colors.red} />
-        <MetricCard icon="sync" label="Cadence" value={trainerOn ? String(telemetry.cadence) : "—"} unit="rpm" status={cadStatus} statusTone={cadInRange ? "good" : "warn"} sub={`TARGET ${CAD_LOW}–${CAD_HIGH}`} accent={colors.green} />
-        <MetricCard icon="timer-outline" label="Interval" value={timeLeftLabel ?? "—"} status={stepLabel ? `STEP ${stepLabel}` : undefined} statusTone="neutral" sub={activeSeg?.segment.label} accent={colors.white} />
-      </View>
+      <View style={[styles.mainRow, tablet && styles.flex1]}>
+        <View style={[styles.leftCenter, tablet && styles.flex1]}>
+          <View style={styles.metricRow}>
+            <MetricCard icon="flash" label="Power" value={trainerOn ? String(powerVal) : "—"} unit="W" status={powerStatus} statusTone={powerTone} sub={`TARGET ${Math.max(0, targetW - 8)}–${targetW + 8} W`} accent={colors.yellow} />
+            <MetricCard icon="heart" label="Heart Rate" value={wearableOn ? String(telemetry.hr) : "—"} unit="bpm" status={wearableOn ? `ZONE ${hrZone(telemetry.hr)}` : undefined} statusTone="neutral" accent={colors.red} />
+            <MetricCard icon="sync" label="Cadence" value={trainerOn ? String(telemetry.cadence) : "—"} unit="rpm" status={cadStatus} statusTone={cadInRange ? "good" : "warn"} sub={`TARGET ${CAD_LOW}–${CAD_HIGH}`} accent={colors.green} />
+          </View>
 
-      <View style={[styles.innerRow, tablet && styles.flex1]}>
-        <View style={[styles.leftCol, { width: leftW }]}>
-          <ConnectionsPanel trainerOn={trainerOn} wearableOn={wearableOn} powerOn={trainerOn} hrOn={wearableOn} cadenceOn={trainerOn} />
-        </View>
-        <View style={styles.centerCol} onLayout={onCenterLayout}>
-          <CoachBanner name={persona.name} message={liveCue} avatar={persona.image} />
-          <View
-            style={[styles.videoSlot, tablet && styles.flex1]}
-            onLayout={tablet ? (e) => setVideoSlotH(Math.round(e.nativeEvent.layout.height)) : undefined}
-          >
-            {expanded ? (
-              <VideoPlaceholder width={centerW} onRestore={() => setExpanded(false)} />
-            ) : virtualMode ? (
-              <View style={[tablet ? styles.flex1 : null, { position: "relative" }]}>
-                <VirtualRoute width={centerW} height={videoRenderH} speed={trainerOn ? telemetry.speed : 0} cadence={trainerOn ? telemetry.cadence : 88} gender={getRiderProfile().gender} paused={paused || !trainerOn} />
-                <View style={[styles.inlineRoutes, { pointerEvents: "box-none" }]}>
-                  <RoutesButton onPress={() => setVirtualMode(false)} testID="switch-video" label="Video" icon="videocam" />
-                </View>
+          <View style={[styles.innerRow, tablet && styles.flex1]}>
+            <View style={[styles.leftCol, { width: leftW }]}>
+              <ConnectionsPanel trainerOn={trainerOn} wearableOn={wearableOn} powerOn={trainerOn} hrOn={wearableOn} cadenceOn={trainerOn} />
+            </View>
+            <View style={styles.centerCol} onLayout={onCenterLayout}>
+              <CoachBanner name={persona.name} message={liveCue} avatar={persona.image} />
+              <View
+                style={[styles.videoSlot, tablet && styles.flex1]}
+                onLayout={tablet ? (e) => setVideoSlotH(Math.round(e.nativeEvent.layout.height)) : undefined}
+              >
+                {expanded ? (
+                  <VideoPlaceholder width={centerW} onRestore={() => setExpanded(false)} />
+                ) : virtualMode ? (
+                  <View style={[tablet ? styles.flex1 : null, { position: "relative" }]}>
+                    <VirtualRoute width={centerW} height={videoRenderH} speed={trainerOn ? telemetry.speed : 0} cadence={trainerOn ? telemetry.cadence : 88} gender={getRiderProfile().gender} paused={paused || !trainerOn} />
+                    <View style={[styles.inlineRoutes, { pointerEvents: "box-none" }]}>
+                      <RoutesButton onPress={() => setVirtualMode(false)} testID="switch-video" label="Video" icon="videocam" />
+                    </View>
+                  </View>
+                ) : (
+                  <RouteVideo source={activeRoute.url} title={`${activeRoute.title}${routeAuto ? " · Auto-matched" : activeRoute.id === lastRouteId ? " · Last ride" : ""}`} playing={!paused} muted width={tablet ? undefined : centerW} aspectRatio={16 / 9} fill={tablet} onToggleExpand={() => setExpanded(true)} expanded={false} onError={onVideoError}>
+                    <View style={[styles.inlineRoutes, { pointerEvents: "box-none" }]}>
+                      <RoutesButton onPress={() => setShowRoutes(true)} testID="inline-routes" />
+                      <RoutesButton onPress={() => setVirtualMode(true)} testID="switch-virtual" label="Virtual" icon="bicycle" />
+                    </View>
+                  </RouteVideo>
+                )}
               </View>
-            ) : (
-              <RouteVideo source={activeRoute.url} title={`${activeRoute.title}${routeAuto ? " · Auto-matched" : activeRoute.id === lastRouteId ? " · Last ride" : ""}`} playing={!paused} muted width={tablet ? undefined : centerW} aspectRatio={16 / 9} fill={tablet} onToggleExpand={() => setExpanded(true)} expanded={false} onError={onVideoError}>
-                <View style={[styles.inlineRoutes, { pointerEvents: "box-none" }]}>
-                  <RoutesButton onPress={() => setShowRoutes(true)} testID="inline-routes" />
-                  <RoutesButton onPress={() => setVirtualMode(true)} testID="switch-virtual" label="Virtual" icon="bicycle" />
-                </View>
-              </RouteVideo>
-            )}
+            </View>
           </View>
         </View>
-        <View style={[styles.rightCol, { width: rightW }]}>
+
+        <View style={[styles.rightCol, { width: rightW }, tablet && styles.flex1]}>
+          <WorkoutCard
+            planName={planName}
+            phase={phaseLabel}
+            week={weekLabel}
+            day={dayLabel}
+            workoutName={workoutTitle}
+            steps={stepList}
+            activeIndex={activeSeg?.index ?? -1}
+            onStepPress={(i) => setStepDetail(i)}
+            fill={tablet}
+          />
           <TerrainCard grade={terrain.grade} elevGain={terrain.elev} distanceLeft={Math.max(0, terrain.km - riddenKm)} progress={progress} isClimb={terrain.isClimb} />
           <RouteMapCard title={routeInfo.title} progress={progress} riddenKm={riddenKm} totalKm={routeInfo.km} timeBased={!trainerOn} fill />
         </View>
@@ -787,6 +824,8 @@ const styles = StyleSheet.create({
   hudCastOn: { backgroundColor: colors.yellow, borderColor: colors.yellow },
   inlineRoutes: { position: "absolute", left: 10, bottom: 10 },
   metricRow: { flexDirection: "row", gap: spacing.md },
+  mainRow: { flexDirection: "row", gap: spacing.md, alignItems: "stretch" },
+  leftCenter: { flex: 1, gap: spacing.md },
   innerRow: { flexDirection: "row", gap: spacing.md, alignItems: "stretch" },
   leftCol: { gap: spacing.md },
   centerCol: { flex: 1, gap: spacing.md },

@@ -180,10 +180,59 @@ export function TerrainCard({ grade, elevGain, distanceLeft, progress, isClimb }
   );
 }
 
+// ---- Workout card (right column, top) -------------------------------------
+export function WorkoutCard({
+  planName, phase, week, day, workoutName, steps, activeIndex, onStepPress, fill = false,
+}: {
+  planName: string; phase?: string; week?: string; day?: string; workoutName: string;
+  steps: TimelineStep[]; activeIndex: number; onStepPress: (index: number) => void; fill?: boolean;
+}) {
+  const scrollRef = React.useRef<ScrollView>(null);
+  React.useEffect(() => {
+    if (activeIndex < 0) return;
+    scrollRef.current?.scrollTo({ y: Math.max(0, activeIndex * 46 - 40), animated: true });
+  }, [activeIndex]);
+  const chips = [phase, week, day].filter(Boolean) as string[];
+  return (
+    <View style={wc.card} testID="workout-card">
+      <View style={wc.head}>
+        <Ionicons name="ribbon-outline" size={14} color={colors.yellow} />
+        <Text style={wc.plan} numberOfLines={1}>{planName}</Text>
+      </View>
+      {chips.length ? (
+        <View style={wc.metaRow}>
+          {chips.map((c, i) => (<View key={i} style={wc.chip}><Text style={wc.chipText}>{c}</Text></View>))}
+        </View>
+      ) : null}
+      <Text style={wc.title} numberOfLines={2}>{workoutName}</Text>
+      <View style={wc.divider} />
+      <Text style={wc.stepsHead}>WORKOUT STEPS · {steps.length}</Text>
+      <ScrollView ref={scrollRef} style={[wc.list, { maxHeight: fill ? 300 : 200 }]} contentContainerStyle={wc.listContent} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+        {steps.map((s) => {
+          const status: StepStatus = s.index < activeIndex ? "done" : s.index === activeIndex ? "current" : "future";
+          return (
+            <Pressable key={s.index} onPress={() => onStepPress(s.index)} testID={`wc-step-${s.index}`} style={[wc.step, status === "current" && wc.stepCurrent]}>
+              <View style={[wc.stepBar, { backgroundColor: status === "future" ? "rgba(255,255,255,0.18)" : s.color }]} />
+              <View style={{ flex: 1 }}>
+                <Text style={[wc.stepName, status === "future" && { color: colors.textDim }]} numberOfLines={1}>{s.index + 1}. {s.label}</Text>
+                {s.desc ? <Text style={wc.stepDesc} numberOfLines={1}>{s.desc}</Text> : null}
+              </View>
+              <View style={wc.stepRight}>
+                <Text style={[wc.stepDur, status === "current" && { color: colors.yellow }]}>{s.duration}</Text>
+                {status === "done" ? <Ionicons name="checkmark-circle" size={12} color={colors.green} /> : status === "current" ? <View style={wc.liveDot} /> : <View style={{ height: 12 }} />}
+              </View>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
 // ---- Step timeline (bottom) -----------------------------------------------
 export type TimelineStep = {
   index: number; label: string; zoneLabel: string; duration: string; durationSec: number;
-  watts: number; targetPct: number; rpe: number; color: string; intensity: number;
+  watts: number; targetPct: number; rpe: number; color: string; intensity: number; desc?: string;
 };
 export type StepStatus = "done" | "current" | "future";
 
@@ -213,6 +262,13 @@ export function StepTimeline({
 }: {
   title: string; steps: TimelineStep[]; activeIndex: number; remaining?: string; onStepPress: (index: number) => void;
 }) {
+  const scrollRef = React.useRef<ScrollView>(null);
+  // Keep the active step in view as the workout progresses.
+  React.useEffect(() => {
+    if (activeIndex < 0) return;
+    const CHIP = 116 + 8; // chip width + gap
+    scrollRef.current?.scrollTo({ x: Math.max(0, activeIndex * CHIP - 40), animated: true });
+  }, [activeIndex]);
   return (
     <View style={st.wrap} testID="interval-timeline">
       <View style={st.head}>
@@ -225,7 +281,7 @@ export function StepTimeline({
           ) : null}
         </View>
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.track}>
+      <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.track}>
         {steps.map((s) => (
           <StepChip key={s.index} step={s} status={s.index < activeIndex ? "done" : s.index === activeIndex ? "current" : "future"} onPress={() => onStepPress(s.index)} />
         ))}
@@ -456,6 +512,28 @@ const sd = StyleSheet.create({
   statValue: { color: colors.white, fontSize: 18, fontWeight: "900", marginTop: 4, fontVariant: ["tabular-nums"] },
   tipBox: { flexDirection: "row", gap: 9, alignItems: "flex-start", backgroundColor: colors.yellow + "10", borderWidth: 1, borderColor: colors.yellow + "33", borderRadius: radius.md, padding: 12, marginTop: 2 },
   tipText: { color: colors.white, fontSize: 13, fontWeight: "600", lineHeight: 18, flex: 1 },
+});
+
+const wc = StyleSheet.create({
+  card: { ...card, padding: 14, gap: 8 },
+  head: { flexDirection: "row", alignItems: "center", gap: 7 },
+  plan: { color: colors.yellow, fontSize: 11.5, fontWeight: "800", letterSpacing: 0.5, textTransform: "uppercase", flex: 1 },
+  metaRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  chip: { backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 3 },
+  chipText: { color: colors.textDim, fontSize: 10.5, fontWeight: "800", letterSpacing: 0.3 },
+  title: { color: colors.white, fontSize: 18, fontWeight: "900", marginTop: 2 },
+  divider: { height: 1, backgroundColor: colors.borderSoft, marginVertical: 2 },
+  stepsHead: { color: colors.textFaint, fontSize: 9.5, fontWeight: "800", letterSpacing: 1 },
+  list: { marginTop: 2 },
+  listContent: { gap: 5, paddingBottom: 2 },
+  step: { flexDirection: "row", alignItems: "center", gap: 9, paddingVertical: 6, paddingHorizontal: 8, borderRadius: radius.sm },
+  stepCurrent: { backgroundColor: colors.yellow + "14", borderWidth: 1, borderColor: colors.yellow + "3A" },
+  stepBar: { width: 4, alignSelf: "stretch", minHeight: 26, borderRadius: 2 },
+  stepName: { color: colors.white, fontSize: 12.5, fontWeight: "700" },
+  stepDesc: { color: colors.textDim, fontSize: 11, fontWeight: "600", marginTop: 1 },
+  stepRight: { alignItems: "flex-end", gap: 3, minWidth: 44 },
+  stepDur: { color: colors.textDim, fontSize: 12, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.yellow },
 });
 
 const bc = StyleSheet.create({
