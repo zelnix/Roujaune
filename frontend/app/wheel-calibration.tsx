@@ -8,7 +8,7 @@ import * as Location from "expo-location";
 import { CC } from "@/src/components/calendar";
 import { useBleSensors } from "@/src/hooks/useBleSensors";
 import { BleSensorsPanel } from "@/src/components/BleSensorsPanel";
-import { useSettings } from "@/src/lib/settings";
+import { useSettings, nearestWheelPreset } from "@/src/lib/settings";
 import { haversineMeters } from "@/src/lib/geo";
 
 type Phase = "idle" | "running" | "done";
@@ -194,15 +194,31 @@ export default function WheelCalibrationScreen() {
             {error && <Text style={s.hintWarn} testID="cal-error">{error}</Text>}
 
             {/* Result banner */}
-            {phase === "done" && result != null && (
-              <View style={[s.card, s.resultCard]} testID="cal-result">
-                <Ionicons name="checkmark-circle" size={22} color={CC.green} />
-                <View style={{ flex: 1 }}>
-                  <Text style={s.resultTitle}>Calibrated to {result} mm</Text>
-                  <Text style={s.cardSub}>Saved as your wheel circumference. Your live speed now uses this exact roll-out.</Text>
+            {phase === "done" && result != null && (() => {
+              const near = nearestWheelPreset(result);
+              const sign = near.delta > 0 ? "+" : "";
+              const matchExact = near.delta === 0;
+              const off = Math.abs(near.delta);
+              const trust = off <= 25; // within ~1% of a known tyre → high confidence
+              return (
+                <View style={[s.card, s.resultCard]} testID="cal-result">
+                  <Ionicons name="checkmark-circle" size={22} color={CC.green} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.resultTitle}>Calibrated to {result} mm</Text>
+                    <Text style={s.resultCompare} testID="cal-compare">
+                      {matchExact
+                        ? `Spot-on match for ${near.label}.`
+                        : `Closest to ${near.label} (${sign}${near.delta} mm).`}
+                    </Text>
+                    <Text style={s.cardSub}>
+                      {trust
+                        ? "Within a normal tolerance — this looks reliable and is now saved."
+                        : "That's a fair bit off the nearest tyre — re-run on a longer, straighter stretch if it looks wrong. Saved for now."}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            )}
+              );
+            })()}
 
             {/* Controls */}
             {phase !== "running" ? (
@@ -306,6 +322,7 @@ const s = StyleSheet.create({
   warnBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: CC.rouge, borderRadius: 12, paddingVertical: 12, minHeight: 46 },
   warnBtnText: { color: "#fff", fontSize: 13.5, fontWeight: "700" },
 
-  resultCard: { flexDirection: "row", gap: 12, alignItems: "center", borderColor: "rgba(46,196,124,0.4)" },
+  resultCard: { flexDirection: "row", gap: 12, alignItems: "flex-start", borderColor: "rgba(46,196,124,0.4)" },
   resultTitle: { color: CC.white, fontSize: 16, fontWeight: "800" },
+  resultCompare: { color: CC.white, fontSize: 13, fontWeight: "700", marginTop: 3 },
 });

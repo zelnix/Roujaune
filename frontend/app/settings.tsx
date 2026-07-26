@@ -9,20 +9,9 @@ import { CC } from "@/src/components/calendar";
 import { useCoach, setCoach, COACHES, CoachId, COACH_STYLES, VOICE_GUIDANCE_OPTS, useCoachStyle, setCoachStyle, useVoiceGuidance, setVoiceGuidance, CoachStyle, VoiceGuidance, SPEECH_RATES, useCoachRate, setCoachRate } from "@/src/lib/coach-persona";
 import { resolveBothCoachVoices, ResolvedVoice, COACH_PITCH, loadSpanishVoices, CoachVoiceOption } from "@/src/lib/coach-voice";
 import { getVoiceId, setVoiceId } from "@/src/lib/prefs";
-import { useSettings } from "@/src/lib/settings";
+import { useSettings, WHEEL_PRESETS } from "@/src/lib/settings";
 
 const PREVIEW_LINE = "Alright, let's ride. Hold steady and breathe — you've got this.";
-
-// Common tyre roll-outs (mm). Values match standard cycling speed-sensor tables.
-const WHEEL_PRESETS: { label: string; mm: number }[] = [
-  { label: "700×23c", mm: 2097 },
-  { label: "700×25c", mm: 2105 },
-  { label: "700×28c", mm: 2136 },
-  { label: "700×32c", mm: 2155 },
-  { label: '650b · 27.5"', mm: 2086 },
-  { label: '26" MTB', mm: 2070 },
-  { label: '29" MTB', mm: 2299 },
-];
 
 export default function SettingsScreen() {
   const persona = useCoach();

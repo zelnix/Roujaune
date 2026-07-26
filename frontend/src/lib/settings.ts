@@ -23,6 +23,27 @@ export type Settings = {
 const DEFAULTS: Settings = { hasTrainer: false, hasWearable: false, demoMode: false, hudEnabled: true, ftp: 287, ftpAuto: true, wheelCircumference: 2105, seatedMode: false, homeCity: "Nice, France", homeLat: 43.7102, homeLon: 7.262, units: "metric", coachAudio: true, autoSync: true, weeklyReport: true, restReminders: false };
 const KEY = "roujaune:settings";
 
+// Common tyre roll-outs (mm) — matches standard cycling speed-sensor tables.
+export const WHEEL_PRESETS: { label: string; mm: number }[] = [
+  { label: "700×23c", mm: 2097 },
+  { label: "700×25c", mm: 2105 },
+  { label: "700×28c", mm: 2136 },
+  { label: "700×32c", mm: 2155 },
+  { label: '650b · 27.5"', mm: 2086 },
+  { label: '26" MTB', mm: 2070 },
+  { label: '29" MTB', mm: 2299 },
+];
+
+// Nearest tyre preset to a measured roll-out, with a signed delta (mm) so
+// riders get a quick sanity-check on their calibration.
+export function nearestWheelPreset(mm: number): { label: string; mm: number; delta: number } {
+  let best = WHEEL_PRESETS[0];
+  for (const p of WHEEL_PRESETS) {
+    if (Math.abs(mm - p.mm) < Math.abs(mm - best.mm)) best = p;
+  }
+  return { label: best.label, mm: best.mm, delta: mm - best.mm };
+}
+
 function apiBase(): string {
   return (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
 }

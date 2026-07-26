@@ -33,4 +33,23 @@ const circ2 = Math.round((200 * 1000) / 88);
 assert.ok(circ2 > 2200 && circ2 < 2400, `29er range, got ${circ2}`);
 console.log(`PASS: 200m / 88 revs => ${circ2} mm`);
 
+// 6) nearestWheelPreset: 2108 mm should map to 700x25c (+3 mm)
+const PRESETS = [
+  { label: "700×23c", mm: 2097 }, { label: "700×25c", mm: 2105 }, { label: "700×28c", mm: 2136 },
+  { label: "700×32c", mm: 2155 }, { label: '650b · 27.5"', mm: 2086 }, { label: '26" MTB', mm: 2070 },
+  { label: '29" MTB', mm: 2299 },
+];
+function nearestWheelPreset(mm) {
+  let best = PRESETS[0];
+  for (const p of PRESETS) if (Math.abs(mm - p.mm) < Math.abs(mm - best.mm)) best = p;
+  return { label: best.label, mm: best.mm, delta: mm - best.mm };
+}
+const n1 = nearestWheelPreset(2108);
+assert.equal(n1.label, "700×25c");
+assert.equal(n1.delta, 3);
+const n2 = nearestWheelPreset(2290);
+assert.equal(n2.label, '29" MTB');
+assert.equal(n2.delta, -9);
+console.log(`PASS: 2108mm -> ${n1.label} (${n1.delta >= 0 ? "+" : ""}${n1.delta}mm); 2290mm -> ${n2.label} (${n2.delta}mm)`);
+
 console.log("\nAll calibration tests passed ✅");
