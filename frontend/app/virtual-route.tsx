@@ -2,14 +2,15 @@ import React from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, Image, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing, shadow } from "@/src/theme";
 import { useTelemetry } from "@/src/hooks/useTelemetry";
 import { useBleSensors } from "@/src/hooks/useBleSensors";
 import { BleSensorsPanel } from "@/src/components/BleSensorsPanel";
 import { RouteProfile } from "@/src/components/virtual-route/RouteProfile";
-import { VIRTUAL_RIDERS, getRider } from "@/src/lib/virtual-riders";
+import { riderVisualFor } from "@/src/lib/virtual-riders";
+import { RIDER_TYPES, BIKE_TYPES, CLOTHING_STYLES, DEFAULT_APPEARANCE, loadAppearance, RiderAppearanceConfiguration } from "@/src/lib/rider-config";
 import { VIRTUAL_ROUTES, getVRoute, routeStateAt, routeTerrainBias } from "@/src/lib/vroutes";
 import { VirtualRouteScene, SceneTelemetry } from "@/src/components/virtual-route/scene";
 
@@ -74,15 +75,25 @@ export default function VirtualRouteScreen() {
     sendSensor({ power: ble.readings.power, cadence: ble.readings.cadence, hr: ble.readings.hr });
   }, [ble.readings.ts, connectionState, sendSensor]);
 
-  const [riderId, setRiderId] = React.useState("male");
+  const [appearance, setAppearance] = React.useState<RiderAppearanceConfiguration>(DEFAULT_APPEARANCE);
   const [routeId, setRouteId] = React.useState(VIRTUAL_ROUTES[0].id);
   const [phase, setPhase] = React.useState<"setup" | "riding" | "paused">("setup");
   const [panel, setPanel] = React.useState<PanelMode>("all");
   const [reducedMotion, setReducedMotion] = React.useState(false);
   const [autoResistance, setAutoResistance] = React.useState(true);
   const [emergency, setEmergency] = React.useState(false);
-  const rider = getRider(riderId);
+  const rider = riderVisualFor(appearance.riderType);
   const vroute = getVRoute(routeId);
+
+  // Load persisted rider appearance on mount and whenever we return from the
+  // customisation screen (persists until the user changes it again).
+  useFocusEffect(
+    React.useCallback(() => {
+      let alive = true;
+      loadAppearance().then((cfg) => { if (alive) setAppearance(cfg); });
+      return () => { alive = false; };
+    }, []),
+  );
 
   // Recorded telemetry + ride-relative timing for the end-of-ride summary/save.
   const samplesRef = React.useRef<{ power: number; hr: number; cadence: number; speed: number }[]>([]);
@@ -199,7 +210,7 @@ export default function VirtualRouteScreen() {
     <View style={s.root}>
       <StatusBar hidden />
       {/* Cinematic wide scene */}
-      <VirtualRouteScene rider={rider} backdrop={vroute.backdrop} telemetry={scene} showBrand />
+      <VirtualRouteScene rider={rider} appearance={appearance} backdrop={vroute.backdrop} telemetry={scene} showBrand />
 
       {/* Connection status pill (top-right) */}
       <SafeAreaView style={s.topRight} pointerEvents="box-none" edges={["top", "right"]}>
@@ -293,22 +304,20 @@ export default function VirtualRouteScreen() {
                 })}
               </View>
 
-              <Text style={s.sectionLabel}>CHOOSE YOUR RIDER</Text>
-              <View style={s.riderGrid}>
-                {VIRTUAL_RIDERS.map((r) => {
-                  const sel = r.id === riderId;
-                  return (
-                    <Pressable key={r.id} onPress={() => setRiderId(r.id)} testID={`rider-${r.id}`} style={[s.riderCard, sel && { borderColor: r.accent, borderWidth: 2 }]} accessibilityRole="button" accessibilityLabel={`Select ${r.name}`}>
-                      <Image source={r.sprite} style={s.riderThumb} resizeMode="contain" />
-                      <View style={s.riderMeta}>
-                        <Text style={s.riderName} numberOfLines={1}>{r.name}</Text>
-                        <Text style={s.riderTag} numberOfLines={1}>{r.tag}</Text>
-                      </View>
-                      {sel && <View style={[s.riderCheck, { backgroundColor: r.accent }]}><Ionicons name="checkmark" size={13} color="#fff" /></View>}
-                    </Pressable>
-                  );
-                })}
-              </View>
+              <Text style={s.sectionLabel}>YOUR RIDER</Text>
+              <Pressable onPress={() => router.push("/rider-customise")} testID="vr-customise-rider" style={s.riderSummary} accessibilityRole="button" accessibilityLabel="Customise your rider">
+                <Image source={rider.sprite} style={s.riderSummaryThumb} resizeMode="contain" />
+                <View style={{ flex: 1 }}>
+                  <Text style={s.riderSummaryName} numberOfLines={1}>{RIDER_TYPES.find((r) => r.id === appearance.riderType)?.label}</Text>
+                  <Text style={s.riderSummaryMeta} numberOfLines={1}>
+                    {BIKE_TYPES.find((b) => b.id === appearance.bikeType)?.label} · {CLOTHING_STYLES.find((c) => c.id === appearance.clothingStyle)?.label}
+                  </Text>
+                </View>
+                <View style={s.customiseBtn}>
+                  <Ionicons name="options" size={15} color={colors.yellow} />
+                  <Text style={s.customiseText}>Customise</Text>
+                </View>
+              </Pressable>
 
               <View style={s.setupRow}>
                 <View style={[s.connPill, s.connPillInline, { borderColor: conn.tone + "88", backgroundColor: conn.tone + "22" }]}>
@@ -500,13 +509,12 @@ const s = StyleSheet.create({
   routeName: {color: colors.white, fontSize: 24, fontWeight: "900" },
   routePlace: { color: colors.textDim, fontSize: 13, fontWeight: "600", marginTop: -6 },
   sectionLabel: { color: colors.textFaint, fontSize: 10.5, fontWeight: "800", letterSpacing: 1, marginTop: 4 },
-  riderGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  riderCard: { width: "47%", flexGrow: 1, backgroundColor: "rgba(255,255,255,0.04)", borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, overflow: "hidden" },
-  riderThumb: { width: "100%", height: 96, backgroundColor: "#0d0f14" },
-  riderMeta: { padding: 8 },
-  riderName: { color: colors.white, fontSize: 13, fontWeight: "800" },
-  riderTag: { color: colors.textFaint, fontSize: 11, fontWeight: "600" },
-  riderCheck: { position: "absolute", top: 8, right: 8, width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  riderSummary: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "rgba(255,255,255,0.04)", borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: 10 },
+  riderSummaryThumb: { width: 52, height: 64, backgroundColor: "#0d0f14", borderRadius: radius.sm },
+  riderSummaryName: { color: colors.white, fontSize: 14, fontWeight: "800" },
+  riderSummaryMeta: { color: colors.textFaint, fontSize: 12, fontWeight: "600", marginTop: 2 },
+  customiseBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 9, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.yellow + "88", backgroundColor: colors.yellow + "18" },
+  customiseText: { color: colors.yellow, fontSize: 13, fontWeight: "800" },
   setupRow: { gap: 8, marginTop: 4 },
   simNote: { color: colors.textFaint, fontSize: 12, fontWeight: "600" },
   pairBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, paddingVertical: 12, marginTop: 4 },

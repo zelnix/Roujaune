@@ -1,6 +1,6 @@
 import React from "react";
 import { Image, ImageStyle, StyleProp } from "react-native";
-import type { RiderArtboard } from "@/src/lib/rider-animation";
+import type { RiderType, BikeType, ClothingStyle } from "@/src/lib/rider-config";
 
 /**
  * Web / Expo Go fallback: Rive only renders in a native build, so here we show
@@ -9,7 +9,9 @@ import type { RiderArtboard } from "@/src/lib/rider-animation";
  */
 export type RiveRiderProps = {
   sprite: any;
-  riderArtboard?: RiderArtboard;
+  riderType?: RiderType;
+  bikeType?: BikeType;
+  clothingStyle?: ClothingStyle;
   cadenceRpm?: number;
   powerWatts?: number;
   speedKph?: number;

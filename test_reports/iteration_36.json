@@ -1,0 +1,45 @@
+{
+  "summary": "Configurable Rider/Bike/Clothing feature FULLY VERIFIED. Backend: 8/8 pytest cases pass — GET /api/rider/appearance returns valid doc (defaults younger_male/road/get_fit on first call, no _id leak); PUT with full body persists and a subsequent GET returns the saved values; PUT with a partial body updates only that field and leaves the others intact for all 3 fields (riderType, bikeType, clothingStyle). Frontend: /rider-customise loads with live preview + 3 pickers (4 riders, 3 bikes, 3 styles) + action bar (Reset/Restore/Save/Continue) all rendering the expected testIDs. Changing selections updates the live preview (Mature Female / Vintage Bike / Pro Rider) and flips cust-save from aria-disabled=true to enabled. Pressing Save shows the 'Saved' badge; Continue returns to /virtual-route where the 'YOUR RIDER' card immediately reflects the new selection ('Mature Female · Vintage Bike · Pro Rider'). After a full navigation cycle (home → /virtual-route) the selection persists via loadAppearance() through the backend + AsyncStorage cache. Restore reverts draft to the last saved doc; Reset returns draft to the default (Younger Male / Road / Get Fit). No red screens, no runtime errors, no MongoDB _id leaks.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/rider-customise (mobile 390x844)", "issues": [
+        "cust-back touch target measures 64x23 px — well below iOS/Android 44pt minimum. Wrap the back Pressable with hitSlop or bump paddingVertical to reach 44 pt (Reference: /app/frontend/app/rider-customise.tsx:148, s.backBtn on line 214).",
+        "cust-reset (82x39), cust-restore (95x39) and cust-save (89x41) action-bar buttons are 39–41 px tall on mobile — a hair below 44 pt. Bump paddingVertical from 10/11 to 12 (Reference: /app/frontend/app/rider-customise.tsx:251,253 s.ghostBtn / s.saveBtn)."
+      ]}
+    ],
+    "react_native_issues": [
+      {"component": "styles (shadow*/textShadow*)", "issue": "Pre-existing (also flagged in iter35): console still warns '\"shadow*\" style props are deprecated. Use \"boxShadow\".' and '\"textShadow*\" style props are deprecated. Use \"textShadow\".' — introduced via /app/frontend/src/theme (shadow.card, shadow.glow) which /app/frontend/app/rider-customise.tsx and /app/frontend/app/virtual-route.tsx both spread. Not blocking but should be migrated to boxShadow/textShadow for react-native-web >=0.19 compliance."},
+      {"component": "props.pointerEvents", "issue": "Pre-existing (also flagged in iter35): console warns 'props.pointerEvents is deprecated. Use style.pointerEvents' — /app/frontend/app/virtual-route.tsx:216,246,427 still pass pointerEvents as a prop on SafeAreaView / View. Move it into style={{ pointerEvents: 'box-none' }}."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_rider_appearance.py (new — 8 pytest cases, all pass)",
+    "/app/test_reports/pytest/iter36.xml (JUnit results)",
+    "/tmp/vr_setup.jpeg (setup card BEFORE customisation — Younger Male / Road / Get Fit)",
+    "/tmp/vr_customise_initial.jpeg (customise screen, pre-change)",
+    "/tmp/vr_customise_changed.jpeg (Mature Female / Vintage / Pro selected, preview live-updated)",
+    "/tmp/vr_customise_saved.jpeg (Saved badge visible after cust-save)",
+    "/tmp/vr_setup_after.jpeg (setup card AFTER Continue — new summary reflected)",
+    "/tmp/vr_setup_persist.jpeg (persistence verified after home → virtual-route navigation)",
+    "/tmp/vr_customise_mobile.jpeg (390x844 mobile viewport layout)"
+  ],
+  "action_items": [
+    "Minor a11y: raise action-bar touch targets on /rider-customise (cust-back 23 px, cust-reset/restore/save 39–41 px) to ≥44 pt via paddingVertical or hitSlop.",
+    "Cleanup (repo-wide, pre-existing): migrate deprecated shadow*/textShadow* style props to boxShadow/textShadow and move pointerEvents from prop to style on SafeAreaView/View — same items called out in iter35."
+  ],
+  "critical_code_review_comments": [
+    "server.py:1070-1090 — GET auto-seeds a default doc on first call, PUT is a proper upsert with only non-None fields ($set), and both endpoints strip _id before returning. Correct persistence + partial-update semantics.",
+    "rider-customise.tsx:47-79 — draft/savedRef pattern gives dirty (draft ≠ saved) and isDefault (draft ≠ default) flags used to gate Save/Restore/Reset; justSaved cleared on any field change. Solid state machine.",
+    "rider-config.ts:72-98 — loadAppearance() calls backend first then falls back to AsyncStorage (offline), and saveAppearance() writes cache first then best-effort PUT. Uses coerce() to sanitise unknown values against the canonical enums. Good.",
+    "virtual-route.tsx:90-96 — useFocusEffect reloads appearance every time the setup screen regains focus, guaranteeing the summary card mirrors any change made in /rider-customise. Correct."
+  ],
+  "updated_files": ["/app/backend/tests/test_rider_appearance.py (new)"],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100% (7/7 flow steps)"},
+  "seed_data_creation": "No seed data created. Reused greenlantern@roujaune.app / rideon9900 credentials from /app/memory/test_credentials.md. Backend test module autouse fixture snapshots and restores the appearance doc so it does not leak state.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login: greenlantern@roujaune.app / rideon9900 (testIDs email-input, password-input, submit-btn). Path: /virtual-route → tap testID='vr-customise-rider' → /rider-customise. Customise testIDs: cust-rider-{younger_male|younger_female|mature_male|mature_female}, cust-bike-{road|mountain|vintage}, cust-style-{pro|get_fit|casual}, cust-save, cust-continue, cust-reset, cust-restore, cust-back. Backend endpoints: GET/PUT /api/rider/appearance (Bearer auth required, single-doc keyed by id='me'). Defaults: {riderType:'younger_male', bikeType:'road', clothingStyle:'get_fit'}. Save-badge text is 'Saved'. Setup card summary format: '<Rider Label>\\n<Bike Label> · <Style Label>'."
+}

@@ -21,3 +21,18 @@ export const VIRTUAL_RIDERS: VirtualRider[] = [
 export function getRider(id: string | null | undefined): VirtualRider {
   return VIRTUAL_RIDERS.find((r) => r.id === id) ?? VIRTUAL_RIDERS[0];
 }
+
+// Map a configurable rider identity (rider-config `RiderType`) to its production
+// artboard + placeholder scene visuals, so the customisation config drives the
+// exact sprite/plate shown in the setup preview and the live ride scene.
+const ARTBOARD_BY_RIDER_TYPE: Record<string, VirtualRider["artboard"]> = {
+  younger_male: "Rider_Younger_Male",
+  younger_female: "Rider_Younger_Female",
+  mature_male: "Rider_Mature_Male",
+  mature_female: "Rider_Mature_Female",
+};
+
+export function riderVisualFor(riderType: string | null | undefined): VirtualRider {
+  const ab = ARTBOARD_BY_RIDER_TYPE[riderType ?? ""] ?? "Rider_Younger_Male";
+  return VIRTUAL_RIDERS.find((r) => r.artboard === ab) ?? VIRTUAL_RIDERS[0];
+}

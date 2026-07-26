@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Svg, { Circle, Line, G } from "react-native-svg";
 import { colors } from "@/src/theme";
 import type { VirtualRider } from "@/src/lib/virtual-riders";
+import { DEFAULT_APPEARANCE, RiderAppearanceConfiguration } from "@/src/lib/rider-config";
 // eslint-disable-next-line import/no-unresolved -- resolved by Metro via RiveRider.native/.web
 import { RiveRider } from "./RiveRider";
 
@@ -32,7 +33,7 @@ export type SceneTelemetry = {
  * markers, drifting particles, camera bob, bike lean, dynamic light & motion
  * blur) driven by smoothed telemetry via a rAF phase loop.
  */
-export function VirtualRouteScene({ rider, backdrop, telemetry, showBrand = true }: { rider: VirtualRider; backdrop?: any; telemetry: SceneTelemetry; showBrand?: boolean }) {
+export function VirtualRouteScene({ rider, appearance = DEFAULT_APPEARANCE, backdrop, telemetry, showBrand = true }: { rider: VirtualRider; appearance?: RiderAppearanceConfiguration; backdrop?: any; telemetry: SceneTelemetry; showBrand?: boolean }) {
   const tRef = React.useRef(telemetry);
   tRef.current = telemetry;
 
@@ -143,7 +144,9 @@ export function VirtualRouteScene({ rider, backdrop, telemetry, showBrand = true
           <AView style={[st.riderWrap, { transform: [{ translateX: swayX }, { translateY: bobY }, { rotate: leanDeg }, { scale }] }]}>
             <RiveRider
               sprite={rider.sprite}
-              riderArtboard={rider.artboard}
+              riderType={appearance.riderType}
+              bikeType={appearance.bikeType}
+              clothingStyle={appearance.clothingStyle}
               cadenceRpm={telemetry.cadence}
               powerWatts={telemetry.power}
               speedKph={telemetry.speed}
