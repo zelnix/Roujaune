@@ -270,8 +270,8 @@ export default function VirtualRouteScreen() {
         <SafeAreaView style={s.setup} edges={["top", "bottom", "right"]}>
           <ScrollView contentContainerStyle={s.setupScroll} showsVerticalScrollIndicator={false}>
             <View style={s.setupCard}>
-              <Pressable onPress={leaveScreen} testID="vr-exit" style={s.exitBtn} accessibilityRole="button" accessibilityLabel="Exit Virtual Routes">
-                <Ionicons name="chevron-back" size={18} color={colors.textDim} />
+              <Pressable onPress={leaveScreen} testID="vr-exit" style={s.exitBtn} accessibilityRole="button" accessibilityLabel="Exit Virtual Routes" hitSlop={10}>
+                <Ionicons name="chevron-back" size={24} color={colors.white} />
                 <Text style={s.exitText}>Exit</Text>
               </Pressable>
               <Text style={s.routeName}>{vroute.name}</Text>
@@ -463,8 +463,8 @@ const s = StyleSheet.create({
   setup: { position: "absolute", top: 0, right: 0, bottom: 0, width: 460, maxWidth: "94%" },
   setupScroll: { padding: 16, flexGrow: 1, justifyContent: "center" },
   setupCard: { backgroundColor: "rgba(10,11,14,0.82)", borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, gap: 12, ...(shadow.card as any) },
-  exitBtn: { flexDirection: "row", alignItems: "center", gap: 2, alignSelf: "flex-start", marginBottom: -4, paddingVertical: 4, paddingRight: 8 },
-  exitText: { color: colors.textDim, fontSize: 13, fontWeight: "800" },
+  exitBtn: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", marginBottom: 12, paddingVertical: 11, paddingHorizontal: 18, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1.5, borderColor: colors.border },
+  exitText: { color: colors.white, fontSize: 16, fontWeight: "800" },
   routeName: {color: colors.white, fontSize: 24, fontWeight: "900" },
   routePlace: { color: colors.textDim, fontSize: 13, fontWeight: "600", marginTop: -6 },
   sectionLabel: { color: colors.textFaint, fontSize: 10.5, fontWeight: "800", letterSpacing: 1, marginTop: 4 },

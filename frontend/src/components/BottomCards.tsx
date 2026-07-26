@@ -58,6 +58,23 @@ export function ProgressCard({ onPress }: { onPress?: () => void }) {
         <LineChart data={progressCard.points} color={colors.redBright} width={230} height={56} />
       </View>
 
+      <View style={styles.achStrip} testID="progress-achievements">
+        <View style={styles.achBadgeSm}>
+          <MaterialCommunityIcons name="terrain" size={16} color="#1a1300" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <View style={styles.achStripHead}>
+            <Ionicons name="shield" size={11} color={colors.yellow} />
+            <Text style={styles.achStripKicker}>ACHIEVEMENTS</Text>
+          </View>
+          <Text style={styles.achStripTitle} numberOfLines={1}>{achievement.title}</Text>
+          <View style={styles.achTrackSm}>
+            <View style={[styles.achFillSm, { width: `${(achievement.progress / achievement.total) * 100}%` }]} />
+          </View>
+        </View>
+        <Text style={styles.achStripCount}>{achievement.progress}/{achievement.total}</Text>
+      </View>
+
       {onPress && <SecondaryButton testID="view-progress-button" label="View Progress" tone="red" onPress={onPress} style={{ marginTop: spacing.sm }} />}
     </LinearGradient>
   );
@@ -248,4 +265,12 @@ const styles = StyleSheet.create({
   progressTrack: { height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.1)", overflow: "hidden" },
   progressFill: { height: "100%", backgroundColor: colors.yellow, borderRadius: 3 },
   achCount: { color: colors.textDim, fontSize: 11, fontWeight: "700", alignSelf: "flex-end", marginTop: 5 },
+  achStrip: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.borderSoft },
+  achBadgeSm: { width: 32, height: 32, borderRadius: 9, backgroundColor: colors.yellow, alignItems: "center", justifyContent: "center" },
+  achStripHead: { flexDirection: "row", alignItems: "center", gap: 5 },
+  achStripKicker: { color: colors.yellow, fontSize: 9, fontWeight: "800", letterSpacing: 0.8 },
+  achStripTitle: { color: colors.white, fontSize: 13, fontWeight: "700", marginTop: 2 },
+  achTrackSm: { height: 5, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.1)", overflow: "hidden", marginTop: 5 },
+  achFillSm: { height: "100%", backgroundColor: colors.yellow, borderRadius: 3 },
+  achStripCount: { color: colors.textDim, fontSize: 12, fontWeight: "800" },
 });

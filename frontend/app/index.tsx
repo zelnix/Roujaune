@@ -13,7 +13,7 @@ import { MetricSummaryStrip } from "@/src/components/MetricSummaryStrip";
 import { TrainingPlanCard } from "@/src/components/TrainingPlanCard";
 import { CalendarCard } from "@/src/components/CalendarCard";
 import { ReadinessGate } from "@/src/components/ReadinessGate";
-import { ProgressCard, CommunityCard, WellnessCard, AchievementCard } from "@/src/components/BottomCards";
+import { ProgressCard, CommunityCard, WellnessCard } from "@/src/components/BottomCards";
 import { navItems, navFooter } from "@/src/data";
 import { useCoach } from "@/src/lib/coach-persona";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
@@ -130,14 +130,15 @@ export default function Dashboard() {
                 <ProgressCard onPress={() => router.push("/progress")} />
               </View>
               <View style={styles.midColWide}>
-                <CalendarCard onToast={showToast} onOpenCalendar={() => router.push("/calendar")} onOpenToday={() => router.push("/training")} />
+                <WellnessCard />
               </View>
             </View>
 
             <View style={styles.bottomRow}>
               <CommunityCard onPress={() => showToast("Joining a group ride")} />
-              <WellnessCard />
-              <AchievementCard />
+              <View style={styles.midColWide}>
+                <CalendarCard onToast={showToast} onOpenCalendar={() => router.push("/calendar")} onOpenToday={() => router.push("/training")} />
+              </View>
             </View>
           </ScrollView>
         </View>

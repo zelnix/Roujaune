@@ -20,7 +20,7 @@ const heroImg = require("../../assets/images/hero_cyclist_b2.jpg");
 /* ── mock data (matches the reference exactly) ───────────────────────────── */
 export type PlanGoal = { id: string; title: string; description: string; status: "complete" | "incomplete" };
 export type PlanPhase = { id: string; number: number; name: string; weeks: string; pct: number; active?: boolean; points: number[] };
-export type KeyWorkout = { id: string; title: string; icon: keyof typeof Ionicons.glyphMap; duration: string; zone: string; tss: string; footer: string; color: string; profile: number[]; completed?: boolean; status?: string; actual_tss?: string; actual_duration?: string };
+export type KeyWorkout = { id: string; title: string; icon: keyof typeof Ionicons.glyphMap; duration: string; zone: string; tss: string; footer: string; color: string; profile: number[]; completed?: boolean; status?: string; actual_tss?: string; actual_duration?: string; type?: string; subtitle?: string };
 
 export const PLAN = {
   id: "build-and-climb",
@@ -186,7 +186,7 @@ export const ProgressRing = React.memo(function ProgressRing({ pct, size = 66 }:
 
 /* ── sidebar ────────────────────────────────────────────────────────────── */
 const NAV = [
-  { key: "home", label: "Home", icon: "home-outline" },
+  { key: "home", label: "Today", icon: "home-outline" },
   { key: "training", label: "Training Plan", icon: "clipboard-outline" },
   { key: "calendar", label: "Calendar", icon: "calendar-outline" },
   { key: "workouts", label: "Workouts", icon: "fitness-outline" },

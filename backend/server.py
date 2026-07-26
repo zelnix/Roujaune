@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Query
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -2352,33 +2352,96 @@ def _ctr_calendar_week(week, ride_map, supp_dates, today):
             "tip": (week.get("objective") or "")[:140], "seed_version": 2}
 
 
-def _ctr_plan_response(cur, ride_map, prog, weeks=None, plan_doc=None, plan_id="couch-to-road", plan_complete=False):
+def _ctr_plan_response(cur, ride_map, prog, weeks=None, plan_doc=None, plan_id="couch-to-road", plan_complete=False, supp_dates=None):
+    from datetime import date, timedelta
     weeks_map = weeks or CTR_WEEKS
     pdoc = plan_doc or CTR_PLAN
     is_ctr = (plan_id == "couch-to-road")
     week = weeks_map[cur]
     ride_ids = set(ride_map.keys())
+    supp_set = set(supp_dates or [])
+    today = _ctr_today()
     cyc = [d for d in week["days"] if d["kind"] == "cycling"]
     supp_days = [d for d in week["days"] if d["kind"] in _SUPP_KINDS]
     total_min = sum(_pm(d.get("duration")) for d in cyc)
-    workouts = []
-    for idx, d in enumerate(cyc):
-        done = d.get("workout_id") in ride_ids
-        act = ride_map.get(d.get("workout_id")) or {}
-        w = {"id": d.get("workout_id"), "title": d["title"], "icon": "bicycle",
-             "duration": (f"{round(act['duration_sec'] / 60)} min" if done and act.get("duration_sec") else d.get("duration", "")),
-             "zone": d.get("zone", ""), "tss": f"{d.get('tss', 0)} TSS",
-             "footer": f"Week {cur} \u2022 {d['day_name'].capitalize()}",
-             "color": _RIDE_COLORS[idx % 3], "profile": [0.4, 0.5, 0.6, 0.6, 0.55, 0.5, 0.5, 0.45]}
-        if done:
-            w["status"] = "completed"
-            w["completed"] = True
-            if act.get("tss") is not None:
-                w["actual_tss"] = f"{act['tss']} TSS"
-            if act.get("duration_sec"):
-                w["actual_duration"] = f"{round(act['duration_sec'] / 60)} min"
-        workouts.append(w)
     dw = int(pdoc.get("duration_weeks") or len(weeks_map))
+
+    # Presentation metadata for the non-cycling day types shown on the card.
+    _TYPE_META = {
+        "rest":     {"icon": "bed-outline",      "color": "#8A6FE0", "subtitle": "Rest & Recovery"},
+        "recovery": {"icon": "leaf-outline",     "color": "#55C850", "subtitle": "My Peaceful Companion"},
+        "strength": {"icon": "barbell-outline",  "color": "#E0A93A", "subtitle": "Strength"},
+        "mobility": {"icon": "body-outline",     "color": "#E0A93A", "subtitle": "Mobility"},
+        "balance":  {"icon": "walk-outline",     "color": "#E0A93A", "subtitle": "Balance"},
+    }
+
+    def _week_start(wknum):
+        wk = weeks_map.get(wknum) or {}
+        try:
+            y, m, dd = (int(x) for x in str(wk.get("start_date", "")).split("-"))
+            return date(y, m, dd)
+        except Exception:
+            return None
+
+    def _mk_workout(d, ride_idx, wknum, day_pos):
+        """Build a Training Plan card entry for ANY day (ride, recovery, rest,
+        strength/mobility/balance), folding in completion state so the card can
+        surface the rider's full upcoming schedule — not just the rides."""
+        kind = d.get("kind", "cycling")
+        ws = _week_start(wknum)
+        dt = (ws + timedelta(days=day_pos)) if ws is not None else None
+        w = {"id": d.get("workout_id") or f"{kind}-w{wknum}-d{day_pos}",
+             "title": d.get("title", ""), "type": kind,
+             "duration": d.get("duration", ""),
+             "footer": f"Week {wknum} \u2022 {d.get('day_name', '').capitalize()}"}
+        if kind == "cycling":
+            done = d.get("workout_id") in ride_ids
+            act = ride_map.get(d.get("workout_id")) or {}
+            w["icon"] = "bicycle"
+            w["zone"] = d.get("zone", "")
+            w["tss"] = f"{d.get('tss', 0)} TSS"
+            w["color"] = _RIDE_COLORS[ride_idx % 3]
+            w["profile"] = [0.4, 0.5, 0.6, 0.6, 0.55, 0.5, 0.5, 0.45]
+            if done:
+                w["status"] = "completed"; w["completed"] = True
+                if act.get("tss") is not None:
+                    w["actual_tss"] = f"{act['tss']} TSS"
+                if act.get("duration_sec"):
+                    w["actual_duration"] = f"{round(act['duration_sec'] / 60)} min"
+                    w["duration"] = f"{round(act['duration_sec'] / 60)} min"
+        else:
+            meta = _TYPE_META.get(kind, {"icon": "ellipse-outline", "color": "#8A6FE0", "subtitle": kind.capitalize()})
+            w["icon"] = meta["icon"]; w["color"] = meta["color"]
+            w["subtitle"] = meta["subtitle"]; w["tss"] = ""
+            if kind == "rest":
+                done = dt is not None and dt < today
+            else:
+                done = dt is not None and dt.isoformat() in supp_set
+            if done:
+                w["status"] = "completed"; w["completed"] = True
+        return w
+
+    # Build the schedule in chronological order across whole weeks, starting at
+    # the current week, and keep adding weeks until we have enough upcoming
+    # (incomplete) entries so the card's list never collapses once live loads.
+    UPCOMING_TARGET = 5  # 1 primary + up to 4 "up next" rows
+    workouts = []
+    ride_idx = 0
+    incomplete = 0
+    wknum = cur
+    while wknum <= dw:
+        wk = weeks_map.get(wknum)
+        if wk:
+            for pos, d in enumerate(wk.get("days", [])):
+                w = _mk_workout(d, ride_idx, wknum, pos)
+                if d.get("kind") == "cycling":
+                    ride_idx += 1
+                workouts.append(w)
+                if not w.get("completed"):
+                    incomplete += 1
+        if incomplete >= UPCOMING_TARGET:
+            break
+        wknum += 1
     phase_idx = (cur - 1) // 4 + 1
     week_in_phase = ((cur - 1) % 4) + 1
     phases = []
@@ -2444,19 +2507,19 @@ async def get_plan(id: str = "build-and-climb"):
             cur, ride_map, supp = await _ctr_state()
             prog = await _ctr_progress(ride_map)
             done = _plan_done(CTR_WEEKS, cur, int(CTR_PLAN.get("duration_weeks") or 16), ride_map, supp)
-            return _ctr_plan_response(cur, ride_map, prog, plan_complete=done)
+            return _ctr_plan_response(cur, ride_map, prog, plan_complete=done, supp_dates=supp)
         if active == "ride-stronger" or id == "ride-stronger":
             pdoc, weeks_map, planned, prefix = _struct_ctx("ride-stronger")
             cur, ride_map, supp = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id="ride-stronger", ride_prefix=prefix)
             prog = await _ctr_progress(ride_map, ride_prefix=prefix, planned_tss=planned)
             done = _plan_done(weeks_map, cur, int(pdoc.get("duration_weeks") or 12), ride_map, supp)
-            return _ctr_plan_response(cur, ride_map, prog, weeks=weeks_map, plan_doc=pdoc, plan_id="ride-stronger", plan_complete=done)
+            return _ctr_plan_response(cur, ride_map, prog, weeks=weeks_map, plan_doc=pdoc, plan_id="ride-stronger", plan_complete=done, supp_dates=supp)
         if active == "ride-beyond" or id == "ride-beyond":
             pdoc, weeks_map, planned, prefix = _struct_ctx("ride-beyond")
             cur, ride_map, supp = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id="ride-beyond", ride_prefix=prefix)
             prog = await _ctr_progress(ride_map, ride_prefix=prefix, planned_tss=planned)
             done = _plan_done(weeks_map, cur, int(pdoc.get("duration_weeks") or 12), ride_map, supp)
-            return _ctr_plan_response(cur, ride_map, prog, weeks=weeks_map, plan_doc=pdoc, plan_id="ride-beyond", plan_complete=done)
+            return _ctr_plan_response(cur, ride_map, prog, weeks=weeks_map, plan_doc=pdoc, plan_id="ride-beyond", plan_complete=done, supp_dates=supp)
         doc = await udb.training_plans.find_one({"id": id})
         base = await plans_admin.get_plan_def(id)
         if not base:
@@ -3063,6 +3126,114 @@ CONNECTIONS_DATA = {
 @api_router.get("/progress")
 async def get_progress():
     return PROGRESS_DATA
+
+
+# Bucketed timeline windows: (number of buckets, days per bucket).
+_TIMELINE_SPEC = {
+    "week":  (7, 1),
+    "month": (4, 7),
+    "3m":    (13, 7),
+    "6m":    (6, 30),
+    "1y":    (12, 30),
+}
+
+
+def _bucket_label(start, bucket_days):
+    if bucket_days == 1:
+        return start.strftime("%a")            # Mon, Tue …
+    if bucket_days == 30:
+        return start.strftime("%b")            # Jan, Feb …
+    return start.strftime("%-d %b")            # 3 Jun (weekly buckets)
+
+
+@api_router.get("/progress/timeline")
+async def get_progress_timeline(rng: str = Query("3m", alias="range"), offset: int = 0):
+    """Aggregate the rider's real ride history into a scrollable, bucketed
+    timeline. `range` ∈ week|month|3m|6m|1y; `offset` scrolls whole windows
+    into the past (0 = the window ending today)."""
+    from datetime import date, timedelta
+
+    n_buckets, bucket_days = _TIMELINE_SPEC.get(rng, _TIMELINE_SPEC["3m"])
+    span = n_buckets * bucket_days
+    offset = max(0, int(offset))
+    today = date.today()
+    end = today - timedelta(days=offset * span)
+    start = end - timedelta(days=span - 1)
+    prev_start = start - timedelta(days=span)
+
+    rides = await udb.ride_history.find().sort("created_at", -1).to_list(length=5000)
+
+    buckets = [{"label": _bucket_label(start + timedelta(days=i * bucket_days), bucket_days),
+                "tss": 0, "hours": 0.0, "rides": 0} for i in range(n_buckets)]
+
+    tot = {"rides": 0, "tss": 0, "sec": 0, "km": 0.0, "elev": 0, "power_sum": 0, "power_n": 0}
+    prev_tss = 0
+    recent = []
+    for r in rides:
+        ds = str(r.get("created_at") or "")[:10]
+        if not ds:
+            continue
+        try:
+            y, m, d = (int(x) for x in ds.split("-"))
+            rd = date(y, m, d)
+        except Exception:
+            continue
+        tss = int(r.get("tss") or 0)
+        if prev_start <= rd < start:
+            prev_tss += tss
+        if not (start <= rd <= end):
+            continue
+        idx = min(n_buckets - 1, max(0, (rd - start).days // bucket_days))
+        sec = int(r.get("duration_sec") or 0)
+        buckets[idx]["tss"] += tss
+        buckets[idx]["hours"] += sec / 3600.0
+        buckets[idx]["rides"] += 1
+        tot["rides"] += 1
+        tot["tss"] += tss
+        tot["sec"] += sec
+        tot["km"] += float(r.get("distance_km") or 0)
+        tot["elev"] += int(r.get("elevation_m") or 0)
+        if r.get("avg_power"):
+            tot["power_sum"] += int(r.get("avg_power") or 0)
+            tot["power_n"] += 1
+        if len(recent) < 8:
+            recent.append({
+                "title": r.get("workout") or r.get("route") or "Ride",
+                "date": ds,
+                "tss": tss,
+                "distance": f"{float(r.get('distance_km') or 0):.0f} km",
+                "color": "red",
+            })
+
+    for b in buckets:
+        b["hours"] = round(b["hours"], 1)
+
+    delta_pct = 0
+    if prev_tss > 0:
+        delta_pct = round((tot["tss"] - prev_tss) / prev_tss * 100)
+
+    if bucket_days == 30:
+        window_label = f"{start.strftime('%b %Y')} – {end.strftime('%b %Y')}"
+    else:
+        window_label = f"{start.strftime('%-d %b')} – {end.strftime('%-d %b %Y')}"
+
+    return {
+        "range": rng,
+        "offset": offset,
+        "has_next": offset > 0,
+        "window_label": window_label,
+        "buckets": buckets,
+        "summary": {
+            "rides": tot["rides"],
+            "hours": round(tot["sec"] / 3600.0, 1),
+            "tss": tot["tss"],
+            "distance_km": round(tot["km"]),
+            "elevation_m": tot["elev"],
+            "avg_power": round(tot["power_sum"] / tot["power_n"]) if tot["power_n"] else 0,
+            "tss_delta_pct": delta_pct,
+        },
+        "recent": recent,
+    }
 
 
 @api_router.get("/routes")

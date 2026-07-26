@@ -1,0 +1,48 @@
+{
+  "summary": "Full backend + frontend validation of the iter41 fixes. BACKEND (16/16 pytest pass): GET /api/plan for Green Lantern (couch-to-road) now returns a PERSISTENT workouts[] with 8+ upcoming entries spanning multiple weeks; the list mixes cycling, strength, recovery, balance, rest, mobility with the correct shape (cycling → tss + profile; non-cycling → subtitle + icon + color). Regression: /api/plan for ride-stronger and ride-beyond still returns valid workouts[]. GET /api/progress/timeline honors the spec: bucket counts week=7, month=4, 3m=13, 6m=6, 1y=12; has_next=false at offset=0 and true at offset>=1; window_label rendered; summary has {rides, hours, tss, distance_km, elevation_m, avg_power, tss_delta_pct}; offset scrolls window into the past (window_label differs across offsets); bucket rides sum equals summary.rides. FRONTEND (landscape 1024x720): Today screen sidebar shows 'Today'. training-plan-card renders 'NEXT WORKOUTS' with mixed types (Beginner Cycling Strength, Welcome Ride, Recovery and Mobility, Pedal Smoothly, Balance and Cycling Support) and is stable across T=0/6/12s snapshots (identical 287-char innerText). progress-card + progress-achievements strip + wellness-card render in the mid row; Calendar card in the bottom row; no standalone achievement card. Progress screen: progress-timeline card renders with all 5 range chips (tl-range-week/month/3m/6m/1y); tl-prev + tl-next present; tl-next aria-disabled=true at offset=0 and becomes enabled after pressing tl-prev; range switch and prev/next update the visible window. Virtual Route: vr-exit is a prominent bordered pill (97 x 50 px, above 44px touch target), navigates back to '/' when tapped. GL data pristine after tests: still on couch-to-road, 0 rider_prs, 8 (pre-existing) ride_history docs, temp iter41 test user hard-deleted from all collections.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/progress/timeline", "issue": "Green Lantern's seeded ride_history entries are dated 2026-07-25 (future relative to today Jan 2026), so past-facing windows return 0 rides. Not a code bug — the aggregator correctly excludes future rides. Timeline still functions once real rides land in the window. If the intent was to demo non-empty stats for GL, main agent may want to reseed ride_history with dates ending on/before today."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter41_today_progress_timeline.py",
+    "/app/test_reports/pytest/iter41.xml",
+    "/app/test_reports/screens/iter41_home.jpeg",
+    "/app/test_reports/screens/iter41_progress.jpeg",
+    "/app/test_reports/screens/iter41_vr.jpeg"
+  ],
+  "action_items": [
+    "Optional: reseed Green Lantern's ride_history so at least a subset of created_at values fall inside the current 3m/6m/1y windows — this way the Training Timeline demonstrates non-zero TSS bars and summary stats out of the box.",
+    "Optional cleanup: /api/account delete did not remove the module-scope temp user created by test_iter41 fixture (still returned success but the users doc persisted). If /api/account is meant to hard-delete, verify its multi-collection sweep. I cleaned the leftover user manually so GL environment is pristine."
+  ],
+  "critical_code_review_comments": [
+    "_ctr_plan_response now iterates whole weeks starting at cur and appends until UPCOMING_TARGET=5 incomplete entries are queued, guaranteeing the card list won't collapse to a single row late in the plan or if the current week has few remaining days. Deterministic, no timers, matches TrainingPlanCard's `upcoming = filter(!completed); next = upcoming[0]; more = upcoming.slice(1, 5)` — the reported disappearing-rows bug is structurally fixed.",
+    "_TYPE_META covers rest/recovery/strength/mobility/balance with icon/color/subtitle. Non-cycling entries carry subtitle + empty tss + no profile — matches TrainingPlanCard's non-ride branch that renders the icon badge.",
+    "get_progress_timeline uses `udb.ride_history.find()` (auto user-scoped via context); prev-window TSS is computed from same collection for tss_delta_pct — clean.",
+    "TrainingPlanCard uses key={`${w.id ?? 'wk'}-${idx}`} — safe even if backend ever emits duplicate ids across weeks.",
+    "app/index.tsx: mid row = [TrainingPlan, ProgressCard, WellnessCard]; bottom row = [CommunityCard, CalendarCard]. Matches spec (Wellness moved into mid row in place of former Calendar spot).",
+    "BottomCards.ProgressCard renders progress-achievements strip inline; no separate standalone achievement card mounted anywhere in index.tsx.",
+    "virtual-route.tsx: vr-exit uses `hitSlop={10}`, styled as bordered pill (`s.exitBtn`), size 97×50 confirmed via bounding box.",
+    "progress.tsx: tl-next uses `disabled={!data?.has_next}` which renders as aria-disabled=true when has_next=false — correctly reflects offset=0."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter41_today_progress_timeline.py (new — 16 pytest cases)"
+  ],
+  "success_rate": {
+    "backend": "100% (16/16 tests pass)",
+    "frontend": "100% (all 6 review-request checks pass: Today nav label, TrainingPlanCard persistence + mixed types, progress-achievements, wellness placement, timeline chips + scroll + disabled state, vr-exit size + navigation)"
+  },
+  "seed_data_creation": "Backend test creates one temp user tmp_iter41_<hex>@roujaune.app to exercise ride-stronger + ride-beyond regression. Auto-cleanup via /api/account delete leaked one user record; I hard-deleted it from users/riders/ride_history/rider_prs/plan_assignments/sessions/workout_preferences/rider_appearance. Green Lantern untouched — assigned_plan_id still couch-to-road, ride_history count unchanged at 8 (pre-existing), rider_prs=0.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Reuse /app/backend/tests/test_iter41_today_progress_timeline.py for any regression on GET /api/plan (workouts[] persistence + mixed types) and GET /api/progress/timeline (bucket counts + has_next + summary shape + offset scrolling). Login testIDs on /login are email-input + password-input (no dedicated signin-button testID — click the 'Sign in' text). For Progress timeline UI: tl-range-{week|month|3m|6m|1y}, tl-prev (older), tl-next (newer, aria-disabled=true at offset=0). Virtual Route exit is testID vr-exit and returns to /.",
+  "rca_of_issue": "The original 'Next Workouts rows disappear' complaint (from PRD) is not reproducible in the current build. The backend now emits >=5 incomplete entries and the frontend uses `plan.workouts.filter(!completed).slice(1,5)` for the 'more' list — both deterministic, no timers, no re-fetch. Snapshotting the card innerText at T=0/6/12 seconds returns the identical 287-character string with all 5 workout rows continuously present."
+}
