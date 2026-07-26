@@ -7,14 +7,29 @@ import { colors, radius, spacing } from "../theme";
 import { coach } from "../data";
 import { useCoach } from "../lib/coach-persona";
 import { usePlan } from "../lib/plan";
+import { useCalendarWeek } from "../lib/calendar";
 import { PrimaryButton } from "./ui";
 
 export function AlbertoCoachCard({ width, onStart, onMessage, compact = false }: { width: number; onStart: () => void; onMessage?: () => void; compact?: boolean }) {
   const persona = useCoach();
   const { plan } = usePlan();
+  const { week } = useCalendarWeek();
   const next = (plan.workouts?.find((w) => !w.completed) ?? plan.workouts?.[0]) as any;
-  const headline = next?.title ?? coach.quote;
-  const support = next ? `Next up · ${next.duration} · ${next.zone}${next.footer ? ` · ${next.footer}` : ""}` : coach.support;
+
+  // Reflect TODAY's actual scheduled activity (any type), not just the next ride.
+  const hasWeek = !!week?.days?.length;
+  const today = hasWeek ? week.days.find((d: any) => d.date === week.selected_date) : null;
+  const todaySession: any = today ? (today.cycling ?? today.fb50 ?? today.wellness ?? null) : null;
+  const isRest = hasWeek && !todaySession;
+  const kindLabel = todaySession?.type === "fb50" ? "Strength" : todaySession?.type === "wellness" ? "Recovery" : "";
+
+  const headline = todaySession?.title ?? (isRest ? "Rest Day" : (next?.title ?? coach.quote));
+  const support = todaySession
+    ? `Today${kindLabel ? ` · ${kindLabel}` : ""} · ${todaySession.duration}${todaySession.zone ? ` · ${todaySession.zone}` : ""}`
+    : isRest
+      ? (next ? `Your next workout is ${next.title} · ${next.duration}` : "Recovery day — rest up and come back strong.")
+      : next ? `Next up · ${next.duration} · ${next.zone}${next.footer ? ` · ${next.footer}` : ""}` : coach.support;
+  const cta = isRest ? "View Today's Plan" : "View Today's Workout";
   const portraitW = compact ? 108 : 150;
   return (
     <LinearGradient
@@ -48,7 +63,7 @@ export function AlbertoCoachCard({ width, onStart, onMessage, compact = false }:
 
         <PrimaryButton
           testID="start-ride-button"
-          label={coach.cta}
+          label={cta}
           onPress={onStart}
           style={{ marginTop: spacing.sm, alignSelf: "stretch" }}
         />

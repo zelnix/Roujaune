@@ -98,7 +98,9 @@ export function CalendarCard({ onToast, onOpenCalendar, onOpenToday, scope = "to
 
     const today = days.find((d) => d.date === week?.selected_date);
     if (!today) return todayPlan;
-    return [today.cycling, today.fb50, today.wellness]
+    // The cycling session is already shown as the Today's Training headline
+    // (title + duration + steps), so only list supplementary sessions here.
+    return [today.fb50, today.wellness]
       .filter((s): s is NonNullable<typeof s> => !!s)
       .map((s, i) => ({ key: `${s.type ?? "session"}-${s.id ?? i}`, label: s.title, time: s.duration || "—", state: state(s.status) }));
   }, [week, scope]);
@@ -220,19 +222,21 @@ export function CalendarCard({ onToast, onOpenCalendar, onOpenToday, scope = "to
           </View>
         )}
 
-        <View style={{ marginTop: spacing.sm, gap: 6 }}>
-          {planRows.map((w) => (
-            <TodayRow
-              key={w.key}
-              testID={`today-${w.key}`}
-              label={w.label}
-              time={w.time}
-              state={w.state}
-              active={w.state === "active"}
-              onPress={() => onToast(`${w.label} selected`)}
-            />
-          ))}
-        </View>
+        {planRows.length > 0 && (
+          <View style={{ marginTop: spacing.sm, gap: 6 }}>
+            {planRows.map((w) => (
+              <TodayRow
+                key={w.key}
+                testID={`today-${w.key}`}
+                label={w.label}
+                time={w.time}
+                state={w.state}
+                active={w.state === "active"}
+                onPress={() => onToast(`${w.label} selected`)}
+              />
+            ))}
+          </View>
+        )}
 
         {scope !== "week" && onOpenToday && (
           <>
