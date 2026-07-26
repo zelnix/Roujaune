@@ -486,3 +486,14 @@ Home Alberto "Start Today's Ride" & sidebar Workouts → `/training`. Training "
 - Weekly Load: `WeeklyLoadCard` gained a stats row (This Week / Avg per Week / Peak week / Completed %).
 - Adaptations: NEW `POST /api/coach/adaptation/detail` (Claude, cached per plan+coach, grounded in the computed plan for structured plans) → {summary, factors[], adjustments[]}. `AdaptationsModal` shows a "WHY <coach> ADJUSTED YOUR PLAN" reasoning block above the history timeline.
 - Also: `rider_appearance` is now user-scoped (added to USER_SCOPED in auth.py).
+
+## Full preference persistence + post-ride adaptation nudge (2026-07-26, batch 6)
+- **All rider preferences persist server-side (cross-device)** with an AsyncStorage cache:
+  - NEW user-scoped `GET/PUT /api/rider/settings` (`settings` collection) stores trainer/wearable/demo/HUD/FTP/ftpAuto/seatedMode + home location. `useSettings` loads local → merges remote → writes both on change (and still auto-syncs FTP from progress).
+  - Coaching prefs (`coach_style`, `voice_guidance`, `speech_rate`) now write-through to `/api/rider/prefs`; hydrated on startup via `coach-persona.initCoach → hydrateRiderPrefs()`. (Coach persona already persisted from batch-5 Phase 3.)
+- **Adaptation auto-refresh after each ride + nudge:**
+  - `POST /api/coach/debrief` background task now regenerates BOTH the short adaptation note AND the detailed reasoning cache (`adaptation_detail_<coach>`).
+  - `GET /api/plan` surfaces `adaptation_ai_<coach>_at` / `adaptation_detail_<coach>_at` (via `_with_adaptation_meta`) for structured plans.
+  - `PlanUpdatedNudge` (top of Today screen) shows "<coach> updated your plan" when `usePlanBadge()` detects a fresh adaptation; tap/View → /plan (marks seen); X dismisses. `plan-badge` checks both coaches' timestamps.
+- **Data hygiene:** deduped `training_plans` (had duplicate `id` docs) + added a UNIQUE index on `id` so adaptation caches read/write deterministically.
+- KNOWN/optional (flagged by testing): Seated Mode / Smart Trainer toggles live on the pre-ride sheet & `/connections`, not `app/settings.tsx` — persistence layer is shared, so behaviour is equivalent; could surface them on Settings later.
