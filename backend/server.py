@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Query
+from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Query, Body
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -1114,6 +1114,36 @@ async def get_rider_prefs():
     return doc
 
 
+# ---- Rider settings (live-workout + home location) — persisted per user so
+#      every preference is consistent across sessions and devices.
+SETTINGS_DEFAULT = {
+    "id": "me", "hasTrainer": False, "hasWearable": False, "demoMode": False,
+    "hudEnabled": True, "ftp": 287, "ftpAuto": True, "seatedMode": False,
+    "homeCity": "Nice, France", "homeLat": 43.7102, "homeLon": 7.262,
+}
+
+
+@api_router.get("/rider/settings")
+async def get_rider_settings():
+    doc = await udb.settings.find_one({"id": "me"})
+    if not doc:
+        return {}
+    doc.pop("_id", None)
+    doc.pop("user_id", None)
+    return doc
+
+
+@api_router.put("/rider/settings")
+async def update_rider_settings(payload: Dict[str, Any] = Body(...)):
+    # Merge whatever preference keys the client sends (id/user_id are protected).
+    upd = {k: v for k, v in (payload or {}).items() if k not in ("id", "user_id", "_id")}
+    await udb.settings.update_one({"id": "me"}, {"$set": {**upd, "id": "me"}}, upsert=True)
+    doc = await udb.settings.find_one({"id": "me"})
+    doc.pop("_id", None)
+    doc.pop("user_id", None)
+    return doc
+
+
 @api_router.put("/rider/prefs")
 async def update_rider_prefs(req: PrefsUpdate):
     upd = {k: v for k, v in req.dict().items() if v is not None}
@@ -1807,6 +1837,26 @@ async def _refresh_adaptation_after_ride(req: "CoachDebriefRequest", plan_id: st
         )
         trigger = f"After your {req.workout} ride" if req.workout else "After your last ride"
         await _record_adaptation(plan_id, req.coach_name, text, trigger)
+        # Regenerate the DETAILED reasoning cache too, so the "why" modal shows
+        # fresh, ride-specific reasoning without the rider tapping refresh.
+        try:
+            detail_plan = plan
+            if plan_id in ("couch-to-road", "ride-stronger", "ride-beyond"):
+                try:
+                    computed = await get_plan(id=plan_id)
+                    if isinstance(computed, dict):
+                        detail_plan = {**plan, **computed}
+                except Exception:
+                    pass
+            detail = await _generate_adaptation_detail(detail_plan, req.coach_name, req.coach_gender)
+            dkey = f"adaptation_detail_{req.coach_name.lower()}"
+            await udb.training_plans.update_one(
+                {"id": plan_id},
+                {"$set": {dkey: detail, f"{dkey}_at": now_iso()}},
+                upsert=True,
+            )
+        except Exception:
+            logging.warning("post-ride adaptation detail refresh failed")
     except Exception:
         logging.warning("post-ride adaptation refresh failed")
 
@@ -2537,6 +2587,25 @@ def _ctr_plan_response(cur, ride_map, prog, weeks=None, plan_doc=None, plan_id="
 
 
 
+async def _with_adaptation_meta(resp, plan_id):
+    """Attach the plan's adaptation refresh timestamps to the computed response so
+    the client's 'plan updated' nudge/badge can detect a post-ride refresh."""
+    try:
+        doc = await udb.training_plans.find_one(
+            {"id": plan_id},
+            {"adaptation_ai_alberto_at": 1, "adaptation_ai_adriana_at": 1,
+             "adaptation_detail_alberto_at": 1, "adaptation_detail_adriana_at": 1},
+        )
+        if doc and isinstance(resp, dict):
+            for k in ("adaptation_ai_alberto_at", "adaptation_ai_adriana_at",
+                      "adaptation_detail_alberto_at", "adaptation_detail_adriana_at"):
+                if doc.get(k):
+                    resp[k] = doc[k]
+    except Exception:
+        pass
+    return resp
+
+
 @api_router.get("/plan")
 async def get_plan(id: str = "build-and-climb"):
     """Return the rider's current training plan (seeded into Mongo on first read).
@@ -2553,19 +2622,19 @@ async def get_plan(id: str = "build-and-climb"):
             cur, ride_map, supp = await _ctr_state()
             prog = await _ctr_progress(ride_map)
             done = _plan_done(CTR_WEEKS, cur, int(CTR_PLAN.get("duration_weeks") or 16), ride_map, supp)
-            return _ctr_plan_response(cur, ride_map, prog, plan_complete=done, supp_dates=supp)
+            return await _with_adaptation_meta(_ctr_plan_response(cur, ride_map, prog, plan_complete=done, supp_dates=supp), "couch-to-road")
         if active == "ride-stronger" or id == "ride-stronger":
             pdoc, weeks_map, planned, prefix = _struct_ctx("ride-stronger")
             cur, ride_map, supp = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id="ride-stronger", ride_prefix=prefix)
             prog = await _ctr_progress(ride_map, ride_prefix=prefix, planned_tss=planned)
             done = _plan_done(weeks_map, cur, int(pdoc.get("duration_weeks") or 12), ride_map, supp)
-            return _ctr_plan_response(cur, ride_map, prog, weeks=weeks_map, plan_doc=pdoc, plan_id="ride-stronger", plan_complete=done, supp_dates=supp)
+            return await _with_adaptation_meta(_ctr_plan_response(cur, ride_map, prog, weeks=weeks_map, plan_doc=pdoc, plan_id="ride-stronger", plan_complete=done, supp_dates=supp), "ride-stronger")
         if active == "ride-beyond" or id == "ride-beyond":
             pdoc, weeks_map, planned, prefix = _struct_ctx("ride-beyond")
             cur, ride_map, supp = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id="ride-beyond", ride_prefix=prefix)
             prog = await _ctr_progress(ride_map, ride_prefix=prefix, planned_tss=planned)
             done = _plan_done(weeks_map, cur, int(pdoc.get("duration_weeks") or 12), ride_map, supp)
-            return _ctr_plan_response(cur, ride_map, prog, weeks=weeks_map, plan_doc=pdoc, plan_id="ride-beyond", plan_complete=done, supp_dates=supp)
+            return await _with_adaptation_meta(_ctr_plan_response(cur, ride_map, prog, weeks=weeks_map, plan_doc=pdoc, plan_id="ride-beyond", plan_complete=done, supp_dates=supp), "ride-beyond")
         doc = await udb.training_plans.find_one({"id": id})
         base = await plans_admin.get_plan_def(id)
         if not base:

@@ -17,6 +17,36 @@ export type Settings = {
 const DEFAULTS: Settings = { hasTrainer: false, hasWearable: false, demoMode: false, hudEnabled: true, ftp: 287, ftpAuto: true, seatedMode: false, homeCity: "Nice, France", homeLat: 43.7102, homeLon: 7.262 };
 const KEY = "roujaune:settings";
 
+function apiBase(): string {
+  return (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
+}
+
+// Load / persist the rider's settings server-side so every preference stays
+// consistent across sessions and devices (local cache keeps it instant/offline).
+async function fetchRemoteSettings(): Promise<Partial<Settings> | null> {
+  try {
+    const res = await fetch(`${apiBase()}/api/rider/settings`);
+    if (!res.ok) return null;
+    const d = await res.json();
+    delete (d as any).id;
+    return d && Object.keys(d).length ? d : null;
+  } catch {
+    return null;
+  }
+}
+
+async function pushRemoteSettings(patch: Partial<Settings>): Promise<void> {
+  try {
+    await fetch(`${apiBase()}/api/rider/settings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+  } catch {
+    /* keep local; will re-sync on next change */
+  }
+}
+
 // Pull the current FTP from the backend training-progress metrics (e.g. "287 W").
 async function fetchProgressFtp(): Promise<number | null> {
   try {
@@ -32,7 +62,8 @@ async function fetchProgressFtp(): Promise<number | null> {
   }
 }
 
-/** Persistent live-workout settings (AsyncStorage-backed). */
+/** Persistent rider settings — server-backed (cross-device) with an
+ * AsyncStorage cache for instant load and offline resilience. */
 export function useSettings() {
   const [settings, setSettings] = useState<Settings>(DEFAULTS);
   const [loaded, setLoaded] = useState(false);
@@ -49,6 +80,14 @@ export function useSettings() {
       setSettings(current);
       setLoaded(true);
 
+      // Server is the source of truth — merge remote over the local cache.
+      const remote = await fetchRemoteSettings();
+      if (remote) {
+        current = { ...current, ...remote };
+        setSettings(current);
+        AsyncStorage.setItem(KEY, JSON.stringify(current)).catch(() => {});
+      }
+
       // When auto-sync is on, refresh FTP from the rider's training progress so
       // the ERG target power tracks their improving fitness.
       if (current.ftpAuto) {
@@ -57,6 +96,7 @@ export function useSettings() {
           const next = { ...current, ftp };
           setSettings(next);
           AsyncStorage.setItem(KEY, JSON.stringify(next)).catch(() => {});
+          pushRemoteSettings({ ftp });
         }
       }
     })();
@@ -66,6 +106,7 @@ export function useSettings() {
     setSettings((prev) => {
       const next = { ...prev, [k]: v };
       AsyncStorage.setItem(KEY, JSON.stringify(next)).catch(() => {});
+      pushRemoteSettings({ [k]: v } as Partial<Settings>);
       return next;
     });
   }, []);

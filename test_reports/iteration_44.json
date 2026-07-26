@@ -1,0 +1,43 @@
+{
+  "summary": "Iteration 44 - Cross-device settings persistence + post-ride adaptation auto-refresh with 'plan updated' nudge. BACKEND (8/8 pytest pass - /app/backend/tests/test_iter44_settings_adaptation.py): (1) NEW user-scoped rider settings: GET /api/rider/settings returns a dict (initially {} for a fresh account). PUT /api/rider/settings with partial body {seatedMode:true, hasTrainer:true} returns the merged doc; subsequent GET reflects both. A further PUT {hudEnabled:false} merges without disturbing prior keys. User-scoping verified end-to-end: a freshly registered temp account sees settings with seatedMode/hasTrainer both False, i.e. no leakage from GL's document. After testing, PUT restored {seatedMode:false, hasTrainer:false, hudEnabled:true}. (2) Coaching prefs persistence: PUT /api/rider/prefs {coach_style:'performance'} returns coach_style='performance'; GET confirms; then restored to 'balanced'. (3) Auto-refresh adaptation after a ride: primed a baseline via POST /api/coach/adaptation/detail, then POST /api/coach/debrief with {workout:'Endurance Ride', duration_sec:1800, avg_power:150, tss:40, compliance:98, coach_name:'Alberto', coach_gender:'male', intervals:[]} returned 200. Polled GET /api/plan for up to 24s and observed the timestamp advance - the plan now surfaces a fresh adaptation_ai_alberto_at (and adaptation_detail_alberto_at is also present when checked). (4) GET /api/plan reliably includes both timestamps after the background refresh. FRONTEND (landscape 1024x720, real GL login via testID email-input/password-input/submit-btn): (5) Today (/) - after debrief triggered a fresh timestamp and localStorage seen-key cleared, the plan-updated-nudge appears at the TOP of the main scroll (y=~24) ABOVE the hero (y=~87). Copy reads 'Alberto updated your plan' + 'Fresh guidance based on your last ride'. Tapping the nudge (or its 'View' area) navigates to /plan; returning to Today shows NO nudge (markPlanSeen wrote the timestamp). Separately, the plan-updated-nudge-dismiss ('x') hides the nudge without navigation (URL unchanged). (6) Settings persistence: tested via /connections Smart Trainer toggle (device-btn-trainer) since /settings does not expose Seated Mode / Smart Trainer directly - toggling ON hits PUT /api/rider/settings ({hasTrainer:true}), navigating to Today and back retains 'Disconnect' state; even after localStorage 'roujaune:settings' is cleared and the page reloaded, the server re-hydrates hasTrainer=true. Toggled back to OFF for cleanup. Final GL state verified pristine: coach_id=alberto, coach_style=balanced, seatedMode=false, hasTrainer=false, hudEnabled=true.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/settings", "issues": ["Review request said 'toggle a setting (e.g., Seated Mode or Smart Trainer) on /settings' but neither Seated Mode nor Smart Trainer toggles exist on the /settings screen — Smart Trainer lives on /connections (device-btn-trainer) and Seated Mode is only in the pre-ride sheet inside /workout. Persistence was verified via the /connections Smart Trainer toggle instead; the underlying /api/rider/settings storage is shared, so behaviour is equivalent. Consider surfacing at least the Seated Mode toggle on /settings if the review wording is prescriptive."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter44_settings_adaptation.py",
+    "/app/test_reports/pytest/iter44.xml",
+    "/app/test_reports/screens/iter44_today_nudge.jpeg",
+    "/app/test_reports/screens/iter44_today_final.jpeg",
+    "/app/test_reports/screens/iter44_connections_persist.jpeg"
+  ],
+  "action_items": [
+    "Optional (spec alignment): if the intent is that Seated Mode or Smart Trainer live on /settings (not /connections), add those toggles to /app/frontend/app/settings.tsx. Persistence layer already supports them via useSettings -> PUT /api/rider/settings.",
+    "No functional issues to fix — both features (server-scoped preferences persistence + post-ride adaptation nudge) work end-to-end."
+  ],
+  "critical_code_review_comments": [
+    "server.py get_rider_settings (~line 1126) correctly returns {} when no doc exists (fresh accounts), strips _id and user_id from output. update_rider_settings (~line 1136) safely blacklists id/user_id/_id in the merge patch and upserts with $set, ensuring the user_id auto-injected by _ScopedCollection stays intact.",
+    "server.py _refresh_adaptation_after_ride (~line 1785) writes adaptation_ai_<coach>+_at synchronously against training_plans, then regenerates adaptation_detail_<coach>+_at in a best-effort block. Both timestamps land under the user-scoped training_plans doc and are surfaced by _with_adaptation_meta on GET /api/plan.",
+    "server.py _with_adaptation_meta (~line 2590) only overlays timestamp keys when the training_plans doc has them, keeping the /plan response free of nulls when no debrief has run yet.",
+    "PlanUpdatedNudge.tsx: dismiss button correctly stops propagation via a nested Pressable — the outer nudge Pressable's onPress fires only when the row body is tapped, verified by observing URL remained on / after tapping x. Also renders BEFORE <View style={styles.heroRow}> in app/index.tsx (line 110 before line 112), so it visually sits above the hero as required.",
+    "plan-badge.ts: usePlanBadge picks the max of adaptation_ai_alberto_at / adaptation_ai_adriana_at via sort+pop, then compares to the SEEN_KEY in AsyncStorage — clean and simple. Note: refreshPlanBadge fetches /api/plan without an Authorization header (relies on cookies/session in web / AsyncStorage bearer via fetch interceptor elsewhere); on native this will fail silently and the badge won't fire. In web preview it worked because the app-scaffold-level auth already installs the token — worth verifying on device.",
+    "settings.ts useSettings correctly hydrates in order: (1) local AsyncStorage cache -> immediate UI, (2) fetchRemoteSettings -> merge over cache and persist merged cache, (3) if ftpAuto, fetch progress FTP. This gives instant-load + cross-device correctness."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter44_settings_adaptation.py (new — 8 pytest cases covering rider/settings, rider/prefs, and post-debrief adaptation timestamp refresh)"
+  ],
+  "success_rate": {
+    "backend": "100% (8/8 pytest pass)",
+    "frontend": "100% (plan-updated-nudge appears above hero, View tap → /plan, dismiss hides without navigating, return-to-Today hides nudge as seen, settings persist across navigation + localStorage clear)"
+  },
+  "seed_data_creation": "One ephemeral user tmp_iter44_<hex>@roujaune.app created and immediately deleted via DELETE /api/account to verify user-scoping of rider_settings. GL account left pristine: coach_id=alberto, coach_style=balanced, seatedMode=false, hasTrainer=false, hudEnabled=true. Note: the pytest debrief did successfully register in training_plans as an adaptation_history entry + adaptation_ai_alberto_at timestamp (this is the intended behaviour to prove the feature and cannot be un-done without corrupting the exact feature under test); no ride was ridden to completion.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Reuse /app/backend/tests/test_iter44_settings_adaptation.py for regression on rider/settings user-scoping, rider/prefs, and the post-debrief adaptation timestamp refresh. Frontend testIDs of interest: /: plan-updated-nudge, plan-updated-nudge-dismiss; /connections: device-btn-trainer, device-btn-wearable; /settings: tg-ftpAuto, tg-coachAudio, tg-autoSync, tg-weeklyReport, tg-restReminders, ftp-plus, ftp-minus. Server date 2026-07-26. NOTE: the review says Seated Mode / Smart Trainer live on /settings — they don't; verify via /connections or ask main agent whether to move them.",
+  "rca_of_issue": "N/A — feature verification iteration, all items work end-to-end."
+}

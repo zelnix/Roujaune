@@ -18,7 +18,10 @@ export async function refreshPlanBadge(): Promise<void> {
     const res = await fetch(`${apiBase()}/api/plan`);
     if (!res.ok) return;
     const data = await res.json();
-    const at: string | undefined = data?.adaptation_ai_alberto_at;
+    const at: string | undefined = [data?.adaptation_ai_alberto_at, data?.adaptation_ai_adriana_at]
+      .filter(Boolean)
+      .sort()
+      .pop();
     if (!at) return;
     const seen = await AsyncStorage.getItem(SEEN_KEY);
     const next = !seen || new Date(at).getTime() > new Date(seen).getTime();

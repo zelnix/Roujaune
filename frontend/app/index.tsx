@@ -12,6 +12,7 @@ import { HeroRoute } from "@/src/components/HeroRoute";
 import { MetricSummaryStrip } from "@/src/components/MetricSummaryStrip";
 import { TrainingPlanCard } from "@/src/components/TrainingPlanCard";
 import { TodayTrainingCard } from "@/src/components/TodayTrainingCard";
+import { PlanUpdatedNudge } from "@/src/components/PlanUpdatedNudge";
 import { ReadinessGate } from "@/src/components/ReadinessGate";
 import { ProgressCard, CommunityCard, WellnessCard, AchievementCard } from "@/src/components/BottomCards";
 import { navItems, navFooter } from "@/src/data";
@@ -106,6 +107,8 @@ export default function Dashboard() {
             showsVerticalScrollIndicator={false}
             testID="dashboard-scroll"
           >
+            <PlanUpdatedNudge />
+
             <View style={[styles.heroRow, { height: heroHeight }]}>
               <View style={{ width: heroW }}>
                 <HeroRoute

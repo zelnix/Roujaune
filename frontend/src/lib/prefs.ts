@@ -8,12 +8,25 @@ const COACH_STYLE_KEY = "roujaune:coachStyle";
 const VOICE_GUIDANCE_KEY = "roujaune:voiceGuidance";
 const SPEECH_RATE_KEY = "roujaune:speechRate";
 
+// Mirror coaching preferences to the server so they persist across devices.
+function prefsApi(): string {
+  return (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
+}
+function pushRiderPref(patch: Record<string, unknown>): void {
+  fetch(`${prefsApi()}/api/rider/prefs`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  }).catch(() => { /* keep local; re-syncs on next change */ });
+}
+
 /** Persisted speaking speed for coach TTS (0.8 slow – 1.1 fast; default 0.95). */
 export async function getSpeechRate(): Promise<number | null> {
   try { const v = await AsyncStorage.getItem(SPEECH_RATE_KEY); return v ? parseFloat(v) : null; } catch { return null; }
 }
 export async function setSpeechRate(rate: number): Promise<void> {
   try { await AsyncStorage.setItem(SPEECH_RATE_KEY, String(rate)); } catch { /* noop */ }
+  pushRiderPref({ speech_rate: rate });
 }
 
 /** Persisted coaching style ("balanced" | "performance" | "calm" | "essential"). */
@@ -22,6 +35,7 @@ export async function getCoachStyle(): Promise<string | null> {
 }
 export async function setCoachStyle(style: string): Promise<void> {
   try { await AsyncStorage.setItem(COACH_STYLE_KEY, style); } catch { /* noop */ }
+  pushRiderPref({ coach_style: style });
 }
 
 /** Persisted voice guidance mode ("full" | "essential" | "visual" | "muted"). */
@@ -30,6 +44,22 @@ export async function getVoiceGuidance(): Promise<string | null> {
 }
 export async function setVoiceGuidance(mode: string): Promise<void> {
   try { await AsyncStorage.setItem(VOICE_GUIDANCE_KEY, mode); } catch { /* noop */ }
+  pushRiderPref({ voice_guidance: mode });
+}
+
+/** Hydrate the local cache from the server's rider prefs (call once at startup,
+ * after auth). Ensures coaching preferences follow the rider across devices. */
+export async function hydrateRiderPrefs(): Promise<void> {
+  try {
+    const res = await fetch(`${prefsApi()}/api/rider/prefs`);
+    if (!res.ok) return;
+    const d = await res.json();
+    if (d?.coach_style) await AsyncStorage.setItem(COACH_STYLE_KEY, String(d.coach_style));
+    if (d?.voice_guidance) await AsyncStorage.setItem(VOICE_GUIDANCE_KEY, String(d.voice_guidance));
+    if (d?.speech_rate != null) await AsyncStorage.setItem(SPEECH_RATE_KEY, String(d.speech_rate));
+  } catch {
+    /* keep local cache */
+  }
 }
 
 /** Persisted coach persona id ("alberto" | "adriana"). */
