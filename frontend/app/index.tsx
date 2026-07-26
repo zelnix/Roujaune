@@ -13,6 +13,7 @@ import { MetricSummaryStrip } from "@/src/components/MetricSummaryStrip";
 import { TrainingPlanCard } from "@/src/components/TrainingPlanCard";
 import { TodayTrainingCard } from "@/src/components/TodayTrainingCard";
 import { PlanUpdatedNudge } from "@/src/components/PlanUpdatedNudge";
+import { BenchmarkReminderBanner } from "@/src/components/BenchmarkReminderBanner";
 import { ReadinessGate } from "@/src/components/ReadinessGate";
 import { ProgressCard, CommunityCard, WellnessCard, AchievementCard } from "@/src/components/BottomCards";
 import { navItems, navFooter } from "@/src/data";
@@ -107,6 +108,7 @@ export default function Dashboard() {
             testID="dashboard-scroll"
           >
             <PlanUpdatedNudge />
+            <BenchmarkReminderBanner />
 
             <View style={[styles.heroRow, { height: heroHeight }]}>
               <HeroRoute
