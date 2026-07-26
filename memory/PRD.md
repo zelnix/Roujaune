@@ -462,3 +462,27 @@ Home Alberto "Start Today's Ride" & sidebar Workouts → `/training`. Training "
 - **ROOT-CAUSE FIX for "next workouts show then disappear" (all devices)**: `src/lib/session.ts` fetch wrapper now AWAITS token hydration (`ensureToken()` + `_hydrated` flag; memoised) before firing any `/api/*` request. Previously authenticated calls could fire before the stored token loaded on cold-start → 401 → `usePlan` fell back to bundled static plan → upcoming-workouts list flipped/vanished. Verified via console logs (no post-login 401 on /api/plan) and rows persist.
 - **Home hero (`AlbertoCoachCard.tsx`)** now reflects TODAY's actual scheduled activity from `useCalendarWeek` (any type): a ride shows "Today · <dur> · <zone>"; fb50 → "Strength"; wellness → "Recovery"; a rest day shows "Rest Day" + "Your next workout is <title> · <dur>". Button label is now "View Today's Workout" (or "View Today's Plan" on a rest day) instead of the static "Start Today's Ride". Still routes to /training.
 - **Home Today's Training card (`CalendarCard.tsx`)**: removed the redundant cycling session row at the bottom (it duplicated the Welcome Ride title+duration already shown in the detail headline + WORKOUT STEPS). Today-scope now lists only supplementary sessions (fb50/wellness) and only renders that list when non-empty.
+
+## Today-screen overhaul + Progress timeline + hero rework (2026-07-26 fork, batch 5)
+### P0 — "Next Workouts" persistence (real root cause)
+- The recurring "rows disappear" bug was NOT the auth race — the backend `_ctr_plan_response` only emitted the CURRENT week's rides (often 0–1 incomplete), so once live data replaced the 4-item bundled fallback the list collapsed. Fixed: the builder now emits ALL day types (cycling, recovery, rest, strength/mobility/balance) in chronological order across whole weeks until ≥5 incomplete entries exist. `TrainingPlanCard` shows the next + up to 4 upcoming rows, each with a type-aware icon/color and short meta label. Verified with Green Lantern (couch-to-road).
+### Training Plan card shows all workout types
+- Backend workout entries now carry `type`, `subtitle` (non-cycling), `icon`, `color`, plus `date`, `date_label` ("Mon 27 Jul") and `is_today`. Completion: cycling by ride_id, rest by past-date, recovery/supplementary by supp_dates.
+### Progress timeline (NEW)
+- Backend `GET /api/progress/timeline?range=week|month|3m|6m|1y&offset=N` (auth) buckets real `ride_history` (bucket counts 7/4/13/6/12), returns window_label, buckets[{label,tss,hours,rides}], summary{rides,hours,tss,distance_km,elevation_m,avg_power,tss_delta_pct}, has_next (offset>0). Frontend `src/lib/progress-timeline.ts` + a Training Timeline card on `/progress` (range chips, prev/next date scroll, TSS bar chart, summary, empty-state). Default range = 3 Months.
+### Hero + Today layout rework
+- Nav label "Home" → "Today".
+- Hero coach card (`AlbertoCoachCard`) now uses the plan's first-incomplete workout of ANY type (so Green Lantern's next = "Beginner Cycling Strength · Mon 27 Jul · Strength", not the next ride), shows a phase/week kicker from a new backend `plan.hero` object ({week, phase_number, phase_name, week_in_phase, is_phase_start} → "START OF PHASE 1 · GET MOVING" or "PHASE n · <name> · WEEK w"), and gained Message + View Calendar buttons. Card is narrower.
+- Hero weather is now LIVE & LOCAL: `src/lib/weather.ts` `useWeather()` uses expo-location GPS → Open-Meteo, falling back to a Settings home location (`homeCity/homeLat/homeLon`, default Nice, France) when GPS is unavailable (indoors), plus today's date. Location perms added to app.json.
+- `TodayTrainingCard` extracted from CalendarCard and placed to the RIGHT of the hero (hero width ~0.64 of main). Calendar card REMOVED from the Today screen (still reachable via the hero "Calendar" button + nav). Achievements is a standalone card again next to Progress (undid the earlier merge).
+### Coach persistence (server-side, per user)
+- New user-scoped `rider_prefs` collection + `GET/PUT /api/rider/prefs` ({coach_id, coach_style, voice_guidance, speech_rate}). `coach-persona.ts` reconciles the local AsyncStorage cache with the server on load and PUTs on change, so the chosen companion coach is consistent across sessions/devices. Verified E2E.
+### Misc
+- Virtual Routes setup Exit button (`vr-exit`) enlarged into a prominent bordered pill.
+
+### DEFERRED — Phase 2 (Training Plan deep-dives), still TODO:
+- Phases nav link → detail view of each phase highlighting the current phase.
+- Key Workouts tap → full workout details.
+- Weekly Load overview → richer detail.
+- Adaptations → AI-generated (Claude) detailed reasoning explaining how the coach derived each adaptation (progress/regression per workout, achievements).
+### KNOWN (out of scope, flagged by testing): `rider_appearance` is NOT user-scoped in auth.py — would collide across users if per-user appearance is ever intended.
