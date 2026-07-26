@@ -1181,6 +1181,73 @@ async def update_rider_prefs(req: PrefsUpdate):
     return doc
 
 
+# ---- Benchmark Workouts: sessions, results & headline profile ----
+#      Sessions capture the readiness/setup flow; results (accepted) feed the
+#      rider's headline benchmark profile. Scoped per user.
+@api_router.get("/benchmark/profile")
+async def get_benchmark_profile():
+    doc = await udb.benchmark_profile.find_one({"user_id": auth.current_user_id()}) or {}
+    keys = ["ftp", "ftpWkg", "fiveMinPower", "oneMinPower", "sprintPower",
+            "aerobicEfficiency", "preferredCadence", "recoveryResponse", "lastBenchmarkDate"]
+    return {k: doc.get(k) for k in keys}
+
+
+@api_router.get("/benchmark/results")
+async def get_benchmark_results():
+    docs = await udb.benchmark_results.find(
+        {"user_id": auth.current_user_id()}
+    ).sort("createdAt", -1).to_list(length=200)
+    for d in docs:
+        d.pop("_id", None)
+        d.pop("user_id", None)
+    return {"results": docs}
+
+
+@api_router.post("/benchmark/sessions")
+async def create_benchmark_session(payload: Dict[str, Any] = Body(...)):
+    test_id = payload.get("testId")
+    if not test_id or not isinstance(test_id, str):
+        raise HTTPException(status_code=400, detail="testId is required")
+    sid = str(uuid.uuid4())
+    session = {
+        "id": sid,
+        "user_id": auth.current_user_id(),
+        "testId": test_id,
+        "status": payload.get("status", "in_progress"),
+        "readinessAnswers": payload.get("readinessAnswers") or {},
+        "readiness": payload.get("readiness"),
+        "usingDevData": bool(payload.get("usingDevData", False)),
+        "startedAt": datetime.now(timezone.utc).isoformat(),
+    }
+    await udb.benchmark_sessions.insert_one(dict(session))
+    session.pop("user_id", None)
+    return session
+
+
+@api_router.get("/benchmark/sessions/{sid}")
+async def get_benchmark_session(sid: str):
+    doc = await udb.benchmark_sessions.find_one({"id": sid, "user_id": auth.current_user_id()})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Session not found")
+    doc.pop("_id", None)
+    doc.pop("user_id", None)
+    return doc
+
+
+@api_router.patch("/benchmark/sessions/{sid}")
+async def update_benchmark_session(sid: str, payload: Dict[str, Any] = Body(...)):
+    upd = {k: v for k, v in (payload or {}).items() if k not in ("id", "user_id", "_id")}
+    res = await udb.benchmark_sessions.update_one(
+        {"id": sid, "user_id": auth.current_user_id()}, {"$set": upd})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Session not found")
+    doc = await udb.benchmark_sessions.find_one({"id": sid, "user_id": auth.current_user_id()})
+    doc.pop("_id", None)
+    doc.pop("user_id", None)
+    return doc
+
+
+
 # ---- Personal Records (Best Time / avg power per scenic route + segments) ----
 class SegmentSplit(BaseModel):
     label: str

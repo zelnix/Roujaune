@@ -1,71 +1,133 @@
 import React from "react";
-import { View, Text, StyleSheet, ActivityIndicator, Pressable } from "react-native";
-import { Image } from "expo-image";
+import { View, Text, StyleSheet, Pressable, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { AppScaffold, Card, SectionTitle } from "@/src/components/app-scaffold";
 import { CC } from "@/src/components/calendar";
-import { useCoach } from "@/src/lib/coach-persona";
-import { BENCHMARK_TESTS, AVAILABLE_TESTS } from "@/src/lib/benchmark/catalog";
-import { BenchmarkTestCard } from "@/src/components/benchmark/BenchmarkTestCard";
-import { useBenchmarkResults } from "@/src/lib/benchmark/api";
+import { getBenchmarkTest, CATEGORY_META } from "@/src/lib/benchmark/catalog";
+import { BenchmarkLibrary } from "@/src/components/benchmark/BenchmarkLibrary";
+import { useBenchmarkResults, useBenchmarkProfile } from "@/src/lib/benchmark/api";
+import type { BenchmarkProfile } from "@/src/lib/benchmark/types";
+
+const HISTORY_RANGES = ["4 Weeks", "3 Months", "6 Months", "12 Months", "All Time"];
+
+type Stat = { key: keyof BenchmarkProfile; label: string; unit?: string; format?: (v: any) => string };
+const PROFILE_STATS: Stat[] = [
+  { key: "ftp", label: "FTP", unit: "W" },
+  { key: "ftpWkg", label: "FTP watts / kg", unit: "W/kg" },
+  { key: "fiveMinPower", label: "Five-minute power", unit: "W" },
+  { key: "oneMinPower", label: "One-minute power", unit: "W" },
+  { key: "sprintPower", label: "Sprint power", unit: "W" },
+  { key: "aerobicEfficiency", label: "Aerobic efficiency" },
+  { key: "preferredCadence", label: "Preferred cadence", unit: "rpm" },
+  { key: "recoveryResponse", label: "Recovery response", unit: "bpm" },
+  { key: "lastBenchmarkDate", label: "Last benchmark", format: (v: string) => new Date(v).toLocaleDateString() },
+];
 
 export default function BenchmarkLandingScreen() {
   const router = useRouter();
-  const persona = useCoach();
-  const { results, loading } = useBenchmarkResults();
+  const { results, loading: resultsLoading } = useBenchmarkResults();
+  const { profile, loading: profileLoading } = useBenchmarkProfile();
+  const [range, setRange] = React.useState("3 Months");
+  const [notice, setNotice] = React.useState<string | null>(null);
+
+  const rec = getBenchmarkTest("ramp")!;
+  const recCat = CATEGORY_META[rec.category];
 
   return (
     <AppScaffold
       active="benchmark"
       title="Benchmark Workouts"
-      subtitle="Understand your current fitness — and let your coach personalise your training."
+      subtitle="Test Your Fitness • Track Your Progress"
     >
-      {/* Hero — the core message + coach identity */}
-      <Card testID="bm-hero">
-        <View style={s.heroRow}>
-          <Image source={persona.image} style={s.coachImg} contentFit="cover" contentPosition="top center" />
-          <View style={{ flex: 1 }}>
-            <Text style={s.heroKicker}>{persona.name.toUpperCase()} · YOUR COMPANION COACH</Text>
-            <Text style={s.heroTitle} accessibilityRole="header">Not a pass-or-fail test.</Text>
-            <Text style={s.heroBody}>
-              Benchmark Workouts give {persona.name} the information needed to understand your current fitness,
-              personalise your training and help you build your strongest ride.
-            </Text>
-          </View>
-        </View>
-        <Pressable
-          testID="bm-browse"
-          onPress={() => router.push("/benchmark/library")}
-          accessibilityRole="button"
-          accessibilityLabel="Browse the benchmark test library"
-          style={({ hovered }: any) => [s.cta, hovered && { opacity: 0.92 }]}
-        >
-          <Ionicons name="albums-outline" size={18} color="#fff" />
-          <Text style={s.ctaText}>Browse the test library</Text>
-          <Ionicons name="chevron-forward" size={16} color="#fff" />
-        </Pressable>
+      <Card>
+        <Text style={s.lead}>
+          Discover where your cycling fitness is today, track how it changes over time, and help Alberto or Adriana
+          personalise every part of your training.
+        </Text>
       </Card>
 
-      {/* History — empty state until results exist */}
-      <Card testID="bm-history">
-        <SectionTitle label="YOUR BENCHMARKS" color={CC.rouge} />
-        {loading ? (
+      {/* ── Current Benchmark Profile ── */}
+      <Card testID="bm-profile">
+        <SectionTitle label="CURRENT BENCHMARK PROFILE" color={CC.rouge} />
+        {profileLoading ? (
+          <View style={s.center}><ActivityIndicator color={CC.rouge} /></View>
+        ) : (
+          <View style={s.statGrid}>
+            {PROFILE_STATS.map((st) => {
+              const raw = profile[st.key];
+              const has = raw !== null && raw !== undefined;
+              const value = has ? (st.format ? st.format(raw) : `${raw}${st.unit ? ` ${st.unit}` : ""}`) : "Not yet tested";
+              return (
+                <View key={st.key} style={s.stat} accessibilityLabel={`${st.label}: ${value}`}>
+                  <Text style={s.statLabel}>{st.label}</Text>
+                  <Text style={[s.statValue, !has && s.statEmpty]} numberOfLines={1}>{value}</Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
+      </Card>
+
+      {/* ── Recommended Next Benchmark ── */}
+      <Card testID="bm-recommended">
+        <SectionTitle label="RECOMMENDED NEXT BENCHMARK" />
+        <View style={s.recHead}>
+          <View style={[s.recIcon, { backgroundColor: `${recCat.color}22` }]}>
+            <Ionicons name={rec.icon} size={24} color={recCat.color} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={[s.chip, { borderColor: `${recCat.color}66`, alignSelf: "flex-start" }]}>
+              <Text style={[s.chipText, { color: recCat.color }]}>{recCat.label}</Text>
+            </View>
+            <Text style={s.recName} accessibilityRole="header">{rec.name}</Text>
+          </View>
+        </View>
+        <Text style={s.recDesc}>{rec.description}</Text>
+        <View style={s.recFacts}>
+          <RecFact icon="time-outline" label="Duration" value={`~${rec.durationMin} min`} />
+          <RecFact icon="barbell-outline" label="Intensity" value={rec.difficulty} />
+          <RecFact icon="hardware-chip-outline" label="Equipment" value={rec.requiredEquipment.length > 0 ? "Trainer + power" : "None"} />
+        </View>
+        <View style={s.whyBox}>
+          <Text style={s.whyLabel}>WHY THIS TEST</Text>
+          <Text style={s.whyText}>
+            It&apos;s the quickest way to establish your FTP — the foundation for personalising every training zone. A
+            great first benchmark to anchor your profile.
+          </Text>
+        </View>
+        <View style={s.recActions}>
+          <Pressable testID="rec-view" onPress={() => router.push(`/benchmark/${rec.id}`)} accessibilityRole="button" accessibilityLabel="View the recommended test" style={s.btnGhost}>
+            <Text style={s.btnGhostText}>View Test</Text>
+          </Pressable>
+          <Pressable testID="rec-schedule" onPress={() => setNotice("Scheduling arrives with the training-calendar integration.")} accessibilityRole="button" accessibilityLabel="Schedule the recommended test" style={s.btnGhost}>
+            <Text style={s.btnGhostText}>Schedule Test</Text>
+          </Pressable>
+          <Pressable testID="rec-start" onPress={() => router.push(`/benchmark/readiness/${rec.id}`)} accessibilityRole="button" accessibilityLabel="Start the recommended test" style={s.btnPrimary}>
+            <Ionicons name="play" size={15} color="#fff" />
+            <Text style={s.btnPrimaryText}>Start Test</Text>
+          </Pressable>
+        </View>
+        {notice && (
+          <View style={s.notice}><Ionicons name="information-circle-outline" size={15} color={CC.dim} /><Text style={s.noticeText}>{notice}</Text></View>
+        )}
+      </Card>
+
+      {/* ── Recent Results ── */}
+      <Card testID="bm-recent">
+        <SectionTitle label="RECENT RESULTS" />
+        {resultsLoading ? (
           <View style={s.center}><ActivityIndicator color={CC.rouge} /></View>
         ) : results.length === 0 ? (
-          <View style={s.empty} testID="bm-empty">
-            <View style={s.emptyIcon}><Ionicons name="ribbon-outline" size={26} color={CC.dim} /></View>
-            <Text style={s.emptyTitle} accessibilityRole="header">No benchmarks yet</Text>
-            <Text style={s.emptyBody}>
-              Complete a benchmark to capture a snapshot of your fitness. Your results will appear here so you and
-              {" "}{persona.name} can track how your strongest ride is coming together.
-            </Text>
+          <View style={s.empty} testID="bm-recent-empty">
+            <View style={s.emptyIcon}><Ionicons name="ribbon-outline" size={24} color={CC.dim} /></View>
+            <Text style={s.emptyText}>Complete your first benchmark to begin tracking your cycling fitness.</Text>
           </View>
         ) : (
           <View style={{ gap: 10 }}>
-            {results.map((r) => (
+            {results.slice(0, 5).map((r) => (
               <View key={r.id} style={s.resultRow}>
-                <Text style={s.resultTitle}>{r.testId}</Text>
+                <Text style={s.resultTitle}>{getBenchmarkTest(r.testId)?.name ?? r.testId}</Text>
                 <Text style={s.resultMeta}>{new Date(r.createdAt).toLocaleDateString()}</Text>
               </View>
             ))}
@@ -73,52 +135,92 @@ export default function BenchmarkLandingScreen() {
         )}
       </Card>
 
-      {/* Preview of the library (data-driven, reuses the shared card) */}
-      <Card testID="bm-preview">
-        <SectionTitle
-          label="WHAT YOU CAN TEST"
-          right={
-            <Pressable testID="bm-view-all" onPress={() => router.push("/benchmark/library")} accessibilityRole="button" accessibilityLabel="View all benchmark tests" style={s.viewAll}>
-              <Text style={s.viewAllText}>View all</Text>
-              <Ionicons name="arrow-forward" size={13} color={CC.rouge} />
-            </Pressable>
-          }
-        />
-        <View style={s.grid}>
-          {BENCHMARK_TESTS.slice(0, 4).map((t) => (
-            <BenchmarkTestCard key={t.id} test={t} onPress={() => router.push(`/benchmark/${t.id}`)} />
-          ))}
+      {/* ── Benchmark History ── */}
+      <Card testID="bm-history">
+        <SectionTitle label="BENCHMARK HISTORY" />
+        <View style={s.rangeRow}>
+          {HISTORY_RANGES.map((r) => {
+            const on = range === r;
+            return (
+              <Pressable key={r} testID={`hist-range-${r.replace(/\s/g, "")}`} onPress={() => setRange(r)} accessibilityRole="button" accessibilityState={{ selected: on }} style={[s.range, on && s.rangeOn]}>
+                <Text style={[s.rangeText, on && s.rangeTextOn]}>{r}</Text>
+              </Pressable>
+            );
+          })}
         </View>
-        <Text style={s.previewHint}>
-          {AVAILABLE_TESTS.length} tests are ready to launch, with more on the way. Open the library for full details,
-          readiness checks and guided setup.
-        </Text>
+        <View style={s.chartPlaceholder} accessibilityLabel="Benchmark trend chart, no data yet">
+          <Ionicons name="analytics-outline" size={26} color={CC.dim} />
+          <Text style={s.chartText}>Your fitness trend for the last {range.toLowerCase()} will appear here once you&apos;ve logged benchmarks.</Text>
+        </View>
+      </Card>
+
+      {/* ── Benchmark Test Library (Part 3) ── */}
+      <Card testID="bm-library">
+        <SectionTitle label="BENCHMARK TEST LIBRARY" color={CC.rouge} />
+        <Text style={s.libIntro}>Choose a benchmark to see what it measures and how it runs.</Text>
+        <BenchmarkLibrary />
       </Card>
     </AppScaffold>
   );
 }
 
+function RecFact({ icon, label, value }: { icon: any; label: string; value: string }) {
+  return (
+    <View style={s.recFact}>
+      <Ionicons name={icon} size={15} color={CC.rouge} />
+      <View>
+        <Text style={s.recFactLabel}>{label}</Text>
+        <Text style={s.recFactValue}>{value}</Text>
+      </View>
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
-  heroRow: { flexDirection: "row", gap: 16, alignItems: "flex-start" },
-  coachImg: { width: 72, height: 72, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.06)" },
-  heroKicker: { color: CC.rouge, fontSize: 10.5, fontWeight: "800", letterSpacing: 0.6 },
-  heroTitle: { color: CC.white, fontSize: 22, fontWeight: "800", marginTop: 4 },
-  heroBody: { color: CC.dim, fontSize: 13.5, lineHeight: 20, marginTop: 6 },
-  cta: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 16, alignSelf: "flex-start", backgroundColor: CC.rouge, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 18, minHeight: 46 },
-  ctaText: { color: "#fff", fontSize: 14, fontWeight: "800" },
+  lead: { color: CC.dim, fontSize: 14, lineHeight: 21 },
 
-  center: { paddingVertical: 24, alignItems: "center" },
-  empty: { alignItems: "center", paddingVertical: 18, gap: 8 },
-  emptyIcon: { width: 56, height: 56, borderRadius: 28, backgroundColor: "rgba(255,255,255,0.05)", alignItems: "center", justifyContent: "center" },
-  emptyTitle: { color: CC.white, fontSize: 16, fontWeight: "800" },
-  emptyBody: { color: CC.dim, fontSize: 13, lineHeight: 19, textAlign: "center", maxWidth: 460 },
+  center: { paddingVertical: 22, alignItems: "center" },
+  statGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  stat: { flexGrow: 1, flexBasis: 150, backgroundColor: "rgba(255,255,255,0.02)", borderRadius: 12, borderWidth: 1, borderColor: CC.borderSoft, padding: 12, gap: 4 },
+  statLabel: { color: CC.dim, fontSize: 10.5, fontWeight: "800", letterSpacing: 0.4 },
+  statValue: { color: CC.white, fontSize: 17, fontWeight: "800" },
+  statEmpty: { color: CC.dim, fontSize: 13, fontWeight: "600", fontStyle: "italic" },
 
+  recHead: { flexDirection: "row", gap: 14, alignItems: "flex-start" },
+  recIcon: { width: 52, height: 52, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+  chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 },
+  chipText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.3 },
+  recName: { color: CC.white, fontSize: 19, fontWeight: "800", marginTop: 6 },
+  recDesc: { color: CC.dim, fontSize: 13.5, lineHeight: 20 },
+  recFacts: { flexDirection: "row", flexWrap: "wrap", gap: 14 },
+  recFact: { flexDirection: "row", alignItems: "center", gap: 8, flexGrow: 1, flexBasis: 150 },
+  recFactLabel: { color: CC.dim, fontSize: 10, fontWeight: "800", letterSpacing: 0.4 },
+  recFactValue: { color: CC.white, fontSize: 13, fontWeight: "700" },
+  whyBox: { backgroundColor: "rgba(201,23,39,0.06)", borderWidth: 1, borderColor: "rgba(201,23,39,0.2)", borderRadius: 12, padding: 12, gap: 4 },
+  whyLabel: { color: CC.rouge, fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
+  whyText: { color: CC.white, fontSize: 12.5, lineHeight: 18 },
+  recActions: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 2 },
+  btnGhost: { flexGrow: 1, flexBasis: 120, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: CC.border, borderRadius: 11, paddingVertical: 12, minHeight: 46, backgroundColor: "rgba(255,255,255,0.03)" },
+  btnGhostText: { color: CC.white, fontSize: 13, fontWeight: "700" },
+  btnPrimary: { flexGrow: 1, flexBasis: 120, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: CC.rouge, borderRadius: 11, paddingVertical: 12, minHeight: 46 },
+  btnPrimaryText: { color: "#fff", fontSize: 13, fontWeight: "800" },
+  notice: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 },
+  noticeText: { color: CC.dim, fontSize: 12.5, flex: 1, lineHeight: 17 },
+
+  empty: { alignItems: "center", paddingVertical: 18, gap: 10 },
+  emptyIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: "rgba(255,255,255,0.05)", alignItems: "center", justifyContent: "center" },
+  emptyText: { color: CC.dim, fontSize: 13, lineHeight: 19, textAlign: "center", maxWidth: 440 },
   resultRow: { flexDirection: "row", justifyContent: "space-between", borderWidth: 1, borderColor: CC.borderSoft, borderRadius: 12, padding: 12 },
   resultTitle: { color: CC.white, fontSize: 14, fontWeight: "700" },
   resultMeta: { color: CC.dim, fontSize: 12 },
 
-  viewAll: { flexDirection: "row", alignItems: "center", gap: 4 },
-  viewAllText: { color: CC.rouge, fontSize: 12, fontWeight: "800" },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-  previewHint: { color: CC.dim, fontSize: 12, marginTop: 14, lineHeight: 17 },
+  rangeRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  range: { borderWidth: 1, borderColor: CC.border, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14, backgroundColor: "rgba(255,255,255,0.03)", minHeight: 38, justifyContent: "center" },
+  rangeOn: { backgroundColor: CC.rouge, borderColor: CC.rouge },
+  rangeText: { color: CC.dim, fontSize: 12, fontWeight: "700" },
+  rangeTextOn: { color: "#fff" },
+  chartPlaceholder: { borderWidth: 1, borderColor: CC.borderSoft, borderStyle: "dashed", borderRadius: 12, padding: 24, alignItems: "center", gap: 10, minHeight: 150, justifyContent: "center" },
+  chartText: { color: CC.dim, fontSize: 12.5, textAlign: "center", lineHeight: 18, maxWidth: 420 },
+
+  libIntro: { color: CC.dim, fontSize: 13, lineHeight: 19, marginBottom: 4 },
 });

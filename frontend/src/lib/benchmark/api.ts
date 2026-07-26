@@ -1,13 +1,17 @@
-// Benchmark data access. Forward-compatible: results/sessions are served from
-// `/api/benchmark/*` (added in later phases). Until those endpoints return
-// data, these hooks resolve to empty — so the landing/history UI shows a real
-// empty state now and lights up automatically once persistence is wired.
+// Benchmark data access. `fetch` is auto-authed by installFetchAuth (session.ts),
+// so plain calls carry the rider's token. Hooks resolve gracefully to empty so
+// the UI shows honest empty states before any benchmark is completed.
 import { useCallback, useEffect, useState } from "react";
-import type { BenchmarkResult } from "./types";
+import type { BenchmarkResult, BenchmarkProfile, ReadinessAnswer, ReadinessOutcome, BenchmarkSession } from "./types";
 
 function apiBase(): string {
   return (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
 }
+
+const EMPTY_PROFILE: BenchmarkProfile = {
+  ftp: null, ftpWkg: null, fiveMinPower: null, oneMinPower: null, sprintPower: null,
+  aerobicEfficiency: null, preferredCadence: null, recoveryResponse: null, lastBenchmarkDate: null,
+};
 
 export async function fetchBenchmarkResults(): Promise<BenchmarkResult[]> {
   try {
@@ -20,19 +24,59 @@ export async function fetchBenchmarkResults(): Promise<BenchmarkResult[]> {
   }
 }
 
+export async function fetchBenchmarkProfile(): Promise<BenchmarkProfile> {
+  try {
+    const res = await fetch(`${apiBase()}/api/benchmark/profile`);
+    if (!res.ok) return EMPTY_PROFILE;
+    const data = await res.json();
+    return { ...EMPTY_PROFILE, ...(data || {}) };
+  } catch {
+    return EMPTY_PROFILE;
+  }
+}
+
+export async function createBenchmarkSession(input: {
+  testId: string;
+  readinessAnswers: Record<string, ReadinessAnswer>;
+  readiness: ReadinessOutcome;
+}): Promise<BenchmarkSession | null> {
+  try {
+    const res = await fetch(`${apiBase()}/api/benchmark/sessions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...input, status: "in_progress" }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 /** Rider's benchmark history (empty until results are recorded). */
 export function useBenchmarkResults() {
   const [results, setResults] = useState<BenchmarkResult[]>([]);
   const [loading, setLoading] = useState(true);
-
   const reload = useCallback(async () => {
     setLoading(true);
-    const r = await fetchBenchmarkResults();
-    setResults(r);
+    setResults(await fetchBenchmarkResults());
     setLoading(false);
   }, []);
-
   useEffect(() => { reload(); }, [reload]);
-
   return { results, loading, reload };
+}
+
+/** Headline benchmark profile (all null until the first accepted benchmark). */
+export function useBenchmarkProfile() {
+  const [profile, setProfile] = useState<BenchmarkProfile>(EMPTY_PROFILE);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const p = await fetchBenchmarkProfile();
+      if (alive) { setProfile(p); setLoading(false); }
+    })();
+    return () => { alive = false; };
+  }, []);
+  return { profile, loading };
 }
