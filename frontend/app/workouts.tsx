@@ -20,7 +20,7 @@ import {
 } from "@/src/lib/workouts";
 
 const ROUTE: Record<string, string> = {
-  home: "/", training: "/plan", routes: "/routes", calendar: "/calendar",
+  home: "/", training: "/plan", routes: "/virtual-route", calendar: "/calendar",
   progress: "/progress", community: "/community", wellness: "/wellness",
   connections: "/connections", settings: "/settings", help: "/help",
 };

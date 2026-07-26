@@ -87,7 +87,7 @@ export default function TodaysTraining() {
       return;
     }
     if (key === "workouts") { router.push("/workouts"); return; }
-    const routes: Record<string, string> = { calendar: "/calendar", routes: "/routes", progress: "/progress", wellness: "/wellness", community: "/community", connections: "/connections", settings: "/settings", help: "/help" };
+    const routes: Record<string, string> = { calendar: "/calendar", routes: "/virtual-route", progress: "/progress", wellness: "/wellness", community: "/community", connections: "/connections", settings: "/settings", help: "/help" };
     if (routes[key]) {
       router.push(routes[key] as any);
       return;
