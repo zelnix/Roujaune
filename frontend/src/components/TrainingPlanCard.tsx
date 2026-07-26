@@ -55,8 +55,8 @@ export function TrainingPlanCard({ onPress }: { onPress: () => void }) {
         <ClimbBars data={bars} color={colors.redBright} width={80} height={42} />
       </View>
 
-      {more.map((w) => (
-        <View key={w.id} style={styles.upNextRow}>
+      {more.map((w, idx) => (
+        <View key={`${w.id ?? "wk"}-${idx}`} style={styles.upNextRow}>
           <View style={[styles.upNextDot, { backgroundColor: w.color }]} />
           <Text style={styles.upNextTitle} numberOfLines={1}>{w.title}</Text>
           <Text style={styles.upNextMeta}>{w.duration} · {w.tss}</Text>
