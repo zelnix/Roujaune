@@ -13,9 +13,51 @@ import {
   kindToState, targetWatts, STATE_LABEL, STOP_REASONS, SAFETY_GUIDANCE, coachPrompt,
   simulateReadings, RAMP_STEP_OPTIONS, type WorkoutState,
 } from "@/src/lib/benchmark/player";
+import { computeResult, assembleCapture, type IntervalCapture } from "@/src/lib/benchmark/calc";
 
 function apiBase() { return (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, ""); }
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+// ── Per-interval accumulator (built live, finalized into an IntervalCapture) ──
+interface Acc {
+  pSum: number; pN: number; pMax: number;
+  hrSum: number; hrN: number; endHr: number;
+  cadSum: number; cadN: number; inBand: number; cadCount: number;
+  h1p: number; h1hr: number; h1n: number; h2p: number; h2hr: number; h2n: number;
+}
+function newAcc(): Acc {
+  return { pSum: 0, pN: 0, pMax: 0, hrSum: 0, hrN: 0, endHr: 0, cadSum: 0, cadN: 0, inBand: 0, cadCount: 0, h1p: 0, h1hr: 0, h1n: 0, h2p: 0, h2hr: 0, h2n: 0 };
+}
+function accumulate(a: Acc, r: { power: number; hr: number; cadence: number }, elapsed: number, step: { duration: number; cadenceTarget?: number }) {
+  a.pSum += r.power; a.pN += 1; a.pMax = Math.max(a.pMax, r.power);
+  a.hrSum += r.hr; a.hrN += 1; a.endHr = r.hr;
+  a.cadSum += r.cadence; a.cadN += 1;
+  if (step.cadenceTarget) {
+    a.cadCount += 1;
+    if (Math.abs(r.cadence - step.cadenceTarget) <= 3) a.inBand += 1;
+  }
+  if (step.duration > 0) {
+    const firstHalf = elapsed <= step.duration / 2;
+    if (firstHalf) { a.h1p += r.power; a.h1hr += r.hr; a.h1n += 1; }
+    else { a.h2p += r.power; a.h2hr += r.hr; a.h2n += 1; }
+  }
+}
+function finalizeInterval(
+  step: { iv: { kind: string; label: string }; duration: number; target: number; isRamp: boolean },
+  a: Acc, elapsedSec: number, rampTarget: number,
+): IntervalCapture {
+  return {
+    kind: step.iv.kind, label: step.iv.label,
+    target: step.isRamp ? rampTarget : step.target,
+    durationSec: step.duration, elapsedSec,
+    avgPower: a.pN ? a.pSum / a.pN : 0, maxPower: a.pMax,
+    avgHr: a.hrN ? a.hrSum / a.hrN : 0, endHr: a.endHr,
+    avgCad: a.cadN ? a.cadSum / a.cadN : 0,
+    inCadencePct: a.cadCount ? (a.inBand / a.cadCount) * 100 : 0,
+    h1Power: a.h1n ? a.h1p / a.h1n : 0, h1Hr: a.h1n ? a.h1hr / a.h1n : 0,
+    h2Power: a.h2n ? a.h2p / a.h2n : 0, h2Hr: a.h2n ? a.h2hr / a.h2n : 0,
+  };
+}
 
 export default function WorkoutPlayerScreen() {
   const router = useRouter();
@@ -57,8 +99,12 @@ export default function WorkoutPlayerScreen() {
   const [recoveryPrompt, setRecoveryPrompt] = React.useState(false);
 
   const pRoll = React.useRef<number[]>([]);
-  const ivAcc = React.useRef<{ sum: number; n: number }>({ sum: 0, n: 0 });
+  const accRef = React.useRef<Acc>(newAcc());
+  const logRef = React.useRef<IntervalCapture[]>([]);
+  const pauseCountRef = React.useRef(0);
+  const totalRef = React.useRef(0);
   const savedRef = React.useRef<any>(null);
+  const [sensorLevel, setSensorLevel] = React.useState<"A" | "B" | "C" | "D">("B");
   const running = ["warmup", "main", "recovery", "cooldown"].includes(runState);
 
   // Metric relevance
@@ -99,11 +145,53 @@ export default function WorkoutPlayerScreen() {
     }).catch(() => {});
   }, [session]);
 
+  // refs read inside the ticker / async finish
+  const rpeRef = React.useRef(rpe); rpeRef.current = rpe;
+  const rampStepRef = React.useRef(rampStep); rampStepRef.current = rampStep;
+  const sensorLevelRef = React.useRef(sensorLevel); sensorLevelRef.current = sensorLevel;
+
+  // Pull the sensor level captured in the setup flow (drives result confidence).
+  React.useEffect(() => {
+    if (!session) return;
+    (async () => {
+      try {
+        const res = await fetch(`${apiBase()}/api/benchmark/sessions/${session}`);
+        if (res.ok) {
+          const doc = await res.json();
+          if (doc?.sensorLevel) setSensorLevel(doc.sensorLevel);
+        }
+      } catch { /* keep default */ }
+    })();
+  }, [session]);
+
+  // Assemble the capture, compute the versioned result, persist, and hand off
+  // to the result page. Simulated data is flagged and never touches the profile.
+  const finishRun = React.useCallback(async (status: string, stoppedReason: string | null, rampFinalWatts?: number) => {
+    if (!test) return;
+    const capture = assembleCapture(test, logRef.current, {
+      totalElapsed: totalRef.current,
+      pauseCount: pauseCountRef.current,
+      rampFinalWatts,
+      rampStep: rampStepRef.current,
+      sensorLevel: sensorLevelRef.current,
+      isDevData: true,
+      rpe: rpeRef.current,
+    });
+    const result = computeResult(test, capture);
+    const endedAt = new Date().toISOString();
+    const payload = { testId, sessionId: session ?? null, status, stoppedReason, endedAt, capture, result };
+    try { await AsyncStorage.setItem("bm:lastresult", JSON.stringify(payload)); } catch { /* noop */ }
+    AsyncStorage.removeItem(storeKey).catch(() => {});
+    patchSession(status, { endedAt, stopReason: stoppedReason ?? undefined, rpe: rpeRef.current, capture, result });
+    router.replace("/benchmark/result/current");
+  }, [test, testId, session, storeKey, patchSession, router]);
+  const finishRef = React.useRef(finishRun); finishRef.current = finishRun;
+
   // ── Ticker ──
   React.useEffect(() => {
     if (!running) return;
     const t = setInterval(() => {
-      setTotalElapsed((v) => v + 1);
+      setTotalElapsed((v) => { totalRef.current = v + 1; return v + 1; });
       setStepElapsed((se) => {
         const cur = steps[stepIdx];
         if (!cur) return se;
@@ -119,18 +207,18 @@ export default function WorkoutPlayerScreen() {
         setReadings(r);
         pRoll.current = [...pRoll.current, r.power].slice(-3);
         setP3(Math.round(pRoll.current.reduce((a, b) => a + b, 0) / pRoll.current.length));
-        ivAcc.current.sum += r.power; ivAcc.current.n += 1;
-        setAvgIv(Math.round(ivAcc.current.sum / ivAcc.current.n));
+        accumulate(accRef.current, r, ne, cur);
+        setAvgIv(accRef.current.pN ? Math.round(accRef.current.pSum / accRef.current.pN) : 0);
         if (ne % 3 === 0) persist();
         // advance timed steps
         if (!cur.isRamp && ne >= cur.duration) {
-          const next = stepIdx + 1;
-          ivAcc.current = { sum: 0, n: 0 };
+          logRef.current.push(finalizeInterval(cur, accRef.current, ne, rampTargetRef.current));
+          accRef.current = newAcc();
           pRoll.current = [];
+          const next = stepIdx + 1;
           if (next >= steps.length) {
             setRunState("completed");
-            AsyncStorage.removeItem(storeKey).catch(() => {});
-            patchSession("completed", { completedAt: new Date().toISOString(), rpe });
+            finishRef.current("completed", null);
           } else {
             setStepIdx(next);
             setRunState(steps[next].state);
@@ -141,7 +229,7 @@ export default function WorkoutPlayerScreen() {
       });
     }, 1000);
     return () => clearInterval(t);
-  }, [running, stepIdx, steps, rampStep, fade, persist, patchSession, rpe, storeKey]);
+  }, [running, stepIdx, steps, rampStep, fade, persist]);
 
   // refs to read latest values inside interval
   const rampTargetRef = React.useRef(rampTarget); rampTargetRef.current = rampTarget;
@@ -159,22 +247,38 @@ export default function WorkoutPlayerScreen() {
 
   const begin = () => {
     setStepIdx(0); setStepElapsed(0); setTotalElapsed(0);
-    ivAcc.current = { sum: 0, n: 0 }; pRoll.current = [];
+    totalRef.current = 0; accRef.current = newAcc(); logRef.current = []; pauseCountRef.current = 0; pRoll.current = [];
     if (steps[0]?.isRamp) setRampTarget(steps[0].iv.rampStartWatts || 100);
     setRunState(steps[0]?.state ?? "main");
     patchSession("in_progress", { startedAt: new Date().toISOString() });
   };
   const doPause = () => {
     if (test.effort === "maximal") { setShowPauseWarn(true); return; }
+    pauseCountRef.current += 1;
     setRunState("paused");
   };
-  const confirmPause = () => { setShowPauseWarn(false); setRunState("paused"); };
+  const confirmPause = () => { pauseCountRef.current += 1; setShowPauseWarn(false); setRunState("paused"); };
   const resume = () => { setPauseTotal((p) => p); setRunState(step?.state ?? "main"); };
   const pickStop = (rid: string, isSafety?: boolean) => {
     setShowStop(false); setStoppedReason(rid); setSafety(!!isSafety);
-    setRunState("stopped_early");
-    AsyncStorage.removeItem(storeKey).catch(() => {});
-    patchSession("stopped_early", { stopReason: rid, endedAt: new Date().toISOString(), rpe });
+    // finalize the in-progress interval so its recorded data is captured
+    if (step) logRef.current.push(finalizeInterval(step, accRef.current, stepElapsed, rampTarget));
+    if (isSafety) {
+      setRunState("stopped_early");
+      AsyncStorage.removeItem(storeKey).catch(() => {});
+      patchSession("stopped_early", { stopReason: rid, endedAt: new Date().toISOString(), rpe, safety: true });
+      return;
+    }
+    let rampFinalWatts: number | undefined;
+    if (step?.isRamp) {
+      const stepSec = step.iv.rampStepSec || 60;
+      const stages = Math.floor(stepElapsed / stepSec);
+      const start = step.iv.rampStartWatts || 100;
+      rampFinalWatts = start + Math.max(0, stages - 1) * rampStep;
+    }
+    const status = rid === "limit" ? "completed" : "stopped_early";
+    setRunState(status as WorkoutState);
+    finishRun(status, rid, rampFinalWatts);
   };
   const restoreSaved = () => {
     const sv = savedRef.current; if (!sv) return;

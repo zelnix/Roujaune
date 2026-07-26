@@ -102,6 +102,43 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
+
+benchmark_part7_9_10:
+  - task: "Part 7 — Setup launches Workout Player; player runs 4 core protocols with sim data"
+    implemented: true
+    working: "NA"
+    file: "frontend/app/benchmark/setup/[id].tsx, frontend/app/benchmark/player/[id].tsx, frontend/src/lib/benchmark/player.ts"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Setup 'Begin Test' now navigates to /benchmark/player/{id}?session={sid} (was a Part-7-placeholder). Player is fully stateful: timeline from intervals, sim telemetry (SIM DATA badge), ramp step config (10/15/20/25W), pause (maximal-warning), stop reasons (safety vs non-safety), sensor-dropout inject, session recovery. Player now captures per-interval aggregates (avg/max power, HR, cadence in-band, halves) and on completion/limit-stop computes a result and navigates to /benchmark/result/current. Safety stops (pain/unwell) stay on the safety screen and do NOT produce a result. TEST 4 protocols: Ramp (open-ended → Stop 'reached my limit' → result FTP+MAP), 20-Min FTP (long — use the fact that intervals auto-advance; verify it runs & Stop early works), Aerobic Efficiency (submaximal, no pause warning), Cadence Control (primary metric = CADENCE, target rpm shown). Credentials greenlantern@roujaune.app / rideon9900."
+  - task: "Part 9 — Result page: versioned calc, 0–100 confidence, reflection, accept/exclude/save"
+    implemented: true
+    working: "NA"
+    file: "frontend/app/benchmark/result/current.tsx, frontend/src/lib/benchmark/calc.ts, backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "computeResult() maps each test's calculation method (ramp_map ×0.75, twenty_min ×0.95, five/one-min power, sprint_peak, aerobic_decoupling, cadence_consistency, recovery_hrr) into headline metrics + a 0–100 confidence (completion + steadiness + sensor level + pauses). Result page shows primary metric, confidence meter, measurements, insight, feel chips + notes, and Accept/Save-for-later/Exclude → POST /api/benchmark/results. Because runs are SIM DATA (isDevData), accepting shows a clear 'profile not changed' notice. Backend verified via curl: sim accept does NOT change profile; real accept sets profile.ftp. TEST: finish a Ramp via player → result page shows Estimated FTP + confidence → Accept → dev notice → back to landing."
+  - task: "Part 10 — Landing: results with decision actions, Training Zones, FTP trend"
+    implemented: true
+    working: "NA"
+    file: "frontend/app/benchmark/index.tsx, frontend/src/lib/benchmark/api.ts, backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Recent Results rows now show primary metric + confidence% + decision chip (Accepted/Review/Excluded) and Accept/Exclude buttons for pending results (POST /api/benchmark/results/{id}/decision; accept updates profile+zones ONLY for non-sim). New TRAINING ZONES card (GET /api/benchmark/zones, 7-zone model from FTP; falls back to settings.ftp=287 for Green Lantern). BENCHMARK HISTORY now renders a View-based FTP trend (bars + delta) from FTP-bearing non-excluded results, else the placeholder. Backend curl verified: zones from ftp 287, decision endpoint, sim-guard. NOTE: since all player data is SIM, accepting from the player result page will NOT populate the real profile/zones — that is intended. Zones still render from settings.ftp."
+
+
 user_problem_statement: "ROUJAUNE cycling app — MULTI-USER: auth (email/password + Emergent Google + Apple), per-user data scoping, onboarding that classifies rider level + recommends a plan (or ride free), account sign-out. Green Lantern is a real user migrated to a demo account (greenlantern@roujaune.app / rideon9900)."
 
 multi_user_backend:

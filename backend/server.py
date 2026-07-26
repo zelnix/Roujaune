@@ -1247,6 +1247,125 @@ async def update_benchmark_session(sid: str, payload: Dict[str, Any] = Body(...)
     return doc
 
 
+# ---- Benchmark results: save, accept/exclude (profile update), training zones ----
+#      SAFETY: results flagged isDevData (simulated) are recorded for practice but
+#      NEVER update the rider's genuine benchmark profile. Accepting is explicit.
+
+# Which result metric key maps onto which headline profile field.
+_BM_METRIC_TO_PROFILE = {
+    "ftp": "ftp",
+    "p5": "fiveMinPower",
+    "p1": "oneMinPower",
+    "peak": "sprintPower",
+    "decoupling": "aerobicEfficiency",
+    "preferred_cadence": "preferredCadence",
+    "hrr": "recoveryResponse",
+}
+
+
+async def _apply_benchmark_result_to_profile(result: Dict[str, Any]):
+    """Write an ACCEPTED, non-simulated result's metrics onto the rider profile."""
+    if result.get("isDevData"):
+        return  # never update a genuine profile from simulated data
+    uid = auth.current_user_id()
+    upd: Dict[str, Any] = {"lastBenchmarkDate": datetime.now(timezone.utc).isoformat()}
+    for m in (result.get("metrics") or []):
+        field = _BM_METRIC_TO_PROFILE.get(m.get("key"))
+        if field and isinstance(m.get("value"), (int, float)):
+            upd[field] = m["value"]
+    if "ftp" in upd:
+        # try to derive W/kg from the rider's weight if available
+        rider = await udb.rider_profile.find_one({"user_id": uid}) or {}
+        wt = rider.get("weightKg") or rider.get("weight_kg")
+        if isinstance(wt, (int, float)) and wt > 0:
+            upd["ftpWkg"] = round(upd["ftp"] / wt, 2)
+    await udb.benchmark_profile.update_one(
+        {"user_id": uid}, {"$set": {**upd, "user_id": uid}}, upsert=True)
+
+
+@api_router.post("/benchmark/results")
+async def create_benchmark_result(payload: Dict[str, Any] = Body(...)):
+    rid = str(uuid.uuid4())
+    result = {
+        "id": rid,
+        "user_id": auth.current_user_id(),
+        "sessionId": payload.get("sessionId"),
+        "testId": payload.get("testId"),
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "decision": payload.get("decision", "pending"),
+        "quality": payload.get("quality", "moderate"),
+        "confidence": payload.get("confidence", 0),
+        "metrics": payload.get("metrics") or [],
+        "primaryMetric": payload.get("primaryMetric"),
+        "calcVersion": payload.get("calcVersion", "v1"),
+        "isDevData": bool(payload.get("isDevData", False)),
+        "insight": payload.get("insight"),
+        "notes": payload.get("notes"),
+        "reflection": payload.get("reflection"),
+        "status": payload.get("status"),
+        "stoppedReason": payload.get("stoppedReason"),
+        "rpe": payload.get("rpe"),
+    }
+    await udb.benchmark_results.insert_one(dict(result))
+    if result["decision"] == "accepted":
+        await _apply_benchmark_result_to_profile(result)
+    result.pop("user_id", None)
+    return result
+
+
+@api_router.post("/benchmark/results/{rid}/decision")
+async def set_benchmark_result_decision(rid: str, payload: Dict[str, Any] = Body(...)):
+    decision = payload.get("decision")
+    if decision not in ("pending", "accepted", "excluded"):
+        raise HTTPException(status_code=400, detail="Invalid decision")
+    res = await udb.benchmark_results.update_one(
+        {"id": rid, "user_id": auth.current_user_id()}, {"$set": {"decision": decision}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Result not found")
+    doc = await udb.benchmark_results.find_one({"id": rid, "user_id": auth.current_user_id()})
+    if decision == "accepted":
+        await _apply_benchmark_result_to_profile(doc)
+    doc.pop("_id", None)
+    doc.pop("user_id", None)
+    return doc
+
+
+def _training_zones(ftp: int) -> List[Dict[str, Any]]:
+    """Classic 7-zone model derived from FTP (%FTP boundaries)."""
+    if not ftp or ftp <= 0:
+        return []
+    bounds = [
+        ("Z1", "Active Recovery", 0, 0.55),
+        ("Z2", "Endurance", 0.56, 0.75),
+        ("Z3", "Tempo", 0.76, 0.90),
+        ("Z4", "Threshold", 0.91, 1.05),
+        ("Z5", "VO2 Max", 1.06, 1.20),
+        ("Z6", "Anaerobic", 1.21, 1.50),
+        ("Z7", "Neuromuscular", 1.51, 0),  # open-ended
+    ]
+    out = []
+    for key, name, lo, hi in bounds:
+        out.append({
+            "key": key, "name": name,
+            "lowPct": round(lo * 100), "highPct": round(hi * 100) if hi else None,
+            "lowW": round(ftp * lo), "highW": round(ftp * hi) if hi else None,
+        })
+    return out
+
+
+@api_router.get("/benchmark/zones")
+async def get_benchmark_zones():
+    uid = auth.current_user_id()
+    prof = await udb.benchmark_profile.find_one({"user_id": uid}) or {}
+    ftp = prof.get("ftp")
+    if not ftp:
+        settings = await udb.settings.find_one({"user_id": uid}) or {}
+        ftp = settings.get("ftp")
+    ftp = int(ftp) if ftp else 0
+    return {"ftp": ftp, "zones": _training_zones(ftp)}
+
+
+
 
 # ---- Personal Records (Best Time / avg power per scenic route + segments) ----
 class SegmentSplit(BaseModel):

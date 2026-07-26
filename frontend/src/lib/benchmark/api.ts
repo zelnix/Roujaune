@@ -53,6 +53,45 @@ export async function createBenchmarkSession(input: {
   }
 }
 
+export async function saveBenchmarkResult(payload: Record<string, unknown>): Promise<{ id?: string } | null> {
+  try {
+    const res = await fetch(`${apiBase()}/api/benchmark/results`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export interface TrainingZone { key: string; name: string; lowPct: number; highPct: number | null; lowW: number; highW: number | null; }
+
+export async function fetchBenchmarkZones(): Promise<{ ftp: number; zones: TrainingZone[] }> {
+  try {
+    const res = await fetch(`${apiBase()}/api/benchmark/zones`);
+    if (!res.ok) return { ftp: 0, zones: [] };
+    return await res.json();
+  } catch {
+    return { ftp: 0, zones: [] };
+  }
+}
+
+export async function setBenchmarkResultDecision(id: string, decision: "pending" | "accepted" | "excluded"): Promise<boolean> {
+  try {
+    const res = await fetch(`${apiBase()}/api/benchmark/results/${id}/decision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 /** Rider's benchmark history (empty until results are recorded). */
 export function useBenchmarkResults() {
   const [results, setResults] = useState<BenchmarkResult[]>([]);
@@ -70,13 +109,22 @@ export function useBenchmarkResults() {
 export function useBenchmarkProfile() {
   const [profile, setProfile] = useState<BenchmarkProfile>(EMPTY_PROFILE);
   const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      const p = await fetchBenchmarkProfile();
-      if (alive) { setProfile(p); setLoading(false); }
-    })();
-    return () => { alive = false; };
+  const reload = useCallback(async () => {
+    setProfile(await fetchBenchmarkProfile());
+    setLoading(false);
   }, []);
-  return { profile, loading };
+  useEffect(() => { reload(); }, [reload]);
+  return { profile, loading, reload };
+}
+
+/** Training zones derived from the rider's current FTP (server-computed). */
+export function useBenchmarkZones() {
+  const [data, setData] = useState<{ ftp: number; zones: TrainingZone[] }>({ ftp: 0, zones: [] });
+  const [loading, setLoading] = useState(true);
+  const reload = useCallback(async () => {
+    setData(await fetchBenchmarkZones());
+    setLoading(false);
+  }, []);
+  useEffect(() => { reload(); }, [reload]);
+  return { ftp: data.ftp, zones: data.zones, loading, reload };
 }

@@ -100,6 +100,7 @@ export default function SetupWizardScreen() {
       } catch { /* non-blocking */ }
     }
     setBegun(true);
+    router.replace(`/benchmark/player/${testId}${sessionId ? `?session=${sessionId}` : ""}`);
   };
 
   const canContinue =
@@ -322,7 +323,7 @@ export default function SetupWizardScreen() {
             {begun ? (
               <View style={s.begun} testID="setup-begun">
                 <Ionicons name="checkmark-circle" size={20} color="#7FD98A" />
-                <Text style={s.begunText}>Setup saved to your session. The guided Workout Player arrives in the next update (Part 7).</Text>
+                <Text style={s.begunText}>Setup saved. Launching your guided Workout Player…</Text>
               </View>
             ) : (
               <Pressable testID="begin-test" onPress={beginTest} style={s.primaryBtn} accessibilityRole="button" accessibilityLabel="Begin test">
