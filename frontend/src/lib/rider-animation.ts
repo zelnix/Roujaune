@@ -105,41 +105,48 @@ export function createRiderAnimator() {
     const paused = !!i.isPaused;
     const emergency = !!i.emergencyStop;
     const frozen = paused || emergency;
+    // Signal loss = telemetry has dropped out. Rather than a hard freeze, the
+    // rider believably eases off: pedalling stops, effort/power/cadence bleed to
+    // zero and the bike coasts down while the wheels spin to a natural stop.
+    const degraded = !!i.signalLost && !frozen;
 
-    // Smooth the primary signals (snappy but stable).
-    s.cad = approach(s.cad, Math.max(0, i.cadenceRpm || 0), dt, 0.28);
-    s.pow = approach(s.pow, Math.max(0, i.powerWatts || 0), dt, 0.35);
-    s.spd = approach(s.spd, Math.max(0, i.speedKph || 0), dt, 0.4);
+    // Smooth the primary signals (snappy but stable). On signal loss we drive the
+    // targets to zero with a gentle time-constant so the rider glides to a coast.
+    const easeTau = degraded ? 1.2 : 0;
+    s.cad = approach(s.cad, degraded ? 0 : Math.max(0, i.cadenceRpm || 0), dt, degraded ? easeTau : 0.28);
+    s.pow = approach(s.pow, degraded ? 0 : Math.max(0, i.powerWatts || 0), dt, degraded ? easeTau : 0.35);
+    s.spd = approach(s.spd, degraded ? 0 : Math.max(0, i.speedKph || 0), dt, degraded ? 1.8 : 0.4);
     s.hr = approach(s.hr, Math.max(0, i.heartRateBpm || 0), dt, 0.8);
     s.grad = approach(s.grad, clamp(i.gradientPct ?? 0, -25, 30), dt, 0.5);
 
     // Derived pedalling / coasting.
-    const pedalling = (i.isPedalling ?? (s.cad > 6)) && !frozen;
-    const coastingTarget = (!pedalling && s.spd > 6) || (s.pow < 15 && s.spd > 10 && !frozen) ? 1 : 0;
+    const pedalling = (i.isPedalling ?? (s.cad > 6)) && !frozen && !degraded;
+    const coastingTarget = degraded ? 1 : ((!pedalling && s.spd > 6) || (s.pow < 15 && s.spd > 10 && !frozen) ? 1 : 0);
     s.coast = approach(s.coast, frozen ? 0 : coastingTarget, dt, 0.3);
 
     // Effort from power (reaches ~1 near a hard sprint of ~1.6× FTP).
-    const effortTarget = frozen ? 0 : clamp(s.pow / (ftp * 1.6), 0, 1);
-    s.effort = approach(s.effort, effortTarget, dt, 0.4);
+    const effortTarget = (frozen || degraded) ? 0 : clamp(s.pow / (ftp * 1.6), 0, 1);
+    s.effort = approach(s.effort, effortTarget, dt, degraded ? 0.8 : 0.4);
 
-    // Posture blends from gradient (+ effort for standing).
-    const climbTarget = frozen ? 0 : smoothstep(2, 10, s.grad);
-    const descentTarget = frozen ? 0 : smoothstep(2, 12, -s.grad);
-    const standTarget = frozen ? 0 : smoothstep(8, 14, s.grad) * smoothstep(0.55, 0.9, s.effort);
+    // Posture blends from gradient (+ effort for standing). On signal loss the
+    // rider settles into a neutral seated coast, so climbing/standing ease out.
+    const climbTarget = (frozen || degraded) ? 0 : smoothstep(2, 10, s.grad);
+    const descentTarget = (frozen || degraded) ? 0 : smoothstep(2, 12, -s.grad);
+    const standTarget = (frozen || degraded) ? 0 : smoothstep(8, 14, s.grad) * smoothstep(0.55, 0.9, s.effort);
     s.climb = approach(s.climb, climbTarget, dt, 0.5);
     s.descent = approach(s.descent, descentTarget, dt, 0.5);
     s.stand = approach(s.stand, standTarget, dt, 0.6);
 
     // Braking.
-    s.brake = approach(s.brake, i.braking && !frozen ? 1 : 0, dt, 0.2);
+    s.brake = approach(s.brake, i.braking && !frozen && !degraded ? 1 : 0, dt, 0.2);
 
-    // Lean from explicit override or route curvature.
+    // Lean from explicit override or route curvature (centres on freeze / dropout).
     const leanTarget = clamp(i.leanDeg ?? (i.curve ?? 0) * 15, -18, 18);
-    s.lean = approach(s.lean, frozen ? 0 : leanTarget, dt, 0.35);
+    s.lean = approach(s.lean, (frozen || degraded) ? 0 : leanTarget, dt, 0.35);
 
     // Secondary body bob intensity (out on effort + cadence, damped when coasting).
     const cadNorm = clamp(s.cad / 110, 0, 1);
-    const bobTarget = i.reducedMotion || frozen ? 0 : clamp(0.35 + 0.4 * s.effort + 0.35 * cadNorm, 0, 1) * (1 - 0.7 * s.coast);
+    const bobTarget = i.reducedMotion || frozen || degraded ? 0 : clamp(0.35 + 0.4 * s.effort + 0.35 * cadNorm, 0, 1) * (1 - 0.7 * s.coast);
     s.bob = approach(s.bob, bobTarget, dt, 0.25);
 
     // Phase integration (crank & wheels advance from cadence & speed).

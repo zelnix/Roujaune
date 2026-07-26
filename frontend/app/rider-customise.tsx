@@ -18,6 +18,7 @@ import {
   ClothingStyle,
 } from "@/src/lib/rider-config";
 import { riderVisualFor } from "@/src/lib/virtual-riders";
+import { RiveRider } from "@/src/components/virtual-route/RiveRider";
 
 const eq = (a: RiderAppearanceConfiguration, b: RiderAppearanceConfiguration) =>
   a.riderType === b.riderType && a.bikeType === b.bikeType && a.clothingStyle === b.clothingStyle;
@@ -86,7 +87,19 @@ export default function RiderCustomiseScreen() {
   const Preview = (
     <View style={[s.previewCard, { borderColor: visual.accent + "66" }]}>
       <View style={[s.previewGlow, { backgroundColor: visual.accent + "22" }]} />
-      <Image source={visual.sprite} style={s.previewSprite} resizeMode="contain" />
+      <RiveRider
+        sprite={visual.sprite}
+        riderType={draft.riderType}
+        bikeType={draft.bikeType}
+        clothingStyle={draft.clothingStyle}
+        cadenceRpm={78}
+        powerWatts={150}
+        speedKph={27}
+        isSimulation
+        isConnected={false}
+        isPedalling
+        style={s.previewSprite}
+      />
       <View style={s.previewMeta}>
         <Text style={s.previewName}>{riderMeta.label}</Text>
         <View style={s.previewChips}>

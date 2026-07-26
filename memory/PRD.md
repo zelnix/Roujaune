@@ -557,3 +557,9 @@ Re-specified per detailed 5-part brief; SUPERSEDES batch-9/10 "Phase 1/2".
   - Frontend `_layout.tsx`: module-scope handler + Android channel, tap listeners (warm + cold-start), denied-permission weekly nudge (Alert → openSettings), `registerForPush()` on sign-in. `src/lib/push.ts` uses `getDevicePushTokenAsync`.
   - `app.json`: `expo-notifications` plugin + `android.googleServicesFile: ./google-services.json` (user adds file at deploy).
   - **CANNOT be tested in Expo Go/web** — requires native build. In dev, register-push returns 500 (placeholder key) — EXPECTED; benchmark scheduling still succeeds (verified via curl).
+
+## Session update (Jun 2026 fork) — Rive backlog + Today banners
+- **Bike route-compatibility (was 🔴):** `rider-config.ts` now has `routeSuitability` per bike + `terrainKindForTag()` + `routeCompatibility(bike, tag)`. Virtual-route setup shows a warn/info banner (`testID=bike-route-compat`) when the selected bike isn't ideal for the route (e.g. Vintage + Big Climb → "Tough for big climbs"). Verified via screenshot.
+- **Signal-loss behaviour (was 🟠):** `rider-animation.ts` adds a `degraded = signalLost && !frozen` state — pedalling stops, cadence/power/effort/bob ease to 0, speed spins down (tau 1.8s), posture/lean centre, coast→1. Distinct from the hard paused/emergency freeze.
+- **Customise preview → live Rive rig (was 🟠):** `rider-customise.tsx` preview now renders `<RiveRider>` with idle sim telemetry (falls back to sprite on web / until real `.riv`).
+- **Today plan-review banner:** `BenchmarkReminderBanner.tsx` now also surfaces a pending FTP plan-review (`useBenchmarkPlanReview`) as a green "FTP update ready NNNW→MMMW" row above the benchmark-test row; both tap to `/benchmark`. Verified: both render for demo (287→305W + Ramp Test tomorrow).

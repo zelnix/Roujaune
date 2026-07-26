@@ -8,12 +8,21 @@ export type RiderProfile = { name: string; weight_kg: number; age: number; gende
 
 const DEFAULT: RiderProfile = { name: "Rider One", weight_kg: 78, age: 42, gender: "male", city: "", region: "", country: "", capability: "intermediate" };
 const AVATAR_KEY = "roujaune:riderAvatar";
+const PROFILE_KEY = "roujaune:riderProfile";
 
 // Module-level snapshot so non-React code (coach context builders) can read it.
 let _snap: RiderProfile = { ...DEFAULT };
 export function getRiderProfile(): RiderProfile {
   return _snap;
 }
+
+// Hydrate the module snapshot from the last-known cached profile as early as
+// possible so no screen ever shows the "Rider One" placeholder on cold start.
+AsyncStorage.getItem(PROFILE_KEY).then((raw) => {
+  if (raw) {
+    try { _snap = { ...DEFAULT, ...JSON.parse(raw) }; } catch { /* ignore */ }
+  }
+}).catch(() => {});
 
 function base(): string {
   return (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
@@ -26,6 +35,18 @@ export function useRiderProfile() {
 
   useEffect(() => {
     (async () => {
+      // 1) Instant paint from the cached profile (prevents the "Rider One" flash).
+      try {
+        const cached = await AsyncStorage.getItem(PROFILE_KEY);
+        if (cached) {
+          const c: RiderProfile = { ...DEFAULT, ...JSON.parse(cached) };
+          _snap = c;
+          setProfile(c);
+        }
+      } catch {
+        /* ignore cache */
+      }
+      // 2) Reconcile with the backend (source of truth) and refresh the cache.
       try {
         const res = await fetch(`${base()}/api/rider/profile`);
         if (res.ok) {
@@ -33,9 +54,10 @@ export function useRiderProfile() {
           const p: RiderProfile = { name: d.name, weight_kg: d.weight_kg, age: d.age, gender: d.gender, city: d.city ?? "", region: d.region ?? "", country: d.country ?? "", capability: d.capability ?? "intermediate" };
           _snap = p;
           setProfile(p);
+          AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(p)).catch(() => {});
         }
       } catch {
-        /* keep defaults */
+        /* keep cache/defaults */
       }
       try {
         const a = await AsyncStorage.getItem(AVATAR_KEY);
@@ -51,6 +73,7 @@ export function useRiderProfile() {
     const next = { ..._snap, ...patch };
     _snap = next;
     setProfile(next);
+    AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(next)).catch(() => {});
     try {
       await fetch(`${base()}/api/rider/profile`, {
         method: "PUT",

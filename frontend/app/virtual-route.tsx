@@ -11,7 +11,7 @@ import { BleSensorsPanel } from "@/src/components/BleSensorsPanel";
 import { useSettings } from "@/src/lib/settings";
 import { RouteProfile } from "@/src/components/virtual-route/RouteProfile";
 import { riderVisualFor } from "@/src/lib/virtual-riders";
-import { RIDER_TYPES, BIKE_TYPES, CLOTHING_STYLES, DEFAULT_APPEARANCE, loadAppearance, RiderAppearanceConfiguration } from "@/src/lib/rider-config";
+import { RIDER_TYPES, BIKE_TYPES, CLOTHING_STYLES, DEFAULT_APPEARANCE, loadAppearance, RiderAppearanceConfiguration, routeCompatibility } from "@/src/lib/rider-config";
 import { VIRTUAL_ROUTES, getVRoute, routeStateAt, routeTerrainBias } from "@/src/lib/vroutes";
 import { VirtualRouteScene, SceneTelemetry } from "@/src/components/virtual-route/scene";
 import { VirtualRidePlayer } from "@/src/components/virtual-route/VirtualRidePlayer";
@@ -82,6 +82,7 @@ export default function VirtualRouteScreen() {
   const [emergency, setEmergency] = React.useState(false);
   const rider = riderVisualFor(appearance.riderType);
   const vroute = getVRoute(routeId);
+  const compat = routeCompatibility(appearance.bikeType, vroute.tag);
 
   // Load persisted rider appearance on mount and whenever we return from the
   // customisation screen (persists until the user changes it again).
@@ -318,6 +319,25 @@ export default function VirtualRouteScreen() {
                 </View>
               </Pressable>
 
+              {compat.level !== "ideal" && (
+                <View
+                  testID="bike-route-compat"
+                  style={[s.compatRow, compat.level === "warn" ? s.compatWarn : s.compatInfo]}
+                  accessibilityRole="alert"
+                  accessibilityLabel={`${compat.title}. ${compat.message}`}
+                >
+                  <Ionicons
+                    name={compat.level === "warn" ? "warning" : "information-circle"}
+                    size={16}
+                    color={compat.level === "warn" ? "#FF9F45" : colors.yellow}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.compatTitle}>{compat.title}</Text>
+                    <Text style={s.compatMsg}>{compat.message}</Text>
+                  </View>
+                </View>
+              )}
+
               <View style={s.setupRow}>
                 <View style={[s.connPill, s.connPillInline, { borderColor: conn.tone + "88", backgroundColor: conn.tone + "22" }]}>
                   <View style={[s.connDot, { backgroundColor: conn.tone }]} />
@@ -478,6 +498,11 @@ const s = StyleSheet.create({
   customiseBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 9, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.yellow + "88", backgroundColor: colors.yellow + "18" },
   customiseText: { color: colors.yellow, fontSize: 13, fontWeight: "800" },
   setupRow: { gap: 8, marginTop: 4 },
+  compatRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10 },
+  compatWarn: { borderColor: "rgba(255,159,69,0.45)", backgroundColor: "rgba(255,159,69,0.10)" },
+  compatInfo: { borderColor: "rgba(245,179,1,0.35)", backgroundColor: "rgba(245,179,1,0.08)" },
+  compatTitle: { color: colors.white, fontSize: 13, fontWeight: "800" },
+  compatMsg: { color: colors.textDim, fontSize: 12, marginTop: 1, lineHeight: 16 },
   simNote: { color: colors.textFaint, fontSize: 12, fontWeight: "600" },
   pairBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, paddingVertical: 12, marginTop: 4 },
   pairText: { color: colors.white, fontSize: 13, fontWeight: "800" },

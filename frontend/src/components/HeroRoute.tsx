@@ -39,10 +39,12 @@ function StatusBar({ onFlame, onNotifications, onProfile, avatar, initialsText }
       <GlassPill testID="profile-pill" style={styles.avatar} onPress={onProfile}>
         {avatar ? (
           <Image source={{ uri: avatar }} style={styles.avatarImg} contentFit="cover" contentPosition="top center" />
-        ) : (
+        ) : initialsText ? (
           <View style={styles.avatarInitialsWrap}>
             <Text style={styles.avatarInitials}>{initialsText}</Text>
           </View>
+        ) : (
+          <Ionicons name="person" size={18} color="#fff" />
         )}
       </GlassPill>
     </View>
@@ -70,7 +72,7 @@ export function HeroRoute({
   compact?: boolean;
   sideSlot?: React.ReactNode;
 }) {
-  const { avatar, profile } = useRiderProfile();
+  const { avatar, profile, loaded: profileLoaded } = useRiderProfile();
   const { settings, loaded: settingsLoaded } = useSettings();
   const weather = useWeather({ city: settings.homeCity, lat: settings.homeLat, lon: settings.homeLon });
   const [showForecast, setShowForecast] = React.useState(false);
@@ -102,7 +104,7 @@ export function HeroRoute({
       </View>
 
       {/* top-right status */}
-      <StatusBar onFlame={onFlame} onNotifications={onNotifications} onProfile={onProfile} avatar={avatar} initialsText={initials(profile?.name)} />
+      <StatusBar onFlame={onFlame} onNotifications={onNotifications} onProfile={onProfile} avatar={avatar} initialsText={profileLoaded ? initials(profile?.name) : ""} />
 
       {/* right: local weather → tap for the 7-day forecast */}
       <Pressable
