@@ -5,7 +5,8 @@ import dayjs from "dayjs";
 import { colors, radius, spacing } from "../theme";
 import { todayPlan } from "../data";
 import { useCalendarWeek } from "../lib/calendar";
-import { ActivityDots, SecondaryButton, SectionLabel, Touchable } from "./ui";
+import { usePlan } from "../lib/plan";
+import { ActivityDots, ClimbBars, SecondaryButton, SectionLabel, Touchable } from "./ui";
 
 const WEEK = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
@@ -109,6 +110,15 @@ export function CalendarCard({ onToast, onOpenCalendar, onOpenToday, scope = "to
     return today?.cycling ?? null;
   }, [week, scope]);
 
+  // Effort/step profile for today's ride (from the session, or matched from the plan).
+  const { plan } = usePlan();
+  const todayProfile = React.useMemo(() => {
+    if (scope === "week" || !todayMain) return null;
+    const w = plan.workouts?.find((x: any) => x.id === todayMain.workout_id);
+    const prof = todayMain.profile ?? w?.profile;
+    return Array.isArray(prof) && prof.length ? prof : null;
+  }, [plan, todayMain, scope]);
+
   return (
     <View style={styles.card} testID="calendar-card">
       {/* calendar */}
@@ -195,6 +205,12 @@ export function CalendarCard({ onToast, onOpenCalendar, onOpenToday, scope = "to
               ) : null}
             </View>
             {todayMain.subtitle ? <Text style={styles.todayDetailDesc} numberOfLines={2}>{todayMain.subtitle}</Text> : null}
+            {todayProfile ? (
+              <View style={styles.todaySteps} testID="today-training-steps">
+                <Text style={styles.todayStepsLabel}>WORKOUT STEPS</Text>
+                <ClimbBars data={todayProfile} color={colors.green} width={210} height={36} />
+              </View>
+            ) : null}
           </View>
         )}
 
@@ -254,6 +270,8 @@ const styles = StyleSheet.create({
   todayMetaRow: { flexDirection: "row", alignItems: "center", marginTop: 5, gap: 4 },
   todayDetailMeta: { color: colors.textDim, fontSize: 12, fontWeight: "600", marginLeft: 3 },
   todayDetailDesc: { color: colors.textDim, fontSize: 11.5, lineHeight: 16, marginTop: 6 },
+  todaySteps: { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.borderSoft, gap: 6 },
+  todayStepsLabel: { color: colors.textFaint, fontSize: 9.5, fontWeight: "800", letterSpacing: 1 },
   todayRow: {
     flexDirection: "row",
     alignItems: "center",

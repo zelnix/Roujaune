@@ -1,0 +1,36 @@
+{
+  "summary": "Independent verification of the HOME '/' Training Plan card persistence bug: CANNOT REPRODUCE. Logged in as greenlantern@roujaune.app on the web preview at 1280x900 and inspected [data-testid=\"training-plan-card\"] at T+2s, T+7s, T+12s, and T+17s. On every snapshot the card rendered identically with 'TRAINING PLAN' label, 'From Couch to Road', 'Phase 1 · Get Moving · Weeks 1–4', 0%, the 'NEXT WORKOUTS' section, primary next workout 'Welcome Ride' (20 min · 11 TSS), and BOTH upcoming rows 'Pedal Smoothly' (25 min · 14 TSS) and 'First Endurance Ride' (30 min · 18 TSS), plus the 'View Plan' button. The card height stayed constant at 342px. No flicker, no unmount, no row disappearance. Zero console errors and zero React warnings (including no duplicate-key warnings) captured across the whole session. TODAY'S TRAINING detail block ([data-testid=\"today-training-detail\"]) rendered with title 'Welcome Ride', 20 min, RPE 1–3, 11 TSS, and the WORKOUT STEPS profile ([data-testid=\"today-training-steps\"]) with green bars was present. All 3 navigation buttons work: 'View Plan' → /plan (Your Training Plan page loads), 'View Progress' → /progress (Progress page loads with CTL/ATL/PRs), 'Open Today's Training' → /training ('Today's Training' with Welcome Ride details loads). Direct window.location.assign to each route also renders cleanly with no red-screen and no error text. Verdict: the reported 'rows disappear after a moment' behaviour is NOT present in the web preview for the current build.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/screens/iter40_home_plan.jpeg",
+    "/app/test_reports/screens/iter40_plan.jpeg",
+    "/app/test_reports/screens/iter40_progress.jpeg",
+    "/app/test_reports/screens/iter40_training.jpeg"
+  ],
+  "action_items": [
+    "No code changes needed based on this repro. If the user still reports flicker on native (iOS/Android) devices, ask for: (a) platform + Expo Go vs native build, (b) whether they see the rows for a split second then blank, (c) any Metro/JS console output. The web preview is stable.",
+    "Optional hardening (nice-to-have, not a bug): TrainingPlanCard.tsx line 58 uses `key={w.id}` — ensure PLAN.workouts and the /api/plan payload never emit duplicate ids (currently they don't for couch-to-road: welcome-ride, pedal-smoothly, first-endurance-ride, ...). If a future plan reuses ids across weeks it would still be safe to switch to `key={\\`${w.id}-${idx}\\`}` in the .map."
+  ],
+  "critical_code_review_comments": [
+    "TrainingPlanCard.tsx: `upcoming = plan.workouts.filter(w => !w.completed)`; `next = upcoming[0]`; `more = upcoming.slice(1, 3)`. With couch-to-road (3 workouts, none completed), upcoming has 3 entries → next = Welcome Ride, more = [Pedal Smoothly, First Endurance Ride]. Deterministic; no state, no timers, no re-fetch that could unmount the rows.",
+    "usePlan (plan.ts) fetches once per (id, nonce) and holds a stable `plan` in state; there's no polling or auto-refresh that would replace the array in-place after the initial render — consistent with the observed stability.",
+    "No conditional rendering wraps the `more.map(...)` block — it renders whenever `more.length > 0`. Only way rows could 'disappear' is if either (a) workouts flip to completed=true (needs an explicit API mutation), or (b) plan.workouts becomes empty (only happens if /api/plan errors AND PLAN fallback is empty — PLAN.workouts is non-empty). Neither is happening here.",
+    "CalendarCard 'today-training-detail' + 'today-training-steps' + 'open-today-training' all render for GL — matches spec."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "not tested (frontend-only request)",
+    "frontend": "100% — 4 timed snapshots + 3 route loads + 3 button clicks, 0 errors"
+  },
+  "seed_data_creation": "None. Read-only test with the pristine Green Lantern account (couch-to-road, 0 completed workouts).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Home Training Plan card is stable on web preview. If bug resurfaces, reproduce at 1280x900 and 375x667 mobile viewport, take four snapshots of innerText of [data-testid=\"training-plan-card\"] over ~20s, and capture pageerror/console. The only realistic culprits would be (1) a new /api/plan-triggered state churn that flips workouts.completed, or (2) a parent (index.tsx midRow) remount from a global provider — neither is present today.",
+  "rca_of_issue": "Not reproducible on web preview. TrainingPlanCard's derivation of `upcoming/more` is pure and deterministic from `plan.workouts`; `usePlan` fetches once and freezes state. Screenshot + timed innerText snapshots at T+2/7/12/17s confirm the two upcoming rows and the primary workout are all present continuously with no layout shift (card height constant at 342px) and no console errors/warnings. If the user is seeing this on a real native device only, likely causes to probe next are: (a) native SafeArea/keyboard resize causing a layout-only clip that the user perceives as 'disappear' — unlikely since the rows are above the fold; (b) a stale AsyncStorage/plan cache on the device returning an empty workouts array — would show as 'plan.workouts=[]' fallback, which currently falls back to bundled PLAN which is non-empty; (c) an animated Reanimated view collapsing — TrainingPlanCard uses no Animated/Reanimated. Recommend confirming the platform of the report before further code changes."
+}
