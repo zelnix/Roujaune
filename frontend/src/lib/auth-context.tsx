@@ -87,6 +87,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setLoading(false);
             return;
           }
+        } else if (Platform.OS !== "web") {
+          // Mobile cold-start fallback: the app may have been killed mid-auth and
+          // reopened via the deep link. openAuthSessionAsync's result.url is the
+          // primary path (see signInGoogle); this covers the killed-app case.
+          const initialUrl = await Linking.getInitialURL();
+          const sid = initialUrl ? readSessionIdFromUrl(initialUrl) : null;
+          if (sid) {
+            await exchangeGoogle(sid);
+            setLoading(false);
+            return;
+          }
         }
       } catch {
         /* noop */
@@ -96,6 +107,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     })();
   }, [refresh, exchangeGoogle]);
+
+  // Mobile hot-link fallback: handle the auth deep link while the app is running.
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    const sub = Linking.addEventListener("url", ({ url }) => {
+      const sid = readSessionIdFromUrl(url);
+      if (sid) exchangeGoogle(sid).catch(() => { /* noop */ });
+    });
+    return () => sub.remove();
+  }, [exchangeGoogle]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     const d = await post("/api/auth/login", { email, password });
