@@ -87,9 +87,9 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
   const rider = riderVisualFor(appearance.riderType);
   const { width } = useWindowDimensions();
   const smallTablet = width < 1000 || !!compact;
-  const railW = smallTablet ? 152 : 200;
-  const glyphSize = smallTablet ? 34 : 46;
-  const wordW = railW - 8;
+  const railW = smallTablet ? 160 : 208;
+  const glyphSize = smallTablet ? 30 : 40;
+  const wordW = railW - 24 - glyphSize - 10;
   const scene: SceneTelemetry = {
     power: metrics.power,
     cadence: metrics.cadence,
@@ -120,10 +120,10 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
           </Pressable>
           <View style={{ flex: 1 }} />
           <Pressable onPress={onToggleReducedMotion} style={[st.embedIcon, reducedMotion && st.embedIconOn]} testID="vr-embed-view" accessibilityRole="button" accessibilityLabel="Toggle camera / motion">
-            <Ionicons name={reducedMotion ? "eye-off-outline" : "videocam-outline"} size={16} color={reducedMotion ? colors.bg : colors.white} />
+            <Ionicons name={reducedMotion ? "eye-off-outline" : "videocam-outline"} size={22} color={reducedMotion ? colors.bg : colors.white} />
           </Pressable>
           <Pressable onPress={onFullscreen} style={st.embedIcon} testID="vr-embed-fullscreen" accessibilityRole="button" accessibilityLabel="Enter fullscreen virtual ride">
-            <Ionicons name="expand-outline" size={16} color={colors.white} />
+            <Ionicons name="expand-outline" size={22} color={colors.white} />
           </Pressable>
         </View>
 
@@ -170,7 +170,6 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
           <Image source={LOGO_GLYPH} style={{ width: glyphSize, height: glyphSize }} resizeMode="contain" />
           <Image source={WORDMARK} style={{ width: wordW, height: wordW * 0.17 }} resizeMode="contain" />
         </View>
-
         <View style={[st.railHead, { pointerEvents: "none" }]}>
           <Ionicons name="location" size={12} color={colors.yellow} />
           <Text style={st.railRoute} numberOfLines={1}>Next: {routeState.segmentLabel}</Text>
@@ -232,7 +231,7 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
           </View>
         )}
         <Pressable onPress={onToggleReducedMotion} style={[st.fsIcon, reducedMotion && st.fsIconOn]} accessibilityRole="button" accessibilityLabel="Toggle camera / motion">
-          <Ionicons name={reducedMotion ? "eye-off-outline" : "videocam-outline"} size={18} color={reducedMotion ? colors.bg : colors.white} />
+          <Ionicons name={reducedMotion ? "eye-off-outline" : "videocam-outline"} size={22} color={reducedMotion ? colors.bg : colors.white} />
         </Pressable>
       </View>
 
@@ -241,41 +240,41 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
         <View style={st.bar}>
           {onPreset && PRESETS.map((p) => (
             <Pressable key={p.label} onPress={() => onPreset(p.w)} style={st.round} accessibilityLabel={`Set ${p.label} effort`}>
-              <Ionicons name={p.icon} size={18} color={colors.yellow} />
+              <Ionicons name={p.icon} size={24} color={colors.yellow} />
               <Text style={st.roundText}>{p.label}</Text>
             </Pressable>
           ))}
           {onErgToggle && (
             <Pressable onPress={onErgToggle} style={[st.round, ergOn && st.roundOn]} accessibilityLabel="Toggle ERG resistance">
-              <Ionicons name="options-outline" size={18} color={ergOn ? colors.yellow : colors.white} />
+              <Ionicons name="options-outline" size={24} color={ergOn ? colors.yellow : colors.white} />
               <Text style={[st.roundText, ergOn && { color: colors.yellow }]}>ERG</Text>
             </Pressable>
           )}
           {onReconnect && (
             <Pressable onPress={onReconnect} style={st.round} accessibilityLabel="Reconnect trainer">
-              <Ionicons name="refresh" size={18} color={colors.white} />
+              <Ionicons name="refresh" size={24} color={colors.white} />
               <Text style={st.roundText}>Reconnect</Text>
             </Pressable>
           )}
           {onSensors && (
             <Pressable onPress={onSensors} style={[st.round, sensorsOn && st.roundOn]} testID="vr-fs-sensors" accessibilityLabel="Pair Bluetooth sensors">
-              <Ionicons name="bluetooth" size={18} color={sensorsOn ? colors.yellow : colors.white} />
+              <Ionicons name="bluetooth" size={24} color={sensorsOn ? colors.yellow : colors.white} />
               <Text style={[st.roundText, sensorsOn && { color: colors.yellow }]}>Sensors</Text>
             </Pressable>
           )}
           {onEmergency && (
             <Pressable onPress={onEmergency} style={[st.round, { borderColor: colors.red }]} testID="vr-fs-emergency" accessibilityLabel="Emergency stop resistance">
-              <Ionicons name="warning-outline" size={18} color={colors.red} />
+              <Ionicons name="warning-outline" size={24} color={colors.red} />
               <Text style={[st.roundText, { color: colors.red }]}>Stop</Text>
             </Pressable>
           )}
           <View style={st.barSpacer} />
           <Pressable onPress={onPauseToggle} style={st.pausePrimary} testID="vr-fs-pause" accessibilityLabel={paused ? "Resume" : "Pause"}>
-            <Ionicons name={paused ? "play" : "pause"} size={20} color={colors.bg} />
+            <Ionicons name={paused ? "play" : "pause"} size={28} color={colors.bg} />
             <Text style={st.pausePrimaryText}>{paused ? "Resume" : "Pause"}</Text>
           </Pressable>
           <Pressable onPress={onExitFullscreen} style={st.exitBtn} testID="vr-exit-fullscreen" accessibilityLabel={exitLabel}>
-            <Ionicons name={exitIcon} size={18} color={colors.white} />
+            <Ionicons name={exitIcon} size={26} color={colors.white} />
             <Text style={st.exitText}>{exitLabel}</Text>
           </Pressable>
         </View>
@@ -289,7 +288,7 @@ const st = StyleSheet.create({
   embedTopRow: { position: "absolute", top: 10, left: 10, right: 10, flexDirection: "row", alignItems: "center", gap: 8 },
   routeNamePill: { flexDirection: "row", alignItems: "center", gap: 6, maxWidth: "62%", backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 7 },
   routeNameText: { color: colors.white, fontSize: 13, fontWeight: "800" },
-  embedIcon: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: colors.border },
+  embedIcon: { width: 52, height: 52, borderRadius: 26, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: colors.border },
   embedIconOn: { backgroundColor: colors.yellow, borderColor: colors.yellow },
   embedBottomRow: { position: "absolute", left: 10, bottom: 10, flexDirection: "row", alignItems: "center", gap: 8 },
   gradePill: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(0,0,0,0.6)", borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6 },
@@ -302,7 +301,7 @@ const st = StyleSheet.create({
   // Vertical HUD rail (left)
   rail: { position: "absolute", left: 0, top: 0, bottom: 74, backgroundColor: "rgba(8,9,12,0.62)", borderRightWidth: 1, borderRightColor: colors.border },
   railContent: { padding: 12, gap: 8 },
-  brand: { alignItems: "center", gap: 4, marginBottom: 4 },
+  brand: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
   railHead: { flexDirection: "row", alignItems: "center", gap: 5 },
   railRoute: { color: colors.textDim, fontSize: 11, fontWeight: "700", flex: 1 },
   railKm: { color: colors.textFaint, fontSize: 10, fontWeight: "700" },
@@ -324,7 +323,7 @@ const st = StyleSheet.create({
   connText: { color: colors.white, fontSize: 12, fontWeight: "800" },
 
   fsTopRight: { position: "absolute", top: 0, right: 0, flexDirection: "row", alignItems: "flex-start", gap: 8, padding: 12, maxWidth: "62%" },
-  fsIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: colors.border },
+  fsIcon: { width: 52, height: 52, borderRadius: 26, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: colors.border },
   fsIconOn: { backgroundColor: colors.yellow, borderColor: colors.yellow },
   cuePill: { flexShrink: 1, flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: "rgba(10,11,14,0.8)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 8 },
   cueText: { color: colors.textDim, fontSize: 12, fontWeight: "700", flexShrink: 1 },
@@ -334,12 +333,12 @@ const st = StyleSheet.create({
   // Bottom control bar — mirrors LiveControlBar
   controlsWrap: { position: "absolute", left: 0, right: 0, bottom: 0, padding: 10 },
   bar: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: "rgba(8,9,9,0.86)", paddingHorizontal: 12, paddingVertical: 8, flexWrap: "wrap", ...(shadow.card as any) },
-  round: { alignItems: "center", justifyContent: "center", gap: 3, minWidth: 58, height: 52, borderRadius: radius.md, backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: colors.border, paddingHorizontal: 8 },
+  round: { alignItems: "center", justifyContent: "center", gap: 4, minWidth: 90, height: 72, borderRadius: radius.md, backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10 },
   roundOn: { backgroundColor: colors.yellow + "22", borderColor: colors.yellow },
-  roundText: { color: colors.textDim, fontSize: 10.5, fontWeight: "700" },
+  roundText: { color: colors.textDim, fontSize: 13, fontWeight: "700" },
   barSpacer: { flex: 1, minWidth: 8 },
-  pausePrimary: { flexDirection: "row", alignItems: "center", gap: 8, height: 52, paddingHorizontal: 22, borderRadius: radius.md, backgroundColor: colors.yellow },
-  pausePrimaryText: { color: colors.bg, fontSize: 15, fontWeight: "800" },
-  exitBtn: { flexDirection: "row", alignItems: "center", gap: 8, height: 52, paddingHorizontal: 18, borderRadius: radius.md, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: colors.border },
-  exitText: { color: colors.white, fontSize: 15, fontWeight: "800" },
+  pausePrimary: { flexDirection: "row", alignItems: "center", gap: 10, height: 72, paddingHorizontal: 30, borderRadius: radius.md, backgroundColor: colors.yellow },
+  pausePrimaryText: { color: colors.bg, fontSize: 20, fontWeight: "800" },
+  exitBtn: { flexDirection: "row", alignItems: "center", gap: 10, height: 72, paddingHorizontal: 26, borderRadius: radius.md, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: colors.border },
+  exitText: { color: colors.white, fontSize: 20, fontWeight: "800" },
 });
