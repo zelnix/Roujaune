@@ -120,8 +120,10 @@ export default function TrainingPlanScreen() {
 
   const hero = (
     <View style={styles.rowGap}>
-      <View style={styles.heroCard}><PlanHeroCard /></View>
-      <View style={styles.heroGoals}><PlanGoalsCard onEdit={() => setShowGoals(true)} /></View>
+      <View style={styles.heroCol}>
+        <PlanHeroCard />
+        <PlanGoalsCard onEdit={() => setShowGoals(true)} />
+      </View>
       <View style={styles.heroCalendar}>
         <CalendarCard onToast={showToast} onOpenCalendar={() => router.push("/calendar")} scope="week" />
       </View>
@@ -152,7 +154,7 @@ export default function TrainingPlanScreen() {
   } else if (tab === "Adaptations") {
     body = (<><View style={styles.rowGap}><AlbertoAdaptationsCard persona={persona} onViewAll={() => setShowAdaptations(true)} text={adaptation.text} loading={adaptation.loading} onRefresh={adaptation.refresh} /><View style={{ width: 380 }}><AdaptiveTargetsCard targets={adaptiveTargets.targets} loading={adaptiveTargets.loading} width={380} /></View></View>{progress}{tip}</>);
   } else {
-    body = (<>{hero}{roadmapRow}{workoutsRow}{progress}{tip}</>);
+    body = (<>{hero}{progress}{roadmapRow}{workoutsRow}{tip}</>);
   }
 
   const Grid = (
@@ -256,7 +258,8 @@ const styles = StyleSheet.create({
   rowGap: { flexDirection: "row", gap: 14, alignItems: "stretch" },
   heroCard: { flex: 1, minWidth: 170 },
   heroGoals: { width: 258 },
-  heroCalendar: { width: 520 },
+  heroCol: { width: 340, gap: 14 },
+  heroCalendar: { flex: 1, minWidth: 460 },
   toast: { position: "absolute", bottom: 30, alignSelf: "center", backgroundColor: "rgba(20,22,21,0.96)", borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 18 },
   toastText: { color: C.white, fontSize: 13, fontWeight: "600" },
 });
