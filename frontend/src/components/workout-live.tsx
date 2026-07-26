@@ -398,7 +398,7 @@ export function LiveControlBar({
 
   return (
     <View style={bc.bar}>
-      <View style={bc.group}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={bc.group} contentContainerStyle={bc.groupInner}>
         <Pressable onPress={onLive} style={[bc.pill, { height: H }, live ? bc.pillOn : bc.pillOff]} testID="bc-live">
           <View style={[bc.pillDot, { backgroundColor: live ? colors.green : colors.textDim }]} />
           <Text style={[bc.pillText, { color: live ? colors.green : colors.textDim, fontSize: PTXT }]}>{live ? "LIVE" : "DEMO"}</Text>
@@ -441,7 +441,7 @@ export function LiveControlBar({
           <Ionicons name="options-outline" size={ICON} color={colors.white} />
           <Text style={rtxt}>Controls</Text>
         </Pressable>
-      </View>
+      </ScrollView>
 
       <View style={bc.primary}>
         <Pressable onPress={onPauseToggle} style={[bc.pause, { height: H, paddingHorizontal: PPADH }]} testID="bc-pause">
@@ -627,8 +627,9 @@ const wc = StyleSheet.create({
 });
 
 const bc = StyleSheet.create({
-  bar: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", rowGap: 8, columnGap: 8, ...card, backgroundColor: colors.nav, paddingHorizontal: 12, paddingVertical: 10 },
-  group: { flex: 1, minWidth: 180, flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 },
+  bar: { flexDirection: "row", alignItems: "center", flexWrap: "nowrap", columnGap: 8, ...card, backgroundColor: colors.nav, paddingHorizontal: 12, paddingVertical: 10 },
+  group: { flex: 1 },
+  groupInner: { flexDirection: "row", alignItems: "center", gap: 8, paddingRight: 8 },
   primary: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 0 },
   round: { alignItems: "center", justifyContent: "center", gap: 4, minWidth: 92, height: 76, borderRadius: radius.md, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12 },
   roundText: { color: colors.textDim, fontSize: 13, fontWeight: "700" },

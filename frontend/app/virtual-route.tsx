@@ -14,7 +14,8 @@ import { RIDER_TYPES, BIKE_TYPES, CLOTHING_STYLES, DEFAULT_APPEARANCE, loadAppea
 import { VIRTUAL_ROUTES, getVRoute, routeStateAt, routeTerrainBias } from "@/src/lib/vroutes";
 import { VirtualRouteScene, SceneTelemetry } from "@/src/components/virtual-route/scene";
 import { VirtualRidePlayer } from "@/src/components/virtual-route/VirtualRidePlayer";
-import { prTracker, prToastMessages, PRRecords } from "@/src/lib/pr-tracker";
+import { prTracker, prToastMessages, PRRecords, PRSummary, fetchAllRoutePRs, fmtPRTime } from "@/src/lib/pr-tracker";
+import { EndPrompt } from "@/src/components/workout/WorkoutModals";
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
@@ -86,6 +87,7 @@ export default function VirtualRouteScreen() {
     React.useCallback(() => {
       let alive = true;
       loadAppearance().then((cfg) => { if (alive) setAppearance(cfg); });
+      fetchAllRoutePRs().then((m) => { if (alive) setPrByRoute(m); });
       return () => { alive = false; };
     }, []),
   );
@@ -96,6 +98,8 @@ export default function VirtualRouteScreen() {
   const [summary, setSummary] = React.useState<null | RideSummary>(null);
   const [saving, setSaving] = React.useState(false);
   const [prRecords, setPrRecords] = React.useState<PRRecords | null>(null);
+  const [endPrompt, setEndPrompt] = React.useState(false);
+  const [prByRoute, setPrByRoute] = React.useState<Record<string, PRSummary>>({});
 
   // Local route distance integrated from speed while riding.
   const distRef = React.useRef(0);
@@ -161,9 +165,12 @@ export default function VirtualRouteScreen() {
   };
   const pauseRide = () => { pause(); setPhase("paused"); };
   const resumeRide = () => { resume(); setPhase("riding"); };
-  const endRide = () => {
-    pause();
-    setPhase("paused");
+  // Tapping End Ride now opens a confirm popup (matching the Live Workout screen).
+  const requestEnd = () => { pause(); setPhase("paused"); setEndPrompt(true); };
+  const onResumeEnd = () => { setEndPrompt(false); resumeRide(); };
+  const onAbandonEnd = () => { setEndPrompt(false); exitRide(); };
+  const onSaveEnd = async () => {
+    setEndPrompt(false);
     const dur = telemetry.elapsed - startElapsedRef.current;
     const sum = buildSummary(samplesRef.current, distRef.current, dur, vroute);
     setSummary(sum);
@@ -173,7 +180,30 @@ export default function VirtualRouteScreen() {
       if (records && (records.route_time || records.route_power || records.first_time || records.segments.length)) {
         setPrRecords(records);
       }
+      fetchAllRoutePRs().then(setPrByRoute);
     });
+    // Persist the ride to history (best-effort — never blocks the results view).
+    setSaving(true);
+    try {
+      const base = (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
+      await fetch(`${base}/api/workouts/summarize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workout: `Virtual Ride · ${vroute.name}`,
+          workout_id: `virtual-${vroute.id}`,
+          route: { id: vroute.id, name: vroute.name, place: vroute.place, distance: `${sum.distanceKm} km`, elevation: `${vroute.elevationM} m`, tag: vroute.tag },
+          elapsed: sum.durationSec,
+          ftp: 250,
+          samples: samplesRef.current,
+          est_calories: sum.calories,
+        }),
+      });
+    } catch {
+      /* history save is best-effort */
+    } finally {
+      setSaving(false);
+    }
   };
   // Ending a ride returns to the setup screen (pick another route/rider).
   const exitRide = () => {
@@ -185,31 +215,6 @@ export default function VirtualRouteScreen() {
   };
   // Leave the Virtual Route feature entirely (back to the app).
   const leaveScreen = () => { if (router.canGoBack()) router.back(); else router.replace("/"); };
-  const saveRide = async () => {
-    if (!summary || saving) return;
-    setSaving(true);
-    try {
-      const base = (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
-      await fetch(`${base}/api/workouts/summarize`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          workout: `Virtual Ride · ${vroute.name}`,
-          workout_id: `virtual-${vroute.id}`,
-          route: { id: vroute.id, name: vroute.name, place: vroute.place, distance: `${summary.distanceKm} km`, elevation: `${vroute.elevationM} m`, tag: vroute.tag },
-          elapsed: summary.durationSec,
-          ftp: 250,
-          samples: samplesRef.current,
-          est_calories: summary.calories,
-        }),
-      });
-    } catch {
-      /* history save is best-effort — never block the exit */
-    } finally {
-      setSaving(false);
-      exitRide();
-    }
-  };
   const emergencyStop = () => { setEmergency(true); setAutoResistance(false); sendErg(50); };
 
   // Route checkpoints as vertical "stages" for the shared HUD rail.
@@ -253,7 +258,7 @@ export default function VirtualRouteScreen() {
           onReconnect={simulateDropout}
           exitLabel="End Ride"
           exitIcon="stop"
-          onExitFullscreen={endRide}
+          onExitFullscreen={requestEnd}
           onSensors={() => setShowBle(true)}
           sensorsOn={ble.connected.length > 0}
           onEmergency={emergencyStop}
@@ -277,12 +282,19 @@ export default function VirtualRouteScreen() {
               <View style={s.routeList}>
                 {VIRTUAL_ROUTES.map((rt) => {
                   const sel = rt.id === routeId;
+                  const best = prByRoute[rt.id]?.best_time_sec;
                   return (
                     <Pressable key={rt.id} onPress={() => setRouteId(rt.id)} testID={`route-${rt.id}`} style={[s.routeOpt, sel && s.routeOptSel]} accessibilityRole="button" accessibilityLabel={`Select ${rt.name}`}>
                       <View style={{ flex: 1 }}>
                         <Text style={s.routeOptName} numberOfLines={1}>{rt.name}</Text>
                         <Text style={s.routeOptMeta} numberOfLines={1}>{rt.distanceKm} km · {rt.tag}</Text>
                       </View>
+                      {best ? (
+                        <View style={s.prChip} testID={`route-pr-${rt.id}`}>
+                          <Ionicons name="trophy" size={11} color={colors.yellow} />
+                          <Text style={s.prChipText}>{fmtPRTime(best)}</Text>
+                        </View>
+                      ) : null}
                       <Ionicons name={sel ? "checkmark-circle" : "chevron-forward"} size={18} color={sel ? colors.yellow : colors.textFaint} />
                     </Pressable>
                   );
@@ -326,13 +338,18 @@ export default function VirtualRouteScreen() {
         </SafeAreaView>
       )}
 
-      {/* End-of-ride summary + save prompt */}
+      {/* End-ride confirmation popup (same as the Live Workout screen) */}
+      {endPrompt && (
+        <EndPrompt onSave={onSaveEnd} onAbandon={onAbandonEnd} onResume={onResumeEnd} />
+      )}
+
+      {/* End-of-ride summary shown after saving */}
       {summary && (
         <View style={s.summaryOverlay}>
           <View style={s.summaryCard} testID="vr-summary">
             <View style={s.summaryHead}>
-              <Ionicons name="flag" size={20} color={colors.yellow} />
-              <Text style={s.summaryTitle}>Ride Summary</Text>
+              <Ionicons name="checkmark-circle" size={20} color={colors.green} />
+              <Text style={s.summaryTitle}>Ride Saved</Text>
             </View>
             <Text style={s.summarySub}>{summary.routeName} · {summary.reached}/{summary.total} checkpoints</Text>
 
@@ -357,12 +374,9 @@ export default function VirtualRouteScreen() {
               </View>
             )}
 
-            <Pressable onPress={saveRide} disabled={saving} testID="vr-save-ride" style={[s.summarySave, saving && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel="Save ride">
-              <Ionicons name="save" size={18} color={colors.bg} />
-              <Text style={s.summarySaveText}>{saving ? "Saving…" : "Save Ride"}</Text>
-            </Pressable>
-            <Pressable onPress={exitRide} disabled={saving} testID="vr-discard-ride" style={s.summaryDiscard} accessibilityRole="button" accessibilityLabel="Discard ride">
-              <Text style={s.summaryDiscardText}>Discard</Text>
+            <Pressable onPress={exitRide} disabled={saving} testID="vr-summary-done" style={[s.summarySave, saving && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel="Done">
+              <Ionicons name="checkmark-circle" size={18} color={colors.bg} />
+              <Text style={s.summarySaveText}>{saving ? "Saving…" : "Done"}</Text>
             </Pressable>
           </View>
         </View>
@@ -472,6 +486,8 @@ const s = StyleSheet.create({
   routeOptSel: { borderColor: colors.yellow, backgroundColor: colors.yellow + "14" },
   routeOptName: { color: colors.white, fontSize: 13, fontWeight: "800" },
   routeOptMeta: { color: colors.textFaint, fontSize: 11, fontWeight: "600", marginTop: 2 },
+  prChip: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.yellow + "18", borderWidth: 1, borderColor: colors.yellow + "55", borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 },
+  prChipText: { color: colors.yellow, fontSize: 11, fontWeight: "800" },
 
   summaryOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.72)", alignItems: "center", justifyContent: "center", padding: 20 },
   summaryCard: { width: 440, maxWidth: "94%", backgroundColor: "rgba(14,15,19,0.98)", borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, gap: 12, ...(shadow.card as any) },

@@ -44,7 +44,7 @@ function TodayRow({ label, time, state, active, onPress, testID }: {
   );
 }
 
-export function CalendarCard({ onToast, onOpenCalendar, scope = "today" }: { onToast: (m: string) => void; onOpenCalendar?: () => void; scope?: "today" | "week" }) {
+export function CalendarCard({ onToast, onOpenCalendar, onOpenToday, scope = "today" }: { onToast: (m: string) => void; onOpenCalendar?: () => void; onOpenToday?: () => void; scope?: "today" | "week" }) {
   const { week } = useCalendarWeek();
   const [month, setMonth] = React.useState(dayjs("2025-05-13").startOf("month"));
   const [selected, setSelected] = React.useState(13);
@@ -100,6 +100,13 @@ export function CalendarCard({ onToast, onOpenCalendar, scope = "today" }: { onT
     return [today.cycling, today.fb50, today.wellness]
       .filter((s): s is NonNullable<typeof s> => !!s)
       .map((s, i) => ({ key: `${s.type ?? "session"}-${s.id ?? i}`, label: s.title, time: s.duration || "—", state: state(s.status) }));
+  }, [week, scope]);
+
+  // Today's main cycling session — the "full detail" headline of Today's Training.
+  const todayMain = React.useMemo(() => {
+    if (scope === "week") return null;
+    const today = (week?.days ?? []).find((d) => d.date === week?.selected_date);
+    return today?.cycling ?? null;
   }, [week, scope]);
 
   return (
@@ -166,7 +173,31 @@ export function CalendarCard({ onToast, onOpenCalendar, scope = "today" }: { onT
 
       {/* plan list (today or this week) */}
       <View style={styles.planSide}>
-        <SectionLabel color={colors.textDim}>{scope === "week" ? "THIS WEEK'S PLAN" : "TODAY'S PLAN"}</SectionLabel>
+        <SectionLabel color={colors.textDim}>{scope === "week" ? "THIS WEEK'S PLAN" : "TODAY'S TRAINING"}</SectionLabel>
+
+        {scope !== "week" && todayMain && (
+          <View style={styles.todayDetail} testID="today-training-detail">
+            <Text style={styles.todayDetailTitle} numberOfLines={1}>{todayMain.title}</Text>
+            <View style={styles.todayMetaRow}>
+              <Ionicons name="time-outline" size={13} color={colors.textDim} />
+              <Text style={styles.todayDetailMeta}>{todayMain.duration || "—"}</Text>
+              {todayMain.zone ? (
+                <>
+                  <Ionicons name="pulse" size={13} color={colors.green} style={{ marginLeft: 12 }} />
+                  <Text style={styles.todayDetailMeta}>{todayMain.zone}</Text>
+                </>
+              ) : null}
+              {todayMain.tss ? (
+                <>
+                  <Ionicons name="flash" size={13} color={colors.yellow} style={{ marginLeft: 12 }} />
+                  <Text style={styles.todayDetailMeta}>{todayMain.tss}</Text>
+                </>
+              ) : null}
+            </View>
+            {todayMain.subtitle ? <Text style={styles.todayDetailDesc} numberOfLines={2}>{todayMain.subtitle}</Text> : null}
+          </View>
+        )}
+
         <View style={{ marginTop: spacing.sm, gap: 6 }}>
           {planRows.map((w) => (
             <TodayRow
@@ -180,6 +211,13 @@ export function CalendarCard({ onToast, onOpenCalendar, scope = "today" }: { onT
             />
           ))}
         </View>
+
+        {scope !== "week" && onOpenToday && (
+          <>
+            <View style={{ flex: 1 }} />
+            <SecondaryButton testID="open-today-training" label="Open Today's Training" onPress={onOpenToday} />
+          </>
+        )}
       </View>
     </View>
   );
@@ -211,6 +249,11 @@ const styles = StyleSheet.create({
   daySelectedText: { color: "#fff", fontWeight: "800" },
   vDivider: { width: 1, backgroundColor: colors.borderSoft, marginHorizontal: spacing.md },
   planSide: { flex: 1 },
+  todayDetail: { marginTop: 8, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: colors.borderSoft, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10 },
+  todayDetailTitle: { color: colors.white, fontSize: 15, fontWeight: "800" },
+  todayMetaRow: { flexDirection: "row", alignItems: "center", marginTop: 5, gap: 4 },
+  todayDetailMeta: { color: colors.textDim, fontSize: 12, fontWeight: "600", marginLeft: 3 },
+  todayDetailDesc: { color: colors.textDim, fontSize: 11.5, lineHeight: 16, marginTop: 6 },
   todayRow: {
     flexDirection: "row",
     alignItems: "center",

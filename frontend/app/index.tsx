@@ -11,7 +11,6 @@ import { SideNavigation } from "@/src/components/SideNavigation";
 import { HeroRoute } from "@/src/components/HeroRoute";
 import { MetricSummaryStrip } from "@/src/components/MetricSummaryStrip";
 import { TrainingPlanCard } from "@/src/components/TrainingPlanCard";
-import { FeaturedRouteCard } from "@/src/components/FeaturedRouteCard";
 import { CalendarCard } from "@/src/components/CalendarCard";
 import { ReadinessGate } from "@/src/components/ReadinessGate";
 import { ProgressCard, CommunityCard, WellnessCard, AchievementCard } from "@/src/components/BottomCards";
@@ -128,15 +127,14 @@ export default function Dashboard() {
                 <TrainingPlanCard onPress={() => router.push("/plan")} />
               </View>
               <View style={styles.midCol}>
-                <FeaturedRouteCard onPress={() => showToast("Exploring Col du Galibier")} />
+                <ProgressCard onPress={() => router.push("/progress")} />
               </View>
               <View style={styles.midColWide}>
-                <CalendarCard onToast={showToast} onOpenCalendar={() => router.push("/calendar")} />
+                <CalendarCard onToast={showToast} onOpenCalendar={() => router.push("/calendar")} onOpenToday={() => router.push("/training")} />
               </View>
             </View>
 
             <View style={styles.bottomRow}>
-              <ProgressCard />
               <CommunityCard onPress={() => showToast("Joining a group ride")} />
               <WellnessCard />
               <AchievementCard />

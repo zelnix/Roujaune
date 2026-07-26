@@ -6,10 +6,18 @@ import Svg, { Circle, Path, Defs, LinearGradient as SvgGrad, Stop } from "react-
 import { colors, radius, spacing } from "./../theme";
 import { progressCard, community, wellness, achievement } from "../data";
 import { LineChart, SecondaryButton, SectionLabel } from "./ui";
+import { PLAN } from "./plan";
 import { useSettings } from "../lib/settings";
 
 /* -------- PROGRESS -------- */
-export function ProgressCard() {
+export function ProgressCard({ onPress }: { onPress?: () => void }) {
+  const p = PLAN.progress;
+  const stats = [
+    { label: "WEEKS", value: p.weeks },
+    { label: "WORKOUTS", value: p.workouts },
+    { label: "TIME", value: p.time },
+    { label: "TSS", value: p.tss },
+  ];
   return (
     <LinearGradient
       testID="progress-card"
@@ -30,9 +38,27 @@ export function ProgressCard() {
       </View>
       <Text style={styles.title}>{progressCard.title}</Text>
       <Text style={styles.sub}>{progressCard.subtitle}</Text>
-      <View style={{ flex: 1, justifyContent: "flex-end" }}>
-        <LineChart data={progressCard.points} color={colors.redBright} width={230} height={64} />
+
+      <View style={styles.progStatGrid}>
+        {stats.map((s) => (
+          <View key={s.label} style={styles.progStat}>
+            <Text style={styles.progStatValue}>{s.value}</Text>
+            <Text style={styles.progStatLabel}>{s.label}</Text>
+          </View>
+        ))}
       </View>
+
+      <View style={styles.progFitRow}>
+        <Text style={styles.progFit}>CTL {p.ctl}</Text>
+        <Text style={styles.progFitDim}>ATL {p.atl}</Text>
+        <Text style={styles.progFitDim}>TSB {p.tsb}</Text>
+      </View>
+
+      <View style={{ flex: 1, justifyContent: "flex-end" }}>
+        <LineChart data={progressCard.points} color={colors.redBright} width={230} height={56} />
+      </View>
+
+      {onPress && <SecondaryButton testID="view-progress-button" label="View Progress" tone="red" onPress={onPress} style={{ marginTop: spacing.sm }} />}
     </LinearGradient>
   );
 }
@@ -181,6 +207,13 @@ const styles = StyleSheet.create({
   deltaUnit: { color: colors.textDim, fontSize: 10, fontWeight: "700" },
   title: { color: colors.white, fontSize: 16, fontWeight: "800", marginTop: 8 },
   sub: { color: colors.textDim, fontSize: 12, marginTop: 2 },
+  progStatGrid: { flexDirection: "row", flexWrap: "wrap", marginTop: 12, gap: 8 },
+  progStat: { minWidth: "45%", flex: 1, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: colors.borderSoft, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 7 },
+  progStatValue: { color: colors.white, fontSize: 16, fontWeight: "900" },
+  progStatLabel: { color: colors.textFaint, fontSize: 9, fontWeight: "800", letterSpacing: 0.8, marginTop: 1 },
+  progFitRow: { flexDirection: "row", alignItems: "center", gap: 14, marginTop: 10 },
+  progFit: { color: colors.greenText, fontSize: 12, fontWeight: "800" },
+  progFitDim: { color: colors.textDim, fontSize: 12, fontWeight: "700" },
   online: { color: colors.greenText, fontSize: 12.5, fontWeight: "600", marginTop: 3 },
   avatarRow: { flexDirection: "row", alignItems: "center", marginTop: 12 },
   avatar: {

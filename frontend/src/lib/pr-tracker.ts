@@ -75,6 +75,20 @@ export async function fetchRoutePR(routeId: string): Promise<PRSummary | null> {
   }
 }
 
+/** Fetch every stored route PR keyed by route id (for the route picker chips). */
+export async function fetchAllRoutePRs(): Promise<Record<string, PRSummary>> {
+  try {
+    const res = await fetch(`${BASE}/api/rider/prs`);
+    if (!res.ok) return {};
+    const data = await res.json();
+    const map: Record<string, PRSummary> = {};
+    for (const p of (data?.prs ?? [])) if (p?.id) map[p.id] = p;
+    return map;
+  } catch {
+    return {};
+  }
+}
+
 /** Human toast lines celebrating whatever records were beaten this ride. */
 export function prToastMessages(records: PRRecords | null, routeName: string): string[] {
   if (!records) return [];

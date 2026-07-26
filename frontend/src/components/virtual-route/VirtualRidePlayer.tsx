@@ -90,6 +90,31 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
   const railW = smallTablet ? 160 : 208;
   const glyphSize = smallTablet ? 30 : 40;
   const wordW = railW - 24 - glyphSize - 10;
+  // Responsive bottom control bar — scales down on small screens so the row
+  // never overflows and the buttons aren't oversized (Pause / End Ride etc).
+  const compactBar = width < 1180 || !!compact;
+  const tinyBar = width < 900;
+  const RB_H = tinyBar ? 48 : compactBar ? 58 : 72;
+  const RB_ICON = tinyBar ? 17 : compactBar ? 20 : 24;
+  const RB_TXT = tinyBar ? 10 : compactBar ? 11 : 13;
+  const RB_MINW = tinyBar ? 56 : compactBar ? 70 : 90;
+  const RB_PAD = tinyBar ? 8 : 10;
+  const P_ICON = tinyBar ? 19 : compactBar ? 22 : 28;
+  const P_TXT = tinyBar ? 14 : compactBar ? 16 : 20;
+  const P_PAD = tinyBar ? 16 : compactBar ? 22 : 30;
+  const EX_H = tinyBar ? 48 : compactBar ? 60 : 88;
+  const EX_ICON = tinyBar ? 20 : compactBar ? 26 : 40;
+  const EX_TXT = tinyBar ? 15 : compactBar ? 20 : 30;
+  const EX_PAD = tinyBar ? 16 : compactBar ? 28 : 44;
+  const EX_GAP = tinyBar ? 8 : compactBar ? 10 : 14;
+  const roundDyn = { minWidth: RB_MINW, height: RB_H, paddingHorizontal: RB_PAD };
+  const roundTxtDyn = { fontSize: RB_TXT };
+  // Everything scales down on small tablets — small fonts/graphics are the
+  // accepted trade-off for a small screen (per product direction).
+  const RAIL_VAL = smallTablet ? 15 : 18;
+  const RAIL_ICON = smallTablet ? 14 : 16;
+  const TR_ICON = smallTablet ? 42 : 52;
+  const TR_GLYPH = smallTablet ? 18 : 22;
   const scene: SceneTelemetry = {
     power: metrics.power,
     cadence: metrics.cadence,
@@ -181,9 +206,9 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
         <View style={st.railMetrics}>
           {cells.map((c) => (
             <View key={c.label} style={st.railRow}>
-              <Ionicons name={c.icon} size={16} color={c.tone} style={{ width: 20, textAlign: "center" }} />
+              <Ionicons name={c.icon} size={RAIL_ICON} color={c.tone} style={{ width: 20, textAlign: "center" }} />
               <View style={{ flex: 1 }}>
-                <Text style={st.railValue} numberOfLines={1}>{c.value}<Text style={st.railUnit}> {c.unit}</Text></Text>
+                <Text style={[st.railValue, { fontSize: RAIL_VAL }]} numberOfLines={1}>{c.value}<Text style={st.railUnit}> {c.unit}</Text></Text>
                 <Text style={st.railLabel}>{c.label}</Text>
               </View>
             </View>
@@ -230,52 +255,53 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
             <Text style={st.cueText} numberOfLines={2}>{cue}</Text>
           </View>
         )}
-        <Pressable onPress={onToggleReducedMotion} style={[st.fsIcon, reducedMotion && st.fsIconOn]} accessibilityRole="button" accessibilityLabel="Toggle camera / motion">
-          <Ionicons name={reducedMotion ? "eye-off-outline" : "videocam-outline"} size={22} color={reducedMotion ? colors.bg : colors.white} />
+        <Pressable onPress={onToggleReducedMotion} style={[st.fsIcon, { width: TR_ICON, height: TR_ICON, borderRadius: TR_ICON / 2 }, reducedMotion && st.fsIconOn]} accessibilityRole="button" accessibilityLabel="Toggle camera / motion">
+          <Ionicons name={reducedMotion ? "eye-off-outline" : "videocam-outline"} size={TR_GLYPH} color={reducedMotion ? colors.bg : colors.white} />
         </Pressable>
       </View>
 
       {/* Control bar (bottom) — mirrors the Live Workout control bar, pinned across the bottom */}
       <View style={[st.controlsWrap, { pointerEvents: "box-none" }]}>
         <View style={st.bar}>
-          {onPreset && PRESETS.map((p) => (
-            <Pressable key={p.label} onPress={() => onPreset(p.w)} style={st.round} accessibilityLabel={`Set ${p.label} effort`}>
-              <Ionicons name={p.icon} size={24} color={colors.yellow} />
-              <Text style={st.roundText}>{p.label}</Text>
-            </Pressable>
-          ))}
-          {onErgToggle && (
-            <Pressable onPress={onErgToggle} style={[st.round, ergOn && st.roundOn]} accessibilityLabel="Toggle ERG resistance">
-              <Ionicons name="options-outline" size={24} color={ergOn ? colors.yellow : colors.white} />
-              <Text style={[st.roundText, ergOn && { color: colors.yellow }]}>ERG</Text>
-            </Pressable>
-          )}
-          {onReconnect && (
-            <Pressable onPress={onReconnect} style={st.round} accessibilityLabel="Reconnect trainer">
-              <Ionicons name="refresh" size={24} color={colors.white} />
-              <Text style={st.roundText}>Reconnect</Text>
-            </Pressable>
-          )}
-          {onSensors && (
-            <Pressable onPress={onSensors} style={[st.round, sensorsOn && st.roundOn]} testID="vr-fs-sensors" accessibilityLabel="Pair Bluetooth sensors">
-              <Ionicons name="bluetooth" size={24} color={sensorsOn ? colors.yellow : colors.white} />
-              <Text style={[st.roundText, sensorsOn && { color: colors.yellow }]}>Sensors</Text>
-            </Pressable>
-          )}
-          {onEmergency && (
-            <Pressable onPress={onEmergency} style={[st.round, { borderColor: colors.red }]} testID="vr-fs-emergency" accessibilityLabel="Emergency stop resistance">
-              <Ionicons name="warning-outline" size={24} color={colors.red} />
-              <Text style={[st.roundText, { color: colors.red }]}>Stop</Text>
-            </Pressable>
-          )}
-          <View style={st.barSpacer} />
-          <Pressable onPress={onPauseToggle} style={st.pausePrimary} testID="vr-fs-pause" accessibilityLabel={paused ? "Resume" : "Pause"}>
-            <Ionicons name={paused ? "play" : "pause"} size={28} color={colors.bg} />
-            <Text style={st.pausePrimaryText}>{paused ? "Resume" : "Pause"}</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.barScroll} contentContainerStyle={st.barScrollInner}>
+            {onPreset && PRESETS.map((p) => (
+              <Pressable key={p.label} onPress={() => onPreset(p.w)} style={[st.round, roundDyn]} accessibilityLabel={`Set ${p.label} effort`}>
+                <Ionicons name={p.icon} size={RB_ICON} color={colors.yellow} />
+                <Text style={[st.roundText, roundTxtDyn]}>{p.label}</Text>
+              </Pressable>
+            ))}
+            {onErgToggle && (
+              <Pressable onPress={onErgToggle} style={[st.round, roundDyn, ergOn && st.roundOn]} accessibilityLabel="Toggle ERG resistance">
+                <Ionicons name="options-outline" size={RB_ICON} color={ergOn ? colors.yellow : colors.white} />
+                <Text style={[st.roundText, roundTxtDyn, ergOn && { color: colors.yellow }]}>ERG</Text>
+              </Pressable>
+            )}
+            {onReconnect && (
+              <Pressable onPress={onReconnect} style={[st.round, roundDyn]} accessibilityLabel="Reconnect trainer">
+                <Ionicons name="refresh" size={RB_ICON} color={colors.white} />
+                <Text style={[st.roundText, roundTxtDyn]}>Reconnect</Text>
+              </Pressable>
+            )}
+            {onSensors && (
+              <Pressable onPress={onSensors} style={[st.round, roundDyn, sensorsOn && st.roundOn]} testID="vr-fs-sensors" accessibilityLabel="Pair Bluetooth sensors">
+                <Ionicons name="bluetooth" size={RB_ICON} color={sensorsOn ? colors.yellow : colors.white} />
+                <Text style={[st.roundText, roundTxtDyn, sensorsOn && { color: colors.yellow }]}>Sensors</Text>
+              </Pressable>
+            )}
+            {onEmergency && (
+              <Pressable onPress={onEmergency} style={[st.round, roundDyn, { borderColor: colors.red }]} testID="vr-fs-emergency" accessibilityLabel="Emergency stop resistance">
+                <Ionicons name="warning-outline" size={RB_ICON} color={colors.red} />
+                <Text style={[st.roundText, roundTxtDyn, { color: colors.red }]}>Stop</Text>
+              </Pressable>
+            )}
+          </ScrollView>
+          <Pressable onPress={onPauseToggle} style={[st.pausePrimary, { height: RB_H, paddingHorizontal: P_PAD }]} testID="vr-fs-pause" accessibilityLabel={paused ? "Resume" : "Pause"}>
+            <Ionicons name={paused ? "play" : "pause"} size={P_ICON} color={colors.bg} />
+            <Text style={[st.pausePrimaryText, { fontSize: P_TXT }]}>{paused ? "Resume" : "Pause"}</Text>
           </Pressable>
-          <Pressable onPress={onExitFullscreen} style={st.exitBtn} testID="vr-exit-fullscreen" accessibilityLabel={exitLabel}>
-            <Ionicons name={exitIcon} size={40} color={colors.white} />
-            <Text style={st.exitText}>{exitLabel}</Text>
+          <Pressable onPress={onExitFullscreen} style={[st.exitBtn, { height: EX_H, paddingHorizontal: EX_PAD, gap: EX_GAP }]} testID="vr-exit-fullscreen" accessibilityLabel={exitLabel}>
+            <Ionicons name={exitIcon} size={EX_ICON} color={colors.white} />
+            <Text style={[st.exitText, { fontSize: EX_TXT }]}>{exitLabel}</Text>
           </Pressable>
         </View>
       </View>
@@ -332,7 +358,9 @@ const st = StyleSheet.create({
 
   // Bottom control bar — mirrors LiveControlBar
   controlsWrap: { position: "absolute", left: 0, right: 0, bottom: 0, padding: 10 },
-  bar: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: "rgba(8,9,9,0.86)", paddingHorizontal: 12, paddingVertical: 8, flexWrap: "wrap", ...(shadow.card as any) },
+  bar: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: "rgba(8,9,9,0.86)", paddingHorizontal: 12, paddingVertical: 8, flexWrap: "nowrap", ...(shadow.card as any) },
+  barScroll: { flex: 1 },
+  barScrollInner: { flexDirection: "row", alignItems: "center", gap: 8, paddingRight: 8 },
   round: { alignItems: "center", justifyContent: "center", gap: 4, minWidth: 90, height: 72, borderRadius: radius.md, backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: colors.border, paddingHorizontal: 10 },
   roundOn: { backgroundColor: colors.yellow + "22", borderColor: colors.yellow },
   roundText: { color: colors.textDim, fontSize: 13, fontWeight: "700" },
