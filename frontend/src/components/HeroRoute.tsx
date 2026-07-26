@@ -40,7 +40,9 @@ function StatusBar({ onFlame, onNotifications, onProfile, avatar, initialsText }
         {avatar ? (
           <Image source={{ uri: avatar }} style={styles.avatarImg} contentFit="cover" contentPosition="top center" />
         ) : (
-          <Text style={styles.avatarInitials}>{initialsText}</Text>
+          <View style={styles.avatarInitialsWrap}>
+            <Text style={styles.avatarInitials}>{initialsText}</Text>
+          </View>
         )}
       </GlassPill>
     </View>
@@ -179,9 +181,10 @@ const styles = StyleSheet.create({
   brandArea: { position: "absolute", top: spacing.lg, left: spacing.lg },
   statusRow: { position: "absolute", top: spacing.lg, right: spacing.lg, flexDirection: "row", gap: 10, alignItems: "center" },
   pillText: { color: "#fff", fontWeight: "800", fontSize: 14, marginLeft: 6 },
-  avatar: { width: 44, height: 44, paddingHorizontal: 0, borderColor: colors.yellow },
+  avatar: { width: 44, height: 44, paddingHorizontal: 0, borderColor: colors.yellow, borderWidth: 1.5 },
   avatarImg: { width: "100%", height: "100%", borderRadius: radius.pill },
-  avatarInitials: { color: colors.white, fontSize: 15, fontWeight: "800", letterSpacing: 0.5 },
+  avatarInitialsWrap: { width: "100%", height: "100%", alignItems: "center", justifyContent: "center", borderRadius: radius.pill, backgroundColor: "rgba(255,194,10,0.16)" },
+  avatarInitials: { color: colors.yellow, fontSize: 15, fontWeight: "800", letterSpacing: 0.5 },
   badge: {
     position: "absolute",
     top: 4,
