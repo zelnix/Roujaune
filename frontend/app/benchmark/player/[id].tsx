@@ -339,7 +339,7 @@ export default function WorkoutPlayerScreen() {
             {stoppedReason && <Text style={s.sumLine}>Reason: {STOP_REASONS.find((r) => r.id === stoppedReason)?.label}</Text>}
             <Text style={s.devInline}>Recorded from simulated development data — not added to your real profile.</Text>
           </View>
-          <View style={s.noteCard}><Text style={s.dim}>Result calculation, confidence and accept/exclude arrive in the next update (Part 9). Your session has been saved.</Text></View>
+          <View style={s.noteCard}><Text style={s.dim}>Your session has been saved. Your recorded data is preserved.</Text></View>
           <Pressable testID="player-return" onPress={() => router.replace("/benchmark")} style={s.beginBtn}><Text style={s.beginText}>Return to Benchmark Workouts</Text></Pressable>
         </ScrollView>
       ) : (
