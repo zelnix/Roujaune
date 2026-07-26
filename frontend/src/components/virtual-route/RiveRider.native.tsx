@@ -6,33 +6,36 @@ import {
   CyclingTelemetry,
   CYCLING_NUMBER_KEYS,
   CYCLING_BOOLEAN_KEYS,
-  RiderArtboard,
 } from "@/src/lib/rider-animation";
 import {
   RIVE_MODE,
   RIVE_STATE_MACHINE,
   RIVE_VIEW_MODEL_INSTANCE,
+  RIVE_BIKE_PROPERTY,
+  RIVE_CLOTHING_PROPERTY,
   PROTOTYPE_ARTBOARD,
   PROTOTYPE_STATE_MACHINE,
+  riderArtboardFor,
+  bikeEnumValue,
+  clothingEnumValue,
 } from "@/src/lib/rive-profile";
+import { RiderType, BikeType, ClothingStyle, wheelCircumferenceFor } from "@/src/lib/rider-config";
 
 /**
- * Native (iOS/Android) Roujaune rider. Renders one of four rider artboards from
- * the production `roujaune-riders.riv` and drives its `CyclingTelemetry` View
- * Model via Data Binding. All animation values are derived by the pure
- * telemetry engine and pushed each frame (diffed to avoid redundant native
- * calls). Falls back to the chroma-keyed sprite if the file/artboard fails to
- * load (e.g. while the placeholder is still in place).
- *
- * A prototype-compatibility mode (RIVE_MODE = "prototype") instead drives a
- * simple Artboard "Rider" / State Machine "Ride" with cadence + effort inputs.
+ * Native Roujaune rider. Resolves the artboard from `riderType`, binds the
+ * `CyclingTelemetry` View Model, selects nested bike + clothing variants via
+ * data-bound enum properties, and drives all animation values from the pure
+ * telemetry engine (wheel phase uses the selected bike's circumference).
+ * Falls back to the chroma-keyed sprite if the .riv/artboard fails to load.
  */
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- Rive loads .riv via a required asset
 const RIDERS_RIV = require("../../../assets/rive/roujaune-riders.riv");
 
 export type RiveRiderProps = {
   sprite: any;                 // fallback artwork (web / load failure)
-  riderArtboard: RiderArtboard;
+  riderType: RiderType;
+  bikeType: BikeType;
+  clothingStyle: ClothingStyle;
   cadenceRpm: number;
   powerWatts: number;
   speedKph: number;
@@ -52,12 +55,11 @@ export type RiveRiderProps = {
 };
 
 export function RiveRider(props: RiveRiderProps) {
-  const { sprite, riderArtboard, style } = props;
+  const { sprite, riderType, bikeType, clothingStyle, style } = props;
   const ref = React.useRef<RiveRef>(null);
   const [failed, setFailed] = React.useState(false);
   const prototype = RIVE_MODE === "prototype";
 
-  // Latest inputs, read by the animation loop without re-subscribing.
   const inputsRef = React.useRef(props);
   inputsRef.current = props;
 
@@ -65,22 +67,23 @@ export function RiveRider(props: RiveRiderProps) {
   const lastNum = React.useRef<Record<string, number>>({});
   const lastBool = React.useRef<Record<string, boolean>>({});
 
+  // Push bike + clothing selections (nested variant switching) when they change.
+  React.useEffect(() => {
+    if (failed || prototype || !ref.current) return;
+    try { ref.current.setString(RIVE_BIKE_PROPERTY, bikeEnumValue(bikeType)); } catch { /* prop absent */ }
+    try { ref.current.setString(RIVE_CLOTHING_PROPERTY, clothingEnumValue(clothingStyle)); } catch { /* prop absent */ }
+  }, [bikeType, clothingStyle, failed, prototype]);
+
   const pushProduction = React.useCallback((t: CyclingTelemetry) => {
     const r = ref.current;
     if (!r) return;
     for (const k of CYCLING_NUMBER_KEYS) {
       const v = t[k] as number;
-      if (lastNum.current[k] !== v) {
-        lastNum.current[k] = v;
-        try { r.setNumber(k, v); } catch { /* prop absent / not ready */ }
-      }
+      if (lastNum.current[k] !== v) { lastNum.current[k] = v; try { r.setNumber(k, v); } catch { /* noop */ } }
     }
     for (const k of CYCLING_BOOLEAN_KEYS) {
       const v = t[k] as boolean;
-      if (lastBool.current[k] !== v) {
-        lastBool.current[k] = v;
-        try { r.setBoolean(k, v); } catch { /* prop absent / not ready */ }
-      }
+      if (lastBool.current[k] !== v) { lastBool.current[k] = v; try { r.setBoolean(k, v); } catch { /* noop */ } }
     }
   }, []);
 
@@ -91,7 +94,6 @@ export function RiveRider(props: RiveRiderProps) {
     try { r.setInputState(PROTOTYPE_STATE_MACHINE, "effort", Math.round(t.effort01 * 100)); } catch { /* noop */ }
   }, []);
 
-  // Drive the animation from a rAF loop with real delta-time.
   React.useEffect(() => {
     if (failed) return;
     let raf = 0;
@@ -100,9 +102,13 @@ export function RiveRider(props: RiveRiderProps) {
     const loop = (now: number) => {
       const dt = last ? (now - last) / 1000 : 0;
       last = now;
-      const t = animatorRef.current.step(inputsRef.current, dt);
+      const p = inputsRef.current;
+      const t = animatorRef.current.step(
+        { ...p, wheelCircumferenceMetres: wheelCircumferenceFor(p.bikeType) },
+        dt,
+      );
       acc += dt;
-      if (acc >= 1 / 30) { // throttle native writes to ~30fps
+      if (acc >= 1 / 30) {
         acc = 0;
         if (prototype) pushPrototype(t); else pushProduction(t);
       }
@@ -120,7 +126,7 @@ export function RiveRider(props: RiveRiderProps) {
     <Rive
       ref={ref}
       source={RIDERS_RIV}
-      artboardName={prototype ? PROTOTYPE_ARTBOARD : riderArtboard}
+      artboardName={prototype ? PROTOTYPE_ARTBOARD : riderArtboardFor(riderType)}
       stateMachineName={prototype ? PROTOTYPE_STATE_MACHINE : RIVE_STATE_MACHINE}
       dataBinding={prototype ? undefined : BindByName(RIVE_VIEW_MODEL_INSTANCE)}
       autoplay

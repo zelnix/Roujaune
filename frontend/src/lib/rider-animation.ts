@@ -32,6 +32,8 @@ export type RiderInputs = {
   signalLost?: boolean;
   emergencyStop?: boolean;
   reducedMotion?: boolean;
+  /** Wheel circumference (m) from the selected bike config; defaults to a road wheel. */
+  wheelCircumferenceMetres?: number;
 };
 
 /** The complete value set bound to the Rive `CyclingTelemetry` View Model. */
@@ -87,7 +89,7 @@ const approach = (prev: number, target: number, dt: number, tau: number) => {
 };
 const wrap360 = (v: number) => ((v % 360) + 360) % 360;
 
-const WHEEL_CIRCUMFERENCE_M = 2.096; // 700x25c road wheel
+const DEFAULT_WHEEL_CIRCUMFERENCE_M = 2.105; // road wheel; overridden per bike
 
 export function createRiderAnimator() {
   // Smoothed / integrated state.
@@ -145,7 +147,8 @@ export function createRiderAnimator() {
       s.pedal = wrap360(s.pedal + s.cad * 6 * dt);          // 6 deg per rpm-second
     }
     if (!frozen) {
-      const revPerSec = (s.spd / 3.6) / WHEEL_CIRCUMFERENCE_M;
+      const circ = i.wheelCircumferenceMetres && i.wheelCircumferenceMetres > 0 ? i.wheelCircumferenceMetres : DEFAULT_WHEEL_CIRCUMFERENCE_M;
+      const revPerSec = (s.spd / 3.6) / circ;
       s.wheel = wrap360(s.wheel + revPerSec * 360 * dt);
     }
 

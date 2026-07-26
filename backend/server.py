@@ -1057,6 +1057,39 @@ async def get_rider_profile():
     return await _rider_doc()
 
 
+# ---- Rider appearance (identity + bike + clothing) — decoupled from training ----
+APPEARANCE_DEFAULT = {"id": "me", "riderType": "younger_male", "bikeType": "road", "clothingStyle": "get_fit"}
+
+
+class AppearanceUpdate(BaseModel):
+    riderType: Optional[str] = None
+    bikeType: Optional[str] = None
+    clothingStyle: Optional[str] = None
+
+
+@api_router.get("/rider/appearance")
+async def get_rider_appearance():
+    doc = await udb.rider_appearance.find_one({"id": "me"})
+    if not doc:
+        doc = dict(APPEARANCE_DEFAULT)
+        await udb.rider_appearance.insert_one(dict(doc))
+    doc.pop("_id", None)
+    for k, v in APPEARANCE_DEFAULT.items():
+        doc.setdefault(k, v)
+    return doc
+
+
+@api_router.put("/rider/appearance")
+async def update_rider_appearance(req: AppearanceUpdate):
+    upd = {k: v for k, v in req.dict().items() if v is not None}
+    await udb.rider_appearance.update_one({"id": "me"}, {"$set": {**upd, "id": "me"}}, upsert=True)
+    doc = await udb.rider_appearance.find_one({"id": "me"})
+    doc.pop("_id", None)
+    for k, v in APPEARANCE_DEFAULT.items():
+        doc.setdefault(k, v)
+    return doc
+
+
 class AssignPlanRequest(BaseModel):
     plan_id: str
     reset_progress: bool = False
