@@ -5,7 +5,7 @@ import type { BleDevice, BleReadings, PermState } from "./useBleSensors";
  * the workout screen shows the "needs a native build" guidance.
  */
 export function useBleSensors(_wheelCircumferenceMm?: number) {
-  const readings: BleReadings = { power: null, cadence: null, hr: null, speed: null, ts: 0 };
+  const readings: BleReadings = { power: null, cadence: null, hr: null, speed: null, wheelRevs: null, ts: 0 };
   const noop = async () => {};
   return {
     supported: false,

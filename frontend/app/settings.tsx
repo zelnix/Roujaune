@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Image } from "expo-image";
+import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Speech from "expo-speech";
 import { AppScaffold, Card, SectionTitle, Toggle } from "@/src/components/app-scaffold";
@@ -25,6 +26,7 @@ const WHEEL_PRESETS: { label: string; mm: number }[] = [
 
 export default function SettingsScreen() {
   const persona = useCoach();
+  const router = useRouter();
   const { settings, setSetting } = useSettings();
   const coachStyle = useCoachStyle();
   const voiceGuidance = useVoiceGuidance();
@@ -249,6 +251,15 @@ export default function SettingsScreen() {
             </Pressable>
           </View>
         </View>
+        <Pressable testID="wheel-calibrate" onPress={() => router.push("/wheel-calibration")}
+          style={({ hovered }: any) => [s.calibrateBtn, hovered && s.calibrateHover]}>
+          <Ionicons name="locate" size={16} color={CC.rouge} />
+          <View style={{ flex: 1 }}>
+            <Text style={s.calibrateText}>Auto-calibrate with GPS</Text>
+            <Text style={s.calibrateSub}>Ride outdoors to measure your exact roll-out automatically.</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={CC.dim} />
+        </Pressable>
         <Text style={s.coachHint}>Only used with a wheel / speed sensor. A smart trainer reports speed directly.</Text>
       </Card>
 
@@ -353,6 +364,10 @@ const s = StyleSheet.create({
   segOn: { backgroundColor: CC.rouge },
   segText: { color: CC.dim, fontSize: 12.5, fontWeight: "700" },
   segTextOn: { color: "#fff" },
+  calibrateBtn: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 14, borderWidth: 1, borderColor: CC.border, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14, backgroundColor: "rgba(201,23,39,0.05)", minHeight: 46 },
+  calibrateHover: { borderColor: "rgba(255,255,255,0.28)", backgroundColor: "rgba(201,23,39,0.09)" },
+  calibrateText: { color: CC.white, fontSize: 13.5, fontWeight: "700" },
+  calibrateSub: { color: CC.dim, fontSize: 11.5, marginTop: 2, lineHeight: 15 },
   aboutRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 13, paddingHorizontal: 4, borderRadius: 8 },
   aboutText: { flex: 1, color: CC.white, fontSize: 14, fontWeight: "600" },
   version: { color: CC.dim, fontSize: 11, textAlign: "center", marginTop: 14 },

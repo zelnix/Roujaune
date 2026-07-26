@@ -13,7 +13,7 @@ import {
 } from "@/src/lib/ble/parse";
 
 export type BleDevice = { id: string; name: string };
-export type BleReadings = { power: number | null; cadence: number | null; hr: number | null; speed: number | null; ts: number };
+export type BleReadings = { power: number | null; cadence: number | null; hr: number | null; speed: number | null; wheelRevs: number | null; ts: number };
 export type PermState = "unknown" | "granted" | "denied" | "blocked";
 
 // Lazily load the native module so the app keeps working in Expo Go / web,
@@ -46,7 +46,7 @@ export function useBleSensors(wheelCircumferenceMm: number = 2105) {
   const [scanning, setScanning] = useState(false);
   const [devices, setDevices] = useState<BleDevice[]>([]);
   const [connected, setConnected] = useState<BleDevice[]>([]);
-  const [readings, setReadings] = useState<BleReadings>({ power: null, cadence: null, hr: null, speed: null, ts: 0 });
+  const [readings, setReadings] = useState<BleReadings>({ power: null, cadence: null, hr: null, speed: null, wheelRevs: null, ts: 0 });
   const [permissionStatus, setPermissionStatus] = useState<PermState>("unknown");
   const [error, setError] = useState<string | null>(null);
 
@@ -161,6 +161,7 @@ export function useBleSensors(wheelCircumferenceMm: number = 2105) {
               if (sp != null) next.speed = sp;
             }
             wheelState.current[deviceId] = cp.wheel;
+            next.wheelRevs = cp.wheel.revs;
           }
           return next;
         });
@@ -185,6 +186,7 @@ export function useBleSensors(wheelCircumferenceMm: number = 2105) {
               if (sp != null) next.speed = sp;
             }
             wheelState.current[deviceId] = csc.wheel;
+            next.wheelRevs = csc.wheel.revs;
           }
           return next;
         });
