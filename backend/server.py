@@ -1144,6 +1144,31 @@ async def update_rider_settings(payload: Dict[str, Any] = Body(...)):
     return doc
 
 
+# ---- Generic per-user key/value preference store — mirrors the client's local
+#      AsyncStorage keys (per-coach voice, favourite routes, etc.) so EVERY
+#      preference is persisted server-side and follows the rider across devices.
+@api_router.get("/rider/kv")
+async def get_rider_kv():
+    doc = await udb.kv_prefs.find_one({"id": "me"}) or {}
+    doc.pop("_id", None)
+    doc.pop("user_id", None)
+    doc.pop("id", None)
+    return doc
+
+
+@api_router.put("/rider/kv")
+async def set_rider_kv(payload: Dict[str, Any] = Body(...)):
+    key = payload.get("key")
+    if not key or not isinstance(key, str) or "." in key:
+        raise HTTPException(status_code=400, detail="Invalid key")
+    value = payload.get("value")
+    if value is None:
+        await udb.kv_prefs.update_one({"id": "me"}, {"$unset": {key: ""}, "$set": {"id": "me"}}, upsert=True)
+    else:
+        await udb.kv_prefs.update_one({"id": "me"}, {"$set": {key: value, "id": "me"}}, upsert=True)
+    return {"ok": True}
+
+
 @api_router.put("/rider/prefs")
 async def update_rider_prefs(req: PrefsUpdate):
     upd = {k: v for k, v in req.dict().items() if v is not None}

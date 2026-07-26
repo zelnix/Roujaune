@@ -1,5 +1,5 @@
 import React from "react";
-import { getCoachId, setCoachId, getCoachStyle as loadStyle, setCoachStyle as saveStyle, getVoiceGuidance as loadGuidance, setVoiceGuidance as saveGuidance, getSpeechRate as loadRate, setSpeechRate as saveRate, hydrateRiderPrefs } from "./prefs";
+import { getCoachId, setCoachId, getCoachStyle as loadStyle, setCoachStyle as saveStyle, getVoiceGuidance as loadGuidance, setVoiceGuidance as saveGuidance, getSpeechRate as loadRate, setSpeechRate as saveRate, hydrateRiderPrefs, hydrateKvPrefs } from "./prefs";
 
 export type CoachId = "alberto" | "adriana";
 export type CoachGender = "male" | "female";
@@ -73,9 +73,10 @@ export function initCoach() {
       }
     })
     .catch(() => {});
-  // Hydrate coaching style / voice guidance / speech rate from the server so
-  // all coaching preferences follow the rider across devices.
+  // Hydrate coaching style / voice guidance / speech rate + all KV preferences
+  // from the server so all coaching preferences follow the rider across devices.
   hydrateRiderPrefs();
+  hydrateKvPrefs();
 }
 
 export function getCoach(): CoachId {

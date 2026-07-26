@@ -21,10 +21,7 @@ export default function SettingsScreen() {
   const voices = React.useRef<Record<CoachId, ResolvedVoice> | null>(null);
   const [available, setAvailable] = React.useState<CoachVoiceOption[]>([]);
   const [savedVoice, setSavedVoice] = React.useState<Record<CoachId, string | null>>({ alberto: null, adriana: null });
-  const [units, setUnits] = React.useState<"metric" | "imperial">("metric");
   const [previewing, setPreviewing] = React.useState<CoachId | null>(null);
-  const [toggles, setToggles] = React.useState({ coachAudio: true, autoSync: true, weeklyReport: true, restReminders: false });
-  const set = (k: keyof typeof toggles) => setToggles((t) => ({ ...t, [k]: !t[k] }));
 
   const refreshVoices = React.useCallback(async () => {
     const saved = { alberto: await getVoiceId("alberto"), adriana: await getVoiceId("adriana") };
@@ -212,14 +209,14 @@ export default function SettingsScreen() {
         <View style={[s.prefRow, s.divider]}>
           <View style={{ flex: 1 }}><Text style={s.prefTitle}>Units</Text><Text style={s.prefSub}>Distance, weight and speed</Text></View>
           <View style={s.segment}>
-            <Pressable testID="units-metric" onPress={() => setUnits("metric")} style={[s.seg, units === "metric" && s.segOn]}><Text style={[s.segText, units === "metric" && s.segTextOn]}>Metric</Text></Pressable>
-            <Pressable testID="units-imperial" onPress={() => setUnits("imperial")} style={[s.seg, units === "imperial" && s.segOn]}><Text style={[s.segText, units === "imperial" && s.segTextOn]}>Imperial</Text></Pressable>
+            <Pressable testID="units-metric" onPress={() => setSetting("units", "metric")} style={[s.seg, settings.units === "metric" && s.segOn]}><Text style={[s.segText, settings.units === "metric" && s.segTextOn]}>Metric</Text></Pressable>
+            <Pressable testID="units-imperial" onPress={() => setSetting("units", "imperial")} style={[s.seg, settings.units === "imperial" && s.segOn]}><Text style={[s.segText, settings.units === "imperial" && s.segTextOn]}>Imperial</Text></Pressable>
           </View>
         </View>
-        <PrefToggle label="Coach audio cues" sub="Live spoken coaching during rides" on={toggles.coachAudio} onToggle={() => set("coachAudio")} testID="tg-coachAudio" divider />
-        <PrefToggle label="Auto-sync activities" sub="Send completed rides to connected services" on={toggles.autoSync} onToggle={() => set("autoSync")} testID="tg-autoSync" divider />
-        <PrefToggle label="Weekly report" sub={`${persona.name}'s summary every Sunday`} on={toggles.weeklyReport} onToggle={() => set("weeklyReport")} testID="tg-weeklyReport" divider />
-        <PrefToggle label="Rest-day reminders" sub="Gentle nudge to recover" on={toggles.restReminders} onToggle={() => set("restReminders")} testID="tg-restReminders" />
+        <PrefToggle label="Coach audio cues" sub="Live spoken coaching during rides" on={settings.coachAudio} onToggle={() => setSetting("coachAudio", !settings.coachAudio)} testID="tg-coachAudio" divider />
+        <PrefToggle label="Auto-sync activities" sub="Send completed rides to connected services" on={settings.autoSync} onToggle={() => setSetting("autoSync", !settings.autoSync)} testID="tg-autoSync" divider />
+        <PrefToggle label="Weekly report" sub={`${persona.name}'s summary every Sunday`} on={settings.weeklyReport} onToggle={() => setSetting("weeklyReport", !settings.weeklyReport)} testID="tg-weeklyReport" divider />
+        <PrefToggle label="Rest-day reminders" sub="Gentle nudge to recover" on={settings.restReminders} onToggle={() => setSetting("restReminders", !settings.restReminders)} testID="tg-restReminders" />
       </Card>
 
       <Card testID="about">

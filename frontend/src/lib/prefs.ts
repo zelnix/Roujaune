@@ -20,6 +20,33 @@ function pushRiderPref(patch: Record<string, unknown>): void {
   }).catch(() => { /* keep local; re-syncs on next change */ });
 }
 
+// Mirror an arbitrary local (AsyncStorage) preference key to the server KV store
+// so per-coach voice, favourite routes, etc. persist across devices too.
+function remoteKvSet(key: string, value: string | null): void {
+  fetch(`${prefsApi()}/api/rider/kv`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key, value }),
+  }).catch(() => { /* keep local; re-syncs on next change */ });
+}
+
+/** Pull every server-stored KV preference into the local cache at startup so
+ * ALL preferences follow the rider across devices. */
+export async function hydrateKvPrefs(): Promise<void> {
+  try {
+    const res = await fetch(`${prefsApi()}/api/rider/kv`);
+    if (!res.ok) return;
+    const d = await res.json();
+    for (const [k, v] of Object.entries(d || {})) {
+      if (typeof k === "string" && k.startsWith("roujaune:") && v != null) {
+        await AsyncStorage.setItem(k, String(v));
+      }
+    }
+  } catch {
+    /* keep local cache */
+  }
+}
+
 /** Persisted speaking speed for coach TTS (0.8 slow – 1.1 fast; default 0.95). */
 export async function getSpeechRate(): Promise<number | null> {
   try { const v = await AsyncStorage.getItem(SPEECH_RATE_KEY); return v ? parseFloat(v) : null; } catch { return null; }
@@ -95,6 +122,7 @@ export async function setVoiceId(coachId: string, id: string | null): Promise<vo
   } catch {
     /* noop */
   }
+  remoteKvSet(`${VOICE_KEY}:${coachId}`, id);
 }
 
 /** Persisted id of the last route the rider chose (across sessions). */
@@ -113,6 +141,7 @@ export async function setLastRouteId(id: string | null): Promise<void> {
   } catch {
     /* noop */
   }
+  remoteKvSet(LAST_ROUTE_KEY, id);
 }
 
 /** Persisted favourite scenic route pinned per workout type (across sessions). */
@@ -131,4 +160,5 @@ export async function setFavoriteRoute(typeId: string, routeId: string | null): 
   } catch {
     /* noop */
   }
+  remoteKvSet(`${FAV_ROUTE_KEY}:${typeId}`, routeId);
 }

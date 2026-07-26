@@ -12,9 +12,14 @@ export type Settings = {
   homeCity: string;      // fallback location label for the home weather when GPS is unavailable
   homeLat: number;       // fallback latitude
   homeLon: number;       // fallback longitude
+  units: "metric" | "imperial"; // distance/elevation units
+  coachAudio: boolean;   // spoken coach guidance during rides
+  autoSync: boolean;     // auto-sync completed rides to connected services
+  weeklyReport: boolean; // weekly training summary email
+  restReminders: boolean; // reminders to take scheduled rest days
 };
 
-const DEFAULTS: Settings = { hasTrainer: false, hasWearable: false, demoMode: false, hudEnabled: true, ftp: 287, ftpAuto: true, seatedMode: false, homeCity: "Nice, France", homeLat: 43.7102, homeLon: 7.262 };
+const DEFAULTS: Settings = { hasTrainer: false, hasWearable: false, demoMode: false, hudEnabled: true, ftp: 287, ftpAuto: true, seatedMode: false, homeCity: "Nice, France", homeLat: 43.7102, homeLon: 7.262, units: "metric", coachAudio: true, autoSync: true, weeklyReport: true, restReminders: false };
 const KEY = "roujaune:settings";
 
 function apiBase(): string {

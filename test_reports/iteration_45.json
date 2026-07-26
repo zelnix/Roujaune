@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration 45 - EVERY rider preference now persists server-side. BACKEND (9/9 pytest pass, /app/backend/tests/test_iter45_prefs_persist.py): (1) NEW rider settings keys — PUT /api/rider/settings with {units:'imperial', coachAudio:false, autoSync:false, weeklyReport:false, restReminders:true} returns the merged doc containing all five values, GET reflects them exactly. Restore PUT {units:'metric', coachAudio:true, autoSync:true, weeklyReport:true, restReminders:false} verified via GET. (2) User-scoping — a freshly registered temp account sees settings.units!='imperial' and restReminders!=true, proving no leakage from GL. (3) NEW generic KV store — PUT /api/rider/kv {key:'roujaune:voiceId:alberto', value:'onyx'} returns {ok:true}; GET /api/rider/kv → {'roujaune:voiceId:alberto':'onyx'}. PUT {..., value:null} removes it (GET no longer contains the key). Invalid key with '.' (bad.key) → 400 Invalid key. Empty key '' → 400. KV is user-scoped: 'roujaune:test:scope45' set on GL is not visible on the tmp account. (4) Regression — /api/rider/settings equipment key hasTrainer toggles + GETs cleanly around its original value; /api/rider/prefs still returns coach_id/coach_style/voice_guidance/speech_rate with coach_id='alberto'. FRONTEND (landscape 1024x720, real GL login via testID email-input/password-input/submit-btn, /settings): (5) EQUIPMENT & RIDE card testID equipment-prefs is present. Tapping tg-seatedMode fires a network PUT /api/rider/settings body {'seatedMode':true}; after navigating to / and back to /settings, the server state (GET) still returns seatedMode:true and the DOM re-renders the toggle in its ON style. (6) TRAINING PREFERENCES card: tapping units-imperial fires PUT {'units':'imperial'}; tapping tg-restReminders fires PUT {'restReminders':true}. After nav to / and back to /settings, the server state confirms {units:'imperial', restReminders:true, seatedMode:true, coachAudio:true, autoSync:true, weeklyReport:true} and the DOM shows Imperial with the selected background class and both toggles ON in the screenshot. Every toggle produced its own network PUT (one PUT per change, correct body) — captured via page.on('request'). No JS errors, no red-screen, no crash on the Settings screen. FINAL CLEANUP: restored via API to units='metric', seatedMode=false, restReminders=false, coachAudio/autoSync/weeklyReport=true, hasTrainer=false, hudEnabled=true, hasWearable=false, demoMode=false. KV verified empty {}. Prefs verified coach_id='alberto', coach_style='balanced'. Account is pristine.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter45_prefs_persist.py",
+    "/app/test_reports/pytest/iter45.xml",
+    "/app/test_reports/screens/iter45_settings.jpeg"
+  ],
+  "action_items": [
+    "None - all preference-persistence behaviour works end-to-end for both the extended rider settings (units + notification toggles) and the new generic KV store, with correct user-scoping and 400 on invalid keys."
+  ],
+  "critical_code_review_comments": [
+    "server.py PUT /api/rider/kv (~L1159) correctly rejects keys containing '.' (would collide with Mongo's dotted-path $set semantics) and empty/non-string keys with HTTP 400. Uses $unset when value is null and $set otherwise, upserting {id:'me'} so a fresh account still gets a scoped doc via _ScopedCollection.update_one which injects user_id.",
+    "server.py GET /api/rider/kv strips _id/user_id/id before returning, so the response is exactly the KV map the client can merge into AsyncStorage. Fresh account gets {} which the frontend handles gracefully.",
+    "auth.py USER_SCOPED (L40-45) correctly adds 'kv_prefs' alongside 'settings' and 'rider_prefs', ensuring the generic KV store is per-user via _ScopedCollection.",
+    "frontend/src/lib/settings.ts DEFAULTS now include units/coachAudio/autoSync/weeklyReport/restReminders; useSettings merges remote over the local cache; setSetting fires pushRemoteSettings({[k]:v}) on every change - one PUT per toggle, verified via page.on('request').",
+    "frontend/src/lib/prefs.ts remoteKvSet mirrors setVoiceId/setLastRouteId/setFavoriteRoute writes to /api/rider/kv, and hydrateKvPrefs rehydrates every 'roujaune:*' key at startup into AsyncStorage so per-coach voices etc. survive device switches.",
+    "frontend/app/settings.tsx wires units-metric/units-imperial segmented control and all four notification PrefToggles to useSettings.setSetting — no dead local state. Every toggle has a distinct testID (tg-coachAudio/tg-autoSync/tg-weeklyReport/tg-restReminders) which allowed pinpoint automation verification."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter45_prefs_persist.py (new - 9 pytest cases covering extended settings, KV set/get/remove, invalid-key rejection, user-scoping on both settings and KV, and equipment/prefs regression)"
+  ],
+  "success_rate": {
+    "backend": "100% (9/9 pytest pass)",
+    "frontend": "100% (equipment-prefs + training-preferences toggles persist across navigation, one PUT /api/rider/settings per change with correct body, no crashes)"
+  },
+  "seed_data_creation": "One ephemeral user tmp_iter45_<hex>@roujaune.app registered and DELETE /api/account'd after use to prove user-scoping on both /api/rider/settings and /api/rider/kv. GL account left pristine: settings={units:metric, coachAudio:true, autoSync:true, weeklyReport:true, restReminders:false, seatedMode:false, hasTrainer:false, hasWearable:false, demoMode:false, hudEnabled:true, ftp:287}, kv={}, coach_id=alberto. No ride was ridden to completion.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Reuse /app/backend/tests/test_iter45_prefs_persist.py for regression on rider settings extended keys, KV store, and coach prefs. Frontend /settings testIDs: equipment-prefs, tg-seatedMode, tg-hasTrainer, tg-hasWearable, tg-hudEnabled, tg-demoMode, preferences card with units-metric/units-imperial + tg-coachAudio/tg-autoSync/tg-weeklyReport/tg-restReminders. Note: window.localStorage token key is NOT 'roujaune:token'; to fetch authenticated data from within the browser context use fetch to a different auth source, or drive restore via curl+/api/auth/login from the shell. Every toggle in /settings fires exactly one PUT /api/rider/settings with body {[key]:value} - one-shot, no debounce. KV keys must NOT contain '.' (returns 400).",
+  "rca_of_issue": "N/A - feature verification iteration, all persistence flows work end-to-end."
+}
