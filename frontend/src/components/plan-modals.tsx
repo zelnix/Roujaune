@@ -6,12 +6,13 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import Svg, { Path, Circle, Line, Rect, Text as SvgText } from "react-native-svg";
-import { C, ProgressRing } from "./plan";
+import { C, ProgressRing, PlanPhase, KeyWorkout, WorkoutProfile } from "./plan";
 import { CoachPersona } from "../lib/coach-persona";
 import {
   EditableGoal, savePlanGoals, PlanProgressDetail, fetchPlanProgress,
-  AdaptationEntry, fetchAdaptations,
+  AdaptationEntry, fetchAdaptations, AdaptationDetail, fetchAdaptationDetail,
 } from "../lib/plan";
+import { getWorkout, buildSegments } from "../lib/workout-catalog";
 
 /* ── shared modal shell ─────────────────────────────────────────────────── */
 function ModalShell({
@@ -261,10 +262,12 @@ function relTime(iso: string): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-export function AdaptationsModal({ visible, onClose, persona }: { visible: boolean; onClose: () => void; persona: CoachPersona }) {
+export function AdaptationsModal({ visible, onClose, persona, planId = "build-and-climb" }: { visible: boolean; onClose: () => void; persona: CoachPersona; planId?: string }) {
   const [items, setItems] = React.useState<AdaptationEntry[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [err, setErr] = React.useState(false);
+  const [detail, setDetail] = React.useState<AdaptationDetail | null>(null);
+  const [detailLoading, setDetailLoading] = React.useState(true);
 
   React.useEffect(() => {
     if (!visible) return;
@@ -274,11 +277,54 @@ export function AdaptationsModal({ visible, onClose, persona }: { visible: boole
       .then((d) => { if (alive) setItems(d); })
       .catch(() => { if (alive) setErr(true); })
       .finally(() => { if (alive) setLoading(false); });
+
+    setDetailLoading(true); setDetail(null);
+    fetchAdaptationDetail(persona.name, persona.gender, planId)
+      .then((d) => { if (alive) setDetail(d); })
+      .finally(() => { if (alive) setDetailLoading(false); });
     return () => { alive = false; };
-  }, [visible, persona.name]);
+  }, [visible, persona.name, persona.gender, planId]);
 
   return (
     <ModalShell visible={visible} onClose={onClose} title={`${persona.name}'s Adaptations`} subtitle="How your companion coach has adjusted the plan over time." icon="git-branch-outline" iconColor={C.rouge} maxWidth={680}>
+      {/* Why this adaptation — AI-generated reasoning */}
+      <View style={m.reasonCard} testID="adaptation-reasoning">
+        <View style={m.reasonHead}>
+          <Ionicons name="sparkles" size={14} color={C.yellow} />
+          <Text style={m.reasonHeadText}>WHY {persona.name.toUpperCase()} ADJUSTED YOUR PLAN</Text>
+        </View>
+        {detailLoading ? (
+          <View style={[m.center, { paddingVertical: 22 }]}><ActivityIndicator color={C.yellow} /><Text style={m.centerText}>{persona.name} is reviewing your training…</Text></View>
+        ) : !detail ? (
+          <Text style={m.reasonSummary}>Finish a few rides and {persona.name} will explain exactly how your plan is being tuned.</Text>
+        ) : (
+          <>
+            {detail.summary ? <Text style={m.reasonSummary}>{detail.summary}</Text> : null}
+            {detail.factors.map((f, i) => (
+              <View key={i} style={m.factorRow}>
+                <View style={m.factorDot} />
+                <View style={{ flex: 1 }}>
+                  <Text style={m.factorLabel}>{f.label}</Text>
+                  <Text style={m.factorDetail}>{f.detail}</Text>
+                </View>
+              </View>
+            ))}
+            {detail.adjustments.length > 0 && (
+              <View style={m.adjBox}>
+                <Text style={m.adjHead}>WHAT CHANGED</Text>
+                {detail.adjustments.map((a, i) => (
+                  <View key={i} style={m.adjRow}>
+                    <Ionicons name="arrow-forward-circle" size={14} color={C.green} style={{ marginTop: 1 }} />
+                    <Text style={m.adjText}>{a}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </>
+        )}
+      </View>
+
+      <Text style={m.histLabel}>ADAPTATION HISTORY</Text>
       {loading ? (
         <View style={m.center}><ActivityIndicator color={C.yellow} /><Text style={m.centerText}>Loading history…</Text></View>
       ) : err ? (
@@ -301,6 +347,86 @@ export function AdaptationsModal({ visible, onClose, persona }: { visible: boole
             </View>
           </View>
         ))
+      )}
+    </ModalShell>
+  );
+}
+
+/* ── Phase detail (per-phase breakdown, current highlighted) ─────────────── */
+export function PhaseDetailModal({ visible, onClose, phases, selectedId }: { visible: boolean; onClose: () => void; phases: PlanPhase[]; selectedId?: string }) {
+  return (
+    <ModalShell visible={visible} onClose={onClose} title="Training Phases" subtitle="Each phase of your journey — your current phase is highlighted." icon="layers-outline" iconColor={C.yellow} maxWidth={640}>
+      {phases.map((p) => {
+        const active = !!p.active;
+        const isSel = p.id === selectedId;
+        return (
+          <View key={p.id} testID={`phase-detail-${p.id}`} style={[m.phaseItem, active && m.phaseItemActive, isSel && !active && m.phaseItemSel]}>
+            <View style={[m.phaseNum, active && { backgroundColor: C.yellow, borderColor: C.yellow }]}>
+              {p.number === 4
+                ? <Ionicons name="flag" size={15} color={active ? "#241B00" : C.dim} />
+                : <Text style={[m.phaseNumText, active && { color: "#241B00" }]}>{p.number}</Text>}
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={m.phaseItemHead}>
+                <Text style={[m.phaseItemName, active && { color: C.white }]}>{p.name}</Text>
+                {active ? <View style={m.currentChip}><Text style={m.currentChipText}>CURRENT</Text></View> : null}
+              </View>
+              <Text style={m.phaseItemWeeks}>{p.weeks} · {p.pct}% complete</Text>
+              {p.objective ? <Text style={m.phaseItemObjective}>{p.objective}</Text> : null}
+              <View style={m.phaseProgTrack}><View style={[m.phaseProgFill, { width: `${Math.max(2, p.pct)}%`, backgroundColor: active ? C.yellow : C.rouge }]} /></View>
+            </View>
+          </View>
+        );
+      })}
+    </ModalShell>
+  );
+}
+
+/* ── Key-workout detail (steps + profile) ───────────────────────────────── */
+export function KeyWorkoutDetailModal({ visible, onClose, workout, onOpen }: { visible: boolean; onClose: () => void; workout: KeyWorkout | null; onOpen?: (w: KeyWorkout) => void }) {
+  const segs = React.useMemo(() => {
+    if (!workout?.id) return [];
+    const w = getWorkout(workout.id);
+    return w ? buildSegments(w) : [];
+  }, [workout]);
+  if (!workout) return null;
+  const done = !!workout.completed;
+  return (
+    <ModalShell
+      visible={visible} onClose={onClose} title={workout.title}
+      subtitle={workout.footer} icon={done ? "checkmark-circle" : (workout.icon as any)} iconColor={done ? C.green : workout.color} maxWidth={560}
+      footer={onOpen ? (
+        <Pressable testID="workout-detail-open" onPress={() => onOpen(workout)} style={({ hovered }: any) => [m.btnPrimary, hovered && { opacity: 0.9 }]}>
+          <Ionicons name="play" size={15} color="#241B00" />
+          <Text style={m.btnPrimaryText}>Open in Training</Text>
+        </Pressable>
+      ) : undefined}
+    >
+      <View style={m.woMetaRow}>
+        <View style={[m.zoneTag, { borderColor: done ? C.green : workout.color }]}><Text style={[m.zoneTagText, { color: done ? C.green : workout.color }]}>{workout.zone || (workout.type ?? "").toUpperCase()}</Text></View>
+        <View style={m.woMetaCell}><Ionicons name="time-outline" size={14} color={C.dim} /><Text style={m.woMetaText}>{done && workout.actual_duration ? workout.actual_duration : workout.duration}</Text></View>
+        {workout.tss ? <View style={m.woMetaCell}><Ionicons name="flash" size={14} color={C.yellow} /><Text style={m.woMetaText}>{done && workout.actual_tss ? workout.actual_tss : workout.tss}</Text></View> : null}
+      </View>
+      {workout.subtitle ? <Text style={m.woDesc}>{workout.subtitle}</Text> : null}
+      {workout.profile?.length ? (
+        <View style={m.woProfileBox}><WorkoutProfile bars={workout.profile} color={done ? C.green : workout.color} width={480} height={64} /></View>
+      ) : null}
+      {segs.length ? (
+        <>
+          <Text style={m.stepsLabel}>WORKOUT STEPS</Text>
+          {segs.map((seg, i) => (
+            <View key={i} style={m.stepRow}>
+              <View style={[m.stepDot, { backgroundColor: seg.color }]} />
+              <Text style={m.stepName} numberOfLines={2}>{seg.label}</Text>
+              <Text style={m.stepMeta}>{Math.max(1, Math.round(seg.durationSec / 60))} min</Text>
+            </View>
+          ))}
+        </>
+      ) : (
+        <View style={[m.center, { paddingVertical: 24 }]}>
+          <Ionicons name="list-outline" size={22} color={C.dim} />
+          <Text style={m.centerText}>Detailed steps will appear once this session is scheduled.</Text>
+        </View>
       )}
     </ModalShell>
   );
@@ -374,4 +500,48 @@ const m = StyleSheet.create({
   triggerText: { color: C.yellow, fontSize: 11, fontWeight: "700" },
   adaptWhen: { color: C.dim, fontSize: 11 },
   adaptBody: { color: C.white, fontSize: 13, lineHeight: 19 },
+
+  // adaptation reasoning (AI detail)
+  reasonCard: { backgroundColor: "rgba(255,194,10,0.05)", borderWidth: 1, borderColor: "rgba(255,194,10,0.22)", borderRadius: 14, padding: 14, marginBottom: 18 },
+  reasonHead: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 8 },
+  reasonHeadText: { color: C.yellow, fontSize: 10.5, fontWeight: "800", letterSpacing: 0.6 },
+  reasonSummary: { color: C.white, fontSize: 13.5, lineHeight: 20, marginBottom: 10 },
+  factorRow: { flexDirection: "row", gap: 10, marginTop: 8 },
+  factorDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.yellow, marginTop: 6 },
+  factorLabel: { color: C.white, fontSize: 12.5, fontWeight: "800" },
+  factorDetail: { color: C.dim, fontSize: 12.5, lineHeight: 18, marginTop: 2 },
+  adjBox: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: "rgba(255,194,10,0.18)" },
+  adjHead: { color: C.green, fontSize: 10, fontWeight: "800", letterSpacing: 0.6, marginBottom: 7 },
+  adjRow: { flexDirection: "row", gap: 8, marginBottom: 7 },
+  adjText: { color: C.white, fontSize: 12.5, lineHeight: 18, flex: 1 },
+  histLabel: { color: C.dim, fontSize: 10.5, fontWeight: "800", letterSpacing: 0.6, marginBottom: 12 },
+
+  // phase detail
+  phaseItem: { flexDirection: "row", gap: 12, backgroundColor: "rgba(255,255,255,0.02)", borderWidth: 1, borderColor: C.borderSoft, borderRadius: 14, padding: 13, marginBottom: 10 },
+  phaseItemActive: { borderColor: "rgba(255,194,10,0.5)", backgroundColor: "rgba(255,194,10,0.06)" },
+  phaseItemSel: { borderColor: "rgba(255,255,255,0.25)" },
+  phaseNum: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, borderColor: C.border, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.03)" },
+  phaseNumText: { color: C.dim, fontSize: 15, fontWeight: "800" },
+  phaseItemHead: { flexDirection: "row", alignItems: "center", gap: 8 },
+  phaseItemName: { color: C.dim, fontSize: 15, fontWeight: "800", flex: 1 },
+  currentChip: { backgroundColor: C.yellow, borderRadius: 999, paddingVertical: 2, paddingHorizontal: 9 },
+  currentChipText: { color: "#241B00", fontSize: 9.5, fontWeight: "900", letterSpacing: 0.5 },
+  phaseItemWeeks: { color: C.dim, fontSize: 12, marginTop: 2 },
+  phaseItemObjective: { color: C.white, fontSize: 13, lineHeight: 19, marginTop: 7 },
+  phaseProgTrack: { height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.08)", overflow: "hidden", marginTop: 10 },
+  phaseProgFill: { height: "100%", borderRadius: 3 },
+
+  // key-workout detail
+  woMetaRow: { flexDirection: "row", alignItems: "center", gap: 14, marginBottom: 10 },
+  woMetaCell: { flexDirection: "row", alignItems: "center", gap: 5 },
+  woMetaText: { color: C.white, fontSize: 13, fontWeight: "700" },
+  zoneTag: { borderWidth: 1, borderRadius: 999, paddingVertical: 3, paddingHorizontal: 11 },
+  zoneTagText: { fontSize: 11, fontWeight: "800" },
+  woDesc: { color: C.dim, fontSize: 13, lineHeight: 19, marginBottom: 12 },
+  woProfileBox: { backgroundColor: "rgba(255,255,255,0.03)", borderRadius: 12, borderWidth: 1, borderColor: C.borderSoft, padding: 12, marginBottom: 14, alignItems: "center" },
+  stepsLabel: { color: C.dim, fontSize: 10.5, fontWeight: "800", letterSpacing: 0.8, marginBottom: 10 },
+  stepRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: C.borderSoft },
+  stepDot: { width: 8, height: 8, borderRadius: 4 },
+  stepName: { color: C.white, fontSize: 13, fontWeight: "600", flex: 1 },
+  stepMeta: { color: C.dim, fontSize: 12, fontWeight: "700" },
 });

@@ -12,13 +12,13 @@ import { markPlanSeen } from "@/src/lib/plan-badge";
 import {
   C, PlanPhase, KeyWorkout, PlanProvider,
   PlanHeader, PlanTabs,
-  PlanHeroCard, PlanGoalsCard, CurrentPhaseRoadmap, WeeklyLoadCard,
+  PlanHeroCard, PlanGoalsCard, CurrentPhaseRoadmap, PhasesDetailCard, WeeklyLoadCard,
   KeyWorkoutsCard, AlbertoAdaptationsCard, AdaptiveTargetsCard, PlanProgressStrip, AlbertoTipFooter,
 } from "@/src/components/plan";
 import { SideNavigation } from "@/src/components/SideNavigation";
 import { CalendarCard } from "@/src/components/CalendarCard";
 import { ReadinessGate } from "@/src/components/ReadinessGate";
-import { EditGoalsModal, ProgressModal, AdaptationsModal } from "@/src/components/plan-modals";
+import { EditGoalsModal, ProgressModal, AdaptationsModal, PhaseDetailModal, KeyWorkoutDetailModal } from "@/src/components/plan-modals";
 import { PhaseCelebrationModal } from "@/src/components/PhaseCelebrationModal";
 import { ShareCardModal } from "@/src/components/ShareCardModal";
 import type { AchievementCardData } from "@/src/components/AchievementCard";
@@ -88,6 +88,8 @@ export default function TrainingPlanScreen() {
   const [showGoals, setShowGoals] = React.useState(false);
   const [showProgress, setShowProgress] = React.useState(false);
   const [showAdaptations, setShowAdaptations] = React.useState(false);
+  const [phaseDetail, setPhaseDetail] = React.useState<string | null>(null);
+  const [workoutDetail, setWorkoutDetail] = React.useState<KeyWorkout | null>(null);
   const [showChat, setShowChat] = React.useState(false);
   const [chatSeed, setChatSeed] = React.useState<string | undefined>(undefined);
   const [goalsOverride, setGoalsOverride] = React.useState<EditableGoal[] | null>(null);
@@ -112,8 +114,9 @@ export default function TrainingPlanScreen() {
     showToast(`${key.charAt(0).toUpperCase() + key.slice(1)} — coming soon`);
   };
 
-  const onPhase = (p: PlanPhase) => showToast(`${p.name} · ${p.weeks} · ${p.pct}% complete`);
-  const onWorkout = (w: KeyWorkout) => router.push({ pathname: "/training", params: { workoutId: w.id, title: w.title } } as any);
+  const onPhase = (p: PlanPhase) => setPhaseDetail(p.id);
+  const onWorkout = (w: KeyWorkout) => setWorkoutDetail(w);
+  const activePlanId = (plan as any)?.id ?? "build-and-climb";
 
   const contentW = availW > 0 ? availW : width - 96;
   const fullW = Math.max(600, contentW - 44); // content minus horizontal padding
@@ -146,7 +149,7 @@ export default function TrainingPlanScreen() {
 
   let body: React.ReactNode;
   if (tab === "Phases") {
-    body = (<>{hero}<CurrentPhaseRoadmap onPhase={onPhase} /><KeyWorkoutsCard onView={() => showToast("View all workouts")} onWorkout={onWorkout} onNext={() => showToast("More workouts")} />{tip}</>);
+    body = (<><CurrentPhaseRoadmap onPhase={onPhase} /><PhasesDetailCard onPhase={onPhase} />{tip}</>);
   } else if (tab === "Key Workouts") {
     body = (<><KeyWorkoutsCard onView={() => showToast("View all workouts")} onWorkout={onWorkout} onNext={() => showToast("More workouts")} /><View style={styles.rowGap}><WeeklyLoadCard width={fullW - 460} onFilter={() => showToast("Filter: This Plan")} /><View style={{ width: 440 }}><AlbertoAdaptationsCard persona={persona} width={440} onViewAll={() => setShowAdaptations(true)} text={adaptation.text} loading={adaptation.loading} onRefresh={adaptation.refresh} /></View></View>{tip}</>);
   } else if (tab === "Load & Progress") {
@@ -208,7 +211,19 @@ export default function TrainingPlanScreen() {
           onSaved={(g) => { setGoalsOverride(g); showToast("Goals updated"); }}
         />
         <ProgressModal visible={showProgress} onClose={() => setShowProgress(false)} />
-        <AdaptationsModal visible={showAdaptations} onClose={() => setShowAdaptations(false)} persona={persona} />
+        <AdaptationsModal visible={showAdaptations} onClose={() => setShowAdaptations(false)} persona={persona} planId={activePlanId} />
+        <PhaseDetailModal
+          visible={!!phaseDetail}
+          onClose={() => setPhaseDetail(null)}
+          phases={(displayPlan.phases ?? []) as PlanPhase[]}
+          selectedId={phaseDetail ?? undefined}
+        />
+        <KeyWorkoutDetailModal
+          visible={!!workoutDetail}
+          onClose={() => setWorkoutDetail(null)}
+          workout={workoutDetail}
+          onOpen={(w) => { setWorkoutDetail(null); router.push({ pathname: "/training", params: { workoutId: w.id, title: w.title } } as any); }}
+        />
         <CoachChatModal visible={showChat} onClose={() => { setShowChat(false); setChatSeed(undefined); }} persona={persona} onPlanUpdated={refreshPlan} seedMessage={chatSeed} />
         <PhaseCelebrationModal
           visible={!!celebration && !completion}

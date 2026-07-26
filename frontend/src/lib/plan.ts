@@ -110,6 +110,28 @@ export async function fetchAdaptations(coachName: string, planId = "build-and-cl
   return data?.adaptations ?? [];
 }
 
+/* Detailed reasoning behind the current adaptation (AI-generated). */
+export type AdaptationDetail = { summary: string; factors: { label: string; detail: string }[]; adjustments: string[] };
+
+export async function fetchAdaptationDetail(coachName: string, coachGender: string, planId = "build-and-climb"): Promise<AdaptationDetail | null> {
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 20000);
+    const res = await fetch(`${apiBase()}/api/coach/adaptation/detail`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ plan_id: planId, coach_name: coachName, coach_gender: coachGender, refresh: false }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    const d = await res.json();
+    return d?.detail ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export type PlanProgressDetail = {
   progress_pct: number;
   summary: Record<string, string>;

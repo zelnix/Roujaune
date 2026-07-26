@@ -19,7 +19,7 @@ const heroImg = require("../../assets/images/hero_cyclist_b2.jpg");
 
 /* ── mock data (matches the reference exactly) ───────────────────────────── */
 export type PlanGoal = { id: string; title: string; description: string; status: "complete" | "incomplete" };
-export type PlanPhase = { id: string; number: number; name: string; weeks: string; pct: number; active?: boolean; points: number[] };
+export type PlanPhase = { id: string; number: number; name: string; weeks: string; pct: number; active?: boolean; objective?: string; points: number[] };
 export type KeyWorkout = { id: string; title: string; icon: keyof typeof Ionicons.glyphMap; duration: string; zone: string; tss: string; footer: string; color: string; profile: number[]; completed?: boolean; status?: string; actual_tss?: string; actual_duration?: string; type?: string; subtitle?: string; date?: string; date_label?: string; is_today?: boolean };
 
 export const PLAN = {
@@ -410,11 +410,62 @@ export function CurrentPhaseRoadmap({ onPhase }: { onPhase: (p: PlanPhase) => vo
   );
 }
 
+/* Inline per-phase breakdown for the Phases tab: objectives + progress, with
+ * the current phase clearly highlighted. Tapping opens the full detail modal. */
+export function PhasesDetailCard({ onPhase }: { onPhase: (p: PlanPhase) => void }) {
+  const PLAN = useP();
+  return (
+    <View style={[s.card, { flex: 1 }]} testID="phases-detail">
+      <View style={s.cardHeadRow}>
+        <View style={s.cardHead}><Text style={[s.cardHeadText, { color: C.yellow }]}>YOUR TRAINING PHASES</Text></View>
+      </View>
+      {(PLAN.phases ?? []).map((p: PlanPhase) => {
+        const active = !!p.active;
+        return (
+          <Pressable key={p.id} testID={`phase-row-${p.id}`} onPress={() => onPhase(p)}
+            style={({ hovered }: any) => [s.phaseRow, active && s.phaseRowActive, hovered && s.phaseCardHover]}>
+            <View style={[s.phaseRowNum, active && { backgroundColor: C.yellow, borderColor: C.yellow }]}>
+              {p.number === 4
+                ? <Ionicons name="flag" size={14} color={active ? "#241B00" : C.dim} />
+                : <Text style={[s.phaseRowNumText, active && { color: "#241B00" }]}>{p.number}</Text>}
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={s.phaseRowHead}>
+                <Text style={[s.phaseRowName, active && { color: C.white }]} numberOfLines={1}>{p.name}</Text>
+                {active ? <View style={s.phaseRowChip}><Text style={s.phaseRowChipText}>CURRENT</Text></View> : null}
+                <Text style={s.phaseRowWeeks}>{p.weeks}</Text>
+              </View>
+              {p.objective ? <Text style={s.phaseRowObjective} numberOfLines={2}>{p.objective}</Text> : null}
+              <View style={s.phaseRowTrack}><View style={[s.phaseRowFill, { width: `${Math.max(2, p.pct)}%`, backgroundColor: active ? C.yellow : C.rouge }]} /></View>
+            </View>
+            <Text style={[s.phaseRowPct, active ? { color: C.yellow } : { color: C.dim }]}>{p.pct}%</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 /* ── weekly load ────────────────────────────────────────────────────────── */
 export function WeeklyLoadCard({ onFilter, width = 430 }: { onFilter: () => void; width?: number }) {
   const PLAN = useP();
   const chartW = Math.max(300, width - 44);
   const legend = [["Build", C.yellow], ["Build More", C.orange], ["Climb", C.rouge], ["Peak", "#4A4C4A"]] as const;
+  // Richer weekly-load breakdown so the overview is more than just a chart.
+  const loads: number[] = (PLAN.weeklyLoad ?? []).map((v: any) => Number(v) || 0);
+  const here = PLAN.youAreHere ?? 0;
+  const total = loads.reduce((a, b) => a + b, 0);
+  const avg = loads.length ? Math.round(total / loads.length) : 0;
+  const peak = loads.length ? Math.max(...loads) : 0;
+  const peakWeek = loads.indexOf(peak) + 1;
+  const thisWeek = loads[here] ?? 0;
+  const done = loads.slice(0, here).reduce((a, b) => a + b, 0);
+  const stats: [string, string][] = [
+    ["THIS WEEK", `${thisWeek} TSS`],
+    ["AVG / WEEK", `${avg} TSS`],
+    [`PEAK · WK ${peakWeek}`, `${peak} TSS`],
+    ["COMPLETED", `${Math.round(total ? (done / total) * 100 : 0)}%`],
+  ];
   return (
     <View style={[s.card, { flex: 1 }]} testID="weekly-load">
       <View style={s.cardHeadRow}>
@@ -428,6 +479,14 @@ export function WeeklyLoadCard({ onFilter, width = 430 }: { onFilter: () => void
       <View style={s.legend}>
         {legend.map(([lbl, col]) => (
           <View key={lbl} style={s.legendItem}><View style={[s.legendDot, { backgroundColor: col }]} /><Text style={s.legendText}>{lbl}</Text></View>
+        ))}
+      </View>
+      <View style={s.wlStats} testID="weekly-load-stats">
+        {stats.map(([lbl, val]) => (
+          <View key={lbl} style={s.wlStat}>
+            <Text style={s.wlStatVal}>{val}</Text>
+            <Text style={s.wlStatLbl}>{lbl}</Text>
+          </View>
         ))}
       </View>
     </View>
@@ -466,7 +525,7 @@ export function KeyWorkoutsCard({ onView, onWorkout, onNext }: { onView: () => v
         </Pressable>
       </View>
       <View style={s.woRow}>
-        {PLAN.workouts.map((w) => (
+        {PLAN.workouts.filter((w) => (!w.type || w.type === "cycling") && Array.isArray(w.profile)).map((w) => (
           <View key={w.id} style={{ flex: 1 }}><KeyWorkoutCard w={w} onPress={() => onWorkout(w)} /></View>
         ))}
         <Pressable testID="workouts-next" onPress={onNext} style={({ hovered }: any) => [s.nextBtn, hovered && s.secBtnHover]} accessibilityLabel="More workouts">
@@ -754,6 +813,23 @@ const s = StyleSheet.create({
   legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },
   legendDot: { width: 10, height: 10, borderRadius: 3 },
   legendText: { color: C.dim, fontSize: 11 },
+  wlStats: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.borderSoft },
+  wlStat: { flexGrow: 1, minWidth: 78, backgroundColor: "rgba(255,255,255,0.03)", borderWidth: 1, borderColor: C.borderSoft, borderRadius: 11, paddingVertical: 9, paddingHorizontal: 11 },
+  wlStatVal: { color: C.white, fontSize: 16, fontWeight: "900" },
+  wlStatLbl: { color: C.dim, fontSize: 9.5, fontWeight: "800", letterSpacing: 0.5, marginTop: 2 },
+  phaseRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "rgba(255,255,255,0.02)", borderWidth: 1, borderColor: C.borderSoft, borderRadius: 13, padding: 12, marginTop: 10 },
+  phaseRowActive: { borderColor: "rgba(255,194,10,0.5)", backgroundColor: "rgba(255,194,10,0.06)" },
+  phaseRowNum: { width: 32, height: 32, borderRadius: 9, borderWidth: 1, borderColor: C.border, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.03)" },
+  phaseRowNumText: { color: C.dim, fontSize: 14, fontWeight: "800" },
+  phaseRowHead: { flexDirection: "row", alignItems: "center", gap: 8 },
+  phaseRowName: { color: C.dim, fontSize: 14, fontWeight: "800", flexShrink: 1 },
+  phaseRowChip: { backgroundColor: C.yellow, borderRadius: 999, paddingVertical: 2, paddingHorizontal: 8 },
+  phaseRowChipText: { color: "#241B00", fontSize: 8.5, fontWeight: "900", letterSpacing: 0.4 },
+  phaseRowWeeks: { color: C.dim, fontSize: 11, marginLeft: "auto" },
+  phaseRowObjective: { color: C.white, fontSize: 12, lineHeight: 17, marginTop: 4 },
+  phaseRowTrack: { height: 5, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.08)", overflow: "hidden", marginTop: 8 },
+  phaseRowFill: { height: "100%", borderRadius: 3 },
+  phaseRowPct: { fontSize: 13, fontWeight: "800", minWidth: 34, textAlign: "right" },
 
   // workouts
   woRow: { flexDirection: "row", gap: 10, alignItems: "stretch" },

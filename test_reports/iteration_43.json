@@ -1,0 +1,46 @@
+{
+  "summary": "Iteration 43 — PHASE 2 Training Plan deep-dives. BACKEND (14/14 pytest pass — /app/backend/tests/test_iter43_phase2_training.py): (1) GET /api/plan returns 4 phases exactly ['Get Moving','Build the Foundation','Extend Your Endurance','Road Ready'], every phase carries a non-empty `objective` string, phase 1 active=true and phases 2-4 active=false. (2) POST /api/coach/adaptation/detail (Alberto/male, plan_id=couch-to-road, refresh=true) returns {detail:{summary,factors,adjustments}, cached:false} with 3-4 factors (each having label+detail non-empty), 2-3 adjustments (non-empty strings), and grounded copy that mentions plan/phase/goals/rides. A follow-up call without refresh returns cached:true with identical detail; a further refresh:true regenerates (cached:false again). Omitting coach_gender is handled gracefully (still 200 + valid detail). (3) rider_appearance is user-scoped — GET returns doc with user_id=user_greenlantern; PUT {bikeType:'tt'} updates and subsequent GET reflects it; a freshly-registered temp user sees default {bikeType:'road'} with their own user_id (isolation confirmed); GL appearance restored to defaults afterwards. FRONTEND (landscape 1024x720, real GL login): (4) Phases tab — phases-detail card renders all 4 phases with objectives, CURRENT chip on Get Moving, phase-row-p1..p4 all present; tapping phase-row-p1 opens phase-detail-p1 modal listing all 4 phases with progress % and objectives; Close (aria-label) dismisses. (5) Key Workouts tab — 3 workout-* cards; tapping workout-ctr-ride-1 does NOT navigate (url stayed /plan) and opens KeyWorkoutDetailModal with header 'Welcome Ride · Week 1 · Tue', RPE/duration/TSS chips, workout profile bars, WORKOUT STEPS list (Settle In/Build the Rhythm/Easy Riding/Posture and Flow/Easy Finish), and 'Open in Training' primary button with testID workout-detail-open. (6) Adaptations tab — adaptations card visible, 'View All Adaptations' (view-adaptations) opens modal; the LLM-generated adaptation-reasoning block loaded within ~5s, titled 'WHY ALBERTO ADJUSTED YOUR PLAN', containing a summary + 4 factor bullets ('Zero workouts completed', 'Recent outdoor sessions show good capacity', 'Smooth cadence and pacing goal is lagging', 'Three rides per week goal in progress but no indoor sessions yet') and a 'WHAT CHANGED' section, ABOVE the adaptation history. (7) Load & Progress tab — WeeklyLoadCard renders with weekly-load-stats row showing '70 TSS · THIS WEEK', '118 TSS · AVG / WEEK', '195 TSS · PEAK · WK 15', '3% · COMPLETED'. GL environment left pristine: appearance={riderType:younger_male,bikeType:road,clothingStyle:get_fit}, coach_id=alberto.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/plan Load & Progress", "issues": ["Stat labels render uppercase 'AVG / WEEK' and 'PEAK · WK 15' — semantically match the spec's 'Avg per Week' and 'Peak' but the exact wording differs. Cosmetic; no fix needed unless main agent wants strict wording match."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter43_phase2_training.py",
+    "/app/test_reports/pytest/iter43.xml",
+    "/app/test_reports/screens/iter43_plan_overview.jpeg",
+    "/app/test_reports/screens/iter43_phases_tab.jpeg",
+    "/app/test_reports/screens/iter43_phase_detail.jpeg",
+    "/app/test_reports/screens/iter43_workout_detail.jpeg",
+    "/app/test_reports/screens/iter43_adaptations_modal.jpeg",
+    "/app/test_reports/screens/iter43_load_progress.jpeg"
+  ],
+  "action_items": [
+    "Optional: align WeeklyLoadCard stat labels with the review request wording ('Avg per Week' vs current 'AVG / WEEK'). Functionality is correct; purely cosmetic.",
+    "Optional (not in this iteration's scope): AppearanceUpdate schema only exposes riderType/bikeType/clothingStyle — the review request example {skin_tone:'medium'} is not a supported field. If main agent intended richer appearance fields, extend the model; otherwise the example was illustrative only."
+  ],
+  "critical_code_review_comments": [
+    "server.py _ctr_plan_response (~line 2495) correctly emits each phase with objective read from CTR_PLAN.phases[i].objective; when the shipped JSON is missing a phase's objective the code falls back to '' — the current data has all 4 objectives populated, so guard against future regressions by asserting non-empty (already covered by pytest).",
+    "server.py POST /api/coach/adaptation/detail (~line 2769-2802) correctly: (a) computes plan overlay with computed CTR/RS/RB fields, (b) reads cache key adaptation_detail_<coach>, (c) short-circuits when refresh=false and cache exists, (d) writes cache and returns cached:false on regenerate. LLM JSON parsing strips code fences and isolates the outer {...} — robust.",
+    "auth.py USER_SCOPED now includes 'rider_appearance' (line 44) so all rider_appearance find_one/update_one calls auto-inject user_id via _ScopedCollection — verified end-to-end by the isolation test.",
+    "plan-modals.tsx AdaptationsModal calls fetchAdaptationDetail on open, renders adaptation-reasoning above the history, and correctly falls back if detail is null. LLM latency observed ~5-6s on the preview (well under the ~20s allowance).",
+    "plan.tsx PhasesDetailCard renders CURRENT chip via active flag; phase-row-<id> testIDs are correct; PhaseDetailModal receives full phases[] and correctly highlights the active one.",
+    "KeyWorkoutDetailModal opens on card tap without touching router — confirmed no navigation to workouts/routes; button testID workout-detail-open is present and takes the user to /training when tapped."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter43_phase2_training.py (new — 14 pytest cases)"
+  ],
+  "success_rate": {
+    "backend": "100% (14/14 tests pass)",
+    "frontend": "100% (Phases card+modal, Key Workouts modal without nav, Adaptations reasoning modal with WHY/WHAT CHANGED, Weekly Load stats row — all verified)"
+  },
+  "seed_data_creation": "One ephemeral user tmp_iter43_<hex>@roujaune.app created to verify user-scoping of rider_appearance, then deleted via /api/account. Green Lantern rider_appearance restored to defaults (bikeType=road, riderType=younger_male, clothingStyle=get_fit). coach_id remains 'alberto'. No plan progress or ride data mutated.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Reuse /app/backend/tests/test_iter43_phase2_training.py for regression on phase objectives, /api/coach/adaptation/detail refresh/cache/groundedness, and rider_appearance user-scoping. Frontend testIDs of interest on /plan: tab-Overview, tab-Phases, tab-'Key Workouts', tab-Adaptations, tab-'Load & Progress'; phases-detail, phase-row-p1..p4, phase-detail-p1..p4; key-workouts, workout-<id>, workout-detail-open; adaptations, view-adaptations, adaptation-reasoning; weekly-load, weekly-load-stats. Server date 2026-07-26, phase 1 active. LLM adaptation-detail typically resolves in ~5s but allow up to 20s.",
+  "rca_of_issue": "N/A — feature verification iteration, all Phase 2 items work end-to-end. Only a minor cosmetic label-wording difference on the Weekly Load stats row; not a bug."
+}

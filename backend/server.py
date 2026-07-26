@@ -2492,7 +2492,7 @@ def _ctr_plan_response(cur, ride_map, prog, weeks=None, plan_doc=None, plan_id="
             pct, active = round((week_in_phase - 1) / 4 * 100), True
         else:
             pct, active = 0, False
-        phases.append({"id": f"p{n}", "number": n, "name": p["name"], "weeks": p.get("weeks_label", ""), "pct": pct, "active": active, "points": _PHASE_POINTS.get(n, [])})
+        phases.append({"id": f"p{n}", "number": n, "name": p["name"], "weeks": p.get("weeks_label", ""), "pct": pct, "active": active, "objective": p.get("objective", ""), "points": _PHASE_POINTS.get(n, [])})
     level = pdoc.get("level") or ("Beginner" if is_ctr else "Intermediate")
     if is_ctr:
         weekly_load = [55, 70, 90, 65, 100, 115, 130, 90, 120, 140, 160, 110, 150, 170, 195, 120]
@@ -2690,6 +2690,116 @@ async def coach_adaptation(req: AdaptationRequest):
     except Exception as e:
         logging.exception("coach_adaptation failed")
         raise HTTPException(status_code=502, detail=f"Adaptation generation failed: {e}")
+
+
+async def _generate_adaptation_detail(plan: dict, coach_name: str, coach_gender: str) -> dict:
+    """Ask the LLM to explain HOW the current adaptation was derived, returning a
+    structured breakdown (summary + reasoning factors + concrete adjustments)."""
+    key = os.environ.get("EMERGENT_LLM_KEY")
+    if not key:
+        raise RuntimeError("Coaching model not configured")
+
+    prog = plan.get("progress", {})
+    phase = plan.get("phase", {})
+    goals_txt = ", ".join(
+        f"{g.get('title')} ({'achieved' if g.get('status') == 'complete' else 'in progress'})"
+        for g in plan.get("goals", [])
+    ) or "n/a"
+    # Recent ride execution (grounds the reasoning in real sessions).
+    rides_txt = "none logged yet"
+    try:
+        recent = await udb.ride_history.find().sort("created_at", -1).to_list(length=4)
+        parts = []
+        for r in recent:
+            parts.append(
+                f"{r.get('workout') or r.get('route') or 'Ride'} — {round((r.get('duration_sec') or 0)/60)} min, "
+                f"{r.get('avg_power') or '—'} W avg, {r.get('tss') or 0} TSS"
+            )
+        if parts:
+            rides_txt = "; ".join(parts)
+    except Exception:
+        pass
+    # Per-zone execution bias (auto-tuned targets) if present.
+    zbias = plan.get("zone_bias") or {}
+    zbias_txt = ", ".join(f"{z} {'+' if v > 0 else ''}{v}%" for z, v in zbias.items() if v) or "no per-zone changes"
+
+    prompt = (
+        f"Rider plan: '{plan.get('title')}'. Current phase: {phase.get('name')} ({phase.get('weeks')}), "
+        f"week {plan.get('current_week')} of {plan.get('duration_weeks')}.\n"
+        f"Progress: {prog.get('workouts')} workouts, {prog.get('time')} ridden, {prog.get('tss')} TSS, "
+        f"fitness CTL {prog.get('ctl')}, fatigue ATL {prog.get('atl')}, form TSB {prog.get('tsb')}.\n"
+        f"Goals: {goals_txt}.\n"
+        f"Recent sessions: {rides_txt}.\n"
+        f"Automatic per-zone target changes: {zbias_txt}.\n\n"
+        "As the rider's coach, explain HOW you arrived at their current plan adaptation. "
+        "Reply with ONLY valid minified JSON (no markdown, no code fences) of the shape: "
+        '{"summary": string, "factors": [{"label": string, "detail": string}], "adjustments": [string]}. '
+        "Give 3-4 factors — each grounds the decision in something concrete (a completed workout or streak, "
+        "progress or lack of progress in a zone, fatigue/form, an achieved or lagging goal). "
+        "Give 2-3 adjustments describing the concrete changes made to upcoming training (zones, volume, recovery). "
+        "Warm, first person, specific, no emojis."
+    )
+
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    chat = LlmChat(
+        api_key=key,
+        session_id=f"{coach_name.lower()}-adaptation-detail",
+        system_message=coach_system(coach_name, coach_gender),
+    ).with_model("anthropic", "claude-sonnet-4-6")
+    reply = await chat.send_message(UserMessage(text=prompt))
+    raw = (reply or "").strip()
+    # Strip any accidental code fences and isolate the JSON object.
+    if raw.startswith("```"):
+        raw = raw.strip("`")
+        raw = raw[raw.find("{"):] if "{" in raw else raw
+    start, end = raw.find("{"), raw.rfind("}")
+    if start >= 0 and end > start:
+        raw = raw[start:end + 1]
+    data = json.loads(raw)
+    return {
+        "summary": str(data.get("summary", "")).strip(),
+        "factors": [
+            {"label": str(f.get("label", "")).strip(), "detail": str(f.get("detail", "")).strip()}
+            for f in (data.get("factors") or []) if isinstance(f, dict)
+        ][:4],
+        "adjustments": [str(a).strip() for a in (data.get("adjustments") or [])][:3],
+    }
+
+
+@api_router.post("/coach/adaptation/detail")
+async def coach_adaptation_detail(req: AdaptationRequest):
+    """Detailed, AI-generated breakdown of HOW the coach derived the current plan
+    adaptation (reasoning factors + concrete adjustments). Cached per plan+coach."""
+    if not os.environ.get("EMERGENT_LLM_KEY"):
+        raise HTTPException(status_code=503, detail="Coaching model not configured")
+    plan = await udb.training_plans.find_one({"id": req.plan_id})
+    if not plan:
+        await udb.training_plans.update_one({"id": req.plan_id}, {"$set": BUILD_AND_CLIMB}, upsert=True)
+        plan = dict(BUILD_AND_CLIMB)
+    # Ground structured plans in their COMPUTED phase/progress (the training_plans
+    # doc alone is sparse for couch-to-road / ride-stronger / ride-beyond).
+    if req.plan_id in ("couch-to-road", "ride-stronger", "ride-beyond"):
+        try:
+            computed = await get_plan(id=req.plan_id)
+            if isinstance(computed, dict):
+                plan = {**plan, **computed}
+        except Exception:
+            pass
+    cache_key = f"adaptation_detail_{req.coach_name.lower()}"
+    if not req.refresh and plan.get(cache_key):
+        return {"detail": plan[cache_key], "cached": True}
+    try:
+        detail = await _generate_adaptation_detail(plan, req.coach_name, req.coach_gender)
+        try:
+            await udb.training_plans.update_one(
+                {"id": req.plan_id}, {"$set": {cache_key: detail, f"{cache_key}_at": now_iso()}}
+            )
+        except Exception:
+            logging.warning("adaptation detail cache write failed")
+        return {"detail": detail, "cached": False}
+    except Exception as e:
+        logging.exception("coach_adaptation_detail failed")
+        raise HTTPException(status_code=502, detail=f"Adaptation detail failed: {e}")
 
 
 @api_router.get("/plan/adaptations")
