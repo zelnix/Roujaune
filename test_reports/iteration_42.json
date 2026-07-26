@@ -1,0 +1,47 @@
+{
+  "summary": "Iteration 42 (hero phase-kicker + dated workouts + user-scoped rider_prefs). BACKEND (9/9 pytest pass — /app/backend/tests/test_iter42_hero_prefs.py): GET /api/plan for Green Lantern now returns hero={week:1, phase_number:1, phase_name:'Get Moving', week_in_phase:1, is_phase_start:true}, every workouts[] entry carries date + date_label + is_today, and the FIRST incomplete workout is the strength session 'Beginner Cycling Strength' with date='2026-07-27' and date_label='Mon 27 Jul' — the 'follow all workout types' fix is verified. GET /api/rider/prefs returns full shape {coach_id, coach_style, voice_guidance, speech_rate} with default coach_id='alberto'. PUT /api/rider/prefs {coach_id:'adriana'} updates and a subsequent GET returns 'adriana'. Confirmed user-scoping by registering a fresh temp user in parallel — they see coach_id='alberto' while Green Lantern is on 'adriana'. Finally restored Green Lantern to coach_id='alberto'. FRONTEND (landscape 1024x720): alberto-coach-card hero renders phase kicker 'START OF PHASE 1 · GET MOVING', headline 'Beginner Cycling Strength', support line 'Mon 27 Jul · Strength · ~15 min', message + calendar buttons; home-view-calendar navigates to /calendar. Weather area shows 26°C, place 'Nice, France' (home-location fallback since web has no GPS) and today's date. today-training-card renders to the RIGHT of hero with workout steps + 'Open Today's Training' button (open-today-training). Cards row: training-plan-card, progress-card (no progress-achievements strip — count=0 ✓), standalone achievement-card, community-card, wellness-card; calendar-card is GONE (count=0 ✓). Coach persistence E2E on /settings: tapping data-testid=coach-adriana → reload / → hero + card show 'Adriana' with matching portrait; tap coach-alberto → reload → back to 'Alberto'. GL environment pristine: assigned_plan_id=couch-to-road, rider_prefs.coach_id='alberto', rider_prs=0, ride_history=8 (pre-existing), no lingering tmp_iter42 users.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/", "issues": ["Hero weather date displays 'Sunday, July 26' (month-name, day) but the review request example used the format 'Sunday, 26 July' (day, month-name). Cosmetic — main agent may want to align the format if strict."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter42_hero_prefs.py",
+    "/app/test_reports/pytest/iter42.xml",
+    "/app/test_reports/screens/iter42_home_landscape.jpeg",
+    "/app/test_reports/screens/iter42_settings.jpeg",
+    "/app/test_reports/screens/iter42_home_adriana.jpeg"
+  ],
+  "action_items": [
+    "Optional: align hero weather date format with the review request example ('Sunday, 26 July' vs current 'Sunday, July 26'). Everything else in the request is implemented correctly.",
+    "Optional: rider_appearance is NOT listed in USER_SCOPED in /app/backend/auth.py (only rider_prefs was added). It queries `find_one({'id':'me'})` without user_id and would collide across users. If per-user appearance is intended, add 'rider_appearance' to USER_SCOPED. Not part of this iteration's scope but worth noting."
+  ],
+  "critical_code_review_comments": [
+    "server.py::_ctr_plan_response now computes phase_idx=(cur-1)//4+1 and week_in_phase=((cur-1)%4)+1, and looks up phase_name from CTR_PLAN.phases — deterministic and matches spec (week=1 → phase 1 Get Moving, week_in_phase=1, is_phase_start=True).",
+    "_mk_workout attaches date via _week_start(wknum)+timedelta(days=day_pos) and formats date_label with %a %-d %b — verified 'Mon 27 Jul' matches week1.start_date '2026-07-27'.",
+    "rider_prefs is correctly registered in USER_SCOPED (auth.py:44) so udb.rider_prefs auto-injects user_id, making prefs per-user. GET seeds defaults on first call; PUT does upsert with $set including user_id. Clean.",
+    "AlbertoCoachCard.tsx: hero-phase-kicker testID present (line 59), home-message-coach (line 84) and home-view-calendar (line 96) buttons wired.",
+    "TodayTrainingCard.tsx: today-training-card testID (line 57) + open-today-training button (line 111) as spec'd; renders to right of hero on wide viewports.",
+    "app/index.tsx: correct card layout — mid row has training-plan-card + progress-card + achievement-card (standalone), bottom row has community-card + wellness-card, no calendar-card mounted. progress-achievements strip is NOT rendered inside progress-card (confirmed count=0 in DOM).",
+    "Coach persona lookup in HeroRoute/AlbertoCoachCard reads coach_id from GET /api/rider/prefs on mount and rerenders with the fetched persona — verified end-to-end: switching to Adriana via /settings and reloading updates hero portrait, name, and 'Personalised cycling training with Adriana.' subtitle."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter42_hero_prefs.py (new — 9 pytest cases)"
+  ],
+  "success_rate": {
+    "backend": "100% (9/9 tests pass)",
+    "frontend": "100% (hero kicker/headline/support/date/buttons, weather area, today-training-card + open-today-training, cards row layout incl. calendar-card removed, coach persistence E2E — all verified)"
+  },
+  "seed_data_creation": "One ephemeral user tmp_iter42_<hex>@roujaune.app created to verify user-scoping of rider_prefs, then removed via /api/account + manual sweep across users/user_sessions/rider_prefs. Verified 0 lingering tmp_iter42_* users at end. Green Lantern coach_id restored to 'alberto', assigned_plan_id=couch-to-road unchanged, rider_prs=0, ride_history=8 (pre-existing).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Reuse /app/backend/tests/test_iter42_hero_prefs.py for regression on hero object shape/values + workouts[] date/date_label/is_today + rider_prefs GET/PUT + user-scoping. Frontend testIDs of interest: alberto-coach-card, hero-phase-kicker, home-message-coach, home-view-calendar, today-training-card, open-today-training, training-plan-card, progress-card, achievement-card, community-card, wellness-card. On /settings: coach-alberto, coach-adriana select the companion coach. Login testIDs on /login: email-input, password-input, then click text 'Sign in'. Server date is 2026-07-26 (BEFORE week-1 start 2026-07-27), so first incomplete workout is strength 'Beginner Cycling Strength' on Mon 27 Jul; if server date advances, expected first workout may change.",
+  "rca_of_issue": "N/A — feature verification iteration, no bugs found."
+}

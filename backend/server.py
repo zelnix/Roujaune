@@ -1090,6 +1090,41 @@ async def update_rider_appearance(req: AppearanceUpdate):
     return doc
 
 
+# ---- Rider preferences (coach persona + coaching style) — persisted per user
+#      so the chosen companion coach stays consistent across every session/device.
+PREFS_DEFAULT = {"id": "me", "coach_id": "alberto", "coach_style": "balanced", "voice_guidance": "full", "speech_rate": 0.95}
+
+
+class PrefsUpdate(BaseModel):
+    coach_id: Optional[str] = None
+    coach_style: Optional[str] = None
+    voice_guidance: Optional[str] = None
+    speech_rate: Optional[float] = None
+
+
+@api_router.get("/rider/prefs")
+async def get_rider_prefs():
+    doc = await udb.rider_prefs.find_one({"id": "me"})
+    if not doc:
+        doc = dict(PREFS_DEFAULT)
+        await udb.rider_prefs.insert_one(dict(doc))
+    doc.pop("_id", None)
+    for k, v in PREFS_DEFAULT.items():
+        doc.setdefault(k, v)
+    return doc
+
+
+@api_router.put("/rider/prefs")
+async def update_rider_prefs(req: PrefsUpdate):
+    upd = {k: v for k, v in req.dict().items() if v is not None}
+    await udb.rider_prefs.update_one({"id": "me"}, {"$set": {**upd, "id": "me"}}, upsert=True)
+    doc = await udb.rider_prefs.find_one({"id": "me"})
+    doc.pop("_id", None)
+    for k, v in PREFS_DEFAULT.items():
+        doc.setdefault(k, v)
+    return doc
+
+
 # ---- Personal Records (Best Time / avg power per scenic route + segments) ----
 class SegmentSplit(BaseModel):
     label: str
@@ -2394,6 +2429,10 @@ def _ctr_plan_response(cur, ride_map, prog, weeks=None, plan_doc=None, plan_id="
              "title": d.get("title", ""), "type": kind,
              "duration": d.get("duration", ""),
              "footer": f"Week {wknum} \u2022 {d.get('day_name', '').capitalize()}"}
+        if dt is not None:
+            w["date"] = dt.isoformat()
+            w["date_label"] = dt.strftime("%a %-d %b")
+            w["is_today"] = (dt == today)
         if kind == "cycling":
             done = d.get("workout_id") in ride_ids
             act = ride_map.get(d.get("workout_id")) or {}
@@ -2476,6 +2515,13 @@ def _ctr_plan_response(cur, ride_map, prog, weeks=None, plan_doc=None, plan_id="
         "phases": phases,
         "weekly_load": weekly_load,
         "you_are_here": cur, "workouts": workouts,
+        "hero": {
+            "week": cur,
+            "phase_number": phase_idx,
+            "phase_name": next((p["name"] for p in pdoc.get("phases", []) if p["number"] == phase_idx), ""),
+            "week_in_phase": week_in_phase,
+            "is_phase_start": week_in_phase == 1,
+        },
         "plan_complete": plan_complete,
         "adaptation": f"Week {cur} \u2014 {week['title']}. {week['objective']}",
         "adaptation_status": f"{level} plan \u2014 week {cur} of {dw}",

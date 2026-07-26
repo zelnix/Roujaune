@@ -41,7 +41,7 @@ USER_SCOPED = {
     "rider_profile", "plan_state", "ride_history", "supplementary_log",
     "training_plans", "coach_chats", "connected_accounts", "workout_sessions",
     "scheduled_workouts", "daily_checkins", "workout_prefs", "cycling_activities",
-    "settings", "calendar_weeks", "rider_prs",
+    "settings", "calendar_weeks", "rider_prs", "rider_prefs",
 }
 
 # Public HTTP paths (no auth required).

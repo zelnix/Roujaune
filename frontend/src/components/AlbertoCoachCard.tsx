@@ -7,30 +7,35 @@ import { colors, radius, spacing } from "../theme";
 import { coach } from "../data";
 import { useCoach } from "../lib/coach-persona";
 import { usePlan } from "../lib/plan";
-import { useCalendarWeek } from "../lib/calendar";
 import { PrimaryButton } from "./ui";
 
-export function AlbertoCoachCard({ width, onStart, onMessage, compact = false }: { width: number; onStart: () => void; onMessage?: () => void; compact?: boolean }) {
+const KIND_LABEL: Record<string, string> = { recovery: "Recovery", rest: "Rest", strength: "Strength", balance: "Balance", mobility: "Mobility", cycling: "" };
+
+export function AlbertoCoachCard({ width, onStart, onMessage, onCalendar, compact = false }: { width: number; onStart: () => void; onMessage?: () => void; onCalendar?: () => void; compact?: boolean }) {
   const persona = useCoach();
   const { plan } = usePlan();
-  const { week } = useCalendarWeek();
+  // The next scheduled activity of ANY type (ride, strength, recovery, rest…).
   const next = (plan.workouts?.find((w) => !w.completed) ?? plan.workouts?.[0]) as any;
 
-  // Reflect TODAY's actual scheduled activity (any type), not just the next ride.
-  const hasWeek = !!week?.days?.length;
-  const today = hasWeek ? week.days.find((d: any) => d.date === week.selected_date) : null;
-  const todaySession: any = today ? (today.cycling ?? today.fb50 ?? today.wellness ?? null) : null;
-  const isRest = hasWeek && !todaySession;
-  const kindLabel = todaySession?.type === "fb50" ? "Strength" : todaySession?.type === "wellness" ? "Recovery" : "";
+  const isRest = next?.type === "rest";
+  const kindLabel = KIND_LABEL[next?.type ?? "cycling"] ?? "";
+  const dayLabel = next?.is_today ? "Today" : (next?.date_label ?? "");
+  const headline = isRest ? "Rest & Recovery" : (next?.title ?? coach.quote);
+  const support = next
+    ? [dayLabel, kindLabel, next.duration, next.type === "cycling" ? next.zone : null, next.type === "cycling" ? next.tss : null]
+        .filter(Boolean).join(" · ")
+    : coach.support;
 
-  const headline = todaySession?.title ?? (isRest ? "Rest Day" : (next?.title ?? coach.quote));
-  const support = todaySession
-    ? `Today${kindLabel ? ` · ${kindLabel}` : ""} · ${todaySession.duration}${todaySession.zone ? ` · ${todaySession.zone}` : ""}`
-    : isRest
-      ? (next ? `Your next workout is ${next.title} · ${next.duration}` : "Recovery day — rest up and come back strong.")
-      : next ? `Next up · ${next.duration} · ${next.zone}${next.footer ? ` · ${next.footer}` : ""}` : coach.support;
+  // Phase / week acknowledgment kicker.
+  const h = plan.hero;
+  const heroKicker = h
+    ? (h.is_phase_start
+        ? `START OF PHASE ${h.phase_number} · ${(h.phase_name || "").toUpperCase()}`
+        : `PHASE ${h.phase_number} · ${h.phase_name} · WEEK ${h.week_in_phase}`)
+    : null;
+
   const cta = isRest ? "View Today's Plan" : "View Today's Workout";
-  const portraitW = compact ? 108 : 150;
+  const portraitW = compact ? 108 : 138;
   return (
     <LinearGradient
       testID="alberto-coach-card"
@@ -50,6 +55,12 @@ export function AlbertoCoachCard({ width, onStart, onMessage, compact = false }:
       </View>
 
       <View style={[styles.body, compact && { padding: spacing.sm }]}>
+        {heroKicker ? (
+          <View style={styles.kickerRow} testID="hero-phase-kicker">
+            <Ionicons name={h?.is_phase_start ? "flag" : "calendar-outline"} size={11} color={colors.red} />
+            <Text style={styles.kicker} numberOfLines={1}>{heroKicker}</Text>
+          </View>
+        ) : null}
         <View style={styles.headRow}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.name, compact && { fontSize: 15 }]}>{persona.name}</Text>
@@ -58,8 +69,8 @@ export function AlbertoCoachCard({ width, onStart, onMessage, compact = false }:
           <Text style={[styles.quoteMark, compact && { fontSize: 34, lineHeight: 34 }]}>&#8220;</Text>
         </View>
 
-        <Text style={[styles.quote, compact && { fontSize: 18, lineHeight: 21 }]}>{headline}</Text>
-        <Text style={[styles.support, compact && { fontSize: 11, lineHeight: 15, marginTop: 5 }]}>{support}</Text>
+        <Text style={[styles.quote, compact && { fontSize: 18, lineHeight: 21 }]} numberOfLines={2}>{headline}</Text>
+        <Text style={[styles.support, compact && { fontSize: 11, lineHeight: 15, marginTop: 5 }]} numberOfLines={2}>{support}</Text>
 
         <PrimaryButton
           testID="start-ride-button"
@@ -67,18 +78,32 @@ export function AlbertoCoachCard({ width, onStart, onMessage, compact = false }:
           onPress={onStart}
           style={{ marginTop: spacing.sm, alignSelf: "stretch" }}
         />
-        {onMessage ? (
-          <Pressable
-            testID="home-message-coach"
-            onPress={onMessage}
-            accessibilityRole="button"
-            accessibilityLabel={`Message ${persona.name}`}
-            style={({ hovered }: any) => [styles.msgBtn, hovered && styles.msgBtnHover]}
-          >
-            <Ionicons name="chatbubble-ellipses-outline" size={15} color={colors.yellow} />
-            <Text style={styles.msgText}>Message {persona.name}</Text>
-          </Pressable>
-        ) : null}
+        <View style={styles.linkRow}>
+          {onMessage ? (
+            <Pressable
+              testID="home-message-coach"
+              onPress={onMessage}
+              accessibilityRole="button"
+              accessibilityLabel={`Message ${persona.name}`}
+              style={({ hovered }: any) => [styles.msgBtn, hovered && styles.msgBtnHover]}
+            >
+              <Ionicons name="chatbubble-ellipses-outline" size={15} color={colors.yellow} />
+              <Text style={styles.msgText} numberOfLines={1}>Message</Text>
+            </Pressable>
+          ) : null}
+          {onCalendar ? (
+            <Pressable
+              testID="home-view-calendar"
+              onPress={onCalendar}
+              accessibilityRole="button"
+              accessibilityLabel="View calendar"
+              style={({ hovered }: any) => [styles.msgBtn, hovered && styles.msgBtnHover]}
+            >
+              <Ionicons name="calendar-outline" size={15} color={colors.yellow} />
+              <Text style={styles.msgText} numberOfLines={1}>Calendar</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
     </LinearGradient>
   );
@@ -93,16 +118,19 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     minHeight: 190,
   },
-  portraitWrap: { width: 150, alignSelf: "stretch", minHeight: 190 },
+  portraitWrap: { width: 138, alignSelf: "stretch", minHeight: 190 },
   portrait: { width: "100%", height: "100%" },
   body: { flex: 1, padding: spacing.md, justifyContent: "center" },
+  kickerRow: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 4 },
+  kicker: { color: colors.red, fontSize: 10.5, fontWeight: "900", letterSpacing: 0.6, flex: 1 },
   headRow: { flexDirection: "row", alignItems: "flex-start" },
   name: { color: colors.yellow, fontSize: 18, fontWeight: "800" },
   role: { color: colors.textDim, fontSize: 12, marginTop: 1 },
   quoteMark: { color: colors.gold, fontSize: 46, lineHeight: 46, fontWeight: "800", marginTop: -6 },
-  quote: { color: colors.white, fontSize: 24, fontWeight: "800", lineHeight: 27, marginTop: 2 },
+  quote: { color: colors.white, fontSize: 23, fontWeight: "800", lineHeight: 26, marginTop: 2 },
   support: { color: colors.textDim, fontSize: 12.5, lineHeight: 17, marginTop: 8, marginBottom: 4 },
-  msgBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, marginTop: 8, borderWidth: 1, borderColor: "rgba(255,194,10,0.35)", borderRadius: radius.md, paddingVertical: 9, backgroundColor: "rgba(255,194,10,0.06)", minHeight: 40 },
+  linkRow: { flexDirection: "row", gap: 8, marginTop: 8 },
+  msgBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: "rgba(255,194,10,0.35)", borderRadius: radius.md, paddingVertical: 9, backgroundColor: "rgba(255,194,10,0.06)", minHeight: 40 },
   msgBtnHover: { backgroundColor: "rgba(255,194,10,0.14)" },
   msgText: { color: colors.yellow, fontSize: 12.5, fontWeight: "700" },
 });

@@ -49,15 +49,30 @@ let loaded = false;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 
+const PREFS_API = (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
+
 export function initCoach() {
   if (loaded) return;
   loaded = true;
+  // Local cache first (instant), then reconcile with the server so the chosen
+  // companion coach stays consistent across every session and device.
   getCoachId().then((id) => {
     if (id === "alberto" || id === "adriana") {
       current = id;
       emit();
     }
   });
+  fetch(`${PREFS_API}/api/rider/prefs`)
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => {
+      const id = d?.coach_id;
+      if ((id === "alberto" || id === "adriana") && id !== current) {
+        current = id;
+        setCoachId(id);
+        emit();
+      }
+    })
+    .catch(() => {});
 }
 
 export function getCoach(): CoachId {
@@ -68,6 +83,12 @@ export function setCoach(id: CoachId) {
   if (current === id) return;
   current = id;
   setCoachId(id);
+  // Persist server-side so the choice follows the rider everywhere.
+  fetch(`${PREFS_API}/api/rider/prefs`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ coach_id: id }),
+  }).catch(() => {});
   emit();
 }
 

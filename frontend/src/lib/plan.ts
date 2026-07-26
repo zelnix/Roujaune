@@ -29,6 +29,7 @@ function normalize(d: any): TrainingPlan {
     progress: d.progress ?? PLAN.progress,
     weekTargets: d.week_targets ?? d.weekTargets ?? PLAN.weekTargets,
     autoAdjustment: d.auto_adjustment ?? d.autoAdjustment ?? undefined,
+    hero: d.hero ?? PLAN.hero,
     tip: d.tip ?? PLAN.tip,
   };
 }

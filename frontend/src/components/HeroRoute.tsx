@@ -4,9 +4,11 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing, textShadow } from "../theme";
-import { brand, heroRoute } from "../data";
+import { brand } from "../data";
 import { useCoach } from "../lib/coach-persona";
 import { useRiderProfile } from "../lib/rider-profile";
+import { useSettings } from "../lib/settings";
+import { useWeather } from "../lib/weather";
 import { BrandHeader } from "./BrandHeader";
 import { AlbertoCoachCard } from "./AlbertoCoachCard";
 import { GlassPill } from "./ui";
@@ -47,6 +49,7 @@ export function HeroRoute({
   onProfile,
   onFlame,
   onNotifications,
+  onCalendar,
   compact = false,
 }: {
   width: number;
@@ -56,10 +59,13 @@ export function HeroRoute({
   onProfile?: () => void;
   onFlame: () => void;
   onNotifications: () => void;
+  onCalendar?: () => void;
   compact?: boolean;
 }) {
   const persona = useCoach();
   const { avatar } = useRiderProfile();
+  const { settings } = useSettings();
+  const weather = useWeather({ city: settings.homeCity, lat: settings.homeLat, lon: settings.homeLon });
   return (
     <View style={[styles.wrap, { height }]} testID="hero-route">
       <Image
@@ -90,30 +96,26 @@ export function HeroRoute({
       {/* top-right status */}
       <StatusBar onFlame={onFlame} onNotifications={onNotifications} onProfile={onProfile} avatar={avatar} />
 
-      {/* right: Alberto signature + coach */}
-      <View style={[styles.signatureArea, compact && { top: "26%" }]}>
+      {/* right: coach signature + local weather + today's date */}
+      <View style={[styles.signatureArea, compact && { top: "22%" }]}>
         <Text style={[styles.signature, compact && { fontSize: 26 }]}>{persona.name}</Text>
         <Text style={styles.signatureSub}>Your Companion Coach</Text>
-      </View>
 
-      {/* right-lower weather */}
-      <View style={[styles.weatherArea, compact && { top: "50%" }]}>
         <View style={styles.weatherTop}>
-          <Ionicons name="sunny" size={compact ? 15 : 18} color={colors.yellow} />
-          <Text style={[styles.temp, compact && { fontSize: 18 }]}>{heroRoute.temp}</Text>
+          <Ionicons name={weather.icon} size={compact ? 15 : 18} color={colors.yellow} />
+          <Text style={[styles.temp, compact && { fontSize: 18 }]}>{weather.temp}</Text>
         </View>
-        <Text style={[styles.place, compact && { fontSize: 14 }]}>{heroRoute.place}</Text>
-        <Text style={styles.routeMeta}>
-          {heroRoute.distance}  <Text style={{ color: colors.textFaint }}>•</Text>  {heroRoute.elevation}
-        </Text>
+        <Text style={[styles.place, compact && { fontSize: 14 }]} numberOfLines={1}>{weather.place}</Text>
+        <Text style={styles.dateText}>{weather.dateLabel}</Text>
       </View>
 
       {/* bottom-left coaching card */}
       <View style={styles.coachArea}>
         <AlbertoCoachCard
-          width={compact ? Math.min(380, width * 0.56) : Math.min(460, width * 0.44)}
+          width={compact ? Math.min(360, width * 0.7) : Math.min(430, width * 0.66)}
           onStart={onStart}
           onMessage={onMessage}
+          onCalendar={onCalendar}
           compact={compact}
         />
       </View>
@@ -146,7 +148,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
   },
   badgeText: { color: "#fff", fontSize: 9, fontWeight: "800" },
-  signatureArea: { position: "absolute", right: spacing.xl, top: "36%", alignItems: "flex-end" },
+  signatureArea: { position: "absolute", right: spacing.xl, top: "30%", alignItems: "flex-end" },
   signature: {
     color: colors.gold,
     fontSize: 34,
@@ -155,10 +157,9 @@ const styles = StyleSheet.create({
     ...textShadow("rgba(0,0,0,0.5)", 8),
   },
   signatureSub: { color: colors.white, fontSize: 13, marginTop: -2 },
-  weatherArea: { position: "absolute", right: spacing.xl, top: "56%", alignItems: "flex-end" },
-  weatherTop: { flexDirection: "row", alignItems: "center", gap: 6 },
+  weatherTop: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 16 },
   temp: { color: colors.white, fontSize: 22, fontWeight: "800" },
   place: { color: colors.white, fontSize: 16, fontWeight: "700", marginTop: 2 },
-  routeMeta: { color: colors.textDim, fontSize: 12.5, marginTop: 3 },
+  dateText: { color: colors.textDim, fontSize: 12.5, fontWeight: "600", marginTop: 3 },
   coachArea: { position: "absolute", left: spacing.lg, bottom: spacing.lg },
 });

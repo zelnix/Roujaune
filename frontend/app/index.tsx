@@ -11,9 +11,9 @@ import { SideNavigation } from "@/src/components/SideNavigation";
 import { HeroRoute } from "@/src/components/HeroRoute";
 import { MetricSummaryStrip } from "@/src/components/MetricSummaryStrip";
 import { TrainingPlanCard } from "@/src/components/TrainingPlanCard";
-import { CalendarCard } from "@/src/components/CalendarCard";
+import { TodayTrainingCard } from "@/src/components/TodayTrainingCard";
 import { ReadinessGate } from "@/src/components/ReadinessGate";
-import { ProgressCard, CommunityCard, WellnessCard } from "@/src/components/BottomCards";
+import { ProgressCard, CommunityCard, WellnessCard, AchievementCard } from "@/src/components/BottomCards";
 import { navItems, navFooter } from "@/src/data";
 import { useCoach } from "@/src/lib/coach-persona";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
@@ -58,6 +58,7 @@ export default function Dashboard() {
   const contentWidth = width - navWidth;
   const mainWidth = contentWidth - spacing.lg * 2;
   const heroHeight = compact ? Math.max(320, Math.round(height * 0.94)) : 476;
+  const heroW = compact ? Math.round(mainWidth * 0.6) : Math.round(mainWidth * 0.64);
 
   const router = useRouter();
   const persona = useCoach();
@@ -105,16 +106,24 @@ export default function Dashboard() {
             showsVerticalScrollIndicator={false}
             testID="dashboard-scroll"
           >
-            <HeroRoute
-              width={mainWidth}
-              height={heroHeight}
-              onStart={() => router.push("/training")}
-              onMessage={() => setShowChat(true)}
-              onProfile={() => router.push("/profile")}
-              onFlame={() => setShowProgress(true)}
-              onNotifications={() => setShowNotifs(true)}
-              compact={compact}
-            />
+            <View style={[styles.heroRow, { height: heroHeight }]}>
+              <View style={{ width: heroW }}>
+                <HeroRoute
+                  width={heroW}
+                  height={heroHeight}
+                  onStart={() => router.push("/training")}
+                  onMessage={() => setShowChat(true)}
+                  onProfile={() => router.push("/profile")}
+                  onFlame={() => setShowProgress(true)}
+                  onNotifications={() => setShowNotifs(true)}
+                  onCalendar={() => router.push("/calendar")}
+                  compact={compact}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <TodayTrainingCard onOpenToday={() => router.push("/training")} onToast={showToast} />
+              </View>
+            </View>
 
             <MetricSummaryStrip />
 
@@ -129,16 +138,14 @@ export default function Dashboard() {
               <View style={styles.midCol}>
                 <ProgressCard onPress={() => router.push("/progress")} />
               </View>
-              <View style={styles.midColWide}>
-                <WellnessCard />
+              <View style={styles.midCol}>
+                <AchievementCard />
               </View>
             </View>
 
             <View style={styles.bottomRow}>
               <CommunityCard onPress={() => showToast("Joining a group ride")} />
-              <View style={styles.midColWide}>
-                <CalendarCard onToast={showToast} onOpenCalendar={() => router.push("/calendar")} onOpenToday={() => router.push("/training")} />
-              </View>
+              <WellnessCard />
             </View>
           </ScrollView>
         </View>
@@ -175,6 +182,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   midRow: { flexDirection: "row", gap: spacing.md, minHeight: 240 },
+  heroRow: { flexDirection: "row", gap: spacing.md },
   midCol: { flex: 1 },
   midColWide: { flex: 1.55 },
   bottomRow: { flexDirection: "row", gap: spacing.md },

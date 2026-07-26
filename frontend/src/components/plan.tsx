@@ -20,7 +20,7 @@ const heroImg = require("../../assets/images/hero_cyclist_b2.jpg");
 /* ── mock data (matches the reference exactly) ───────────────────────────── */
 export type PlanGoal = { id: string; title: string; description: string; status: "complete" | "incomplete" };
 export type PlanPhase = { id: string; number: number; name: string; weeks: string; pct: number; active?: boolean; points: number[] };
-export type KeyWorkout = { id: string; title: string; icon: keyof typeof Ionicons.glyphMap; duration: string; zone: string; tss: string; footer: string; color: string; profile: number[]; completed?: boolean; status?: string; actual_tss?: string; actual_duration?: string; type?: string; subtitle?: string };
+export type KeyWorkout = { id: string; title: string; icon: keyof typeof Ionicons.glyphMap; duration: string; zone: string; tss: string; footer: string; color: string; profile: number[]; completed?: boolean; status?: string; actual_tss?: string; actual_duration?: string; type?: string; subtitle?: string; date?: string; date_label?: string; is_today?: boolean };
 
 export const PLAN = {
   id: "build-and-climb",
@@ -56,6 +56,7 @@ export const PLAN = {
   progress: { weeks: "3 / 12", workouts: "15", time: "10.2 h", tss: "1,420", ctl: "+8.4", atl: "92", tsb: "+6" },
   weekTargets: { rides: 5, duration: "6h 24m", distance_km: 165, elevation_m: 1800, supplementary: 2 },
   autoAdjustment: undefined as string | undefined,
+  hero: undefined as { week: number; phase_number: number; phase_name: string; week_in_phase: number; is_phase_start: boolean } | undefined,
   tip: "Consistency compounds. Focus on the process this phase and the results will come.",
 };
 

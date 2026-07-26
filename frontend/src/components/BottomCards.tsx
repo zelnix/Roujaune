@@ -58,23 +58,6 @@ export function ProgressCard({ onPress }: { onPress?: () => void }) {
         <LineChart data={progressCard.points} color={colors.redBright} width={230} height={56} />
       </View>
 
-      <View style={styles.achStrip} testID="progress-achievements">
-        <View style={styles.achBadgeSm}>
-          <MaterialCommunityIcons name="terrain" size={16} color="#1a1300" />
-        </View>
-        <View style={{ flex: 1 }}>
-          <View style={styles.achStripHead}>
-            <Ionicons name="shield" size={11} color={colors.yellow} />
-            <Text style={styles.achStripKicker}>ACHIEVEMENTS</Text>
-          </View>
-          <Text style={styles.achStripTitle} numberOfLines={1}>{achievement.title}</Text>
-          <View style={styles.achTrackSm}>
-            <View style={[styles.achFillSm, { width: `${(achievement.progress / achievement.total) * 100}%` }]} />
-          </View>
-        </View>
-        <Text style={styles.achStripCount}>{achievement.progress}/{achievement.total}</Text>
-      </View>
-
       {onPress && <SecondaryButton testID="view-progress-button" label="View Progress" tone="red" onPress={onPress} style={{ marginTop: spacing.sm }} />}
     </LinearGradient>
   );
