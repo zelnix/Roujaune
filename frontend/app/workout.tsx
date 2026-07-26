@@ -12,16 +12,16 @@ import { useTelemetry } from "@/src/hooks/useTelemetry";
 import { rideRecorder } from "@/src/lib/ride";
 import { getLastRouteId, setLastRouteId } from "@/src/lib/prefs";
 import { useSettings } from "@/src/lib/settings";
-import { routeVideos, currentWorkout } from "@/src/data";
+import { currentWorkout } from "@/src/data";
 import { getWorkout, buildSegments, currentSegment, mmss, targetWatts, planDayNumber, extensionSegment } from "@/src/lib/workout-catalog";
 import { fetchZoneBias, ZoneBias } from "@/src/lib/targets";
 import { usePlan } from "@/src/lib/plan";
-import { getRiderProfile } from "@/src/lib/rider-profile";
 import { WORKOUT_TYPES } from "@/src/lib/workouts";
-import { RouteVideo } from "@/src/components/RouteVideo";
-import { VirtualRoute } from "@/src/components/VirtualRoute";
+import { VirtualRidePlayer } from "@/src/components/virtual-route/VirtualRidePlayer";
+import { VIRTUAL_ROUTES, getVRoute, routeStateAt, routeTerrainBias } from "@/src/lib/vroutes";
+import { loadAppearance, RiderAppearanceConfiguration, DEFAULT_APPEARANCE } from "@/src/lib/rider-config";
 import {
-  VideoPlaceholder, RoutesButton, RoutePicker, SettingsPanel, MusicPanel, CastPanel, ImmersiveHud, RouteMapCard,
+  SettingsPanel, MusicPanel, CastPanel, RouteMapCard,
 } from "@/src/components/workout";
 import {
   MetricCard, ConnectionsPanel, CoachBanner, TerrainCard, WorkoutCard, BrandCard, StepTimeline, StepDetailModal, LiveControlBar, AdjustmentsStrip,
@@ -99,25 +99,20 @@ const ZONE_DESC: Record<string, string> = {
   Z6: "Anaerobic · all-out effort",
 };
 
-// Pick the route whose terrain best matches the chosen workout's type.
-const ROUTE_TAGS: Record<string, string[]> = {
-  endurance: ["Flat", "Easy", "Scenic", "Coastal", "Forest", "Rolling"],
-  recovery: ["Easy", "Flat", "Scenic"],
-  climbing: ["Climb", "Mountain", "Epic"],
-  threshold: ["Rolling", "Mountain", "Climb"],
-  vo2max: ["Rolling", "Mountain"],
-  sprints: ["Rolling", "Flat"],
-  tempo: ["Rolling", "Forest", "Flat"],
-  restday: ["Easy", "Scenic"],
-  fb50: ["Easy", "Scenic"],
+// Pick the virtual route whose terrain best matches the chosen workout's type.
+const TYPE_VROUTE: Record<string, string> = {
+  climbing: "alpine-sunset-pass",
+  threshold: "desert-climb",
+  vo2max: "city-night-crit",
+  sprints: "coastal-sprint",
+  tempo: "forest-loop",
+  endurance: "forest-loop",
+  recovery: "coastal-sprint",
+  restday: "coastal-sprint",
+  fb50: "forest-loop",
 };
-function routeIndexForType(typeId?: string) {
-  const tags = (typeId && ROUTE_TAGS[typeId]) || ["Climb"];
-  for (const t of tags) {
-    const i = routeVideos.findIndex((r) => r.tag === t);
-    if (i >= 0) return i;
-  }
-  return 0;
+function vrouteIdForType(typeId?: string): string {
+  return TYPE_VROUTE[typeId ?? ""] ?? VIRTUAL_ROUTES[0].id;
 }
 
 // Estimate terrain + route length from the chosen workout (used when the route
@@ -177,10 +172,11 @@ export default function LiveWorkout() {
   const [videoSlotH, setVideoSlotH] = React.useState(0);
   const [paused, setPaused] = React.useState(false);
   const [expanded, setExpanded] = React.useState(false);
-  const [virtualMode, setVirtualMode] = React.useState(false);
-  const [routeIdx, setRouteIdx] = React.useState(() => routeIndexForType(selected?.typeId));
-  const [routeAuto, setRouteAuto] = React.useState(true);
-  const [lastRouteId, setLastRouteIdState] = React.useState<string | null>(null);
+  const [vRouteId, setVRouteId] = React.useState(() => vrouteIdForType(selected?.typeId));
+  const [vAuto, setVAuto] = React.useState(true);
+  const [reducedMotion, setReducedMotion] = React.useState(false);
+  const [appearance, setAppearance] = React.useState<RiderAppearanceConfiguration>(DEFAULT_APPEARANCE);
+  const [, setLastRouteIdState] = React.useState<string | null>(null);
   const [showRoutes, setShowRoutes] = React.useState(false);
   const [showControls, setShowControls] = React.useState(false);
   const [showSettings, setShowSettings] = React.useState(false);
@@ -195,13 +191,10 @@ export default function LiveWorkout() {
   const [locked, setLocked] = React.useState(false);
   const [controlLog, setControlLog] = React.useState<{ id: number; t: string; label: string }[]>([]);
   const [stepDetail, setStepDetail] = React.useState<number | null>(null);
-  const videoFellBackRef = React.useRef(false);
-
-  const [hudVisible, setHudVisible] = React.useState(true);
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
   const [cueIdx] = React.useState(0);
 
-  const { telemetry, connectionState, stale, sendErg, sendTarget, sendInit, sendSensor, pause, resume, simulateDropout } = useTelemetry();
+  const { telemetry, connectionState, sendErg, sendTarget, sendInit, sendSensor, pause, resume, simulateDropout } = useTelemetry();
   const { settings, setSetting, loaded } = useSettings();
   const ble = useBleSensors();
   const { plan } = usePlan();
@@ -299,11 +292,6 @@ export default function LiveWorkout() {
     }
   }, [loaded, settings.hudEnabled, showToast]);
 
-  // Reset temporary HUD visibility to the saved preference each time we expand.
-  React.useEffect(() => {
-    if (expanded) setHudVisible(settings.hudEnabled);
-  }, [expanded, settings.hudEnabled]);
-
   React.useEffect(() => {
     rideRecorder.reset({ workout: workoutTitle, workoutId: selected?.id, ftp });
     energyRef.current = 0;
@@ -318,21 +306,28 @@ export default function LiveWorkout() {
 
   // Keep the ride recorder's route in sync so the summary reflects the scenery ridden.
   React.useEffect(() => {
-    const r = routeVideos[routeIdx];
-    rideRecorder.setRoute({ id: r.id, name: r.title, place: r.place, distance: r.distance, elevation: r.elevation, tag: r.tag });
-  }, [routeIdx]);
+    const r = getVRoute(vRouteId);
+    rideRecorder.setRoute({ id: r.id, name: r.name, place: r.place, distance: `${r.distanceKm} km`, elevation: `${r.elevationM} m`, tag: r.tag });
+  }, [vRouteId]);
 
-  // Restore the rider's last route across sessions (falls back to auto-match).
+  // Load the rider's saved appearance (identity + bike + clothing) for the scene.
+  React.useEffect(() => {
+    let alive = true;
+    loadAppearance().then((cfg) => { if (alive) setAppearance(cfg); });
+    return () => { alive = false; };
+  }, []);
+
+  // Restore the rider's last virtual route across sessions (falls back to auto-match).
   React.useEffect(() => {
     (async () => {
       const id = await getLastRouteId();
       if (!id) return;
-      const i = routeVideos.findIndex((r) => r.id === id);
-      if (i >= 0) {
-        setRouteIdx(i);
-        setRouteAuto(false);
+      const r = VIRTUAL_ROUTES.find((v) => v.id === id);
+      if (r) {
+        setVRouteId(r.id);
+        setVAuto(false);
         setLastRouteIdState(id);
-        showToast(`Resuming your last route: ${routeVideos[i].title}`);
+        showToast(`Resuming your last route: ${r.name}`);
       }
     })();
   }, [showToast]);
@@ -372,15 +367,6 @@ export default function LiveWorkout() {
     setControlLog((prev) => [{ id: Date.now(), t, label }, ...prev].slice(0, 8));
     rideRecorder.addAdjustment(t, label);
   }, []);
-
-  // If the route video can't load, gracefully fall back to the Virtual route
-  // once (the rider can still switch back to Video manually afterwards).
-  const onVideoError = React.useCallback(() => {
-    if (videoFellBackRef.current) return;
-    videoFellBackRef.current = true;
-    setVirtualMode(true);
-    showToast("Route video unavailable — switched to your Virtual ride.");
-  }, [showToast]);
 
   const onErg = (d: number) => {
     const next = Math.max(50, Math.min(150, ergRef.current + d));
@@ -494,7 +480,7 @@ export default function LiveWorkout() {
     showToast(`Ride extended · ${label} · added to your ride`);
   };
 
-  const activeRoute = routeVideos[routeIdx];
+  const vroute = getVRoute(vRouteId);
 
   // Live data is only shown for connected devices. "Demo mode" simulates both so
   // the rider can preview the connected experience. A connected BLE power/cadence
@@ -540,7 +526,23 @@ export default function LiveWorkout() {
   const timeProgress = Math.min(1, telemetry.elapsed / totalSec);
   const progress = trainerOn ? (terrain.km > 0 ? Math.min(1, telemetry.distance / terrain.km) : 0) : timeProgress;
   const riddenKm = trainerOn ? Math.min(terrain.km, telemetry.distance) : +(timeProgress * terrain.km).toFixed(1);
-  const routeInfo = { title: activeRoute.title, place: activeRoute.place, km: terrain.km, elev: terrain.elev, grade: terrain.grade, isClimb: terrain.isClimb, tag: activeRoute.tag };
+  const routeInfo = { title: vroute.name, place: vroute.place, km: terrain.km, elev: terrain.elev, grade: terrain.grade, isClimb: terrain.isClimb, tag: vroute.tag };
+
+  // Virtual route state: map the workout's progress onto the selected scenic route
+  // so gradient / elevation / checkpoints track along with the ride. This single
+  // derived value feeds BOTH the embedded and fullscreen virtual-ride views.
+  const vState = routeStateAt(vroute, progress * vroute.distanceKm);
+  const vResistance = Math.round(Math.max(55, Math.min(150, 100 + vState.gradient * 7 + routeTerrainBias(vroute.id))));
+  // Metrics for the scene — keep the rider pedalling with a gentle default cadence
+  // and nominal speed when no trainer is connected (time-based ride).
+  const vMetrics = {
+    power: Math.round(telemetry.power),
+    cadence: trainerOn ? Math.round(telemetry.cadence) : (paused ? 0 : 84),
+    speed: trainerOn ? telemetry.speed : (paused ? 0 : Math.max(22, telemetry.speed)),
+    hr: Math.round(telemetry.hr),
+    elapsed: telemetry.elapsed,
+    riddenKm,
+  };
 
   // ---- Alberto's live AI coaching cues ----
   // Prefers the AI-generated cue; falls back to the local rule-based line while
@@ -561,11 +563,11 @@ export default function LiveWorkout() {
     cadence_low: CAD_LOW,
     cadence_high: CAD_HIGH,
     workout: workoutTitle,
-    route: activeRoute.title,
+    route: vroute.name,
     seated: settings.seatedMode,
     coach_name: persona.name,
     coach_gender: persona.gender,
-  }), [activeRoute.title, persona.name, persona.gender, workoutTitle, targetW, activeSeg, settings.seatedMode]);
+  }), [vroute.name, persona.name, persona.gender, workoutTitle, targetW, activeSeg, settings.seatedMode]);
 
   const cueBusy = React.useRef(false);
   const lastCueAt = React.useRef(0);
@@ -651,23 +653,23 @@ export default function LiveWorkout() {
     }
   }, [activeSeg?.remaining, paused, generateCue]);
 
-  const onSelectRoute = (i: number) => {
-    setRouteIdx(i); setRouteAuto(false); setShowRoutes(false);
-    setLastRouteIdState(routeVideos[i].id); setLastRouteId(routeVideos[i].id);
-    showToast(`Route: ${routeVideos[i].title}`);
+  const onSelectRoute = (id: string) => {
+    setVRouteId(id); setVAuto(false); setShowRoutes(false);
+    setLastRouteIdState(id); setLastRouteId(id);
+    showToast(`Route: ${getVRoute(id).name}`);
   };
   const onAutoRoute = () => {
-    const i = routeIndexForType(selected?.typeId);
-    setRouteIdx(i); setRouteAuto(true); setShowRoutes(false);
+    const id = vrouteIdForType(selected?.typeId);
+    setVRouteId(id); setVAuto(true); setShowRoutes(false);
     setLastRouteIdState(null); setLastRouteId(null);
-    showToast(`Auto-matched to your ${(selectedType?.name ?? selected?.typeName ?? "ride").toLowerCase()}: ${routeVideos[i].title}`);
+    showToast(`Auto-matched to your ${(selectedType?.name ?? selected?.typeName ?? "ride").toLowerCase()}: ${getVRoute(id).name}`);
   };
   const onShuffleRoute = () => {
-    let i = routeIdx;
-    if (routeVideos.length > 1) { while (i === routeIdx) i = Math.floor(Math.random() * routeVideos.length); }
-    setRouteIdx(i); setRouteAuto(false); setShowRoutes(false);
-    setLastRouteIdState(routeVideos[i].id); setLastRouteId(routeVideos[i].id);
-    showToast(`Surprise route: ${routeVideos[i].title}`);
+    let id = vRouteId;
+    if (VIRTUAL_ROUTES.length > 1) { while (id === vRouteId) id = VIRTUAL_ROUTES[Math.floor(Math.random() * VIRTUAL_ROUTES.length)].id; }
+    setVRouteId(id); setVAuto(false); setShowRoutes(false);
+    setLastRouteIdState(id); setLastRouteId(id);
+    showToast(`Surprise route: ${getVRoute(id).name}`);
   };
 
   // Tablet/TV (landscape): the layout fills the screen with a responsive
@@ -753,21 +755,28 @@ export default function LiveWorkout() {
                 onLayout={tablet ? (e) => setVideoSlotH(Math.round(e.nativeEvent.layout.height)) : undefined}
               >
                 {expanded ? (
-                  <VideoPlaceholder width={centerW} onRestore={() => setExpanded(false)} />
-                ) : virtualMode ? (
-                  <View style={[tablet ? styles.flex1 : null, { position: "relative" }]}>
-                    <VirtualRoute width={centerW} height={videoRenderH} speed={trainerOn ? telemetry.speed : 0} cadence={trainerOn ? telemetry.cadence : 88} gender={getRiderProfile().gender} paused={paused || !trainerOn} />
-                    <View style={[styles.inlineRoutes, { pointerEvents: "box-none" }]}>
-                      <RoutesButton onPress={() => setVirtualMode(false)} testID="switch-video" label="Video" icon="videocam" />
-                    </View>
-                  </View>
+                  <Pressable style={styles.fsMinimised} onPress={() => setExpanded(false)} testID="vr-restore-inline">
+                    <Ionicons name="contract-outline" size={22} color={colors.textDim} />
+                    <Text style={styles.fsMinimisedText}>Virtual ride is fullscreen — tap to return</Text>
+                  </Pressable>
                 ) : (
-                  <RouteVideo source={activeRoute.url} title={`${activeRoute.title}${routeAuto ? " · Auto-matched" : activeRoute.id === lastRouteId ? " · Last ride" : ""}`} playing={!paused} muted width={tablet ? undefined : centerW} aspectRatio={16 / 9} fill={tablet} onToggleExpand={() => setExpanded(true)} expanded={false} onError={onVideoError}>
-                    <View style={[styles.inlineRoutes, { pointerEvents: "box-none" }]}>
-                      <RoutesButton onPress={() => setShowRoutes(true)} testID="inline-routes" />
-                      <RoutesButton onPress={() => setVirtualMode(true)} testID="switch-virtual" label="Virtual" icon="bicycle" />
-                    </View>
-                  </RouteVideo>
+                  <VirtualRidePlayer
+                    mode="embedded"
+                    vroute={vroute}
+                    routeState={vState}
+                    appearance={appearance}
+                    metrics={vMetrics}
+                    paused={paused}
+                    connected={trainerOn || wearableOn || settings.demoMode}
+                    simulation={!trainerOn}
+                    hrOn={wearableOn}
+                    load={vResistance}
+                    reducedMotion={reducedMotion}
+                    onToggleReducedMotion={() => setReducedMotion((r) => !r)}
+                    onFullscreen={() => setExpanded(true)}
+                    onOpenRoutes={() => setShowRoutes(true)}
+                    style={tablet ? styles.flex1 : { height: videoRenderH }}
+                  />
                 )}
               </View>
             </View>
@@ -866,70 +875,67 @@ export default function LiveWorkout() {
 
       {expanded && (
         <View style={styles.immersive} testID="immersive-overlay">
-          <RouteVideo
-            source={activeRoute.url}
-            playing={!paused}
-            muted
-            fill
-            expanded
-            onToggleExpand={() => setExpanded(false)}
-          >
-            {hudVisible && (
-              <ImmersiveHud
-                elapsed={fmt(telemetry.elapsed)}
-                power={telemetry.power}
-                wkg={(telemetry.power / 78).toFixed(1)}
-                hr={telemetry.hr}
-                cadence={telemetry.cadence}
-                speed={telemetry.speed}
-                progress="10.2 km"
-                connectionState={connectionState}
-                stale={stale}
-                paused={paused}
-                cue={liveCue}
-                trainerConnected={trainerOn}
-                wearableConnected={wearableOn}
-                onPause={onPauseToggle}
-                onEnd={requestEnd}
-                onOpenRoutes={() => setShowRoutes(true)}
-              />
-            )}
-            <Pressable
-              style={styles.hudEye}
-              onPress={() => setHudVisible((v) => !v)}
-              testID="hud-eye-toggle"
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel={hudVisible ? "Hide on-screen data" : "Show on-screen data"}
-            >
-              <Ionicons name={hudVisible ? "eye" : "eye-off"} size={18} color="#fff" />
-            </Pressable>
-            <Pressable
-              style={styles.hudCast}
-              onPress={() => setShowCast(true)}
-              testID="hud-cast"
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel="Mirror screen to TV"
-            >
-              <Ionicons name="tv-outline" size={18} color="#fff" />
-            </Pressable>
-          </RouteVideo>
+          <VirtualRidePlayer
+            mode="fullscreen"
+            vroute={vroute}
+            routeState={vState}
+            appearance={appearance}
+            metrics={vMetrics}
+            paused={paused}
+            connected={trainerOn || wearableOn || settings.demoMode}
+            simulation={!trainerOn}
+            hrOn={wearableOn}
+            load={vResistance}
+            compact={compact}
+            reducedMotion={reducedMotion}
+            onToggleReducedMotion={() => setReducedMotion((r) => !r)}
+            cue={liveCue}
+            stepLabel={activeSeg?.segment.label}
+            stepTimeLeft={timeLeftLabel ?? undefined}
+            onExitFullscreen={() => setExpanded(false)}
+            onPauseToggle={onPauseToggle}
+            onPreset={(w) => { sendTarget(w); showToast(`Target ${w} W`); logControl(`Target → ${w} W`); }}
+            ergOn={ergMode}
+            onErgToggle={() => setErgMode((m) => { const next = !m; showToast(next ? "ERG mode ON" : "ERG mode OFF"); logControl(next ? "ERG mode ON" : "ERG mode OFF"); return next; })}
+            onReconnect={() => { simulateDropout(); showToast("Reconnecting trainer…"); }}
+          />
         </View>
       )}
 
       {showRoutes && (
-        <RoutePicker
-          routes={routeVideos}
-          activeIndex={routeIdx}
-          recommendedTag={currentWorkout.recommendedTag}
-          auto={routeAuto}
-          lastRouteId={lastRouteId}
-          onSelect={onSelectRoute}
-          onAuto={onAutoRoute}
-          onShuffle={onShuffleRoute}
-          onClose={() => setShowRoutes(false)}
-        />
+        <Pressable style={styles.overlay} testID="vroute-picker-overlay" onPress={() => setShowRoutes(false)}>
+          <Pressable style={styles.routePickerPanel} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.panelHead}>
+              <Text style={styles.panelTitle}>Choose your route</Text>
+              <Pressable testID="vroute-picker-close" onPress={() => setShowRoutes(false)} hitSlop={10}><Ionicons name="close" size={22} color={colors.white} /></Pressable>
+            </View>
+            <View style={styles.routePickerActions}>
+              <Pressable onPress={onAutoRoute} style={[styles.routeActionBtn, vAuto && styles.routeActionOn]} testID="vroute-auto">
+                <Ionicons name="sparkles-outline" size={15} color={vAuto ? colors.bg : colors.yellow} />
+                <Text style={[styles.routeActionText, vAuto && { color: colors.bg }]}>Auto-match</Text>
+              </Pressable>
+              <Pressable onPress={onShuffleRoute} style={styles.routeActionBtn} testID="vroute-shuffle">
+                <Ionicons name="shuffle-outline" size={15} color={colors.yellow} />
+                <Text style={styles.routeActionText}>Shuffle</Text>
+              </Pressable>
+            </View>
+            <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
+              {VIRTUAL_ROUTES.map((rt) => {
+                const sel = rt.id === vRouteId;
+                return (
+                  <Pressable key={rt.id} onPress={() => onSelectRoute(rt.id)} testID={`vroute-${rt.id}`} style={[styles.routeOpt, sel && styles.routeOptSel]}>
+                    <Image source={rt.backdrop} style={styles.routeOptThumb} contentFit="cover" />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.routeOptName} numberOfLines={1}>{rt.name}</Text>
+                      <Text style={styles.routeOptMeta} numberOfLines={1}>{rt.place} · {rt.distanceKm} km · {rt.tag}</Text>
+                    </View>
+                    <Ionicons name={sel ? "checkmark-circle" : "chevron-forward"} size={20} color={sel ? colors.yellow : colors.textFaint} />
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
       )}
 
       {showSettings && (
@@ -1088,10 +1094,18 @@ const styles = StyleSheet.create({
   lockTitle: { color: colors.white, fontSize: 18, fontWeight: "800" },
   lockBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.yellow, borderRadius: radius.pill, paddingHorizontal: 20, paddingVertical: 12 },
   lockBtnText: { color: colors.bg, fontSize: 14, fontWeight: "800" },
-  hudEye: { position: "absolute", top: 12, left: 12, width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center", zIndex: 5 },
-  hudCast: { position: "absolute", top: 56, left: 12, width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.25)", alignItems: "center", justifyContent: "center", zIndex: 5 },
-  hudCastOn: { backgroundColor: colors.yellow, borderColor: colors.yellow },
-  inlineRoutes: { position: "absolute", left: 10, bottom: 10 },
+  fsMinimised: { flex: 1, minHeight: 150, alignItems: "center", justifyContent: "center", gap: 8, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: "#0b0d12" },
+  fsMinimisedText: { color: colors.textDim, fontSize: 13, fontWeight: "700" },
+  routePickerPanel: { width: 560, maxWidth: "92%", backgroundColor: colors.cardElevated, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, ...(shadow.card as any) },
+  routePickerActions: { flexDirection: "row", gap: 10, marginBottom: spacing.md },
+  routeActionBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.yellow + "88", backgroundColor: colors.yellow + "18" },
+  routeActionOn: { backgroundColor: colors.yellow, borderColor: colors.yellow },
+  routeActionText: { color: colors.yellow, fontSize: 13, fontWeight: "800" },
+  routeOpt: { flexDirection: "row", alignItems: "center", gap: 12, padding: 8, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, marginBottom: 8 },
+  routeOptSel: { borderColor: colors.yellow, backgroundColor: colors.cardElevated },
+  routeOptThumb: { width: 84, height: 52, borderRadius: radius.sm, backgroundColor: "#0d0f14" },
+  routeOptName: { color: colors.white, fontSize: 14, fontWeight: "800" },
+  routeOptMeta: { color: colors.textFaint, fontSize: 12, fontWeight: "600", marginTop: 2 },
   metricRow: { flexDirection: "row", gap: spacing.md },
   mainRow: { flexDirection: "row", gap: spacing.md, alignItems: "stretch" },
   leftCenter: { flex: 1, gap: spacing.md },
