@@ -89,7 +89,7 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
   if (mode === "embedded") {
     return (
       <View style={[st.embedWrap, style]}>
-        <VirtualRouteScene rider={rider} appearance={appearance} backdrop={vroute.backdrop} telemetry={scene} showBrand={false} />
+        <VirtualRouteScene rider={rider} appearance={appearance} align={vroute.riderAlign} backdrop={vroute.backdrop} telemetry={scene} showBrand={false} />
 
         {/* Minimal overlay only — no duplicated HUD/metrics */}
         <View style={st.embedTopRow} pointerEvents="box-none">
@@ -131,7 +131,7 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
 
   return (
     <View style={st.fsWrap} testID="vr-fullscreen">
-      <VirtualRouteScene rider={rider} appearance={appearance} backdrop={vroute.backdrop} telemetry={scene} showBrand />
+      <VirtualRouteScene rider={rider} appearance={appearance} align={vroute.riderAlign} backdrop={vroute.backdrop} telemetry={scene} showBrand />
 
       {/* Top-right controls */}
       <View style={st.fsTopRight} pointerEvents="box-none">

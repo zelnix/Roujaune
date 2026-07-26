@@ -5,6 +5,12 @@
 export type VPoint = { km: number; gradient: number; curve: number };
 export type VCheckpoint = { km: number; label: string };
 
+// Optional per-route compositing tweaks so the rider sits believably on the
+// road for each backdrop (roads aren't centred the same way in every scene).
+// x: horizontal centre offset as a fraction of width (negative = left);
+// bottom/top: vertical anchor overrides (% of the scene); scale: size multiplier.
+export type RiderAlign = { x?: number; bottom?: number; top?: number; scale?: number };
+
 export type VRoute = {
   id: string;
   name: string;
@@ -15,6 +21,7 @@ export type VRoute = {
   backdrop: any;         // AI-generated cinematic route scenery (rider composited on top)
   points: VPoint[];
   checkpoints: VCheckpoint[];
+  riderAlign?: RiderAlign;
 };
 
 export type RouteState = {
@@ -67,6 +74,9 @@ export const VIRTUAL_ROUTES: VRoute[] = [
     distanceKm: 12,
     tag: "Fast & Flat",
     elevationM: 180,
+    // Road sits slightly left of centre and the deck is lower on this backdrop —
+    // nudge the rider left + down a touch and scale in so he rides on the tarmac.
+    riderAlign: { x: -0.035, bottom: 1, scale: 0.9 },
     points: [
       { km: 0, gradient: 0, curve: 0 },
       { km: 1.5, gradient: 1.5, curve: 0.4 },

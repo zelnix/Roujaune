@@ -210,7 +210,7 @@ export default function VirtualRouteScreen() {
     <View style={s.root}>
       <StatusBar hidden />
       {/* Cinematic wide scene */}
-      <VirtualRouteScene rider={rider} appearance={appearance} backdrop={vroute.backdrop} telemetry={scene} showBrand />
+      <VirtualRouteScene rider={rider} appearance={appearance} align={vroute.riderAlign} backdrop={vroute.backdrop} telemetry={scene} showBrand />
 
       {/* Connection status pill (top-right) */}
       <SafeAreaView style={s.topRight} pointerEvents="box-none" edges={["top", "right"]}>

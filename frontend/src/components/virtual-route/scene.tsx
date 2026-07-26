@@ -5,6 +5,7 @@ import Svg, { Circle, Line, G } from "react-native-svg";
 import { colors } from "@/src/theme";
 import type { VirtualRider } from "@/src/lib/virtual-riders";
 import { DEFAULT_APPEARANCE, RiderAppearanceConfiguration } from "@/src/lib/rider-config";
+import type { RiderAlign } from "@/src/lib/vroutes";
 // eslint-disable-next-line import/no-unresolved -- resolved by Metro via RiveRider.native/.web
 import { RiveRider } from "./RiveRider";
 
@@ -33,7 +34,7 @@ export type SceneTelemetry = {
  * markers, drifting particles, camera bob, bike lean, dynamic light & motion
  * blur) driven by smoothed telemetry via a rAF phase loop.
  */
-export function VirtualRouteScene({ rider, appearance = DEFAULT_APPEARANCE, backdrop, telemetry, showBrand = true }: { rider: VirtualRider; appearance?: RiderAppearanceConfiguration; backdrop?: any; telemetry: SceneTelemetry; showBrand?: boolean }) {
+export function VirtualRouteScene({ rider, appearance = DEFAULT_APPEARANCE, align, backdrop, telemetry, showBrand = true }: { rider: VirtualRider; appearance?: RiderAppearanceConfiguration; align?: RiderAlign; backdrop?: any; telemetry: SceneTelemetry; showBrand?: boolean }) {
   const tRef = React.useRef(telemetry);
   tRef.current = telemetry;
 
@@ -97,6 +98,17 @@ export function VirtualRouteScene({ rider, appearance = DEFAULT_APPEARANCE, back
 
   const leanDeg = lean.interpolate({ inputRange: [-4, 4], outputRange: ["-4deg", "4deg"] });
 
+  // Per-route rider compositing override (keeps the rider believably on the road
+  // across backdrops whose roads aren't centred the same way).
+  const ax = align?.x ?? 0;
+  const riderPos = {
+    left: `${ax * 100}%`,
+    right: `${-ax * 100}%`,
+    bottom: `${align?.bottom ?? 4}%`,
+    top: `${align?.top ?? 32}%`,
+  } as const;
+  const riderScale = align?.scale ?? 1;
+
   // Two scrolling road-edge streaks per side (offset by 0.5 phase) sliding toward
   // the camera to sell forward motion along the baked road.
   const edgeStreaks = (side: "left" | "right") =>
@@ -141,7 +153,7 @@ export function VirtualRouteScene({ rider, appearance = DEFAULT_APPEARANCE, back
           </View>
 
           {/* Rider composited on top — Rive bone-rig on native, sprite on web (camera bob / weight-shift sway / lean). */}
-          <AView style={[st.riderWrap, { transform: [{ translateX: swayX }, { translateY: bobY }, { rotate: leanDeg }, { scale }] }]}>
+          <AView style={[st.riderWrap, riderPos, { transform: [{ translateX: swayX }, { translateY: bobY }, { rotate: leanDeg }, { scale }, { scale: riderScale }] }]}>
             <RiveRider
               sprite={rider.sprite}
               riderType={appearance.riderType}
