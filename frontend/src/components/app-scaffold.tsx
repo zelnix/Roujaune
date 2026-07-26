@@ -14,6 +14,7 @@ const ROUTE: Record<string, string> = {
   home: "/", training: "/plan", calendar: "/calendar", workouts: "/workouts",
   routes: "/virtual-route", progress: "/progress", wellness: "/wellness",
   community: "/community", connections: "/connections", settings: "/settings", help: "/help",
+  benchmark: "/benchmark",
 };
 
 function useApiData<T>(path: string) {

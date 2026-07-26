@@ -13,6 +13,7 @@ export const navItems: NavItem[] = [
   { key: "routes", label: "Virtual Routes", icon: "git-network-outline" },
   { key: "training", label: "Training Plan", icon: "clipboard-outline" },
   { key: "progress", label: "Progress", icon: "stats-chart-outline" },
+  { key: "benchmark", label: "Benchmark", icon: "speedometer-outline" },
   { key: "community", label: "Community", icon: "people-outline" },
   { key: "wellness", label: "Wellness", icon: "heart-outline" },
   { key: "connections", label: "Connections", icon: "link-outline" },
