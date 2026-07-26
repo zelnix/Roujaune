@@ -480,9 +480,9 @@ Home Alberto "Start Today's Ride" & sidebar Workouts → `/training`. Training "
 ### Misc
 - Virtual Routes setup Exit button (`vr-exit`) enlarged into a prominent bordered pill.
 
-### DEFERRED — Phase 2 (Training Plan deep-dives), still TODO:
-- Phases nav link → detail view of each phase highlighting the current phase.
-- Key Workouts tap → full workout details.
-- Weekly Load overview → richer detail.
-- Adaptations → AI-generated (Claude) detailed reasoning explaining how the coach derived each adaptation (progress/regression per workout, achievements).
-### KNOWN (out of scope, flagged by testing): `rider_appearance` is NOT user-scoped in auth.py — would collide across users if per-user appearance is ever intended.
+### Phase 2 (Training Plan deep-dives) — DONE (2026-07-26):
+- Phases: the Phases tab renders `PhasesDetailCard` (all phases with objectives + progress, current highlighted with a CURRENT chip); tapping a phase (roadmap card or detail row) opens `PhaseDetailModal`. Backend `plan.phases[]` now carry `objective`.
+- Key Workouts: tapping a workout opens `KeyWorkoutDetailModal` (zone/duration/TSS + WorkoutProfile + WORKOUT STEPS via buildSegments + "Open in Training"), instead of navigating away. Grid filtered to cycling entries.
+- Weekly Load: `WeeklyLoadCard` gained a stats row (This Week / Avg per Week / Peak week / Completed %).
+- Adaptations: NEW `POST /api/coach/adaptation/detail` (Claude, cached per plan+coach, grounded in the computed plan for structured plans) → {summary, factors[], adjustments[]}. `AdaptationsModal` shows a "WHY <coach> ADJUSTED YOUR PLAN" reasoning block above the history timeline.
+- Also: `rider_appearance` is now user-scoped (added to USER_SCOPED in auth.py).
