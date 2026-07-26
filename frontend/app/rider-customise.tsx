@@ -145,7 +145,7 @@ export default function RiderCustomiseScreen() {
       <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom", "left", "right"]}>
         {/* Header */}
         <View style={s.header}>
-          <Pressable onPress={() => router.back()} testID="cust-back" style={s.backBtn} accessibilityRole="button" accessibilityLabel="Back">
+          <Pressable onPress={() => router.back()} testID="cust-back" hitSlop={12} style={s.backBtn} accessibilityRole="button" accessibilityLabel="Back">
             <Ionicons name="chevron-back" size={20} color={colors.text} />
             <Text style={s.backText}>Back</Text>
           </Pressable>
@@ -168,16 +168,16 @@ export default function RiderCustomiseScreen() {
 
         {/* Action bar */}
         <View style={s.actions}>
-          <Pressable onPress={onReset} disabled={isDefault} style={[s.ghostBtn, isDefault && { opacity: 0.4 }]} testID="cust-reset" accessibilityRole="button" accessibilityLabel="Reset to default">
+          <Pressable onPress={onReset} disabled={isDefault} hitSlop={8} style={[s.ghostBtn, isDefault && { opacity: 0.4 }]} testID="cust-reset" accessibilityRole="button" accessibilityLabel="Reset to default">
             <Ionicons name="refresh" size={16} color={colors.textDim} />
             <Text style={s.ghostText}>Reset</Text>
           </Pressable>
-          <Pressable onPress={onRestore} disabled={!dirty} style={[s.ghostBtn, !dirty && { opacity: 0.4 }]} testID="cust-restore" accessibilityRole="button" accessibilityLabel="Restore last saved">
+          <Pressable onPress={onRestore} disabled={!dirty} hitSlop={8} style={[s.ghostBtn, !dirty && { opacity: 0.4 }]} testID="cust-restore" accessibilityRole="button" accessibilityLabel="Restore last saved">
             <Ionicons name="arrow-undo" size={16} color={colors.textDim} />
             <Text style={s.ghostText}>Restore</Text>
           </Pressable>
           <View style={{ flex: 1 }} />
-          <Pressable onPress={onSave} disabled={!dirty || saving} style={[s.saveBtn, (!dirty || saving) && { opacity: 0.5 }]} testID="cust-save" accessibilityRole="button" accessibilityLabel="Save">
+          <Pressable onPress={onSave} disabled={!dirty || saving} hitSlop={8} style={[s.saveBtn, (!dirty || saving) && { opacity: 0.5 }]} testID="cust-save" accessibilityRole="button" accessibilityLabel="Save">
             <Ionicons name="save" size={16} color={colors.text} />
             <Text style={s.saveText}>{saving ? "Saving…" : "Save"}</Text>
           </Pressable>
