@@ -103,6 +103,8 @@ export const VIRTUAL_ROUTES: VRoute[] = [
     distanceKm: 15,
     tag: "Rolling Hills",
     elevationM: 340,
+    // Forest trail sits a touch left of centre and is narrower — nudge left + scale in.
+    riderAlign: { x: -0.03, scale: 0.95 },
     points: [
       { km: 0, gradient: 2, curve: 0 },
       { km: 2, gradient: 4, curve: 0.4 },

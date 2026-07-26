@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, StyleProp, ViewStyle } from "react-native";
+import { View, Text, Image, StyleSheet, Pressable, ScrollView, useWindowDimensions, StyleProp, ViewStyle } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, shadow } from "@/src/theme";
 import { VirtualRouteScene, SceneTelemetry } from "./scene";
@@ -7,6 +7,9 @@ import { RouteProfile } from "./RouteProfile";
 import type { VRoute, RouteState } from "@/src/lib/vroutes";
 import { riderVisualFor } from "@/src/lib/virtual-riders";
 import { RiderAppearanceConfiguration, DEFAULT_APPEARANCE } from "@/src/lib/rider-config";
+
+const WORDMARK = require("../../../assets/images/auth_wordmark.png");
+const LOGO_GLYPH = require("../../../assets/images/auth_logo_glyph.png");
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
@@ -70,6 +73,11 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
   } = props;
 
   const rider = riderVisualFor(appearance.riderType);
+  const { width } = useWindowDimensions();
+  const smallTablet = width < 1000 || !!compact;
+  const railW = smallTablet ? 152 : 200;
+  const glyphSize = smallTablet ? 34 : 46;
+  const wordW = railW - 8;
   const scene: SceneTelemetry = {
     power: metrics.power,
     cadence: metrics.cadence,
@@ -131,10 +139,50 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
 
   return (
     <View style={st.fsWrap} testID="vr-fullscreen">
-      <VirtualRouteScene rider={rider} appearance={appearance} align={vroute.riderAlign} backdrop={vroute.backdrop} telemetry={scene} showBrand />
+      <VirtualRouteScene rider={rider} appearance={appearance} align={vroute.riderAlign} backdrop={vroute.backdrop} telemetry={scene} showBrand={false} />
 
-      {/* Top-right controls */}
+      {/* Vertical HUD rail down the left — brand scales to screen, metrics stack top→bottom */}
+      <ScrollView
+        style={[st.rail, { width: railW }]}
+        contentContainerStyle={st.railContent}
+        showsVerticalScrollIndicator={false}
+        pointerEvents="box-none"
+        testID="vr-full-panel"
+      >
+        <View style={st.brand} pointerEvents="none">
+          <Image source={LOGO_GLYPH} style={{ width: glyphSize, height: glyphSize }} resizeMode="contain" />
+          <Image source={WORDMARK} style={{ width: wordW, height: wordW * 0.17 }} resizeMode="contain" />
+        </View>
+
+        <View style={st.railHead} pointerEvents="none">
+          <Ionicons name="location" size={12} color={colors.yellow} />
+          <Text style={st.railRoute} numberOfLines={1}>Next: {routeState.segmentLabel}</Text>
+        </View>
+        <Text style={st.railKm} pointerEvents="none">{routeState.remainingKm.toFixed(1)} km to go</Text>
+        <View style={st.progressTrack}><View style={[st.progressFill, { width: `${routeState.progress * 100}%` }]} /></View>
+        <RouteProfile vroute={vroute} progress={routeState.progress} height={smallTablet ? 30 : 38} />
+
+        <View style={st.railMetrics}>
+          {cells.map((c) => (
+            <View key={c.label} style={st.railRow}>
+              <Ionicons name={c.icon} size={16} color={c.tone} style={{ width: 20, textAlign: "center" }} />
+              <View style={{ flex: 1 }}>
+                <Text style={st.railValue} numberOfLines={1}>{c.value}<Text style={st.railUnit}> {c.unit}</Text></Text>
+                <Text style={st.railLabel}>{c.label}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+
+      {/* Top-right: coaching cue, interval, camera/motion toggle */}
       <View style={st.fsTopRight} pointerEvents="box-none">
+        {(stepLabel || stepTimeLeft) && (
+          <View style={st.fsInterval}>
+            <Ionicons name="flag" size={13} color={colors.yellow} />
+            <Text style={st.fsIntervalText} numberOfLines={1}>{stepLabel ?? "Interval"}{stepTimeLeft ? ` · ${stepTimeLeft}` : ""}</Text>
+          </View>
+        )}
         {!!cue && (
           <View style={st.cuePill}>
             <Ionicons name="chatbubble-ellipses" size={13} color={colors.yellow} />
@@ -144,72 +192,41 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
         <Pressable onPress={onToggleReducedMotion} style={[st.fsIcon, reducedMotion && st.fsIconOn]} accessibilityRole="button" accessibilityLabel="Toggle camera / motion">
           <Ionicons name={reducedMotion ? "eye-off-outline" : "videocam-outline"} size={18} color={reducedMotion ? colors.bg : colors.white} />
         </Pressable>
-        <Pressable onPress={onExitFullscreen} style={st.fsIcon} testID="vr-exit-fullscreen" accessibilityRole="button" accessibilityLabel="Exit fullscreen">
-          <Ionicons name="contract-outline" size={18} color={colors.white} />
-        </Pressable>
       </View>
 
-      {/* Interval chip (top-left) */}
-      {(stepLabel || stepTimeLeft) && (
-        <View style={st.fsInterval} pointerEvents="none">
-          <Ionicons name="flag" size={13} color={colors.yellow} />
-          <Text style={st.fsIntervalText} numberOfLines={1}>{stepLabel ?? "Interval"}{stepTimeLeft ? ` · ${stepTimeLeft}` : ""}</Text>
-        </View>
-      )}
-
-      {/* Telemetry HUD (bottom-left) */}
-      <View style={[st.panel, compact && st.panelCompact]} pointerEvents="box-none" testID="vr-full-panel">
-        <View style={st.panelHead}>
-          <Ionicons name="location" size={13} color={colors.yellow} />
-          <Text style={st.panelRoute} numberOfLines={1}>Next: {routeState.segmentLabel} · {routeState.remainingKm.toFixed(1)} km to go</Text>
-        </View>
-        <RouteProfile vroute={vroute} progress={routeState.progress} height={compact ? 34 : 44} />
-        <View style={st.progressTrack}><View style={[st.progressFill, { width: `${routeState.progress * 100}%` }]} /></View>
-        <View style={st.panelGrid}>
-          {cells.map((c) => (
-            <View key={c.label} style={st.panelCell}>
-              <Ionicons name={c.icon} size={13} color={c.tone} />
-              <Text style={st.panelValue}>{c.value}<Text style={st.panelUnit}> {c.unit}</Text></Text>
-              <Text style={st.panelLabel}>{c.label}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-
-      {/* Control bar (bottom) */}
-      <View style={st.controls} pointerEvents="box-none">
-        <View style={st.controlRow}>
-          <CtrlBtn icon={paused ? "play" : "pause"} label={paused ? "Resume" : "Pause"} tone={paused ? colors.green : undefined} onPress={onPauseToggle} />
-          <CtrlBtn icon="contract" label="Exit" onPress={onExitFullscreen} />
-          <View style={{ flex: 1, minWidth: 8 }} />
+      {/* Control bar (bottom) — mirrors the Live Workout control bar, pinned across the bottom */}
+      <View style={st.controlsWrap} pointerEvents="box-none">
+        <View style={st.bar}>
           {onPreset && PRESETS.map((p) => (
-            <Pressable key={p.label} onPress={() => onPreset(p.w)} style={st.presetChip} accessibilityLabel={`Set ${p.label} effort`}>
-              <Ionicons name={p.icon} size={14} color={colors.yellow} />
-              <Text style={st.presetText}>{p.label}</Text>
+            <Pressable key={p.label} onPress={() => onPreset(p.w)} style={st.round} accessibilityLabel={`Set ${p.label} effort`}>
+              <Ionicons name={p.icon} size={18} color={colors.yellow} />
+              <Text style={st.roundText}>{p.label}</Text>
             </Pressable>
           ))}
           {onErgToggle && (
-            <Pressable onPress={onErgToggle} style={[st.iconBtnDark, ergOn && st.iconBtnOn]} accessibilityLabel="Toggle ERG resistance">
-              <Ionicons name="options-outline" size={16} color={ergOn ? colors.bg : colors.white} />
+            <Pressable onPress={onErgToggle} style={[st.round, ergOn && st.roundOn]} accessibilityLabel="Toggle ERG resistance">
+              <Ionicons name="options-outline" size={18} color={ergOn ? colors.yellow : colors.white} />
+              <Text style={[st.roundText, ergOn && { color: colors.yellow }]}>ERG</Text>
             </Pressable>
           )}
           {onReconnect && (
-            <Pressable onPress={onReconnect} style={st.iconBtnDark} accessibilityLabel="Simulate signal drop / reconnect">
-              <Ionicons name="cellular-outline" size={16} color={colors.white} />
+            <Pressable onPress={onReconnect} style={st.round} accessibilityLabel="Reconnect trainer">
+              <Ionicons name="refresh" size={18} color={colors.white} />
+              <Text style={st.roundText}>Reconnect</Text>
             </Pressable>
           )}
+          <View style={st.barSpacer} />
+          <Pressable onPress={onPauseToggle} style={st.pausePrimary} testID="vr-fs-pause" accessibilityLabel={paused ? "Resume" : "Pause"}>
+            <Ionicons name={paused ? "play" : "pause"} size={20} color={colors.bg} />
+            <Text style={st.pausePrimaryText}>{paused ? "Resume" : "Pause"}</Text>
+          </Pressable>
+          <Pressable onPress={onExitFullscreen} style={st.exitBtn} testID="vr-exit-fullscreen" accessibilityLabel="Exit fullscreen">
+            <Ionicons name="contract" size={18} color={colors.white} />
+            <Text style={st.exitText}>Exit</Text>
+          </Pressable>
         </View>
       </View>
     </View>
-  );
-}
-
-function CtrlBtn({ icon, label, tone, onPress }: { icon: any; label: string; tone?: string; onPress?: () => void }) {
-  return (
-    <Pressable onPress={onPress} style={[st.ctrlBtn, tone ? { backgroundColor: tone } : null]} accessibilityRole="button" accessibilityLabel={label}>
-      <Ionicons name={icon} size={16} color={tone ? "#0b0b0b" : colors.white} />
-      <Text style={[st.ctrlText, tone ? { color: "#0b0b0b" } : null]}>{label}</Text>
-    </Pressable>
   );
 }
 
@@ -225,32 +242,39 @@ const st = StyleSheet.create({
   gradeText: { color: colors.white, fontSize: 13, fontWeight: "900", fontVariant: ["tabular-nums"] },
 
   fsWrap: { ...StyleSheet.absoluteFillObject, backgroundColor: "#05060a" },
-  fsTopRight: { position: "absolute", top: 0, right: 0, flexDirection: "row", alignItems: "flex-start", gap: 8, padding: 12, maxWidth: "70%" },
+
+  // Vertical HUD rail (left)
+  rail: { position: "absolute", left: 0, top: 0, bottom: 74, backgroundColor: "rgba(8,9,12,0.62)", borderRightWidth: 1, borderRightColor: colors.border },
+  railContent: { padding: 12, gap: 8 },
+  brand: { alignItems: "center", gap: 4, marginBottom: 4 },
+  railHead: { flexDirection: "row", alignItems: "center", gap: 5 },
+  railRoute: { color: colors.textDim, fontSize: 11, fontWeight: "700", flex: 1 },
+  railKm: { color: colors.textFaint, fontSize: 10, fontWeight: "700" },
+  progressTrack: { height: 5, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.14)", overflow: "hidden" },
+  progressFill: { height: "100%", backgroundColor: colors.yellow, borderRadius: 3 },
+  railMetrics: { marginTop: 4, gap: 2 },
+  railRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 5, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)" } as any,
+  railValue: { color: colors.white, fontSize: 18, fontWeight: "900", fontVariant: ["tabular-nums"] },
+  railUnit: { color: colors.textFaint, fontSize: 10, fontWeight: "700" },
+  railLabel: { color: colors.textFaint, fontSize: 8.5, fontWeight: "800", letterSpacing: 0.8 },
+
+  fsTopRight: { position: "absolute", top: 0, right: 0, flexDirection: "row", alignItems: "flex-start", gap: 8, padding: 12, maxWidth: "62%" },
   fsIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: colors.border },
   fsIconOn: { backgroundColor: colors.yellow, borderColor: colors.yellow },
   cuePill: { flexShrink: 1, flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: "rgba(10,11,14,0.8)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 8 },
   cueText: { color: colors.textDim, fontSize: 12, fontWeight: "700", flexShrink: 1 },
-  fsInterval: { position: "absolute", top: 14, left: 14, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6 },
+  fsInterval: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(0,0,0,0.6)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 12, height: 40 },
   fsIntervalText: { color: colors.white, fontSize: 12, fontWeight: "800" },
 
-  panel: { position: "absolute", left: 12, bottom: 78, width: 360, backgroundColor: "rgba(10,11,14,0.72)", borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 12, gap: 10, ...(shadow.card as any) },
-  panelCompact: { width: 300 },
-  panelHead: { flexDirection: "row", alignItems: "center", gap: 6 },
-  panelRoute: { color: colors.textDim, fontSize: 12, fontWeight: "700", flex: 1 },
-  progressTrack: { height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.12)", overflow: "hidden" },
-  progressFill: { height: "100%", backgroundColor: colors.yellow, borderRadius: 3 },
-  panelGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  panelCell: { width: "30%", flexGrow: 1, gap: 2 },
-  panelValue: { color: colors.white, fontSize: 18, fontWeight: "900", fontVariant: ["tabular-nums"] },
-  panelUnit: { color: colors.textFaint, fontSize: 11, fontWeight: "700" },
-  panelLabel: { color: colors.textFaint, fontSize: 9, fontWeight: "800", letterSpacing: 0.8 },
-
-  controls: { position: "absolute", left: 0, right: 0, bottom: 0 },
-  controlRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 10, flexWrap: "wrap" },
-  ctrlBtn: { flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: "rgba(0,0,0,0.6)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 10 },
-  ctrlText: { color: colors.white, fontSize: 13, fontWeight: "800" },
-  presetChip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 8 },
-  presetText: { color: colors.white, fontSize: 12, fontWeight: "800" },
-  iconBtnDark: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: colors.border },
-  iconBtnOn: { backgroundColor: colors.yellow, borderColor: colors.yellow },
+  // Bottom control bar — mirrors LiveControlBar
+  controlsWrap: { position: "absolute", left: 0, right: 0, bottom: 0, padding: 10 },
+  bar: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: "rgba(8,9,9,0.86)", paddingHorizontal: 12, paddingVertical: 8, flexWrap: "wrap", ...(shadow.card as any) },
+  round: { alignItems: "center", justifyContent: "center", gap: 3, minWidth: 58, height: 52, borderRadius: radius.md, backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: colors.border, paddingHorizontal: 8 },
+  roundOn: { backgroundColor: colors.yellow + "22", borderColor: colors.yellow },
+  roundText: { color: colors.textDim, fontSize: 10.5, fontWeight: "700" },
+  barSpacer: { flex: 1, minWidth: 8 },
+  pausePrimary: { flexDirection: "row", alignItems: "center", gap: 8, height: 52, paddingHorizontal: 22, borderRadius: radius.md, backgroundColor: colors.yellow },
+  pausePrimaryText: { color: colors.bg, fontSize: 15, fontWeight: "800" },
+  exitBtn: { flexDirection: "row", alignItems: "center", gap: 8, height: 52, paddingHorizontal: 18, borderRadius: radius.md, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: colors.border },
+  exitText: { color: colors.white, fontSize: 15, fontWeight: "800" },
 });
