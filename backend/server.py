@@ -1119,6 +1119,7 @@ async def get_rider_prefs():
 SETTINGS_DEFAULT = {
     "id": "me", "hasTrainer": False, "hasWearable": False, "demoMode": False,
     "hudEnabled": True, "ftp": 287, "ftpAuto": True, "seatedMode": False,
+    "wheelCircumference": 2105,
     "homeCity": "Nice, France", "homeLat": 43.7102, "homeLon": 7.262,
 }
 
@@ -2028,6 +2029,7 @@ class TrainerSim:
         self.sensor_power = None
         self.sensor_cadence = None
         self.sensor_hr = None
+        self.sensor_speed = None
         self.sensor_expires = 0.0
         self.sensor_fresh = False
 
@@ -2053,6 +2055,9 @@ class TrainerSim:
                 self.hr = float(self.sensor_hr)
         # simplified physics: speed rises with power, falls with gradient
         self.speed = max(0.0, 12 + (self.power - 180) / 14 - self.gradient * 0.4 + random.uniform(-0.4, 0.4))
+        # A dedicated speed / wheel sensor overrides the estimated speed.
+        if self.sensor_fresh and self.sensor_speed is not None:
+            self.speed = float(self.sensor_speed)
         self.elapsed += dt
         self.distance += self.speed * dt / 3600.0
 
@@ -2114,6 +2119,8 @@ async def telemetry_ws(websocket: WebSocket):
                         sim.sensor_cadence = max(0.0, float(msg.get("cadence")))
                     if msg.get("hr") is not None:
                         sim.sensor_hr = max(0.0, float(msg.get("hr")))
+                    if msg.get("speed") is not None:
+                        sim.sensor_speed = max(0.0, float(msg.get("speed")))
                     sim.sensor_expires = loop.time() + 4.0
         except WebSocketDisconnect:
             pass

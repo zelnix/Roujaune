@@ -7,11 +7,13 @@ import {
   parseCyclingPower,
   parseCsc,
   cadenceFromCrank,
+  speedFromWheel,
   type CrankSample,
+  type WheelSample,
 } from "@/src/lib/ble/parse";
 
 export type BleDevice = { id: string; name: string };
-export type BleReadings = { power: number | null; cadence: number | null; hr: number | null; ts: number };
+export type BleReadings = { power: number | null; cadence: number | null; hr: number | null; speed: number | null; ts: number };
 export type PermState = "unknown" | "granted" | "denied" | "blocked";
 
 // Lazily load the native module so the app keeps working in Expo Go / web,
@@ -37,18 +39,23 @@ const RELEVANT_SERVICES = [UUID.heartRate, UUID.cyclingPower, UUID.csc];
  * heart-rate readings. Requires a native build — in Expo Go / web `supported`
  * is false and the UI guides the rider to build the app.
  */
-export function useBleSensors() {
+export function useBleSensors(wheelCircumferenceMm: number = 2105) {
   const managerRef = useRef<any>(null);
   const [supported, setSupported] = useState(false);
   const [poweredOn, setPoweredOn] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [devices, setDevices] = useState<BleDevice[]>([]);
   const [connected, setConnected] = useState<BleDevice[]>([]);
-  const [readings, setReadings] = useState<BleReadings>({ power: null, cadence: null, hr: null, ts: 0 });
+  const [readings, setReadings] = useState<BleReadings>({ power: null, cadence: null, hr: null, speed: null, ts: 0 });
   const [permissionStatus, setPermissionStatus] = useState<PermState>("unknown");
   const [error, setError] = useState<string | null>(null);
 
-  const prevCrank = useRef<CrankSample | null>(null);
+  // Per-device crank / wheel state so a standalone cadence sensor and a power
+  // meter (or a separate speed sensor) never trample each other's samples.
+  const crankState = useRef<Record<string, CrankSample>>({});
+  const wheelState = useRef<Record<string, WheelSample>>({});
+  const circumferenceRef = useRef(wheelCircumferenceMm);
+  useEffect(() => { circumferenceRef.current = wheelCircumferenceMm || 2105; }, [wheelCircumferenceMm]);
   const seen = useRef<Set<string>>(new Set());
   const subs = useRef<any[]>([]);
 
@@ -127,7 +134,7 @@ export function useBleSensors() {
     setTimeout(() => stopScan(), 15000);
   }, [requestPermission, stopScan]);
 
-  const handleValue = useCallback((serviceUuid: string, charUuid: string, value: string | null) => {
+  const handleValue = useCallback((deviceId: string, serviceUuid: string, charUuid: string, value: string | null) => {
     if (!value) return;
     const bytes = b64ToBytes(value);
     const cu = charUuid.toLowerCase();
@@ -138,28 +145,48 @@ export function useBleSensors() {
       const cp = parseCyclingPower(bytes);
       if (cp) {
         setReadings((r) => {
-          let cadence = r.cadence;
+          const next = { ...r, power: cp.power, ts: Date.now() };
           if (cp.crank) {
-            if (prevCrank.current) {
-              const c = cadenceFromCrank(prevCrank.current, cp.crank);
-              if (c != null) cadence = c;
+            const prev = crankState.current[deviceId];
+            if (prev) {
+              const c = cadenceFromCrank(prev, cp.crank);
+              if (c != null) next.cadence = c;
             }
-            prevCrank.current = cp.crank;
+            crankState.current[deviceId] = cp.crank;
           }
-          return { ...r, power: cp.power, cadence, ts: Date.now() };
+          if (cp.wheel) {
+            const prevW = wheelState.current[deviceId];
+            if (prevW) {
+              const sp = speedFromWheel(prevW, cp.wheel, circumferenceRef.current);
+              if (sp != null) next.speed = sp;
+            }
+            wheelState.current[deviceId] = cp.wheel;
+          }
+          return next;
         });
       }
     } else if (cu === UUID.cscMeasurement) {
       const csc = parseCsc(bytes);
-      if (csc?.crank) {
+      if (csc) {
         setReadings((r) => {
-          let cadence = r.cadence;
-          if (prevCrank.current) {
-            const c = cadenceFromCrank(prevCrank.current, csc.crank!);
-            if (c != null) cadence = c;
+          const next = { ...r, ts: Date.now() };
+          if (csc.crank) {
+            const prev = crankState.current[deviceId];
+            if (prev) {
+              const c = cadenceFromCrank(prev, csc.crank);
+              if (c != null) next.cadence = c;
+            }
+            crankState.current[deviceId] = csc.crank;
           }
-          prevCrank.current = csc.crank!;
-          return { ...r, cadence, ts: Date.now() };
+          if (csc.wheel) {
+            const prevW = wheelState.current[deviceId];
+            if (prevW) {
+              const sp = speedFromWheel(prevW, csc.wheel, circumferenceRef.current);
+              if (sp != null) next.speed = sp;
+            }
+            wheelState.current[deviceId] = csc.wheel;
+          }
+          return next;
         });
       }
     }
@@ -168,7 +195,7 @@ export function useBleSensors() {
   const monitor = useCallback((device: any, serviceUuid: string, charUuid: string) => {
     const sub = device.monitorCharacteristicForService(serviceUuid, charUuid, (err: any, ch: any) => {
       if (err) return;
-      handleValue(serviceUuid, charUuid, ch?.value ?? null);
+      handleValue(device.id, serviceUuid, charUuid, ch?.value ?? null);
     });
     subs.current.push(sub);
   }, [handleValue]);
@@ -193,6 +220,8 @@ export function useBleSensors() {
         }
       }
       device.onDisconnected(() => {
+        delete crankState.current[id];
+        delete wheelState.current[id];
         setConnected((prev) => prev.filter((d) => d.id !== id));
       });
       setConnected((prev) => (prev.some((d) => d.id === id) ? prev : [...prev, { id, name: device.name || "Sensor" }]));
@@ -203,6 +232,8 @@ export function useBleSensors() {
 
   const disconnect = useCallback(async (id: string) => {
     try { await managerRef.current?.cancelDeviceConnection(id); } catch { /* noop */ }
+    delete crankState.current[id];
+    delete wheelState.current[id];
     setConnected((prev) => prev.filter((d) => d.id !== id));
   }, []);
 

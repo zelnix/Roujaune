@@ -4,8 +4,8 @@ import type { BleDevice, BleReadings, PermState } from "./useBleSensors";
  * Web / preview stub — Web Bluetooth is not used here. `supported` is false so
  * the workout screen shows the "needs a native build" guidance.
  */
-export function useBleSensors() {
-  const readings: BleReadings = { power: null, cadence: null, hr: null, ts: 0 };
+export function useBleSensors(_wheelCircumferenceMm?: number) {
+  const readings: BleReadings = { power: null, cadence: null, hr: null, speed: null, ts: 0 };
   const noop = async () => {};
   return {
     supported: false,

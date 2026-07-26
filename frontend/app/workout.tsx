@@ -153,7 +153,7 @@ export default function LiveWorkout() {
 
   const { telemetry, connectionState, sendErg, sendTarget, sendInit, sendSensor, pause, resume, simulateDropout } = useTelemetry();
   const { settings, setSetting, loaded } = useSettings();
-  const ble = useBleSensors();
+  const ble = useBleSensors(settings.wheelCircumference);
   const { plan } = usePlan();
 
   // Plan context for the Workout card: plan name + current phase + week, with
@@ -186,7 +186,7 @@ export default function LiveWorkout() {
   // records measured power/cadence/HR (falls back to the trainer sim if BLE stops).
   React.useEffect(() => {
     if (ble.readings.ts <= 0 || connectionState !== "connected") return;
-    sendSensor({ power: ble.readings.power, cadence: ble.readings.cadence, hr: ble.readings.hr });
+    sendSensor({ power: ble.readings.power, cadence: ble.readings.cadence, hr: ble.readings.hr, speed: ble.readings.speed });
   }, [ble.readings.ts, connectionState, sendSensor]);
 
   // ---- Live segment driven by the chosen workout ----
@@ -976,6 +976,7 @@ export default function LiveWorkout() {
           onConnect={ble.connect}
           onDisconnect={ble.disconnect}
           onClose={() => setShowBle(false)}
+          units={settings.units}
         />
       )}
 

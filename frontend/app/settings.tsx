@@ -12,6 +12,17 @@ import { useSettings } from "@/src/lib/settings";
 
 const PREVIEW_LINE = "Alright, let's ride. Hold steady and breathe — you've got this.";
 
+// Common tyre roll-outs (mm). Values match standard cycling speed-sensor tables.
+const WHEEL_PRESETS: { label: string; mm: number }[] = [
+  { label: "700×23c", mm: 2097 },
+  { label: "700×25c", mm: 2105 },
+  { label: "700×28c", mm: 2136 },
+  { label: "700×32c", mm: 2155 },
+  { label: '650b · 27.5"', mm: 2086 },
+  { label: '26" MTB', mm: 2070 },
+  { label: '29" MTB', mm: 2299 },
+];
+
 export default function SettingsScreen() {
   const persona = useCoach();
   const { settings, setSetting } = useSettings();
@@ -202,6 +213,43 @@ export default function SettingsScreen() {
         <PrefToggle label="Seated mode" sub={`${persona.name} avoids standing-effort cues`} on={settings.seatedMode} onToggle={() => setSetting("seatedMode", !settings.seatedMode)} testID="tg-seatedMode" divider />
         <PrefToggle label="Demo mode" sub="Simulate sensor data without hardware" on={settings.demoMode} onToggle={() => setSetting("demoMode", !settings.demoMode)} testID="tg-demoMode" />
         <Text style={s.coachHint}>These stay in sync with the pre-ride setup and your Connections — one source of truth, saved to your account.</Text>
+      </Card>
+
+      <Card testID="wheel-speed">
+        <SectionTitle label="WHEEL & SPEED" color={CC.rouge} />
+        <Text style={s.prefTitle}>Wheel circumference</Text>
+        <Text style={[s.prefSub, { marginBottom: 12 }]}>Converts wheel-sensor revolutions into your live speed. Pick your tyre or set an exact roll-out.</Text>
+        <View style={s.voiceGrid}>
+          {WHEEL_PRESETS.map((p) => {
+            const on = settings.wheelCircumference === p.mm;
+            return (
+              <Pressable key={p.mm} testID={`wheel-${p.mm}`} onPress={() => setSetting("wheelCircumference", p.mm)} accessibilityState={{ selected: on }}
+                style={[s.voiceChip, on && s.voiceChipOn]}>
+                <Ionicons name={on ? "checkmark-circle" : "ellipse-outline"} size={14} color={on ? CC.rouge : CC.dim} />
+                <Text style={[s.voiceChipText, on && { color: CC.white }]}>{p.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <View style={[s.ftpRow, { borderTopWidth: 1, borderTopColor: CC.borderSoft, marginTop: 14, paddingTop: 14 }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.prefTitle}>Custom roll-out</Text>
+            <Text style={s.prefSub}>Fine-tune to your exact measured circumference.</Text>
+          </View>
+          <View style={s.ftpStepper}>
+            <Pressable testID="wheel-minus" onPress={() => setSetting("wheelCircumference", Math.max(1000, settings.wheelCircumference - 1))} style={s.ftpBtn}>
+              <Ionicons name="remove" size={18} color={CC.white} />
+            </Pressable>
+            <View style={[s.ftpValueWrap, { minWidth: 84 }]}>
+              <Text style={s.ftpValue}>{settings.wheelCircumference}</Text>
+              <Text style={s.ftpUnit}>mm</Text>
+            </View>
+            <Pressable testID="wheel-plus" onPress={() => setSetting("wheelCircumference", Math.min(2400, settings.wheelCircumference + 1))} style={s.ftpBtn}>
+              <Ionicons name="add" size={18} color={CC.white} />
+            </Pressable>
+          </View>
+        </View>
+        <Text style={s.coachHint}>Only used with a wheel / speed sensor. A smart trainer reports speed directly.</Text>
       </Card>
 
       <Card testID="preferences">

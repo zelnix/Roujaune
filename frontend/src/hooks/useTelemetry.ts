@@ -112,7 +112,7 @@ export function useTelemetry() {
   const sendErg = useCallback((intensity: number) => send({ type: "erg", intensity }), [send]);
   const sendTarget = useCallback((watts: number) => send({ type: "target", watts }), [send]);
   const sendInit = useCallback((opts: { elapsed?: number; distance?: number; watts?: number }) => send({ type: "init", ...opts }), [send]);
-  const sendSensor = useCallback((r: { power?: number | null; cadence?: number | null; hr?: number | null }) => send({ type: "sensor", ...r }), [send]);
+  const sendSensor = useCallback((r: { power?: number | null; cadence?: number | null; hr?: number | null; speed?: number | null }) => send({ type: "sensor", ...r }), [send]);
   const pause = useCallback(() => send({ type: "pause" }), [send]);
   const resume = useCallback(() => send({ type: "resume" }), [send]);
   const simulateDropout = useCallback(() => send({ type: "dropout", seconds: 4 }), [send]);

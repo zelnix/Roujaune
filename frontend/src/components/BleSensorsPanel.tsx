@@ -6,7 +6,7 @@ import type { BleDevice, BleReadings, PermState } from "../hooks/useBleSensors";
 
 export function BleSensorsPanel({
   supported, poweredOn, scanning, devices, connected, readings, permissionStatus, error,
-  onScan, onStopScan, onConnect, onDisconnect, onClose,
+  onScan, onStopScan, onConnect, onDisconnect, onClose, units = "metric",
 }: {
   supported: boolean;
   poweredOn: boolean;
@@ -21,10 +21,14 @@ export function BleSensorsPanel({
   onConnect: (id: string) => void;
   onDisconnect: (id: string) => void;
   onClose: () => void;
+  units?: "metric" | "imperial";
 }) {
   const connectedIds = new Set(connected.map((d) => d.id));
   const discovered = devices.filter((d) => !connectedIds.has(d.id));
   const live = readings.ts > 0 && Date.now() - readings.ts < 4000;
+  const speedLabel = readings.speed != null
+    ? (units === "imperial" ? `${Math.round(readings.speed * 0.621371 * 10) / 10} mph` : `${readings.speed} km/h`)
+    : "—";
 
   return (
     <Pressable style={styles.overlay} onPress={onClose} testID="ble-panel">
@@ -32,7 +36,7 @@ export function BleSensorsPanel({
         <View style={styles.head}>
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>Bluetooth sensors</Text>
-            <Text style={styles.sub}>Trainer · power · cadence · heart rate</Text>
+            <Text style={styles.sub}>Trainer · power · cadence · speed · heart rate</Text>
           </View>
           <Pressable onPress={onClose} testID="ble-close" hitSlop={10}><Ionicons name="close" size={22} color={colors.white} /></Pressable>
         </View>
@@ -67,6 +71,7 @@ export function BleSensorsPanel({
             <View style={styles.readings}>
               <Reading label="POWER" value={readings.power != null ? `${readings.power} W` : "—"} live={live} />
               <Reading label="CADENCE" value={readings.cadence != null ? `${readings.cadence} rpm` : "—"} live={live} />
+              <Reading label="SPEED" value={speedLabel} live={live} />
               <Reading label="HEART RATE" value={readings.hr != null ? `${readings.hr} bpm` : "—"} live={live} />
             </View>
 

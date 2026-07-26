@@ -8,6 +8,7 @@ import { colors, radius, spacing, shadow } from "@/src/theme";
 import { useTelemetry } from "@/src/hooks/useTelemetry";
 import { useBleSensors } from "@/src/hooks/useBleSensors";
 import { BleSensorsPanel } from "@/src/components/BleSensorsPanel";
+import { useSettings } from "@/src/lib/settings";
 import { RouteProfile } from "@/src/components/virtual-route/RouteProfile";
 import { riderVisualFor } from "@/src/lib/virtual-riders";
 import { RIDER_TYPES, BIKE_TYPES, CLOTHING_STYLES, DEFAULT_APPEARANCE, loadAppearance, RiderAppearanceConfiguration } from "@/src/lib/rider-config";
@@ -63,13 +64,14 @@ export default function VirtualRouteScreen() {
   const { width } = useWindowDimensions();
   const compact = width < 820;
   const { telemetry, connectionState, stale, sendErg, sendTarget, sendSensor, simulateDropout, pause, resume } = useTelemetry();
-  const ble = useBleSensors();
+  const { settings } = useSettings();
+  const ble = useBleSensors(settings.wheelCircumference);
   const [showBle, setShowBle] = React.useState(false);
 
   // Push real Bluetooth sensor readings into the telemetry stream (overrides sim).
   React.useEffect(() => {
     if (ble.readings.ts <= 0 || connectionState !== "connected") return;
-    sendSensor({ power: ble.readings.power, cadence: ble.readings.cadence, hr: ble.readings.hr });
+    sendSensor({ power: ble.readings.power, cadence: ble.readings.cadence, hr: ble.readings.hr, speed: ble.readings.speed });
   }, [ble.readings.ts, connectionState, sendSensor]);
 
   const [appearance, setAppearance] = React.useState<RiderAppearanceConfiguration>(DEFAULT_APPEARANCE);
@@ -397,6 +399,7 @@ export default function VirtualRouteScreen() {
           onConnect={ble.connect}
           onDisconnect={ble.disconnect}
           onClose={() => setShowBle(false)}
+          units={settings.units}
         />
       )}
     </View>

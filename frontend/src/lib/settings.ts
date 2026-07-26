@@ -8,6 +8,7 @@ export type Settings = {
   hudEnabled: boolean;   // show the on-screen HUD overlay in immersive mode
   ftp: number;           // rider FTP (watts) — drives live ERG target power
   ftpAuto: boolean;      // keep FTP in sync with training-progress FTP
+  wheelCircumference: number; // wheel roll-out in mm — converts wheel revs to speed
   seatedMode: boolean;   // ride seated throughout — coach cues avoid standing efforts
   homeCity: string;      // fallback location label for the home weather when GPS is unavailable
   homeLat: number;       // fallback latitude
@@ -19,7 +20,7 @@ export type Settings = {
   restReminders: boolean; // reminders to take scheduled rest days
 };
 
-const DEFAULTS: Settings = { hasTrainer: false, hasWearable: false, demoMode: false, hudEnabled: true, ftp: 287, ftpAuto: true, seatedMode: false, homeCity: "Nice, France", homeLat: 43.7102, homeLon: 7.262, units: "metric", coachAudio: true, autoSync: true, weeklyReport: true, restReminders: false };
+const DEFAULTS: Settings = { hasTrainer: false, hasWearable: false, demoMode: false, hudEnabled: true, ftp: 287, ftpAuto: true, wheelCircumference: 2105, seatedMode: false, homeCity: "Nice, France", homeLat: 43.7102, homeLon: 7.262, units: "metric", coachAudio: true, autoSync: true, weeklyReport: true, restReminders: false };
 const KEY = "roujaune:settings";
 
 function apiBase(): string {
