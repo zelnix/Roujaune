@@ -1,7 +1,6 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, Animated, useWindowDimensions, LayoutChangeEvent, Pressable, Platform, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, ScrollView, useWindowDimensions, LayoutChangeEvent, Pressable } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { Image } from "expo-image";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -21,6 +20,7 @@ import { VirtualRidePlayer } from "@/src/components/virtual-route/VirtualRidePla
 import { VIRTUAL_ROUTES, getVRoute } from "@/src/lib/vroutes";
 import { vrouteIdForType, deriveVirtualRide } from "@/src/lib/workout-vroute";
 import { prTracker, prToastMessages } from "@/src/lib/pr-tracker";
+import { Toast, CompletePrompt, EndPrompt } from "@/src/components/workout/WorkoutModals";
 import { VRoutePicker } from "@/src/components/workout/VRoutePicker";
 import { loadAppearance, RiderAppearanceConfiguration, DEFAULT_APPEARANCE } from "@/src/lib/rider-config";
 import {
@@ -107,36 +107,6 @@ const ZONE_DESC: Record<string, string> = {
 const TYPE_SPEED: Record<string, number> = { climbing: 20, threshold: 27, endurance: 30, tempo: 29, vo2max: 30, sprints: 31, recovery: 25, restday: 22, fb50: 24 };
 const TYPE_GRADE: Record<string, number> = { climbing: 7.2, threshold: 4, endurance: 1.5, tempo: 2.2, vo2max: 2.6, sprints: 1.8, recovery: 0.6, restday: 0.4, fb50: 1 };
 
-function Toast({ message }: { message: { id: number; text: string } | null }) {
-  const anim = React.useRef(new Animated.Value(0)).current;
-  React.useEffect(() => {
-    if (!message) return;
-    Animated.spring(anim, { toValue: 1, useNativeDriver: Platform.OS !== "web", speed: 18, bounciness: 6 }).start();
-    const t = setTimeout(() => Animated.timing(anim, { toValue: 0, duration: 220, useNativeDriver: Platform.OS !== "web" }).start(), 1800);
-    return () => clearTimeout(t);
-  }, [message, anim]);
-  if (!message) return null;
-  return (
-    <Animated.View testID="toast" style={[styles.toast, shadow.glow, { pointerEvents: "none", opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] }]}>
-      <Ionicons name="checkmark-circle" size={18} color={colors.yellow} />
-      <Text style={styles.toastText}>{message.text}</Text>
-    </Animated.View>
-  );
-}
-
-// One extension option in the Workout Complete popup. The coach's recommended
-// option is highlighted with an accent border + "Coach pick" badge.
-function ExtendChip({ testID, icon, label, pick, onPress }: { testID: string; icon: any; label: string; pick: boolean; onPress: () => void }) {
-  return (
-    <Pressable testID={testID} onPress={onPress} style={[styles.extendChip, pick && styles.extendChipPick]}>
-      {pick ? (
-        <View style={styles.pickBadge}><Text style={styles.pickBadgeText}>COACH PICK</Text></View>
-      ) : null}
-      <Ionicons name={icon} size={16} color={colors.yellow} />
-      <Text style={styles.extendChipText}>{label}</Text>
-    </Pressable>
-  );
-}
 
 
 export default function LiveWorkout() {
@@ -1010,84 +980,23 @@ export default function LiveWorkout() {
       )}
 
       {completePrompt && (
-        <View style={styles.overlay}>
-          <View style={styles.completePanel} testID="workout-complete-prompt">
-            <View style={styles.completeBadge}><Ionicons name="checkmark-circle" size={40} color={colors.green} /></View>
-            <Text style={styles.completeTitle}>Workout Complete</Text>
-            <Text style={styles.completeSub}>You finished {workoutTitle}. Nicely done.</Text>
-
-            <View style={styles.adviceCard}>
-              <View style={styles.adviceHead}>
-                <Image source={persona.image} style={styles.adviceAvatar} contentFit="cover" contentPosition="top center" />
-                <Text style={styles.adviceName}>{`${persona.name}'s advice`}</Text>
-              </View>
-              {extendAdvice ? (
-                <Text style={styles.adviceText} testID="extend-advice">{extendAdvice}</Text>
-              ) : (
-                <View style={styles.adviceLoading}>
-                  <ActivityIndicator size="small" color={colors.yellow} />
-                  <Text style={styles.adviceLoadingText}>{persona.name} is reviewing your ride…</Text>
-                </View>
-              )}
-            </View>
-
-            {extendRec === "finish" ? (
-              <View style={styles.recoverNote} testID="recover-note">
-                <Ionicons name="bed-outline" size={16} color={colors.green} />
-                <Text style={styles.recoverNoteText}>{persona.name} recommends finishing here and recovering.</Text>
-              </View>
-            ) : (
-              <>
-                <Text style={styles.extendLabel}>
-                  EXTEND YOUR RIDE{extendPick ? " · COACH PICK HIGHLIGHTED" : ""}
-                </Text>
-                <View style={styles.extendRow}>
-                  <ExtendChip
-                    testID="extend-10" icon="time-outline" label="+10 min" pick={extendPick === "10min"}
-                    onPress={() => onExtendRide(10, "+10 min")}
-                  />
-                  <ExtendChip
-                    testID="extend-20" icon="time-outline" label="+20 min" pick={extendPick === "20min"}
-                    onPress={() => onExtendRide(20, "+20 min")}
-                  />
-                  <ExtendChip
-                    testID="extend-5km" icon="navigate-outline" label="+5 km" pick={extendPick === "5km"}
-                    onPress={() => {
-                      const kmh = TYPE_SPEED[selected?.typeId ?? "endurance"] ?? 28;
-                      onExtendRide(Math.max(6, Math.round((5 / kmh) * 60)), "+5 km");
-                    }}
-                  />
-                </View>
-              </>
-            )}
-
-            <Pressable testID="complete-finish" onPress={onFinishComplete} style={({ hovered }: any) => [styles.endSave, { backgroundColor: colors.green }, hovered && { opacity: 0.9 }]}>
-              <Ionicons name="checkmark-circle" size={18} color="#fff" />
-              <Text style={styles.endSaveText}>OK</Text>
-            </Pressable>
-          </View>
-        </View>
+        <CompletePrompt
+          workoutTitle={workoutTitle}
+          persona={persona}
+          extendAdvice={extendAdvice}
+          extendRec={extendRec}
+          extendPick={extendPick}
+          onExtend={onExtendRide}
+          on5km={() => {
+            const kmh = TYPE_SPEED[selected?.typeId ?? "endurance"] ?? 28;
+            onExtendRide(Math.max(6, Math.round((5 / kmh) * 60)), "+5 km");
+          }}
+          onFinish={onFinishComplete}
+        />
       )}
 
       {endPrompt && (
-        <View style={styles.overlay}>
-          <View style={styles.endPanel} testID="end-ride-prompt">
-            <Ionicons name="flag" size={30} color={colors.yellow} />
-            <Text style={styles.endTitle}>End this ride?</Text>
-            <Text style={styles.endSub}>Save your ride to record it in your progress and plan, or abandon it — abandoned rides are not recorded.</Text>
-            <Pressable testID="end-save" onPress={onSaveRide} style={({ hovered }: any) => [styles.endSave, hovered && { opacity: 0.9 }]}>
-              <Ionicons name="checkmark-circle" size={18} color="#fff" />
-              <Text style={styles.endSaveText}>Save Ride</Text>
-            </Pressable>
-            <Pressable testID="end-abandon" onPress={onAbandonRide} style={({ hovered }: any) => [styles.endAbandon, hovered && { backgroundColor: "rgba(224,30,43,0.14)" }]}>
-              <Ionicons name="trash-outline" size={17} color={colors.red} />
-              <Text style={styles.endAbandonText}>Abandon Ride</Text>
-            </Pressable>
-            <Pressable testID="end-resume" onPress={onResumeRide} style={styles.endResume}>
-              <Text style={styles.endResumeText}>Resume</Text>
-            </Pressable>
-          </View>
-        </View>
+        <EndPrompt onSave={onSaveRide} onAbandon={onAbandonRide} onResume={onResumeRide} />
       )}
 
       {stepDetail != null && stepList[stepDetail] && (
@@ -1139,9 +1048,6 @@ const styles = StyleSheet.create({
   centerCol: { flex: 1, gap: spacing.md },
   rightCol: { gap: spacing.md },
 
-  toast: { position: "absolute", bottom: 90, alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(20,18,16,0.96)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 18, paddingVertical: 11 },
-  toastText: { color: colors.white, fontWeight: "700", fontSize: 14 },
-
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center" },
   controlsPanel: { width: 560, maxWidth: "90%", backgroundColor: colors.cardElevated, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, ...shadow.card },
   panelHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.md },
@@ -1151,35 +1057,4 @@ const styles = StyleSheet.create({
   panelItemText: { color: colors.white, fontSize: 14, fontWeight: "600" },
   menuPanel: { position: "absolute", left: spacing.lg, bottom: 90, width: 300, backgroundColor: colors.cardElevated, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md, ...shadow.card },
   menuItem: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, paddingHorizontal: 6 },
-
-  endPanel: { width: 440, maxWidth: "90%", backgroundColor: colors.cardElevated, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, alignItems: "center", gap: 10, ...shadow.card },
-  endTitle: { color: colors.white, fontSize: 22, fontWeight: "800", marginTop: 4 },
-  endSub: { color: colors.textDim, fontSize: 13.5, lineHeight: 19, textAlign: "center", marginBottom: 6 },
-  endSave: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.red, borderRadius: radius.md, paddingVertical: 14, width: "100%", ...shadow.glow },
-  endSaveText: { color: "#fff", fontSize: 15, fontWeight: "800" },
-  endAbandon: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: radius.md, paddingVertical: 13, width: "100%", borderWidth: 1, borderColor: "rgba(224,30,43,0.4)", backgroundColor: "rgba(224,30,43,0.06)" },
-  endAbandonText: { color: colors.red, fontSize: 14.5, fontWeight: "700" },
-  endResume: { paddingVertical: 8, marginTop: 2 },
-  endResumeText: { color: colors.textDim, fontSize: 14, fontWeight: "700" },
-
-  completePanel: { width: 480, maxWidth: "92%", backgroundColor: colors.cardElevated, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, alignItems: "center", gap: 10, ...shadow.card },
-  completeBadge: { width: 66, height: 66, borderRadius: 33, alignItems: "center", justifyContent: "center", backgroundColor: colors.green + "1A", borderWidth: 1, borderColor: colors.green + "55" },
-  completeTitle: { color: colors.white, fontSize: 24, fontWeight: "900", marginTop: 2 },
-  completeSub: { color: colors.textDim, fontSize: 14, textAlign: "center", marginBottom: 4 },
-  adviceCard: { width: "100%", backgroundColor: colors.yellow + "10", borderWidth: 1, borderColor: colors.yellow + "3A", borderRadius: radius.lg, padding: 14, gap: 8 },
-  adviceHead: { flexDirection: "row", alignItems: "center", gap: 9 },
-  adviceAvatar: { width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(255,255,255,0.08)" },
-  adviceName: { color: colors.yellow, fontSize: 12, fontWeight: "800", letterSpacing: 0.5 },
-  adviceText: { color: colors.white, fontSize: 14, fontWeight: "600", lineHeight: 20 },
-  adviceLoading: { flexDirection: "row", alignItems: "center", gap: 9 },
-  adviceLoadingText: { color: colors.textDim, fontSize: 13, fontWeight: "600" },
-  extendLabel: { color: colors.textFaint, fontSize: 10.5, fontWeight: "800", letterSpacing: 1, alignSelf: "flex-start", marginTop: 4 },
-  extendRow: { flexDirection: "row", gap: 10, width: "100%" },
-  extendChip: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: colors.yellow + "44", borderRadius: radius.md, paddingVertical: 12 },
-  extendChipPick: { borderColor: colors.yellow, backgroundColor: colors.yellow + "1E", ...(shadow.glow || {}) },
-  extendChipText: { color: colors.white, fontSize: 13.5, fontWeight: "800" },
-  pickBadge: { position: "absolute", top: -9, alignSelf: "center", backgroundColor: colors.yellow, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2 },
-  pickBadgeText: { color: colors.bg, fontSize: 8.5, fontWeight: "900", letterSpacing: 0.5 },
-  recoverNote: { flexDirection: "row", alignItems: "center", gap: 8, width: "100%", backgroundColor: colors.green + "12", borderWidth: 1, borderColor: colors.green + "44", borderRadius: radius.md, paddingVertical: 12, paddingHorizontal: 14 },
-  recoverNoteText: { color: colors.white, fontSize: 13.5, fontWeight: "600", flex: 1 },
 });
