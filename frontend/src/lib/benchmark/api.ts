@@ -67,6 +67,89 @@ export async function saveBenchmarkResult(payload: Record<string, unknown>): Pro
   }
 }
 
+export interface PlanReview {
+  hasProposal: boolean;
+  metric?: string; previous?: number; next?: number; delta?: number; deltaPct?: number;
+  effectiveDate?: string; reason?: string; affected?: string[];
+  zonesPreview?: { key: string; name: string; oldLow: number; oldHigh: number | null; newLow: number; newHigh: number | null }[];
+  sourceTestId?: string;
+}
+export async function fetchPlanReview(): Promise<PlanReview> {
+  try { const res = await fetch(`${apiBase()}/api/benchmark/plan-review`); return res.ok ? await res.json() : { hasProposal: false }; }
+  catch { return { hasProposal: false }; }
+}
+export async function applyPlanReview(): Promise<boolean> {
+  try { const res = await fetch(`${apiBase()}/api/benchmark/plan-review/apply`, { method: "POST" }); return res.ok; } catch { return false; }
+}
+export async function dismissPlanReview(): Promise<boolean> {
+  try { const res = await fetch(`${apiBase()}/api/benchmark/plan-review/dismiss`, { method: "POST" }); return res.ok; } catch { return false; }
+}
+export function useBenchmarkPlanReview() {
+  const [review, setReview] = useState<PlanReview>({ hasProposal: false });
+  const [loading, setLoading] = useState(true);
+  const reload = useCallback(async () => { setReview(await fetchPlanReview()); setLoading(false); }, []);
+  useEffect(() => { reload(); }, [reload]);
+  return { review, setReview, loading, reload };
+}
+
+export interface BenchmarkTrends {
+  range: string;
+  series: Record<string, { date: string; value: number }[]>;
+  labels: Record<string, string>;
+  units: Record<string, string>;
+}
+export async function fetchBenchmarkTrends(range: string): Promise<BenchmarkTrends> {
+  try { const res = await fetch(`${apiBase()}/api/benchmark/trends?range=${range}`); return res.ok ? await res.json() : { range, series: {}, labels: {}, units: {} }; }
+  catch { return { range, series: {}, labels: {}, units: {} }; }
+}
+export function useBenchmarkTrends(range: string) {
+  const [trends, setTrends] = useState<BenchmarkTrends>({ range, series: {}, labels: {}, units: {} });
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { let alive = true; setLoading(true); fetchBenchmarkTrends(range).then((t) => { if (alive) { setTrends(t); setLoading(false); } }); return () => { alive = false; }; }, [range]);
+  return { trends, loading };
+}
+
+export interface BenchmarkWeekDay { index: number; date: string; kind: "test" | "recovery" | "rest"; testId?: string; label: string; status: "scheduled" | "done" | "skipped"; }
+export interface BenchmarkWeek { active: boolean; startDate?: string; days: BenchmarkWeekDay[]; }
+
+export async function fetchBenchmarkWeek(): Promise<BenchmarkWeek> {
+  try {
+    const res = await fetch(`${apiBase()}/api/benchmark/week`);
+    if (!res.ok) return { active: false, days: [] };
+    return await res.json();
+  } catch { return { active: false, days: [] }; }
+}
+export async function startBenchmarkWeek(startDate?: string): Promise<BenchmarkWeek | null> {
+  try {
+    const res = await fetch(`${apiBase()}/api/benchmark/week/start`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(startDate ? { startDate } : {}),
+    });
+    return res.ok ? await res.json() : null;
+  } catch { return null; }
+}
+export async function patchBenchmarkWeekDay(index: number, payload: Record<string, unknown>): Promise<{ ok: boolean; error?: string; week?: BenchmarkWeek }> {
+  try {
+    const res = await fetch(`${apiBase()}/api/benchmark/week/day/${index}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+    });
+    if (res.ok) return { ok: true, week: await res.json() };
+    const err = await res.json().catch(() => ({}));
+    return { ok: false, error: err?.detail || "Update failed" };
+  } catch { return { ok: false, error: "Network error" }; }
+}
+export async function cancelBenchmarkWeek(): Promise<boolean> {
+  try { const res = await fetch(`${apiBase()}/api/benchmark/week/cancel`, { method: "POST" }); return res.ok; }
+  catch { return false; }
+}
+export function useBenchmarkWeek() {
+  const [week, setWeek] = useState<BenchmarkWeek>({ active: false, days: [] });
+  const [loading, setLoading] = useState(true);
+  const reload = useCallback(async () => { setWeek(await fetchBenchmarkWeek()); setLoading(false); }, []);
+  useEffect(() => { reload(); }, [reload]);
+  return { week, setWeek, loading, reload };
+}
+
 export interface BenchmarkRecommendation {
   primary: { testId: string; score: number; reasons: string[] };
   ordered: { testId: string; score: number; reasons: string[] }[];

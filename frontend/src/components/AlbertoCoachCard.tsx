@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { View, Text, StyleSheet, Pressable, Platform } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -78,7 +78,7 @@ export function AlbertoCoachCard({ width, onStart, onMessage, compact = false }:
           testID="start-ride-button"
           label={cta}
           onPress={onStart}
-          style={{ marginTop: spacing.sm, alignSelf: "stretch" }}
+          style={[{ marginTop: spacing.sm, alignSelf: "stretch" }, Platform.select({ web: { boxShadow: "none" }, default: { shadowOpacity: 0, shadowRadius: 0, elevation: 0 } }) as any]}
         />
         <View style={styles.linkRow}>
           {onMessage ? (

@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, radius, spacing } from "../theme";
+import { colors, radius, spacing, shadow } from "../theme";
 import { usePlan } from "../lib/plan";
 import { getWorkout, buildSegments } from "../lib/workout-catalog";
 import { SecondaryButton, SectionLabel } from "./ui";
@@ -11,7 +11,7 @@ const KIND_LABEL: Record<string, string> = { recovery: "Recovery", rest: "Rest",
 /** "Today's Training" / "Next Scheduled Workout" card — reflects the same next
  * scheduled activity (any type) as the coach hero. Title flips depending on
  * whether that activity is actually scheduled for today. */
-export function TodayTrainingCard({ onOpenToday, onToast, onCalendar }: { onOpenToday?: () => void; onToast?: (m: string) => void; onCalendar?: () => void }) {
+export function TodayTrainingCard({ onOpenToday, onToast, onCalendar, overlay = false }: { onOpenToday?: () => void; onToast?: (m: string) => void; onCalendar?: () => void; overlay?: boolean }) {
   const { plan } = usePlan();
   const next = (plan.workouts?.find((w) => !w.completed) ?? plan.workouts?.[0]) as any;
 
@@ -31,13 +31,13 @@ export function TodayTrainingCard({ onOpenToday, onToast, onCalendar }: { onOpen
   }, [next, isRide]);
 
   return (
-    <View style={styles.card} testID="today-training-card">
+    <View style={[styles.card, overlay && styles.cardOverlay]} testID="today-training-card">
       <View style={styles.headRow}>
         <SectionLabel color={colors.textDim}>{title}</SectionLabel>
         {dayLabel ? <Text style={styles.dayLabel}>{dayLabel.toUpperCase()}</Text> : null}
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 4 }}>
+      <ScrollView showsVerticalScrollIndicator={false} style={overlay ? { flex: 1 } : undefined} contentContainerStyle={{ paddingBottom: 4 }}>
         {next ? (
           <View style={styles.detail} testID="today-training-detail">
             <Text style={styles.detailTitle} numberOfLines={2}>{isRest ? "Rest & Recovery" : next.title}</Text>
@@ -108,6 +108,7 @@ export function TodayTrainingCard({ onOpenToday, onToast, onCalendar }: { onOpen
 
 const styles = StyleSheet.create({
   card: { flex: 1, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md },
+  cardOverlay: { backgroundColor: "rgba(10,9,8,0.9)", borderColor: "rgba(255,255,255,0.16)", ...(shadow.card as any) },
   headRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   dayLabel: { color: colors.textFaint, fontSize: 11, fontWeight: "800", letterSpacing: 0.5 },
   detail: { marginTop: 8, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: colors.borderSoft, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10 },

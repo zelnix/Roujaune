@@ -4,20 +4,42 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle, Path, Defs, LinearGradient as SvgGrad, Stop } from "react-native-svg";
 import { colors, radius, spacing } from "./../theme";
-import { progressCard, community, wellness, achievement } from "../data";
-import { LineChart, SecondaryButton, SectionLabel } from "./ui";
-import { PLAN } from "./plan";
+import { community, wellness, achievement } from "../data";
+import { SecondaryButton, SectionLabel } from "./ui";
 import { useSettings } from "../lib/settings";
 
 /* -------- PROGRESS -------- */
+interface ProgressSummary {
+  workouts: { ride: number; strength: number; recoveryMobility: number };
+  ftp: { current: number; delta: number; wkg: number | null };
+  tests: { accepted: number; measured: number; total: number };
+  totals: { km: number; durationLabel: string; rides: number };
+}
+function apiBase() { return (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, ""); }
+
 export function ProgressCard({ onPress }: { onPress?: () => void }) {
-  const p = PLAN.progress;
-  const stats = [
-    { label: "WEEKS", value: p.weeks },
-    { label: "WORKOUTS", value: p.workouts },
-    { label: "TIME", value: p.time },
-    { label: "TSS", value: p.tss },
+  const [sum, setSum] = React.useState<ProgressSummary | null>(null);
+  React.useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`${apiBase()}/api/progress/summary`);
+        if (res.ok && alive) setSum(await res.json());
+      } catch { /* keep placeholders */ }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const ftpDelta = sum?.ftp.delta ?? 0;
+  const tiles = [
+    { label: "RIDES", value: sum ? String(sum.workouts.ride) : "—", icon: "bicycle" as const },
+    { label: "STRENGTH", value: sum ? String(sum.workouts.strength) : "—", icon: "barbell" as const },
+    { label: "RECOVERY & MOBILITY", value: sum ? String(sum.workouts.recoveryMobility) : "—", icon: "leaf" as const },
+    { label: "FTP", value: sum && sum.ftp.current ? `${sum.ftp.current}W` : "—", icon: "flash" as const, sub: ftpDelta ? `${ftpDelta > 0 ? "+" : ""}${ftpDelta}W` : undefined },
+    { label: "TOTAL DISTANCE", value: sum ? `${sum.totals.km} km` : "—", icon: "map" as const },
+    { label: "TOTAL TIME", value: sum ? sum.totals.durationLabel : "—", icon: "time" as const },
   ];
+
   return (
     <LinearGradient
       testID="progress-card"
@@ -31,31 +53,24 @@ export function ProgressCard({ onPress }: { onPress?: () => void }) {
           <Ionicons name="stats-chart" size={13} color={colors.red} />
           <SectionLabel color={colors.red}>PROGRESS</SectionLabel>
         </View>
-        <View style={{ alignItems: "flex-end" }}>
-          <Text style={styles.delta}>{progressCard.delta}</Text>
-          <Text style={styles.deltaUnit}>{progressCard.unit}</Text>
-        </View>
+        <Text style={styles.progTests}>
+          {sum ? `${sum.tests.accepted} test${sum.tests.accepted === 1 ? "" : "s"} · ${sum.tests.measured}/${sum.tests.total} metrics` : ""}
+        </Text>
       </View>
-      <Text style={styles.title}>{progressCard.title}</Text>
-      <Text style={styles.sub}>{progressCard.subtitle}</Text>
+      <Text style={styles.title}>Your training so far</Text>
+      <Text style={styles.sub}>Completed sessions, fitness and totals.</Text>
 
-      <View style={styles.progStatGrid}>
-        {stats.map((s) => (
-          <View key={s.label} style={styles.progStat}>
-            <Text style={styles.progStatValue}>{s.value}</Text>
-            <Text style={styles.progStatLabel}>{s.label}</Text>
+      <View style={styles.progTileGrid}>
+        {tiles.map((t) => (
+          <View key={t.label} style={styles.progTile}>
+            <Ionicons name={t.icon} size={14} color={colors.redBright} />
+            <View style={styles.progTileValRow}>
+              <Text style={styles.progTileValue}>{t.value}</Text>
+              {t.sub ? <Text style={styles.progTileDelta}>{t.sub}</Text> : null}
+            </View>
+            <Text style={styles.progTileLabel}>{t.label}</Text>
           </View>
         ))}
-      </View>
-
-      <View style={styles.progFitRow}>
-        <Text style={styles.progFit}>CTL {p.ctl}</Text>
-        <Text style={styles.progFitDim}>ATL {p.atl}</Text>
-        <Text style={styles.progFitDim}>TSB {p.tsb}</Text>
-      </View>
-
-      <View style={{ flex: 1, justifyContent: "flex-end" }}>
-        <LineChart data={progressCard.points} color={colors.redBright} width={230} height={56} />
       </View>
 
       {onPress && <SecondaryButton testID="view-progress-button" label="View Progress" tone="red" onPress={onPress} style={{ marginTop: spacing.sm }} />}
@@ -208,6 +223,13 @@ const styles = StyleSheet.create({
   title: { color: colors.white, fontSize: 16, fontWeight: "800", marginTop: 8 },
   sub: { color: colors.textDim, fontSize: 12, marginTop: 2 },
   progStatGrid: { flexDirection: "row", flexWrap: "wrap", marginTop: 12, gap: 8 },
+  progTests: { color: colors.textDim, fontSize: 11, fontWeight: "700" },
+  progTileGrid: { flexDirection: "row", flexWrap: "wrap", marginTop: 12, gap: 8 },
+  progTile: { width: "31%", flexGrow: 1, minWidth: 92, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: colors.borderSoft, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 9, gap: 3 },
+  progTileValRow: { flexDirection: "row", alignItems: "baseline", gap: 5 },
+  progTileValue: { color: colors.white, fontSize: 17, fontWeight: "800" },
+  progTileDelta: { color: "#7FD98A", fontSize: 11, fontWeight: "800" },
+  progTileLabel: { color: colors.textDim, fontSize: 9.5, fontWeight: "700", letterSpacing: 0.2 },
   progStat: { minWidth: "45%", flex: 1, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: colors.borderSoft, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 7 },
   progStatValue: { color: colors.white, fontSize: 16, fontWeight: "900" },
   progStatLabel: { color: colors.textFaint, fontSize: 9, fontWeight: "800", letterSpacing: 0.8, marginTop: 1 },

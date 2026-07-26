@@ -94,19 +94,19 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
   // never overflows and the buttons aren't oversized (Pause / End Ride etc).
   const compactBar = width < 1180 || !!compact;
   const tinyBar = width < 900;
-  const RB_H = tinyBar ? 48 : compactBar ? 58 : 72;
-  const RB_ICON = tinyBar ? 17 : compactBar ? 20 : 24;
-  const RB_TXT = tinyBar ? 10 : compactBar ? 11 : 13;
-  const RB_MINW = tinyBar ? 56 : compactBar ? 70 : 90;
+  const RB_H = tinyBar ? 44 : compactBar ? 48 : 50;
+  const RB_ICON = tinyBar ? 16 : compactBar ? 17 : 18;
+  const RB_TXT = tinyBar ? 10 : compactBar ? 10.5 : 11;
+  const RB_MINW = tinyBar ? 54 : compactBar ? 62 : 68;
   const RB_PAD = tinyBar ? 8 : 10;
-  const P_ICON = tinyBar ? 19 : compactBar ? 22 : 28;
-  const P_TXT = tinyBar ? 14 : compactBar ? 16 : 20;
-  const P_PAD = tinyBar ? 16 : compactBar ? 22 : 30;
-  const EX_H = tinyBar ? 48 : compactBar ? 60 : 88;
-  const EX_ICON = tinyBar ? 20 : compactBar ? 26 : 40;
-  const EX_TXT = tinyBar ? 15 : compactBar ? 20 : 30;
-  const EX_PAD = tinyBar ? 16 : compactBar ? 28 : 44;
-  const EX_GAP = tinyBar ? 8 : compactBar ? 10 : 14;
+  const P_ICON = tinyBar ? 18 : compactBar ? 19 : 20;
+  const P_TXT = tinyBar ? 13 : compactBar ? 14 : 15;
+  const P_PAD = tinyBar ? 16 : compactBar ? 18 : 22;
+  const EX_H = tinyBar ? 44 : compactBar ? 48 : 50;
+  const EX_ICON = tinyBar ? 18 : compactBar ? 19 : 20;
+  const EX_TXT = tinyBar ? 13 : compactBar ? 15 : 16;
+  const EX_PAD = tinyBar ? 16 : compactBar ? 22 : 26;
+  const EX_GAP = tinyBar ? 8 : compactBar ? 9 : 10;
   const roundDyn = { minWidth: RB_MINW, height: RB_H, paddingHorizontal: RB_PAD };
   const roundTxtDyn = { fontSize: RB_TXT };
   // Everything scales down on small tablets — small fonts/graphics are the
@@ -365,8 +365,8 @@ const st = StyleSheet.create({
   roundOn: { backgroundColor: colors.yellow + "22", borderColor: colors.yellow },
   roundText: { color: colors.textDim, fontSize: 13, fontWeight: "700" },
   barSpacer: { flex: 1, minWidth: 8 },
-  pausePrimary: { flexDirection: "row", alignItems: "center", gap: 10, height: 72, paddingHorizontal: 30, borderRadius: radius.md, backgroundColor: colors.yellow },
+  pausePrimary: { flexDirection: "row", alignItems: "center", gap: 8, height: 72, paddingHorizontal: 30, borderRadius: radius.md, backgroundColor: colors.yellow },
   pausePrimaryText: { color: colors.bg, fontSize: 20, fontWeight: "800" },
-  exitBtn: { flexDirection: "row", alignItems: "center", gap: 14, height: 88, paddingHorizontal: 44, borderRadius: radius.lg, backgroundColor: "rgba(255,255,255,0.10)", borderWidth: 2, borderColor: colors.border },
+  exitBtn: { flexDirection: "row", alignItems: "center", gap: 10, height: 88, paddingHorizontal: 44, borderRadius: radius.md, backgroundColor: "rgba(255,255,255,0.10)", borderWidth: 1.5, borderColor: colors.border },
   exitText: { color: colors.white, fontSize: 30, fontWeight: "800" },
 });

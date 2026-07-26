@@ -59,7 +59,6 @@ export default function Dashboard() {
   const contentWidth = width - navWidth;
   const mainWidth = contentWidth - spacing.lg * 2;
   const heroHeight = compact ? Math.max(320, Math.round(height * 0.94)) : 476;
-  const heroW = compact ? Math.round(mainWidth * 0.6) : Math.round(mainWidth * 0.64);
 
   const router = useRouter();
   const persona = useCoach();
@@ -110,21 +109,17 @@ export default function Dashboard() {
             <PlanUpdatedNudge />
 
             <View style={[styles.heroRow, { height: heroHeight }]}>
-              <View style={{ width: heroW }}>
-                <HeroRoute
-                  width={heroW}
-                  height={heroHeight}
-                  onStart={() => router.push("/training")}
-                  onMessage={() => setShowChat(true)}
-                  onProfile={() => router.push("/profile")}
-                  onFlame={() => setShowProgress(true)}
-                  onNotifications={() => setShowNotifs(true)}
-                  compact={compact}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <TodayTrainingCard onOpenToday={() => router.push("/training")} onToast={showToast} onCalendar={() => router.push("/calendar")} />
-              </View>
+              <HeroRoute
+                width={mainWidth}
+                height={heroHeight}
+                onStart={() => router.push("/training")}
+                onMessage={() => setShowChat(true)}
+                onProfile={() => router.push("/profile")}
+                onFlame={() => setShowProgress(true)}
+                onNotifications={() => setShowNotifs(true)}
+                compact={compact}
+                sideSlot={<TodayTrainingCard overlay onOpenToday={() => router.push("/training")} onToast={showToast} onCalendar={() => router.push("/calendar")} />}
+              />
             </View>
 
             <MetricSummaryStrip />
@@ -143,11 +138,15 @@ export default function Dashboard() {
               <View style={styles.midCol}>
                 <AchievementCard />
               </View>
+              <View style={styles.midCol}>
+                <WellnessCard />
+              </View>
             </View>
 
             <View style={styles.bottomRow}>
-              <CommunityCard onPress={() => showToast("Joining a group ride")} />
-              <WellnessCard />
+              <View style={styles.midCol}>
+                <CommunityCard onPress={() => showToast("Joining a group ride")} />
+              </View>
             </View>
           </ScrollView>
         </View>
@@ -184,7 +183,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   midRow: { flexDirection: "row", gap: spacing.md, minHeight: 240 },
-  heroRow: { flexDirection: "row", gap: spacing.md },
+  heroRow: { position: "relative" },
   midCol: { flex: 1 },
   midColWide: { flex: 1.55 },
   bottomRow: { flexDirection: "row", gap: spacing.md },

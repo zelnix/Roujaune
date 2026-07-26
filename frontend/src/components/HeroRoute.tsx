@@ -1,11 +1,10 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Pressable, Modal, ScrollView } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, radius, spacing, textShadow } from "../theme";
+import { colors, radius, spacing } from "../theme";
 import { brand } from "../data";
-import { useCoach } from "../lib/coach-persona";
 import { useRiderProfile } from "../lib/rider-profile";
 import { useSettings } from "../lib/settings";
 import { useWeather } from "../lib/weather";
@@ -50,6 +49,7 @@ export function HeroRoute({
   onFlame,
   onNotifications,
   compact = false,
+  sideSlot,
 }: {
   width: number;
   height: number;
@@ -59,11 +59,12 @@ export function HeroRoute({
   onFlame: () => void;
   onNotifications: () => void;
   compact?: boolean;
+  sideSlot?: React.ReactNode;
 }) {
-  const persona = useCoach();
   const { avatar } = useRiderProfile();
   const { settings } = useSettings();
   const weather = useWeather({ city: settings.homeCity, lat: settings.homeLat, lon: settings.homeLon });
+  const [showForecast, setShowForecast] = React.useState(false);
   return (
     <View style={[styles.wrap, { height }]} testID="hero-route">
       <Image
@@ -94,27 +95,65 @@ export function HeroRoute({
       {/* top-right status */}
       <StatusBar onFlame={onFlame} onNotifications={onNotifications} onProfile={onProfile} avatar={avatar} />
 
-      {/* right: coach signature + local weather + today's date */}
-      <View style={[styles.signatureArea, compact && { top: "22%" }]}>
-        <Text style={[styles.signature, compact && { fontSize: 26 }]}>{persona.name}</Text>
-        <Text style={styles.signatureSub}>Your Companion Coach</Text>
-
+      {/* right: local weather → tap for the 7-day forecast */}
+      <Pressable
+        testID="weather-forecast-open"
+        onPress={() => setShowForecast(true)}
+        style={[styles.signatureArea, compact && { top: "22%" }]}
+        accessibilityRole="button"
+        accessibilityLabel="Open seven-day forecast"
+      >
         <View style={styles.weatherTop}>
           <Ionicons name={weather.icon} size={compact ? 15 : 18} color={colors.yellow} />
           <Text style={[styles.temp, compact && { fontSize: 18 }]}>{weather.temp}</Text>
         </View>
         <Text style={[styles.place, compact && { fontSize: 14 }]} numberOfLines={1}>{weather.place}</Text>
         <Text style={styles.dateText}>{weather.dateLabel}</Text>
-      </View>
+        <View style={styles.forecastHint}>
+          <Ionicons name="chevron-forward" size={11} color={colors.textDim} />
+          <Text style={styles.forecastHintText}>7-day forecast</Text>
+        </View>
+      </Pressable>
 
-      {/* bottom-left coaching card */}
-      <View style={styles.coachArea}>
-        <AlbertoCoachCard
-          width={compact ? Math.min(360, width * 0.7) : Math.min(430, width * 0.66)}
-          onStart={onStart}
-          onMessage={onMessage}
-          compact={compact}
-        />
+      <Modal visible={showForecast} transparent animationType="fade" onRequestClose={() => setShowForecast(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setShowForecast(false)}>
+          <Pressable style={styles.forecastCard} onPress={(e) => e.stopPropagation()} testID="weather-forecast-modal">
+            <View style={styles.forecastHead}>
+              <Text style={styles.forecastTitle}>7-Day Forecast</Text>
+              <Text style={styles.forecastPlace}>{weather.place}</Text>
+              <Pressable testID="weather-forecast-close" onPress={() => setShowForecast(false)} style={styles.forecastClose} hitSlop={10}>
+                <Ionicons name="close" size={20} color={colors.white} />
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {weather.daily.length === 0 ? (
+                <Text style={styles.forecastEmpty}>Forecast unavailable right now.</Text>
+              ) : weather.daily.map((d, i) => (
+                <View key={i} style={styles.forecastRow}>
+                  <Text style={[styles.forecastDay, i === 0 && { color: colors.yellow }]}>{i === 0 ? "Today" : d.label}</Text>
+                  <Ionicons name={d.icon} size={20} color={colors.yellow} style={{ width: 34, textAlign: "center" }} />
+                  <View style={styles.forecastTemps}>
+                    <Text style={styles.forecastMax}>{d.tmax}°</Text>
+                    <Text style={styles.forecastMin}>{d.tmin}°</Text>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* bottom-left coaching card + optional side slot (matched height) */}
+      <View style={styles.coachArea} pointerEvents="box-none">
+        <View style={styles.coachRow} pointerEvents="box-none">
+          <AlbertoCoachCard
+            width={compact ? Math.min(360, width * 0.7) : Math.min(430, width * 0.66)}
+            onStart={onStart}
+            onMessage={onMessage}
+            compact={compact}
+          />
+          {sideSlot ? <View style={[styles.sideSlot, { width: compact ? 240 : 320 }]}>{sideSlot}</View> : null}
+        </View>
       </View>
     </View>
   );
@@ -146,17 +185,25 @@ const styles = StyleSheet.create({
   },
   badgeText: { color: "#fff", fontSize: 9, fontWeight: "800" },
   signatureArea: { position: "absolute", right: spacing.xl, top: "30%", alignItems: "flex-end" },
-  signature: {
-    color: colors.gold,
-    fontSize: 34,
-    fontStyle: "italic",
-    fontWeight: "600",
-    ...textShadow("rgba(0,0,0,0.5)", 8),
-  },
-  signatureSub: { color: colors.white, fontSize: 13, marginTop: -2 },
-  weatherTop: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 16 },
+  weatherTop: { flexDirection: "row", alignItems: "center", gap: 6 },
   temp: { color: colors.white, fontSize: 22, fontWeight: "800" },
   place: { color: colors.white, fontSize: 16, fontWeight: "700", marginTop: 2 },
   dateText: { color: colors.textDim, fontSize: 12.5, fontWeight: "600", marginTop: 3 },
-  coachArea: { position: "absolute", left: spacing.lg, bottom: spacing.lg },
+  forecastHint: { flexDirection: "row", alignItems: "center", gap: 2, marginTop: 6 },
+  forecastHintText: { color: colors.textDim, fontSize: 11.5, fontWeight: "700" },
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center", padding: spacing.lg },
+  forecastCard: { width: "100%", maxWidth: 420, maxHeight: "80%", backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.lg },
+  forecastHead: { marginBottom: spacing.md },
+  forecastTitle: { color: colors.white, fontSize: 18, fontWeight: "800" },
+  forecastPlace: { color: colors.textDim, fontSize: 13, marginTop: 2 },
+  forecastClose: { position: "absolute", top: 0, right: 0, width: 32, height: 32, alignItems: "center", justifyContent: "center" },
+  forecastEmpty: { color: colors.textDim, fontSize: 14, paddingVertical: 20, textAlign: "center" },
+  forecastRow: { flexDirection: "row", alignItems: "center", paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  forecastDay: { color: colors.white, fontSize: 14, fontWeight: "700", flex: 1 },
+  forecastTemps: { flexDirection: "row", alignItems: "baseline", gap: 10, width: 88, justifyContent: "flex-end" },
+  forecastMax: { color: colors.white, fontSize: 15, fontWeight: "800" },
+  forecastMin: { color: colors.textDim, fontSize: 13, fontWeight: "600" },
+  coachArea: { position: "absolute", left: spacing.lg, bottom: spacing.lg, right: spacing.lg },
+  coachRow: { flexDirection: "row", alignItems: "stretch", gap: spacing.md },
+  sideSlot: { alignSelf: "stretch" },
 });

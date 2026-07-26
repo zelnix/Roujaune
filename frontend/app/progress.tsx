@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { AppScaffold, useApiData, Card, SectionTitle } from "@/src/components/app-scaffold";
 import { CC, colorOf } from "@/src/components/calendar";
 import { useProgressTimeline, RANGE_OPTIONS, TimelineRange } from "@/src/lib/progress-timeline";
+import BenchmarkTrendsCard from "@/src/components/benchmark/BenchmarkTrendsCard";
 
 type Progress = {
   headline: string; subhead: string;
@@ -138,6 +139,7 @@ export default function ProgressScreen() {
   return (
     <AppScaffold active="progress" title="Progress" subtitle="Your fitness, form and personal records.">
       <TimelineCard />
+      <BenchmarkTrendsCard />
       {d ? (
         <>
           <Card testID="progress-hero" style={s.hero}>

@@ -1120,7 +1120,7 @@ SETTINGS_DEFAULT = {
     "id": "me", "hasTrainer": False, "hasWearable": False, "demoMode": False,
     "hudEnabled": True, "ftp": 287, "ftpAuto": True, "seatedMode": False,
     "wheelCircumference": 2105,
-    "homeCity": "Nice, France", "homeLat": 43.7102, "homeLon": 7.262,
+    "homeCity": "South Perth, Australia", "homeLat": -31.9833, "homeLon": 115.8586,
 }
 
 
@@ -1483,6 +1483,103 @@ async def benchmark_plan_gate(plan_id: str, coach_name: str = "Alberto", coach_g
     }
 
 
+# ---- WP-E: Training Plan review (proposed changes require explicit approval) ----
+def _next_monday_iso() -> str:
+    from datetime import timedelta
+    today = datetime.now(timezone.utc).date()
+    return (today + timedelta(days=(7 - today.weekday()) % 7 or 7)).isoformat()
+
+
+@api_router.get("/benchmark/plan-review")
+async def benchmark_plan_review():
+    uid = auth.current_user_id()
+    settings = await udb.settings.find_one({"user_id": uid}) or {}
+    profile = await udb.benchmark_profile.find_one({"user_id": uid}) or {}
+    cur_ftp = int(settings.get("ftp") or 0)
+    new_ftp = int(profile.get("ftp") or 0)
+    dismissed_for = profile.get("planReviewDismissedFor")
+    if not new_ftp or not cur_ftp or new_ftp == cur_ftp or dismissed_for == new_ftp:
+        return {"hasProposal": False}
+    zc, zn = _training_zones(cur_ftp), _training_zones(new_ftp)
+    zones_preview = []
+    for a, b in zip(zc, zn):
+        zones_preview.append({
+            "key": a["key"], "name": a["name"],
+            "oldLow": a["lowW"], "oldHigh": a["highW"], "newLow": b["lowW"], "newHigh": b["highW"],
+        })
+    delta = new_ftp - cur_ftp
+    results = await udb.benchmark_results.find(
+        {"user_id": uid, "decision": "accepted"}).sort("createdAt", -1).to_list(length=50)
+    src = next((r for r in results if (r.get("primaryMetric") or {}).get("key") == "ftp"), None)
+    return {
+        "hasProposal": True,
+        "metric": "FTP",
+        "previous": cur_ftp,
+        "next": new_ftp,
+        "delta": delta,
+        "deltaPct": round(delta / cur_ftp * 100, 1),
+        "effectiveDate": _next_monday_iso(),
+        "reason": "Your accepted benchmark suggests a different FTP than your current training targets. Review and approve before we adjust your plan.",
+        "affected": ["Workout power targets", "Training zones", "Threshold & VO2 interval intensity", "Recovery target power"],
+        "zonesPreview": zones_preview,
+        "sourceTestId": (src or {}).get("testId"),
+    }
+
+
+@api_router.post("/benchmark/plan-review/apply")
+async def benchmark_plan_review_apply():
+    uid = auth.current_user_id()
+    profile = await udb.benchmark_profile.find_one({"user_id": uid}) or {}
+    new_ftp = int(profile.get("ftp") or 0)
+    if not new_ftp:
+        raise HTTPException(status_code=400, detail="No benchmark FTP to apply")
+    await udb.settings.update_one({"user_id": uid}, {"$set": {"ftp": new_ftp}}, upsert=True)
+    await udb.benchmark_profile.update_one({"user_id": uid}, {"$set": {"planReviewDismissedFor": new_ftp}})
+    return {"applied": True, "ftp": new_ftp}
+
+
+@api_router.post("/benchmark/plan-review/dismiss")
+async def benchmark_plan_review_dismiss():
+    uid = auth.current_user_id()
+    profile = await udb.benchmark_profile.find_one({"user_id": uid}) or {}
+    new_ftp = int(profile.get("ftp") or 0)
+    await udb.benchmark_profile.update_one({"user_id": uid}, {"$set": {"planReviewDismissedFor": new_ftp}}, upsert=True)
+    return {"dismissed": True}
+
+
+# ---- WP-E: Benchmark progress trends (personal history over time) ----
+@api_router.get("/benchmark/trends")
+async def benchmark_trends(range: str = "3m"):
+    uid = auth.current_user_id()
+    days = {"4w": 28, "3m": 92, "6m": 183, "12m": 366, "all": 0}.get(range, 92)
+    cutoff = None
+    if days:
+        from datetime import timedelta
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days))
+    results = await udb.benchmark_results.find(
+        {"user_id": uid, "decision": {"$ne": "excluded"}}).sort("createdAt", 1).to_list(length=500)
+    # metric key -> series of {date, value}
+    series: Dict[str, List[Dict[str, Any]]] = {}
+    labels: Dict[str, str] = {}
+    units: Dict[str, str] = {}
+    for r in results:
+        ts = r.get("createdAt")
+        if cutoff and ts:
+            try:
+                if datetime.fromisoformat(ts.replace("Z", "+00:00")) < cutoff:
+                    continue
+            except Exception:
+                pass
+        for m in (r.get("metrics") or []):
+            k = m.get("key")
+            if k in ("ftp", "ftpWkg", "p5", "p1", "peak", "decoupling", "preferred_cadence", "hrr"):
+                series.setdefault(k, []).append({"date": ts, "value": m.get("value")})
+                labels[k] = m.get("label", k)
+                units[k] = m.get("unit", "")
+    return {"range": range, "series": series, "labels": labels, "units": units}
+
+
+
 
 # ---- Benchmark recommendation engine (Part 14 pt.1) ----
 BM_RETEST_DAYS = {
@@ -1503,6 +1600,100 @@ BM_TEST_NAME = {
     "cadence_control": "Cadence Control Assessment", "recovery_response": "Submaximal Recovery Response Test",
 }
 BM_ALL_TESTS = list(BM_PRIMARY_METRIC.keys())
+BM_MAXIMAL_TESTS = {"ramp", "twenty_min_ftp", "five_min_aerobic", "one_min_power", "sprint_power"}
+
+
+def _default_week_days(start: "date", has_power: bool) -> List[Dict[str, Any]]:
+    from datetime import timedelta
+    day1 = "ramp" if has_power else "recovery_response"
+    day5 = "five_min_aerobic" if has_power else "aerobic_efficiency"
+    plan = [
+        {"kind": "test", "testId": day1, "label": BM_TEST_NAME.get(day1, day1)},
+        {"kind": "recovery", "label": "Recovery or easy ride"},
+        {"kind": "test", "testId": "cadence_control", "label": BM_TEST_NAME["cadence_control"]},
+        {"kind": "rest", "label": "Recovery or rest"},
+        {"kind": "test", "testId": day5, "label": BM_TEST_NAME.get(day5, day5)},
+        {"kind": "recovery", "label": "Recovery or easy ride"},
+        {"kind": "test", "testId": "aerobic_efficiency", "label": BM_TEST_NAME["aerobic_efficiency"]},
+    ]
+    for i, d in enumerate(plan):
+        d["index"] = i
+        d["date"] = (start + timedelta(days=i)).isoformat()
+        d["status"] = "scheduled"
+    return plan
+
+
+def _maximal_spacing_ok(days: List[Dict[str, Any]]) -> bool:
+    """No two maximal tests on consecutive days."""
+    for i in range(len(days) - 1):
+        a, b = days[i], days[i + 1]
+        if a.get("testId") in BM_MAXIMAL_TESTS and b.get("testId") in BM_MAXIMAL_TESTS:
+            return False
+    return True
+
+
+@api_router.get("/benchmark/week")
+async def get_benchmark_week():
+    doc = await udb.benchmark_week.find_one({"user_id": auth.current_user_id(), "id": "current"})
+    if not doc:
+        return {"active": False, "days": []}
+    doc.pop("_id", None); doc.pop("user_id", None)
+    return doc
+
+
+@api_router.post("/benchmark/week/start")
+async def start_benchmark_week(payload: Dict[str, Any] = Body(default={})):
+    from datetime import date, timedelta
+    uid = auth.current_user_id()
+    start_str = payload.get("startDate")
+    if start_str:
+        y, m, d = (int(x) for x in start_str.split("-")); start = date(y, m, d)
+    else:
+        # default: next Monday
+        today = datetime.now(timezone.utc).date()
+        start = today + timedelta(days=(7 - today.weekday()) % 7 or 7)
+    rec = await _benchmark_recommendation()
+    days = _default_week_days(start, rec["hasPower"])
+    doc = {"id": "current", "user_id": uid, "active": True, "startDate": start.isoformat(),
+           "days": days, "createdAt": datetime.now(timezone.utc).isoformat()}
+    await udb.benchmark_week.update_one({"user_id": uid, "id": "current"}, {"$set": doc}, upsert=True)
+    doc.pop("user_id", None)
+    return doc
+
+
+@api_router.patch("/benchmark/week/day/{index}")
+async def patch_benchmark_week_day(index: int, payload: Dict[str, Any] = Body(...)):
+    uid = auth.current_user_id()
+    doc = await udb.benchmark_week.find_one({"user_id": uid, "id": "current"})
+    if not doc or index < 0 or index >= len(doc.get("days", [])):
+        raise HTTPException(status_code=404, detail="Benchmark week day not found")
+    days = doc["days"]
+    day = days[index]
+    if "testId" in payload:
+        tid = payload["testId"]
+        candidate = list(days)
+        candidate[index] = {**day, "kind": "test" if tid else day["kind"], "testId": tid,
+                            "label": BM_TEST_NAME.get(tid, tid) if tid else day["label"]}
+        if tid in BM_MAXIMAL_TESTS and not _maximal_spacing_ok(candidate):
+            raise HTTPException(status_code=400, detail="Maximal tests cannot be scheduled on consecutive days.")
+        day.update(candidate[index])
+    if "status" in payload:
+        if payload["status"] not in ("scheduled", "done", "skipped"):
+            raise HTTPException(status_code=400, detail="Invalid status")
+        day["status"] = payload["status"]
+    if "date" in payload:
+        day["date"] = payload["date"]
+    await udb.benchmark_week.update_one({"user_id": uid, "id": "current"}, {"$set": {"days": days}})
+    doc.pop("_id", None); doc.pop("user_id", None)
+    return doc
+
+
+@api_router.post("/benchmark/week/cancel")
+async def cancel_benchmark_week():
+    await udb.benchmark_week.delete_one({"user_id": auth.current_user_id(), "id": "current"})
+    return {"active": False, "days": []}
+
+
 
 
 def _days_since(iso: Optional[str]) -> Optional[int]:
@@ -1887,6 +2078,54 @@ async def get_rider_season(days: int = 0):
         "indoor": _agg(indoor),
         "outdoor": _agg(outdoor),
     }
+
+
+@api_router.get("/progress/summary")
+async def progress_summary():
+    """Rich progress rollup for the Today 'Progress' card: completed sessions by
+    type, FTP progress, benchmark/test progress, and total distance + duration."""
+    uid = auth.current_user_id()
+    rides = await udb.ride_history.find().to_list(length=5000)
+    ride_count = len(rides)
+    total_km = round(sum((r.get("distance_km") or 0) for r in rides), 1)
+    total_secs = int(sum((r.get("duration_sec") or 0) for r in rides))
+
+    supp = await udb.supplementary_log.find().to_list(length=5000)
+    strength_count = sum(1 for s in supp if s.get("kind") == "strength")
+    recovery_mobility_count = sum(1 for s in supp if s.get("kind") in ("recovery", "mobility", "balance"))
+
+    # FTP progress: current training FTP + change vs earliest accepted FTP benchmark
+    settings = await udb.settings.find_one({"user_id": uid}) or {}
+    profile = await udb.benchmark_profile.find_one({"user_id": uid}) or {}
+    cur_ftp = int(settings.get("ftp") or profile.get("ftp") or 0)
+    accepted = await udb.benchmark_results.find(
+        {"user_id": uid, "decision": "accepted"}).sort("createdAt", 1).to_list(length=200)
+    ftp_series = [int((r.get("primaryMetric") or {}).get("value") or 0)
+                  for r in accepted if (r.get("primaryMetric") or {}).get("key") == "ftp"]
+    ftp_delta = (ftp_series[-1] - ftp_series[0]) if len(ftp_series) >= 2 else 0
+    ftp_wkg = profile.get("ftpWkg")
+
+    # Test/benchmark progress
+    tests_accepted = len(accepted)
+    metric_fields = ["ftp", "fiveMinPower", "oneMinPower", "sprintPower",
+                     "aerobicEfficiency", "preferredCadence", "recoveryResponse"]
+    tests_measured = sum(1 for f in metric_fields if profile.get(f))
+
+    hrs = total_secs // 3600
+    mins = (total_secs % 3600) // 60
+    duration_label = f"{hrs}h {mins:02d}m" if hrs else f"{mins}m"
+
+    return {
+        "workouts": {
+            "ride": ride_count,
+            "strength": strength_count,
+            "recoveryMobility": recovery_mobility_count,
+        },
+        "ftp": {"current": cur_ftp, "delta": ftp_delta, "wkg": ftp_wkg},
+        "tests": {"accepted": tests_accepted, "measured": tests_measured, "total": len(metric_fields)},
+        "totals": {"km": total_km, "durationSec": total_secs, "durationLabel": duration_label, "rides": ride_count},
+    }
+
 
 
 class SupplementaryLog(BaseModel):
@@ -3534,6 +3773,19 @@ async def get_calendar_week(start: str = "2025-05-12"):
                 day["scheduled"] = by_date.get(day["date"], [])
         except Exception:
             logging.warning("attach scheduled workouts failed")
+        # Overlay any Benchmark Week days onto their matching calendar dates.
+        try:
+            wk = await udb.benchmark_week.find_one({"user_id": auth.current_user_id(), "id": "current"})
+            if wk and wk.get("active"):
+                by_bm = {d["date"]: d for d in wk.get("days", [])}
+                for day in doc.get("days", []):
+                    bm = by_bm.get(day["date"])
+                    if bm and bm.get("kind") == "test":
+                        day["benchmark"] = {"testId": bm.get("testId"), "label": bm.get("label"),
+                                            "status": bm.get("status", "scheduled")}
+        except Exception:
+            logging.warning("attach benchmark week failed")
+
         # Override today's readiness ring with the rider's latest daily check-in.
         try:
             ci = await udb.daily_checkins.find_one({"id": "latest"})

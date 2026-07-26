@@ -6,6 +6,8 @@ import { AppScaffold, Card, SectionTitle } from "@/src/components/app-scaffold";
 import { CC } from "@/src/components/calendar";
 import { getBenchmarkTest, CATEGORY_META } from "@/src/lib/benchmark/catalog";
 import { BenchmarkLibrary } from "@/src/components/benchmark/BenchmarkLibrary";
+import BenchmarkWeekCard from "@/src/components/benchmark/BenchmarkWeekCard";
+import PlanReviewCard from "@/src/components/benchmark/PlanReviewCard";
 import { useBenchmarkResults, useBenchmarkProfile, useBenchmarkZones, useBenchmarkRecommendation, setBenchmarkResultDecision } from "@/src/lib/benchmark/api";
 import type { BenchmarkProfile } from "@/src/lib/benchmark/types";
 
@@ -99,6 +101,9 @@ export default function BenchmarkLandingScreen() {
         )}
       </Card>
 
+      {/* ── Proposed training change (WP-E) ── */}
+      <PlanReviewCard onReview={() => router.push("/plan")} />
+
       {/* ── Recommended Next Benchmark ── */}
       <Card testID="bm-recommended">
         <SectionTitle label="RECOMMENDED NEXT BENCHMARK" />
@@ -190,6 +195,12 @@ export default function BenchmarkLandingScreen() {
             })}
           </View>
         )}
+      </Card>
+
+      {/* ── Benchmark Week (guided 7-day schedule) ── */}
+      <Card testID="bm-week">
+        <SectionTitle label="BENCHMARK WEEK" color={CC.rouge} />
+        <BenchmarkWeekCard hasPower={recommendation?.hasPower ?? true} onNotice={(m) => setNotice(m)} />
       </Card>
 
       {/* ── Training Zones (derived from current FTP) ── */}

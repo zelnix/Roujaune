@@ -3,6 +3,8 @@ import * as Location from "expo-location";
 
 export type HomeLocation = { city: string; lat: number; lon: number };
 
+export type DailyForecast = { label: string; tmax: number; tmin: number; icon: WeatherState["icon"] };
+
 export type WeatherState = {
   temp: string;          // e.g. "18°C"
   place: string;         // e.g. "Nice, France"
@@ -10,6 +12,7 @@ export type WeatherState = {
   icon: "sunny" | "partly-sunny" | "cloudy" | "rainy" | "snow" | "thunderstorm";
   source: "gps" | "home" | "default";
   loading: boolean;
+  daily: DailyForecast[]; // next 7 days
 };
 
 // WMO weather-code → a coarse Ionicons name for the hero badge.
@@ -30,12 +33,12 @@ function todayLabel(): string {
   }
 }
 
-async function fetchWeather(lat: number, lon: number): Promise<{ temp: string; icon: WeatherState["icon"] } | null> {
+async function fetchWeather(lat: number, lon: number): Promise<{ temp: string; icon: WeatherState["icon"]; daily: DailyForecast[] } | null> {
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 7000);
     const res = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&timezone=auto`,
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=7&timezone=auto`,
       { signal: ctrl.signal }
     );
     clearTimeout(timer);
@@ -44,7 +47,17 @@ async function fetchWeather(lat: number, lon: number): Promise<{ temp: string; i
     const t = d?.current?.temperature_2m;
     const code = d?.current?.weather_code ?? 0;
     if (t == null) return null;
-    return { temp: `${Math.round(t)}°C`, icon: iconFor(code) };
+    const daily: DailyForecast[] = [];
+    const times: string[] = d?.daily?.time ?? [];
+    const codes: number[] = d?.daily?.weather_code ?? [];
+    const tmax: number[] = d?.daily?.temperature_2m_max ?? [];
+    const tmin: number[] = d?.daily?.temperature_2m_min ?? [];
+    for (let i = 0; i < times.length; i++) {
+      let label = times[i];
+      try { label = new Date(times[i]).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }); } catch { /* keep iso */ }
+      daily.push({ label, tmax: Math.round(tmax[i]), tmin: Math.round(tmin[i]), icon: iconFor(codes[i] ?? 0) });
+    }
+    return { temp: `${Math.round(t)}°C`, icon: iconFor(code), daily };
   } catch {
     return null;
   }
@@ -55,7 +68,7 @@ async function fetchWeather(lat: number, lon: number): Promise<{ temp: string; i
  * then to a sensible default. Never blocks or dead-ends the UI. */
 export function useWeather(home: HomeLocation): WeatherState {
   const [state, setState] = useState<WeatherState>({
-    temp: "—", place: home.city, dateLabel: todayLabel(), icon: "partly-sunny", source: "default", loading: true,
+    temp: "—", place: home.city, dateLabel: todayLabel(), icon: "partly-sunny", source: "default", loading: true, daily: [],
   });
 
   useEffect(() => {

@@ -103,6 +103,31 @@
 #====================================================================================================
 
 
+benchmark_wp_c_d_e_g_and_ui:
+  - task: "WP-C personalised recommendation, WP-G plan-start benchmark gate (rule + LLM), WP-D Benchmark Week (calendar overlay), WP-E plan-change review + Progress trends"
+    implemented: true
+    working: true
+    file: "backend/server.py, frontend/app/benchmark/index.tsx, frontend/app/plan.tsx, frontend/app/progress.tsx, frontend/src/components/benchmark/*, frontend/src/lib/benchmark/api.ts"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "WP-C: GET /api/benchmark/recommendation scores tests by missing metrics/recency/confidence/capability/power; landing 'Recommended Next Benchmark' + WHY reasons wired (verified iter49). WP-G: GET /api/benchmark/plan-gate returns rule-based status (required/recommended/approved/submaximal/deferred/coach_review) + best-effort in-persona LLM coachMessage; rendered as PlanBenchmarkGate on Plan Overview (verified iter49: beginner→submaximal). WP-D: benchmark_week collection + start/get/patch/cancel endpoints (default 7-day plan, maximal spacing enforced, calendar-week overlay); BenchmarkWeekCard on landing (verified via screenshot: 7-day schedule + Start/Skip/Replace/Reschedule/Cancel). WP-E: GET/POST plan-review (proposes settings.ftp vs benchmark_profile.ftp, Apply updates settings.ftp, Keep dismisses) + GET benchmark/trends; PlanReviewCard on landing + BenchmarkTrendsCard on Progress. Curl-verified: sim-accept never changes profile, real-accept sets profile.ftp, apply sets settings.ftp, spacing rejection. Screenshot-verified plan-review card 287→305 +6.3% with zone preview. NOTE: Green Lantern has SEEDED demo benchmark data (profile.ftp=305 + one accepted result) to demo WP-C/E — can be cleared."
+  - task: "Today screen UI refinements + weather location"
+    implemented: true
+    working: true
+    file: "frontend/app/index.tsx, frontend/src/components/HeroRoute.tsx, frontend/src/components/TodayTrainingCard.tsx, frontend/src/components/AlbertoCoachCard.tsx, frontend/src/components/virtual-route/VirtualRidePlayer.tsx, backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "Per user: (1) Next Scheduled Workout card now overlaid on hero graphic beside the coach card via HeroRoute sideSlot with matched height + compact glass style. (2) Removed rectangular red-glow boxShadow behind the coach 'View Next Scheduled Workout' button. (3) Card order now Training Plan/Progress/Achievements/Wellness in one row, Community moved to bottom row. (4) Virtual-route live ride pause/exit buttons + bottom icon row scaled down substantially (exit 88→50, pause 72→50, icons 24→18). (5) Home weather location set to South Perth, Australia (lat -31.9833, lon 115.8586) — live Open-Meteo now shows ~13°C. All verified via screenshots."
+
+
 benchmark_part7_9_10:
   - task: "Part 7 — Setup launches Workout Player; player runs 4 core protocols with sim data"
     implemented: true

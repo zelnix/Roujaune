@@ -46,6 +46,7 @@ export const DEFAULT_COACH: CoachId = "alberto";
 // reflected on every screen (home / training / summary) without a provider.
 let current: CoachId = DEFAULT_COACH;
 let loaded = false;
+let localReady = false;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 
@@ -57,11 +58,10 @@ export function initCoach() {
   // Local cache first (instant), then reconcile with the server so the chosen
   // companion coach stays consistent across every session and device.
   getCoachId().then((id) => {
-    if (id === "alberto" || id === "adriana") {
-      current = id;
-      emit();
-    }
-  });
+    if (id === "alberto" || id === "adriana") current = id;
+    localReady = true;
+    emit();
+  }).catch(() => { localReady = true; emit(); });
   fetch(`${PREFS_API}/api/rider/prefs`)
     .then((r) => (r.ok ? r.json() : null))
     .then((d) => {
