@@ -137,8 +137,10 @@ export default function VirtualRouteScreen() {
   const sensorsOn = telemetry.source === "trainer" || ble.connected.length > 0;
   const hrOn = telemetry.hr > 0;
   const scene: SceneTelemetry = {
-    power: sm.power, cadence: sm.cadence, speed: sm.speed, gradient: route.gradient, curve: route.curve,
+    power: sm.power, cadence: sm.cadence, speed: sm.speed, hr: hrOn ? sm.hr : 0,
+    gradient: route.gradient, curve: route.curve,
     moving: running, connected: connectionState === "connected", reducedMotion,
+    simulation: !sensorsOn, emergencyStop: emergency,
   };
 
   const conn = deriveConnection(connectionState, stale, sensorsOn);

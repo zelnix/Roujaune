@@ -16,11 +16,14 @@ export type SceneTelemetry = {
   power: number;
   cadence: number;
   speed: number;
+  hr?: number;          // heart rate (bpm), when available
   gradient: number;
   curve: number;
   moving: boolean;      // ride running (not paused/stopped)
   connected: boolean;   // any device / sim active
   reducedMotion: boolean;
+  simulation?: boolean; // driven by simulation vs real sensors
+  emergencyStop?: boolean;
 };
 
 /**
@@ -140,9 +143,18 @@ export function VirtualRouteScene({ rider, backdrop, telemetry, showBrand = true
           <AView style={[st.riderWrap, { transform: [{ translateX: swayX }, { translateY: bobY }, { rotate: leanDeg }, { scale }] }]}>
             <RiveRider
               sprite={rider.sprite}
-              cadence={telemetry.cadence}
-              speed={telemetry.speed}
-              effort={Math.max(0, Math.min(100, Math.round((telemetry.power / 300) * 100)))}
+              riderArtboard={rider.artboard}
+              cadenceRpm={telemetry.cadence}
+              powerWatts={telemetry.power}
+              speedKph={telemetry.speed}
+              heartRateBpm={telemetry.hr ?? 0}
+              gradientPct={telemetry.gradient}
+              curve={telemetry.curve}
+              isConnected={telemetry.connected}
+              isPaused={!telemetry.moving}
+              isSimulation={telemetry.simulation ?? !telemetry.connected}
+              emergencyStop={telemetry.emergencyStop ?? false}
+              reducedMotion={telemetry.reducedMotion}
               style={st.riderImg}
             />
           </AView>
