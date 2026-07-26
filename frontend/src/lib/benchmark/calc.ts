@@ -19,12 +19,22 @@ export interface IntervalCapture {
   avgPower: number;
   maxPower: number;
   avgHr: number;
+  maxHr: number;
   endHr: number;           // last HR reading of the interval
   avgCad: number;
+  maxCad: number;
   inCadencePct: number;    // % of samples within the cadence band (cadence test)
   // halves of the interval (for aerobic decoupling)
   h1Power: number; h1Hr: number;
   h2Power: number; h2Hr: number;
+  // short-effort rolling stats (sprint / 1-min)
+  peak1s: number;          // best single-second power
+  peak5s: number;          // best rolling 5-second average power
+  peak8s: number;          // best rolling 8-second average power
+  final10: number;         // average power over the last 10 seconds
+  timeToPeakSec: number;   // seconds until the peak second was reached
+  // recovery HR at fixed offsets from the start of a recovery interval
+  hrAt?: Record<string, number>; // keys "30","60","120","180"
 }
 
 export interface RunCapture {
@@ -39,6 +49,9 @@ export interface RunCapture {
   sensorLevel: "A" | "B" | "C" | "D";
   isDevData: boolean;
   rpe: number;
+  weightKg?: number;         // for W/kg (omitted when unknown)
+  ftp?: number;              // rider's current FTP (for relationship-to-FTP)
+  hasHr?: boolean;           // whether HR data was available
 }
 
 export interface ComputedResult {
@@ -88,6 +101,28 @@ function qualityFrom(confidence: number): TestQuality {
 
 const M = (key: string, label: string, value: number, unit: string): ResultMetric => ({ key, label, value, unit });
 
+// ── Interpretation labels (non-judgemental) ────────────────────────────────
+export function pacingLabel(h1: number, h2: number): string {
+  if (h1 <= 0) return "Result affected by pacing";
+  const fade = ((h1 - h2) / h1) * 100;
+  if (fade > 15) return "Started too hard";
+  if (fade > 7) return "Uneven pacing";
+  if (fade < -5) return "Strong finish";
+  if (fade >= -5 && fade <= 3) return "Excellent pacing";
+  return "Controlled pacing";
+}
+
+export function powerFadeLabel(fadePct: number): string {
+  if (fadePct <= 5) return "Strong power retention";
+  if (fadePct <= 15) return "Moderate power fade";
+  return "Significant power fade";
+}
+
+function wkg(watts: number, weightKg?: number): number | null {
+  if (!weightKg || weightKg <= 0) return null;
+  return Math.round((watts / weightKg) * 100) / 100;
+}
+
 /**
  * Compute a benchmark result from a run capture. Uses the test's versioned
  * calculation config (multipliers preserved so historic results are stable).
@@ -106,6 +141,8 @@ export function computeResult(test: BenchmarkTest, cap: RunCapture): ComputedRes
       const ftp = round(map * multiplier);
       primary = M("ftp", "Estimated FTP", ftp, "W");
       metrics.push(primary, M("map", "Maximal Aerobic Power", map, "W"));
+      const w = wkg(ftp, cap.weightKg);
+      if (w != null) metrics.push(M("ftpWkg", "FTP watts / kg", w, "W/kg"));
       insight = "Your FTP is estimated from your final sustained ramp step. A higher final step suggests stronger aerobic power.";
       if (map <= 0) confidence = clamp(confidence - 40, 0, 100);
       break;
@@ -115,30 +152,58 @@ export function computeResult(test: BenchmarkTest, cap: RunCapture): ComputedRes
       const ftp = round(avg * multiplier);
       primary = M("ftp", "Estimated FTP", ftp, "W");
       metrics.push(primary, M("p20", "20-minute power", avg, "W"));
+      const w = wkg(ftp, cap.weightKg);
+      if (w != null) metrics.push(M("ftpWkg", "FTP watts / kg", w, "W/kg"));
       insight = "Your FTP is scaled from your average 20-minute power. Even pacing gives the most representative estimate.";
       break;
     }
     case "five_min_power": {
       const avg = round(iv?.avgPower ?? 0);
       primary = M("p5", "5-minute power", avg, "W");
-      metrics.push(primary, M("maxp5", "Peak in effort", round(iv?.maxPower ?? 0), "W"));
-      insight = "This marks your aerobic power ceiling over five minutes.";
+      metrics.push(primary);
+      const w = wkg(avg, cap.weightKg);
+      if (w != null) metrics.push(M("p5wkg", "5-minute watts / kg", w, "W/kg"));
+      const fade = iv && iv.h1Power > 0 ? round(((iv.h1Power - iv.h2Power) / iv.h1Power) * 100) : 0;
+      metrics.push(M("h1", "First-half power", round(iv?.h1Power ?? 0), "W"));
+      metrics.push(M("h2", "Second-half power", round(iv?.h2Power ?? 0), "W"));
+      metrics.push(M("fade", "Power fade", fade, "%"));
+      if (cap.hasHr && iv) { metrics.push(M("avgHr", "Average heart rate", round(iv.avgHr), "bpm")); metrics.push(M("peakHr", "Peak heart rate", round(iv.maxHr), "bpm")); }
+      if (iv) { metrics.push(M("avgCad", "Average cadence", round(iv.avgCad), "rpm")); metrics.push(M("maxCad", "Maximum cadence", round(iv.maxCad), "rpm")); }
+      if (cap.ftp) metrics.push(M("vsFtp", "Relative to FTP", Math.round((avg / cap.ftp) * 100), "%"));
+      const pacing = pacingLabel(iv?.h1Power ?? 0, iv?.h2Power ?? 0);
+      insight = `${pacing}. Your five-minute result gives Alberto and Adriana a clearer picture of how you perform during sustained high-intensity efforts.`;
       break;
     }
     case "one_min_power": {
       const avg = round(iv?.avgPower ?? 0);
       primary = M("p1", "1-minute power", avg, "W");
-      metrics.push(primary, M("maxp1", "Peak in effort", round(iv?.maxPower ?? 0), "W"));
-      insight = "This captures your short-duration, sustainable power.";
+      metrics.push(primary);
+      const w = wkg(avg, cap.weightKg);
+      if (w != null) metrics.push(M("p1wkg", "1-minute watts / kg", w, "W/kg"));
+      metrics.push(M("peak5s", "Peak 5-second power", round(iv?.peak5s ?? 0), "W"));
+      metrics.push(M("final10", "Final 10-second power", round(iv?.final10 ?? 0), "W"));
+      const fade = iv && iv.peak5s > 0 ? clamp(round(((iv.peak5s - iv.final10) / iv.peak5s) * 100), 0, 100) : 0;
+      metrics.push(M("fade", "Power fade", fade, "%"));
+      if (iv) { metrics.push(M("avgCad", "Average cadence", round(iv.avgCad), "rpm")); metrics.push(M("maxCad", "Maximum cadence", round(iv.maxCad), "rpm")); }
+      if (cap.hasHr && iv) { metrics.push(M("avgHr", "Average heart rate", round(iv.avgHr), "bpm")); metrics.push(M("peakHr", "Maximum heart rate", round(iv.maxHr), "bpm")); }
+      insight = `${powerFadeLabel(fade)}. This captures your short-duration, sustainable power.`;
       break;
     }
     case "sprint_peak": {
-      const sprints = cap.intervals.filter((i) => i.kind === "effort");
-      const peak = round(Math.max(0, ...sprints.map((s) => s.maxPower)));
-      const best8 = round(Math.max(0, ...sprints.map((s) => s.avgPower)));
-      primary = M("peak", "Peak power", peak, "W");
-      metrics.push(primary, M("p8", "Best 8-second power", best8, "W"));
-      insight = "Peak power reflects your neuromuscular sprint capacity.";
+      const sprints = cap.intervals.filter((i) => i.kind === "effort" && i.label.toLowerCase().startsWith("sprint"));
+      const attempts = sprints.map((sp, idx) => ({ idx: idx + 1, peak1s: round(sp.peak1s), peak5s: round(sp.peak5s), best8s: round(sp.peak8s || sp.avgPower), peakCad: round(sp.maxCad), timeToPeak: sp.timeToPeakSec }));
+      const best5s = Math.max(0, ...attempts.map((a) => a.peak5s));
+      const best8s = Math.max(0, ...attempts.map((a) => a.best8s));
+      const peak1s = Math.max(0, ...attempts.map((a) => a.peak1s));
+      const peakCad = Math.max(0, ...attempts.map((a) => a.peakCad));
+      const bestIdx = attempts.findIndex((a) => a.peak5s === best5s) + 1;
+      const diff = attempts.length >= 3 ? attempts[0].peak5s - attempts[2].peak5s : 0;
+      const spread = best5s > 0 ? clamp(round((1 - (diff > 0 ? diff : 0) / best5s) * 100), 0, 100) : 0;
+      primary = M("peak", "Best 5-second power", best5s, "W");
+      metrics.push(primary, M("peak1s", "Peak 1-second power", peak1s, "W"), M("peak8s", "Best 8-second power", best8s, "W"), M("peakCad", "Peak cadence", peakCad, "rpm"), M("repeatability", "Sprint repeatability", spread, "%"));
+      const w = wkg(best5s, cap.weightKg);
+      if (w != null) metrics.push(M("sprintWkg", "Sprint watts / kg", w, "W/kg"));
+      insight = `Best attempt: #${bestIdx || 1}. Peak power reflects your neuromuscular sprint capacity; a small drop across attempts is normal.`;
       break;
     }
     case "aerobic_decoupling": {
@@ -168,12 +233,25 @@ export function computeResult(test: BenchmarkTest, cap: RunCapture): ComputedRes
     case "recovery_hrr": {
       const effort = cap.intervals.find((i) => i.kind === "effort");
       const recovery = cap.intervals.find((i) => i.kind === "recovery");
-      const peakHr = round(effort?.endHr ?? 0);
-      const afterHr = round(recovery?.endHr ?? 0);
-      const drop = clamp(peakHr - afterHr, 0, 120);
-      primary = M("hrr", "Heart-rate recovery", drop, "bpm");
-      metrics.push(primary, M("peak_hr", "Peak heart rate", peakHr, "bpm"));
-      insight = "A larger drop in the recovery window generally reflects better freshness — track the trend over time.";
+      if (!cap.hasHr) {
+        // Perceived-effort recovery benchmark — no HR value produced.
+        primary = M("perceivedRecovery", "Perceived recovery", cap.rpe, "RPE");
+        metrics.push(primary);
+        if (effort) metrics.push(M("effortPower", "Effort power", round(effort.avgPower), "W"));
+        insight = "Perceived-effort recovery benchmark — recorded without heart-rate data. We track how your recovery feels over comparable tests.";
+        break;
+      }
+      const endHr = round(effort?.endHr ?? recovery?.maxHr ?? 0);
+      const at = recovery?.hrAt || {};
+      const hr30 = round(at["30"] ?? 0), hr60 = round(at["60"] ?? 0), hr120 = round(at["120"] ?? 0), hr180 = round(at["180"] ?? 0);
+      const drop60 = clamp(endHr - hr60, 0, 150);
+      primary = M("hrr", "1-minute HR recovery", drop60, "bpm");
+      metrics.push(primary, M("endHr", "Heart rate at end of effort", endHr, "bpm"));
+      if (hr30) metrics.push(M("hrr30", "30-second reduction", clamp(endHr - hr30, 0, 150), "bpm"));
+      if (hr120) metrics.push(M("hrr120", "2-minute reduction", clamp(endHr - hr120, 0, 150), "bpm"));
+      if (hr180) metrics.push(M("hrr180", "3-minute reduction", clamp(endHr - hr180, 0, 150), "bpm"));
+      if (effort) metrics.push(M("effortPower", "Effort power", round(effort.avgPower), "W"));
+      insight = "A larger drop generally reflects better freshness — but heat, hydration, fatigue, sleep and stress can all influence this. We compare it to your previous comparable tests.";
       break;
     }
     default:
@@ -203,6 +281,9 @@ export function assembleCapture(
     sensorLevel: "A" | "B" | "C" | "D";
     isDevData: boolean;
     rpe: number;
+    weightKg?: number;
+    ftp?: number;
+    hasHr?: boolean;
   },
 ): RunCapture {
   const mains = intervals.filter((i) => ["effort", "steady", "block", "opener", "ramp"].includes(i.kind));
@@ -223,6 +304,9 @@ export function assembleCapture(
     sensorLevel: opts.sensorLevel,
     isDevData: opts.isDevData,
     rpe: opts.rpe,
+    weightKg: opts.weightKg,
+    ftp: opts.ftp,
+    hasHr: opts.hasHr,
   };
 }
 

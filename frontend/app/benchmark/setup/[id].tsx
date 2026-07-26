@@ -12,7 +12,7 @@ import {
 import { createBenchmarkSession } from "@/src/lib/benchmark/api";
 import {
   SETUP_STEPS, EQUIPMENT_OPTIONS, emptyEquipment, hasPower, computeSensorLevel, SENSOR_LEVEL_META,
-  checkCompatibility, ENV_CHECKS, COACH_VOICES, COACH_DEPTHS, simulateSensors,
+  checkCompatibility, sprintEligibility, ENV_CHECKS, COACH_VOICES, COACH_DEPTHS, simulateSensors,
   type EquipmentState, type EnvMode, type CoachVoice, type CoachDepth, type SetupStepKey,
 } from "@/src/lib/benchmark/setup";
 import type { ReadinessAnswer, ReadinessStatus } from "@/src/lib/benchmark/types";
@@ -40,6 +40,16 @@ export default function SetupWizardScreen() {
   const [depth, setDepth] = React.useState<CoachDepth>("full");
   const [sessionId, setSessionId] = React.useState<string | null>(null);
   const [begun, setBegun] = React.useState(false);
+  const [capability, setCapability] = React.useState<string | undefined>(undefined);
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const rp = await fetch(`${apiBase()}/api/rider/profile`);
+        if (rp.ok) { const prof = await rp.json(); setCapability(prof?.capability); }
+      } catch { /* noop */ }
+    })();
+  }, []);
 
   if (!test) {
     return (
@@ -60,6 +70,9 @@ export default function SetupWizardScreen() {
   const compat = checkCompatibility(test, equip);
   const anyEquip = EQUIPMENT_OPTIONS.some((o) => o.key !== "none" && (equip as any)[o.key]);
   const sensors = simulateSensors(equip);
+  const sprintGate = test.id === "sprint_power"
+    ? sprintEligibility({ capability, equipment: equip, envMode, envChecks, readiness: rdStatus })
+    : { ok: true, reasons: [] as string[] };
 
   const setAnswer = (qid: string, a: ReadinessAnswer) => {
     setAnswers((prev) => { const n = { ...prev, [qid]: a }; cacheAnswers(testId, n); return n; });
@@ -87,6 +100,7 @@ export default function SetupWizardScreen() {
   const goBack = () => setStepIdx((i) => Math.max(0, i - 1));
 
   const beginTest = async () => {
+    if (!sprintGate.ok) return; // sprint eligibility gate
     // Persist the full setup snapshot to the session (data integrity).
     if (sessionId) {
       try {
@@ -325,6 +339,19 @@ export default function SetupWizardScreen() {
                 <Ionicons name="checkmark-circle" size={20} color="#7FD98A" />
                 <Text style={s.begunText}>Setup saved. Launching your guided Workout Player…</Text>
               </View>
+            ) : !sprintGate.ok ? (
+              <View style={s.sprintBlock} testID="sprint-blocked">
+                <View style={s.sprintBlockHead}>
+                  <Ionicons name="shield-outline" size={18} color={CC.yellow} />
+                  <Text style={s.sprintBlockTitle}>Not recommended right now</Text>
+                </View>
+                {sprintGate.reasons.map((r, i) => (
+                  <Text key={i} style={s.sprintBlockReason}>• {r}</Text>
+                ))}
+                <Pressable testID="sprint-alt" onPress={() => router.replace("/benchmark/library")} style={s.ghostBtn}>
+                  <Text style={s.ghostText}>Choose a suitable test</Text>
+                </Pressable>
+              </View>
             ) : (
               <Pressable testID="begin-test" onPress={beginTest} style={s.primaryBtn} accessibilityRole="button" accessibilityLabel="Begin test">
                 <Ionicons name="play" size={18} color="#fff" /><Text style={s.primaryText}>Begin Test</Text>
@@ -431,6 +458,10 @@ const s = StyleSheet.create({
   sumValue: { color: CC.white, fontSize: 12.5, fontWeight: "700", flex: 1, textAlign: "right" },
   begun: { flexDirection: "row", gap: 10, alignItems: "center", backgroundColor: "rgba(127,217,138,0.08)", borderWidth: 1, borderColor: "rgba(127,217,138,0.3)", borderRadius: 12, padding: 15 },
   begunText: { flex: 1, color: CC.white, fontSize: 13, lineHeight: 19 },
+  sprintBlock: { backgroundColor: "rgba(255,194,10,0.06)", borderWidth: 1, borderColor: "rgba(255,194,10,0.3)", borderRadius: 12, padding: 14, gap: 8 },
+  sprintBlockHead: { flexDirection: "row", alignItems: "center", gap: 8 },
+  sprintBlockTitle: { color: CC.white, fontSize: 14, fontWeight: "800" },
+  sprintBlockReason: { color: CC.dim, fontSize: 12.5, lineHeight: 18 },
 
   primaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: CC.rouge, borderRadius: 12, paddingVertical: 14, minHeight: 50 },
   primaryText: { color: "#fff", fontSize: 15, fontWeight: "800" },

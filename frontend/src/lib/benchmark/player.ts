@@ -33,6 +33,22 @@ export function targetWatts(iv: TestInterval, ftp: number): number {
 
 export const RAMP_STEP_OPTIONS = [10, 15, 20, 25];
 
+/**
+ * Simulated power base for a maximal (RPE) effort, scaled off FTP by the
+ * interval's duration: shorter efforts allow higher power. Only used to make
+ * development data realistic — never a real target shown to the rider.
+ */
+export function effortBaseWatts(iv: TestInterval, ftp: number): number {
+  if (iv.targetType !== "rpe") return 0;
+  const d = iv.durationSec;
+  let factor = 1.15;
+  if (d <= 10) factor = 2.4;
+  else if (d <= 60) factor = 1.7;
+  else if (d <= 90) factor = 1.55;
+  else if (d <= 360) factor = 1.15;
+  return Math.round(ftp * factor);
+}
+
 // ── Stop-test reasons ───────────────────────────────────────────────────────
 export interface StopReason { id: string; label: string; safety?: boolean; }
 export const STOP_REASONS: StopReason[] = [

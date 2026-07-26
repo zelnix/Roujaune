@@ -1,0 +1,33 @@
+{
+  "summary": "Benchmark player suite tested via web preview (1024x768). LOGIN works. Ramp regression fully verified end-to-end: primary 'Estimated FTP' + MAP + FTP W/kg + insight all render on result page. Sim-notice ('profile not changed (simulated)') confirmed after result-accept. CRITICAL: Sprint safety gating (WP-B) did NOT fire when 'Bike is stable' / 'Trainer is secure' env checks were left unchecked — the 'begin-test' button was still visible and neither 'sprint-blocked' nor 'sprint-alt' testIDs rendered on the Summary step. Five-min, One-min, Sprint (happy), and Recovery flows could not be fully verified in this run due to flaky Playwright interactions inside long ScrollView pages (Skip loop not advancing reliably beyond the initial screen). Ramp result also did NOT render the 'result-dev-notice' testID at the top of the result page even though the run used simulated data — worth double-checking.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "benchmark/setup Summary (sprint_power)", "issue": "Sprint safety gating (WP-B) not triggering. With Green Lantern (intermediate) + Smart trainer selected but env checks 'bike_stable' and 'trainer_secure' UNchecked, Summary step still shows the 'begin-test' button. Expected 'sprint-blocked' block + 'sprint-alt' fallback per spec. Observed counts: sprint-blocked=0, begin-test=1, sprint-alt=0.", "testID": "sprint-blocked / sprint-alt / begin-test", "priority": "HIGH"},
+      {"component": "benchmark/result/current", "issue": "'result-dev-notice' testID did not render at the top of the Ramp Test result page after a simulated run (count=0). The yellow 'profile not changed (simulated)' notice DOES appear after Accept, so the notice pathway works, but the pre-accept dev-notice banner may be missing/mis-conditioned.", "testID": "result-dev-notice", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "benchmark test detail (e.g. Ramp Test)", "issues": ["'Start Test' primary CTA is below the fold on 1024x768 and outer window scroll does not reveal it — the CTA lives inside an inner ScrollView. Consider a sticky footer CTA for accessibility on tablet."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_48.json"],
+  "action_items": [
+    "URGENT: Debug sprintEligibility() gate in /app/frontend/src/lib/benchmark/setup.ts — it did not block begin-test when env checks 'bike_stable'/'trainer_secure' were unchecked (indoor mode, smart trainer, intermediate rider, safe readiness). Verify the reasons array + capability handling for INTERMEDIATE riders.",
+    "Verify 'result-dev-notice' rendering condition in /app/frontend/app/benchmark/result/current.tsx (line ~114). Ensure it always renders for isDevData=true runs.",
+    "Consider sticky 'Start Test' CTA on benchmark detail so it is visible without scrolling inside inner ScrollView on 1024x768 landscape."
+  ],
+  "critical_code_review_comments": [
+    "Player uses AsyncStorage 'bm:lastresult' to hand off to result page — works, but if a subsequent nav races, stale results could appear.",
+    "assembleCapture treats reachedMain = mainIv.elapsedSec > 5 — an aggressive Skip may push elapsedSec low; matches test description of ~12s runs.",
+    "player.ts effortBaseWatts uses 1.15x FTP for 5-min effort; realistic for simulation."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "Ramp regression: PASS. Sim-notice after Accept: PASS. Sprint gating (WP-B): FAIL. Five-min / One-min / Sprint-happy / Recovery: INCONCLUSIVE (test-harness flakiness in ScrollView, code review suggests they should work like Ramp)."},
+  "seed_data_creation": "None",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Detail page 'Start Test' text is inside an inner ScrollView Pressable — click via `getByText('Start Test').scroll_into_view_if_needed()` then find the closest ancestor with cursor:pointer and .click() (verified working via JS evaluate). Player interval label text is duplicated across the app body; skip_until using body.inner_text will match test-name phrases (e.g. '1-minute effort' also appears in setup card). Recommend reading only the small top-of-player interval label (styled with color rgb(201,23,39)) instead of body text.",
+  "rca_of_issue": "Sprint safety gating (WP-B) not blocking. Repro: login as greenlantern@roujaune.app / rideon9900 → /benchmark → Sprint Power → Start Test → Overview Continue → Readiness (all No) → Continue → tick 'Smart trainer' → Continue → Sensors Continue → Environment step, KEEP indoor mode default, DO NOT check 'bike_stable' or 'trainer_secure' → Continue. On Summary the 'begin-test' Pressable is rendered; expected 'sprint-blocked' + 'sprint-alt' per spec. Likely cause: sprintEligibility() returns ok:true when env checks are all false, or the caller inverts the branch, or rider's capability from /api/rider/profile is not being classified as intermediate (may be undefined → treated as advanced/no-gate). Inspect /app/frontend/src/lib/benchmark/setup.ts sprintEligibility() and the initial capability fetch in setup wizard."
+}

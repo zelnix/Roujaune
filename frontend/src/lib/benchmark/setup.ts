@@ -64,6 +64,30 @@ export function checkCompatibility(test: BenchmarkTest, e: EquipmentState): { ok
   return { ok: true, preferredWarning: false };
 }
 
+// ── Sprint test safety eligibility (Part 12B) ──────────────────────────────
+// The Sprint Power Test is an explosive maximal effort; block it unless the
+// rider and setup are suitable. Returns human, non-judgemental reasons.
+export function sprintEligibility(opts: {
+  capability?: string;
+  equipment: EquipmentState;
+  envMode: EnvMode;
+  envChecks: Record<string, boolean>;
+  readiness: "ready" | "caution" | "do_not_start" | null;
+}): { ok: boolean; reasons: string[] } {
+  const reasons: string[] = [];
+  if ((opts.capability || "").toLowerCase() === "beginner")
+    reasons.push("Sprint efforts are best once you've built a base. Try the Ramp or Aerobic Efficiency tests first.");
+  if (!hasPower(opts.equipment))
+    reasons.push("A power meter or smart trainer is required for the Sprint Power Test.");
+  if (opts.readiness === "do_not_start")
+    reasons.push("Your readiness check suggests not starting a maximal effort today.");
+  if (opts.envMode === "indoor" && !(opts.envChecks.bike_stable && opts.envChecks.trainer_secure))
+    reasons.push("Confirm your bike is stable and your trainer is secure before sprinting.");
+  if (opts.envMode === "outdoor")
+    reasons.push("The Sprint Power Test should be done indoors on a secure trainer.");
+  return { ok: reasons.length === 0, reasons };
+}
+
 // ── Environment checklists (indoor vs outdoor differ) ──────────────────────
 export type EnvMode = "indoor" | "outdoor";
 export const ENV_CHECKS: Record<EnvMode, { id: string; label: string }[]> = {

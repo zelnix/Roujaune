@@ -11,7 +11,7 @@ import { useSettings } from "@/src/lib/settings";
 import { POWER_REQUIRED, POWER_PREFERRED } from "@/src/lib/benchmark/setup";
 import {
   kindToState, targetWatts, STATE_LABEL, STOP_REASONS, SAFETY_GUIDANCE, coachPrompt,
-  simulateReadings, RAMP_STEP_OPTIONS, type WorkoutState,
+  simulateReadings, RAMP_STEP_OPTIONS, effortBaseWatts, type WorkoutState,
 } from "@/src/lib/benchmark/player";
 import { computeResult, assembleCapture, type IntervalCapture } from "@/src/lib/benchmark/calc";
 
@@ -21,17 +21,18 @@ const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).p
 // ── Per-interval accumulator (built live, finalized into an IntervalCapture) ──
 interface Acc {
   pSum: number; pN: number; pMax: number;
-  hrSum: number; hrN: number; endHr: number;
-  cadSum: number; cadN: number; inBand: number; cadCount: number;
+  hrSum: number; hrN: number; hrMax: number; endHr: number;
+  cadSum: number; cadN: number; cadMax: number; inBand: number; cadCount: number;
   h1p: number; h1hr: number; h1n: number; h2p: number; h2hr: number; h2n: number;
+  pSamples: number[]; hrSamples: number[];
 }
 function newAcc(): Acc {
-  return { pSum: 0, pN: 0, pMax: 0, hrSum: 0, hrN: 0, endHr: 0, cadSum: 0, cadN: 0, inBand: 0, cadCount: 0, h1p: 0, h1hr: 0, h1n: 0, h2p: 0, h2hr: 0, h2n: 0 };
+  return { pSum: 0, pN: 0, pMax: 0, hrSum: 0, hrN: 0, hrMax: 0, endHr: 0, cadSum: 0, cadN: 0, cadMax: 0, inBand: 0, cadCount: 0, h1p: 0, h1hr: 0, h1n: 0, h2p: 0, h2hr: 0, h2n: 0, pSamples: [], hrSamples: [] };
 }
 function accumulate(a: Acc, r: { power: number; hr: number; cadence: number }, elapsed: number, step: { duration: number; cadenceTarget?: number }) {
-  a.pSum += r.power; a.pN += 1; a.pMax = Math.max(a.pMax, r.power);
-  a.hrSum += r.hr; a.hrN += 1; a.endHr = r.hr;
-  a.cadSum += r.cadence; a.cadN += 1;
+  a.pSum += r.power; a.pN += 1; a.pMax = Math.max(a.pMax, r.power); a.pSamples.push(r.power);
+  a.hrSum += r.hr; a.hrN += 1; a.hrMax = Math.max(a.hrMax, r.hr); a.endHr = r.hr; a.hrSamples.push(r.hr);
+  a.cadSum += r.cadence; a.cadN += 1; a.cadMax = Math.max(a.cadMax, r.cadence);
   if (step.cadenceTarget) {
     a.cadCount += 1;
     if (Math.abs(r.cadence - step.cadenceTarget) <= 3) a.inBand += 1;
@@ -42,21 +43,39 @@ function accumulate(a: Acc, r: { power: number; hr: number; cadence: number }, e
     else { a.h2p += r.power; a.h2hr += r.hr; a.h2n += 1; }
   }
 }
+function rollingMax(samples: number[], win: number): number {
+  if (samples.length === 0) return 0;
+  const n = Math.min(win, samples.length);
+  let sum = 0; for (let i = 0; i < n; i++) sum += samples[i];
+  let best = sum / n;
+  for (let i = n; i < samples.length; i++) { sum += samples[i] - samples[i - n]; best = Math.max(best, sum / n); }
+  return best;
+}
 function finalizeInterval(
   step: { iv: { kind: string; label: string }; duration: number; target: number; isRamp: boolean },
   a: Acc, elapsedSec: number, rampTarget: number,
 ): IntervalCapture {
-  return {
+  const peak1s = a.pSamples.length ? Math.max(...a.pSamples) : 0;
+  const timeToPeakSec = a.pSamples.length ? a.pSamples.indexOf(peak1s) + 1 : 0;
+  const final10 = a.pSamples.length ? a.pSamples.slice(-10).reduce((x, y) => x + y, 0) / Math.min(10, a.pSamples.length) : 0;
+  const cap: IntervalCapture = {
     kind: step.iv.kind, label: step.iv.label,
     target: step.isRamp ? rampTarget : step.target,
     durationSec: step.duration, elapsedSec,
     avgPower: a.pN ? a.pSum / a.pN : 0, maxPower: a.pMax,
-    avgHr: a.hrN ? a.hrSum / a.hrN : 0, endHr: a.endHr,
-    avgCad: a.cadN ? a.cadSum / a.cadN : 0,
+    avgHr: a.hrN ? a.hrSum / a.hrN : 0, maxHr: a.hrMax, endHr: a.endHr,
+    avgCad: a.cadN ? a.cadSum / a.cadN : 0, maxCad: a.cadMax,
     inCadencePct: a.cadCount ? (a.inBand / a.cadCount) * 100 : 0,
     h1Power: a.h1n ? a.h1p / a.h1n : 0, h1Hr: a.h1n ? a.h1hr / a.h1n : 0,
     h2Power: a.h2n ? a.h2p / a.h2n : 0, h2Hr: a.h2n ? a.h2hr / a.h2n : 0,
+    peak1s, peak5s: rollingMax(a.pSamples, 5), peak8s: rollingMax(a.pSamples, 8), final10, timeToPeakSec,
   };
+  if (step.iv.kind === "recovery") {
+    const at: Record<string, number> = {};
+    for (const off of [30, 60, 120, 180]) if (a.hrSamples.length >= off) at[String(off)] = a.hrSamples[off - 1];
+    if (Object.keys(at).length) cap.hrAt = at;
+  }
+  return cap;
 }
 
 export default function WorkoutPlayerScreen() {
@@ -74,6 +93,7 @@ export default function WorkoutPlayerScreen() {
       iv,
       state: kindToState(iv.kind),
       target: targetWatts(iv, ftp),
+      simBase: iv.targetType === "rpe" ? effortBaseWatts(iv, ftp) : targetWatts(iv, ftp),
       cadenceTarget: iv.cadenceLow && iv.cadenceHigh ? Math.round((iv.cadenceLow + iv.cadenceHigh) / 2) : undefined,
       isRamp: iv.targetType === "ramp",
       duration: iv.durationSec,
@@ -105,6 +125,8 @@ export default function WorkoutPlayerScreen() {
   const totalRef = React.useRef(0);
   const savedRef = React.useRef<any>(null);
   const [sensorLevel, setSensorLevel] = React.useState<"A" | "B" | "C" | "D">("B");
+  const [hasHr, setHasHr] = React.useState(true);
+  const [weightKg, setWeightKg] = React.useState<number | undefined>(undefined);
   const running = ["warmup", "main", "recovery", "cooldown"].includes(runState);
 
   // Metric relevance
@@ -149,18 +171,33 @@ export default function WorkoutPlayerScreen() {
   const rpeRef = React.useRef(rpe); rpeRef.current = rpe;
   const rampStepRef = React.useRef(rampStep); rampStepRef.current = rampStep;
   const sensorLevelRef = React.useRef(sensorLevel); sensorLevelRef.current = sensorLevel;
+  const hasHrRef = React.useRef(hasHr); hasHrRef.current = hasHr;
+  const weightRef = React.useRef(weightKg); weightRef.current = weightKg;
+  const ftpRef = React.useRef(ftp); ftpRef.current = ftp;
 
-  // Pull the sensor level captured in the setup flow (drives result confidence).
+  // Pull the sensor level + HR availability captured in setup, and rider weight.
   React.useEffect(() => {
-    if (!session) return;
     (async () => {
+      if (session) {
+        try {
+          const res = await fetch(`${apiBase()}/api/benchmark/sessions/${session}`);
+          if (res.ok) {
+            const doc = await res.json();
+            if (doc?.sensorLevel) setSensorLevel(doc.sensorLevel);
+            const eq = doc?.equipment;
+            if (eq && typeof eq.heart_rate === "boolean") setHasHr(!!eq.heart_rate);
+            else if (doc?.sensorLevel) setHasHr(doc.sensorLevel === "A" || doc.sensorLevel === "C");
+          }
+        } catch { /* keep defaults */ }
+      }
       try {
-        const res = await fetch(`${apiBase()}/api/benchmark/sessions/${session}`);
-        if (res.ok) {
-          const doc = await res.json();
-          if (doc?.sensorLevel) setSensorLevel(doc.sensorLevel);
+        const rp = await fetch(`${apiBase()}/api/rider/profile`);
+        if (rp.ok) {
+          const prof = await rp.json();
+          const wt = prof?.weightKg ?? prof?.weight_kg ?? prof?.weight;
+          if (typeof wt === "number" && wt > 0) setWeightKg(wt);
         }
-      } catch { /* keep default */ }
+      } catch { /* no weight ⇒ W/kg hidden */ }
     })();
   }, [session]);
 
@@ -176,6 +213,9 @@ export default function WorkoutPlayerScreen() {
       sensorLevel: sensorLevelRef.current,
       isDevData: true,
       rpe: rpeRef.current,
+      weightKg: weightRef.current,
+      ftp: ftpRef.current,
+      hasHr: hasHrRef.current,
     });
     const result = computeResult(test, capture);
     const endedAt = new Date().toISOString();
@@ -202,7 +242,7 @@ export default function WorkoutPlayerScreen() {
           if (ne % stepSec === 0) setRampTarget((rt) => rt + rampStep);
         }
         // simulate telemetry
-        const tgt = cur.isRamp ? rampTargetRef.current : cur.target;
+        const tgt = cur.isRamp ? rampTargetRef.current : (cur.simBase ?? cur.target);
         const r = simulateReadings(tgt, cur.state, cur.cadenceTarget, fadeRef.current);
         setReadings(r);
         pRoll.current = [...pRoll.current, r.power].slice(-3);
@@ -259,6 +299,16 @@ export default function WorkoutPlayerScreen() {
   };
   const confirmPause = () => { pauseCountRef.current += 1; setShowPauseWarn(false); setRunState("paused"); };
   const resume = () => { setPauseTotal((p) => p); setRunState(step?.state ?? "main"); };
+  // DEV: jump to the next interval (lets simulated testing reach the main effort fast).
+  const skipStep = () => {
+    const cur = steps[stepIdx];
+    if (!cur) return;
+    logRef.current.push(finalizeInterval(cur, accRef.current, stepElapsed, rampTarget));
+    accRef.current = newAcc(); pRoll.current = [];
+    const next = stepIdx + 1;
+    if (next >= steps.length) { setRunState("completed"); finishRef.current("completed", null); }
+    else { setStepIdx(next); setStepElapsed(0); if (steps[next].isRamp) setRampTarget(steps[next].iv.rampStartWatts || 100); setRunState(steps[next].state); }
+  };
   const pickStop = (rid: string, isSafety?: boolean) => {
     setShowStop(false); setStoppedReason(rid); setSafety(!!isSafety);
     // finalize the in-progress interval so its recorded data is captured
@@ -385,6 +435,7 @@ export default function WorkoutPlayerScreen() {
             <View style={s.injectRow}>
               <Pressable testID="inject-fade" onPress={() => setFade((f) => Math.min(1, f + 0.2))} style={s.injectBtn}><Text style={s.injectText}>Power fade</Text></Pressable>
               <Pressable testID="inject-reset" onPress={() => setFade(0)} style={s.injectBtn}><Text style={s.injectText}>Reset</Text></Pressable>
+              <Pressable testID="inject-skip" onPress={skipStep} style={s.injectBtn}><Text style={s.injectText}>Skip interval</Text></Pressable>
               <Pressable testID="inject-interrupt" onPress={() => { setRunState("interrupted"); persist({ runState: "interrupted" }); }} style={s.injectBtn}><Text style={s.injectText}>Dropout</Text></Pressable>
             </View>
           </View>
