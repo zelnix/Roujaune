@@ -13,15 +13,10 @@ import { riderVisualFor } from "@/src/lib/virtual-riders";
 import { RIDER_TYPES, BIKE_TYPES, CLOTHING_STYLES, DEFAULT_APPEARANCE, loadAppearance, RiderAppearanceConfiguration } from "@/src/lib/rider-config";
 import { VIRTUAL_ROUTES, getVRoute, routeStateAt, routeTerrainBias } from "@/src/lib/vroutes";
 import { VirtualRouteScene, SceneTelemetry } from "@/src/components/virtual-route/scene";
+import { VirtualRidePlayer } from "@/src/components/virtual-route/VirtualRidePlayer";
 
-type PanelMode = "all" | "min" | "hidden";
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-const PRESETS = [
-  { label: "Recovery", w: 120, icon: "leaf-outline" as const },
-  { label: "Endurance", w: 185, icon: "bicycle-outline" as const },
-  { label: "Tempo", w: 235, icon: "flame-outline" as const },
-  { label: "Climb", w: 295, icon: "trending-up-outline" as const },
-];
+
 
 type RideSummary = {
   distanceKm: number;
@@ -78,7 +73,6 @@ export default function VirtualRouteScreen() {
   const [appearance, setAppearance] = React.useState<RiderAppearanceConfiguration>(DEFAULT_APPEARANCE);
   const [routeId, setRouteId] = React.useState(VIRTUAL_ROUTES[0].id);
   const [phase, setPhase] = React.useState<"setup" | "riding" | "paused">("setup");
-  const [panel, setPanel] = React.useState<PanelMode>("all");
   const [reducedMotion, setReducedMotion] = React.useState(false);
   const [autoResistance, setAutoResistance] = React.useState(true);
   const [emergency, setEmergency] = React.useState(false);
@@ -204,75 +198,53 @@ export default function VirtualRouteScreen() {
     }
   };
   const emergencyStop = () => { setEmergency(true); setAutoResistance(false); sendErg(50); };
-  const cyclePanel = () => setPanel((p) => (p === "all" ? "min" : p === "min" ? "hidden" : "all"));
+
+  // Route checkpoints as vertical "stages" for the shared HUD rail.
+  const upIdx = vroute.checkpoints.findIndex((c) => distanceKm < c.km);
+  const vStages = vroute.checkpoints.map((c, idx) => ({
+    label: c.label,
+    sub: `${c.km} km`,
+    state: (distanceKm >= c.km ? "done" : idx === upIdx ? "active" : "upcoming") as "done" | "active" | "upcoming",
+  }));
 
   return (
     <View style={s.root}>
       <StatusBar hidden />
-      {/* Cinematic wide scene */}
-      <VirtualRouteScene rider={rider} appearance={appearance} align={vroute.riderAlign} bgScale={vroute.bgScale} bgShiftY={vroute.bgShiftY} backdrop={vroute.backdrop} telemetry={scene} showBrand />
 
-      {/* Connection status pill (top-right) */}
-      <SafeAreaView style={[s.topRight, { pointerEvents: "box-none" }]} edges={["top", "right"]}>
-        <View style={[s.connPill, { borderColor: conn.tone + "88", backgroundColor: conn.tone + "22" }]}>
-          <View style={[s.connDot, { backgroundColor: conn.tone }]} />
-          <Text style={s.connText}>{conn.label}</Text>
-        </View>
-        <Pressable onPress={cyclePanel} style={s.iconBtn} accessibilityRole="button" accessibilityLabel="Toggle telemetry visibility">
-          <Ionicons name={panel === "hidden" ? "eye-off-outline" : panel === "min" ? "contract-outline" : "grid-outline"} size={18} color={colors.white} />
-        </Pressable>
-        <Pressable onPress={() => setReducedMotion((r) => !r)} style={[s.iconBtn, reducedMotion && s.iconBtnOn]} accessibilityRole="button" accessibilityLabel="Toggle reduced motion">
-          <Ionicons name="accessibility-outline" size={18} color={reducedMotion ? colors.bg : colors.white} />
-        </Pressable>
-      </SafeAreaView>
-
-      {/* Telemetry panels */}
-      {phase !== "setup" && panel === "all" && (
-        <TelemetryPanel sm={sm} route={route} vroute={vroute} elapsed={telemetry.elapsed} dist={distanceKm} load={resistanceTarget} compact={compact} hrOn={hrOn} />
-      )}
-      {phase !== "setup" && panel === "min" && (
-        <View style={s.minBar} testID="vr-min-panel">
-          <MiniStat label="SPEED" value={`${sm.speed}`} unit="km/h" />
-          <MiniStat label="POWER" value={`${sm.power}`} unit="W" />
-          <MiniStat label="CAD" value={`${sm.cadence}`} unit="rpm" />
-          <MiniStat label="GRADE" value={`${route.gradient}`} unit="%" />
-          <MiniStat label="LOAD" value={`${resistanceTarget}`} unit="%" tone={resistanceTarget >= 120 ? colors.red : resistanceTarget >= 105 ? colors.yellow : colors.green} />
-          <View style={s.minProgress}><View style={[s.minFill, { width: `${route.progress * 100}%` }]} /></View>
-        </View>
-      )}
-
-      {/* Bottom control bar */}
-      {phase !== "setup" && (
-        <SafeAreaView style={[s.controls, { pointerEvents: "box-none" }]} edges={["bottom"]}>
-          <View style={s.controlRow}>
-            {running ? (
-              <CtrlBtn icon="pause" label="Pause" onPress={pauseRide} />
-            ) : (
-              <CtrlBtn icon="play" label="Resume" tone={colors.green} onPress={resumeRide} />
-            )}
-            <CtrlBtn icon="stop" label="End Ride" tone={colors.red} onPress={endRide} />
-            <View style={s.spacer} />
-            {/* Simulation presets */}
-            {PRESETS.map((p) => (
-              <Pressable key={p.label} onPress={() => sendTarget(p.w)} style={s.presetChip} accessibilityLabel={`Set ${p.label} effort`}>
-                <Ionicons name={p.icon} size={14} color={colors.yellow} />
-                <Text style={s.presetText}>{p.label}</Text>
-              </Pressable>
-            ))}
-            <Pressable onPress={simulateDropout} style={s.iconBtnDark} accessibilityLabel="Simulate signal drop">
-              <Ionicons name="cellular-outline" size={16} color={colors.white} />
-            </Pressable>
-            <Pressable onPress={() => setAutoResistance((a) => !a)} style={[s.iconBtnDark, autoResistance && !emergency && s.iconBtnOn]} accessibilityLabel="Toggle auto resistance">
-              <Ionicons name="options-outline" size={16} color={autoResistance && !emergency ? colors.bg : colors.white} />
-            </Pressable>
-            <Pressable onPress={emergencyStop} style={[s.iconBtnDark, { borderColor: colors.red }]} accessibilityLabel="Emergency stop resistance">
-              <Ionicons name="warning-outline" size={16} color={colors.red} />
-            </Pressable>
-            <Pressable onPress={() => setShowBle(true)} style={[s.iconBtnDark, ble.connected.length > 0 && s.iconBtnOn]} testID="vr-sensors" accessibilityLabel="Pair Bluetooth sensors">
-              <Ionicons name="bluetooth" size={16} color={ble.connected.length > 0 ? colors.bg : colors.white} />
-            </Pressable>
-          </View>
-        </SafeAreaView>
+      {phase === "setup" ? (
+        // Cinematic wide scene sits behind the setup card.
+        <VirtualRouteScene rider={rider} appearance={appearance} align={vroute.riderAlign} bgScale={vroute.bgScale} bgShiftY={vroute.bgShiftY} backdrop={vroute.backdrop} telemetry={scene} showBrand />
+      ) : (
+        // Shared immersive Virtual Ride player — identical to the Live Workout fullscreen.
+        <VirtualRidePlayer
+          mode="fullscreen"
+          vroute={vroute}
+          routeState={route}
+          appearance={appearance}
+          metrics={{ power: sm.power, cadence: sm.cadence, speed: sm.speed, hr: sm.hr, elapsed: Math.max(0, telemetry.elapsed - startElapsedRef.current), riddenKm: distanceKm }}
+          paused={!running}
+          connected={connectionState === "connected"}
+          simulation={!sensorsOn}
+          hrOn={hrOn}
+          load={resistanceTarget}
+          compact={compact}
+          reducedMotion={reducedMotion}
+          onToggleReducedMotion={() => setReducedMotion((r) => !r)}
+          stages={vStages}
+          connLabel={conn.label}
+          connTone={conn.tone}
+          onPauseToggle={running ? pauseRide : resumeRide}
+          onPreset={(w) => sendTarget(w)}
+          ergOn={autoResistance && !emergency}
+          onErgToggle={() => setAutoResistance((a) => !a)}
+          onReconnect={simulateDropout}
+          exitLabel="End Ride"
+          exitIcon="stop"
+          onExitFullscreen={endRide}
+          onSensors={() => setShowBle(true)}
+          sensorsOn={ble.connected.length > 0}
+          onEmergency={emergencyStop}
+        />
       )}
 
       {/* Setup overlay: rider selection + start */}
@@ -409,57 +381,6 @@ function deriveConnection(state: string, stale: boolean, sensorsOn: boolean): { 
   if (stale) return { label: "Signal temporarily lost", tone: colors.yellow };
   if (!sensorsOn) return { label: "Simulated ride mode", tone: "#5AC8FA" };
   return { label: "Connected", tone: colors.green };
-}
-
-function TelemetryPanel({ sm, route, vroute, elapsed, dist, load, compact, hrOn }: any) {
-  const loadTone = load >= 120 ? colors.red : load >= 105 ? colors.yellow : colors.green;
-  const cells = [
-    { label: "POWER", value: `${sm.power}`, unit: "W", icon: "flash" as const, tone: colors.yellow },
-    { label: "CADENCE", value: `${sm.cadence}`, unit: "rpm", icon: "sync" as const, tone: colors.green },
-    { label: "SPEED", value: `${sm.speed}`, unit: "km/h", icon: "speedometer" as const, tone: "#5AC8FA" },
-    { label: "HEART RATE", value: hrOn ? `${sm.hr}` : "—", unit: "bpm", icon: "heart" as const, tone: colors.red },
-    { label: "GRADIENT", value: `${route.gradient}`, unit: "%", icon: "trending-up" as const, tone: colors.yellow },
-    { label: "LOAD", value: `${load ?? 100}`, unit: "%", icon: "barbell" as const, tone: loadTone },
-    { label: "DISTANCE", value: `${(dist ?? 0).toFixed(1)}`, unit: "km", icon: "navigate" as const, tone: "#5AC8FA" },
-    { label: "ELAPSED", value: mmss(elapsed), unit: "", icon: "time-outline" as const, tone: colors.white },
-  ];
-  return (
-    <View style={[s.panel, compact && s.panelCompact, { pointerEvents: "box-none" }]} testID="vr-full-panel">
-      <View style={s.panelHead}>
-        <Ionicons name="location" size={13} color={colors.yellow} />
-        <Text style={s.panelRoute} numberOfLines={1}>Next: {route.segmentLabel} · {route.remainingKm.toFixed(1)} km to go</Text>
-      </View>
-      {vroute && <RouteProfile vroute={vroute} progress={route.progress} height={compact ? 34 : 44} />}
-      <View style={s.progressTrack}><View style={[s.progressFill, { width: `${route.progress * 100}%` }]} /></View>
-      <View style={s.panelGrid}>
-        {cells.map((c) => (
-          <View key={c.label} style={s.panelCell}>
-            <Ionicons name={c.icon} size={13} color={c.tone} />
-            <Text style={s.panelValue}>{c.value}<Text style={s.panelUnit}> {c.unit}</Text></Text>
-            <Text style={s.panelLabel}>{c.label}</Text>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-function MiniStat({ label, value, unit, tone }: { label: string; value: string; unit: string; tone?: string }) {
-  return (
-    <View style={s.miniStat}>
-      <Text style={[s.miniValue, tone ? { color: tone } : null]}>{value}<Text style={s.miniUnit}> {unit}</Text></Text>
-      <Text style={s.miniLabel}>{label}</Text>
-    </View>
-  );
-}
-
-function CtrlBtn({ icon, label, tone, onPress }: { icon: any; label: string; tone?: string; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} style={[s.ctrlBtn, tone ? { backgroundColor: tone } : null]} accessibilityRole="button" accessibilityLabel={label}>
-      <Ionicons name={icon} size={16} color={tone ? "#0b0b0b" : colors.white} />
-      <Text style={[s.ctrlText, tone ? { color: "#0b0b0b" } : null]}>{label}</Text>
-    </Pressable>
-  );
 }
 
 const s = StyleSheet.create({

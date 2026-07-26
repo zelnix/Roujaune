@@ -48,6 +48,8 @@ export type VirtualRidePlayerProps = {
   compact?: boolean;
   style?: StyleProp<ViewStyle>;
   routeBadge?: { icon: keyof typeof Ionicons.glyphMap; label: string } | null;
+  /** Vertical stage/segment progression shown in the rail (workout intervals or route checkpoints). */
+  stages?: { label: string; sub?: string; state: "done" | "active" | "upcoming" }[];
   // Controls
   onFullscreen?: () => void;
   onExitFullscreen?: () => void;
@@ -57,6 +59,14 @@ export type VirtualRidePlayerProps = {
   ergOn?: boolean;
   onErgToggle?: () => void;
   onReconnect?: () => void;
+  // Context-aware extras (used by the standalone Virtual Routes ride)
+  exitLabel?: string;
+  exitIcon?: keyof typeof Ionicons.glyphMap;
+  onSensors?: () => void;
+  sensorsOn?: boolean;
+  onEmergency?: () => void;
+  connLabel?: string;
+  connTone?: string;
 };
 
 /**
@@ -69,8 +79,9 @@ export type VirtualRidePlayerProps = {
 export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
   const {
     mode, vroute, routeState, appearance = DEFAULT_APPEARANCE, metrics, paused, simulation,
-    hrOn, load = 100, reducedMotion, onToggleReducedMotion, cue, stepLabel, stepTimeLeft, compact, style, routeBadge,
+    hrOn, load = 100, reducedMotion, onToggleReducedMotion, cue, stepLabel, stepTimeLeft, compact, style, routeBadge, stages,
     onFullscreen, onExitFullscreen, onPauseToggle, onOpenRoutes, onPreset, ergOn, onErgToggle, onReconnect,
+    exitLabel = "Exit", exitIcon = "contract", onSensors, sensorsOn, onEmergency, connLabel, connTone,
   } = props;
 
   const rider = riderVisualFor(appearance.riderType);
@@ -179,10 +190,35 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
             </View>
           ))}
         </View>
+
+        {!!stages && stages.length > 0 && (
+          <View style={st.stages}>
+            <Text style={st.stagesLabel}>STAGES</Text>
+            {stages.map((sg, i) => {
+              const tone = sg.state === "active" ? colors.yellow : sg.state === "done" ? colors.green : colors.textFaint;
+              const icon = sg.state === "done" ? "checkmark-circle" : sg.state === "active" ? "radio-button-on" : "ellipse-outline";
+              return (
+                <View key={`${sg.label}-${i}`} style={[st.stageRow, sg.state === "active" && st.stageActive]}>
+                  <Ionicons name={icon as any} size={14} color={tone} style={{ width: 18, textAlign: "center" }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[st.stageName, sg.state === "active" && { color: colors.white }, sg.state === "upcoming" && { color: colors.textDim }]} numberOfLines={1}>{sg.label}</Text>
+                    {!!sg.sub && <Text style={st.stageSub} numberOfLines={1}>{sg.sub}</Text>}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
       </ScrollView>
 
-      {/* Top-right: coaching cue, interval, camera/motion toggle */}
+      {/* Top-right: connection, coaching cue, interval, camera/motion toggle */}
       <View style={[st.fsTopRight, { pointerEvents: "box-none" }]}>
+        {!!connLabel && (
+          <View style={[st.connPill, { borderColor: (connTone ?? colors.textDim) + "88", backgroundColor: (connTone ?? colors.textDim) + "22" }]}>
+            <View style={[st.connDot, { backgroundColor: connTone ?? colors.textDim }]} />
+            <Text style={st.connText}>{connLabel}</Text>
+          </View>
+        )}
         {(stepLabel || stepTimeLeft) && (
           <View style={st.fsInterval}>
             <Ionicons name="flag" size={13} color={colors.yellow} />
@@ -221,14 +257,26 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
               <Text style={st.roundText}>Reconnect</Text>
             </Pressable>
           )}
+          {onSensors && (
+            <Pressable onPress={onSensors} style={[st.round, sensorsOn && st.roundOn]} testID="vr-fs-sensors" accessibilityLabel="Pair Bluetooth sensors">
+              <Ionicons name="bluetooth" size={18} color={sensorsOn ? colors.yellow : colors.white} />
+              <Text style={[st.roundText, sensorsOn && { color: colors.yellow }]}>Sensors</Text>
+            </Pressable>
+          )}
+          {onEmergency && (
+            <Pressable onPress={onEmergency} style={[st.round, { borderColor: colors.red }]} testID="vr-fs-emergency" accessibilityLabel="Emergency stop resistance">
+              <Ionicons name="warning-outline" size={18} color={colors.red} />
+              <Text style={[st.roundText, { color: colors.red }]}>Stop</Text>
+            </Pressable>
+          )}
           <View style={st.barSpacer} />
           <Pressable onPress={onPauseToggle} style={st.pausePrimary} testID="vr-fs-pause" accessibilityLabel={paused ? "Resume" : "Pause"}>
             <Ionicons name={paused ? "play" : "pause"} size={20} color={colors.bg} />
             <Text style={st.pausePrimaryText}>{paused ? "Resume" : "Pause"}</Text>
           </Pressable>
-          <Pressable onPress={onExitFullscreen} style={st.exitBtn} testID="vr-exit-fullscreen" accessibilityLabel="Exit fullscreen">
-            <Ionicons name="contract" size={18} color={colors.white} />
-            <Text style={st.exitText}>Exit</Text>
+          <Pressable onPress={onExitFullscreen} style={st.exitBtn} testID="vr-exit-fullscreen" accessibilityLabel={exitLabel}>
+            <Ionicons name={exitIcon} size={18} color={colors.white} />
+            <Text style={st.exitText}>{exitLabel}</Text>
           </Pressable>
         </View>
       </View>
@@ -265,6 +313,15 @@ const st = StyleSheet.create({
   railValue: { color: colors.white, fontSize: 18, fontWeight: "900", fontVariant: ["tabular-nums"] },
   railUnit: { color: colors.textFaint, fontSize: 10, fontWeight: "700" },
   railLabel: { color: colors.textFaint, fontSize: 8.5, fontWeight: "800", letterSpacing: 0.8 },
+  stages: { marginTop: 8, gap: 2, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.08)", paddingTop: 6 },
+  stagesLabel: { color: colors.textFaint, fontSize: 9, fontWeight: "800", letterSpacing: 1, marginBottom: 2 },
+  stageRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 4, borderRadius: 8, paddingHorizontal: 4 },
+  stageActive: { backgroundColor: "rgba(240,192,64,0.14)" },
+  stageName: { color: colors.textDim, fontSize: 12, fontWeight: "700" },
+  stageSub: { color: colors.textFaint, fontSize: 9.5, fontWeight: "600" },
+  connPill: { flexDirection: "row", alignItems: "center", gap: 6, height: 40, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 12 },
+  connDot: { width: 8, height: 8, borderRadius: 4 },
+  connText: { color: colors.white, fontSize: 12, fontWeight: "800" },
 
   fsTopRight: { position: "absolute", top: 0, right: 0, flexDirection: "row", alignItems: "flex-start", gap: 8, padding: 12, maxWidth: "62%" },
   fsIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: colors.border },

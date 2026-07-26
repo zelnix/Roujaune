@@ -76,9 +76,9 @@ export const VIRTUAL_ROUTES: VRoute[] = [
     distanceKm: 12,
     tag: "Fast & Flat",
     elevationM: 180,
-    // Keep the rider natural size; zoom the backdrop so the road is bigger and the
-    // wheels meet the tarmac. Small left nudge to sit on the road centre.
-    riderAlign: { x: -0.03, bottom: -2 },
+    // Zoom the backdrop so the road reads larger; drop the rider low so the wheels
+    // sit on the tarmac (this backdrop's road surface sits high in frame).
+    riderAlign: { x: -0.03, bottom: -6 },
     bgScale: 1.34,
     bgShiftY: 0.06,
     points: [
@@ -107,9 +107,8 @@ export const VIRTUAL_ROUTES: VRoute[] = [
     distanceKm: 15,
     tag: "Rolling Hills",
     elevationM: 340,
-    // Forest trail sits a touch left of centre — nudge left; a gentle backdrop zoom
-    // brings the trail up so the wheels meet the ground.
-    riderAlign: { x: -0.03, bottom: -1 },
+    // Gentle backdrop zoom + drop the rider low so the wheels meet the trail.
+    riderAlign: { x: -0.03, bottom: -6 },
     bgScale: 1.12,
     points: [
       { km: 0, gradient: 2, curve: 0 },
@@ -188,6 +187,9 @@ export const VIRTUAL_ROUTES: VRoute[] = [
     distanceKm: 14,
     tag: "Rough & Wet",
     elevationM: 260,
+    // Drop the rider low so the wheels sit on the wet cobbles (road sits high here).
+    riderAlign: { bottom: -6 },
+    bgScale: 1.12,
     points: [
       { km: 0, gradient: 1, curve: 0 },
       { km: 2, gradient: 3, curve: 0.3 },

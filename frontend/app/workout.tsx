@@ -229,6 +229,15 @@ export default function LiveWorkout() {
   );
   const targetW = activeSeg ? targetWatts(activeSeg.segment, ftp, zoneBias) : 251;
   const timeLeftLabel = activeSeg ? mmss(activeSeg.remaining) : undefined;
+  // Workout intervals as vertical "stages" for the shared fullscreen HUD rail.
+  const workoutStages = React.useMemo(
+    () => segments.map((seg, i) => ({
+      label: seg.label,
+      sub: seg.zoneLabel ?? mmss(seg.durationSec),
+      state: (activeSeg ? (i < activeSeg.index ? "done" : i === activeSeg.index ? "active" : "upcoming") : "upcoming") as "done" | "active" | "upcoming",
+    })),
+    [segments, activeSeg],
+  );
   // Full step list for the bottom timeline + Workout card — each segment with
   // its summary detail (duration, target watts, %FTP, RPE, one-line description).
   const stepList = React.useMemo(
@@ -895,6 +904,7 @@ export default function LiveWorkout() {
             cue={liveCue}
             stepLabel={activeSeg?.segment.label}
             stepTimeLeft={timeLeftLabel ?? undefined}
+            stages={workoutStages}
             onExitFullscreen={() => setExpanded(false)}
             onPauseToggle={onPauseToggle}
             onPreset={(w) => { sendTarget(w); showToast(`Target ${w} W`); logControl(`Target → ${w} W`); }}

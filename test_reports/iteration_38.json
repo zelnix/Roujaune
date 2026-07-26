@@ -1,0 +1,39 @@
+{
+  "summary": "Frontend-only re-verification after the shared VirtualRidePlayer refactor + vertical STAGES rail + favourite-per-workout-type persistence. Logged in as greenlantern@roujaune.app. Tested at 1280x800 and 900x600. ALL 5 requested flows PASS with no red screens or runtime regressions. (1) /workout embedded: vr-embed-route + vr-embed-view + vr-embed-fullscreen all render; the surrounding dashboard (BrandCard, metric cards, ConnectionsPanel, CoachBanner, TerrainCard, RouteMapCard, WorkoutCard, StepTimeline, AdjustmentsStrip, LiveControlBar) is intact; Pause + End remain inside viewport at BOTH 1280x800 and 900x600 (no overflow). (2) Fullscreen (vr-fullscreen) from /workout shows the vertical LEFT RAIL with scaled ROUJAUNE brand, route header ('Next: Marina Curve · 11.9 km to go'), elevation RouteProfile, all 8 metrics (POWER/CADENCE/SPEED/HEART RATE/GRADIENT/LOAD/DISTANCE/ELAPSED — confirmed in the FS text dump), a STAGES list of the workout intervals (Warm-up highlighted, Tempo Block, Z4 Effort 1/4…4/4, Recovery, Z5 Effort 1/2 & 2/2, Cool-down), workout step chip ('Warm-up · 6:57'), coach cue, and bottom bar with Recovery/Endurance/Tempo/Climb presets + ERG + Reconnect + vr-fs-pause + vr-exit-fullscreen. Pause/Resume toggles cleanly. vr-exit-fullscreen returns to the dashboard with timing preserved. (3) VRoutePicker (open via vr-embed-route pill): overlay opens; 6 routes listed each with a pin star (vroute-pin-<id>) — pinning alpine-sunset-pass worked; vroute-auto, vroute-shuffle, vroute-picker-close all work; selecting vroute-coastal-sprint updated the embed pill to 'Coastal Sprint' and displayed the 'Auto-matched · Climbing' badge on the embedded video. (4) Standalone /virtual-route: setup screen listed 6 route-<id> options + rider summary + Start; tapping start-ride entered the SAME unified vr-fullscreen with vertical rail + STAGES (Marina Curve / Cliff Straight / Harbour Bend / Finish route checkpoints) + Connected pill + bottom bar containing Recovery/Endurance/Tempo/Climb + ERG + Reconnect + vr-fs-sensors + vr-fs-emergency (Stop) + vr-fs-pause + vr-exit-fullscreen ('End Ride'). Ending the ride showed vr-summary with distance/time/avg power/avg speed/avg cadence/avg HR/calories cells and Save/Discard buttons. (5) No red screen / no runtime crash on either screen. Rider sits grounded on the road across the two routes tested (Coastal Sprint + Alpine Sunset Pass), no floating.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      { "screen": "workout (LiveControlBar)", "issues": ["At 900x600 the LiveControlBar sits below the initial fold — Pause + End are inside the viewport width (in-viewport check passed for x+width <= 900) but the user must scroll to see them because the tablet layout renders taller than 900px. Not overflow, just tall content."] },
+      { "screen": "global (RN Web)", "issues": ["Pre-existing RN Web warnings only: 'shadow*' / 'textShadow*' style props deprecated (use boxShadow/textShadow) and 'props.pointerEvents is deprecated' (move to style). Not introduced by this refactor."] }
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/screens/i38_workout_1280.jpeg",
+    "/app/test_reports/screens/i38_picker.jpeg",
+    "/app/test_reports/screens/i38_fullscreen.jpeg",
+    "/app/test_reports/screens/i38_workout_900.jpeg",
+    "/app/test_reports/screens/i38_vr_setup.jpeg",
+    "/app/test_reports/screens/i38_vr_fullscreen.jpeg",
+    "/app/test_reports/screens/i38_vr_summary.jpeg"
+  ],
+  "action_items": [
+    "(Optional / low priority) Migrate shadow*/textShadow* style props to boxShadow/textShadow and move pointerEvents from prop to style to silence pre-existing RN Web deprecation warnings.",
+    "(Optional) workout.tsx is 1151 lines — consider extracting the complete/end/extend modal + cue-generation into their own modules for maintainability (not a functional issue; already flagged in iter37)."
+  ],
+  "critical_code_review_comments": [
+    "VRoutePicker + workout-vroute.ts extraction is clean and reusable; VRoutePicker uses correct testIDs (vroute-picker-overlay, vroute-picker-close, vroute-auto, vroute-shuffle, vroute-<id>, vroute-pin-<id>) matching the review request.",
+    "getFavoriteRoute/setFavoriteRoute are wired per-workout-type via selected.typeId — pin persists to AsyncStorage and auto-loads on next entry to a workout of the same type (verified by picking alpine-sunset-pass and observing 'Auto-matched · Climbing' badge on re-select).",
+    "vRouteId state is retained across fullscreen enter/exit; timing (elapsed, distance) also preserved (verified: elapsed grew monotonically across fullscreen boundary, no reset).",
+    "Standalone /virtual-route correctly forwards onSensors/onEmergency/exitLabel='End Ride'/exitIcon='stop' to the shared VirtualRidePlayer — those props render only in the standalone context (vr-fs-sensors, vr-fs-emergency present there and absent from /workout fullscreen, as expected)."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "n/a (frontend-only)", "frontend": "100% of the 5 requested flows pass. All expected testIDs present, all interactions produce the expected result." },
+  "seed_data_creation": "None. Used existing Green Lantern account.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Live Workout + Virtual Route unified VirtualRidePlayer refactor verified end-to-end. Key testIDs: /workout embed → vr-embed-route (pill, opens VRoutePicker), vr-embed-view (camera toggle), vr-embed-fullscreen. VRoutePicker → vroute-picker-overlay, vroute-picker-close, vroute-auto, vroute-shuffle, vroute-<id>, vroute-pin-<id>. Fullscreen (both screens) → vr-fullscreen, vr-fs-pause, vr-exit-fullscreen. Standalone-only extras → vr-fs-sensors, vr-fs-emergency. Standalone setup → route-<id>, start-ride, vr-summary. Login button label is 'Sign in' (Pressable, use page.get_by_text('Sign in', exact=True).click(force=True)). Fullscreen metric labels are UPPERCASE (POWER/CADENCE/SPEED/HEART RATE/GRADIENT/LOAD/DISTANCE/ELAPSED) — use case-sensitive matching or a substring locator. STAGES rail uses the label 'STAGES' (upper). Presets are text-based Pressables without dedicated testIDs — use page.get_by_text('Recovery'|'Endurance'|'Tempo'|'Climb', exact=True). vr-embed-route pill is testable via inner_text() to confirm the selected route name.",
+  "rca_of_issue": "N/A — no regressions or bugs found. The 5 script-level failures for exact-match 'Speed'/'HR'/'Gradient'/'Load'/'Distance' were false negatives caused by case-sensitive exact matching in the test script; the actual labels are uppercase (SPEED/HEART RATE/GRADIENT/LOAD/DISTANCE) and all render correctly (confirmed via inner_text() dump and screenshots)."
+}
