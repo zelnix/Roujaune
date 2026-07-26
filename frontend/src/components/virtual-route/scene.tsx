@@ -218,7 +218,7 @@ export function VirtualRouteScene({ rider, backdrop, telemetry, showBrand = true
 const st = StyleSheet.create({
   wrap: { flex: 1, overflow: "hidden", backgroundColor: "#05060a" },
   bg: { ...StyleSheet.absoluteFillObject, width: "100%", height: "100%" },
-  riderWrap: { position: "absolute", left: 0, right: 0, bottom: 0, top: "6%", alignItems: "center", justifyContent: "flex-end" },
+  riderWrap: { position: "absolute", left: 0, right: 0, bottom: "3%", top: "22%", alignItems: "center", justifyContent: "flex-end" },
   riderImg: { width: "100%", height: "100%" },
   plateWrap: { ...StyleSheet.absoluteFillObject },
   plate: { width: "100%", height: "100%" },
@@ -235,8 +235,8 @@ const st = StyleSheet.create({
   }) as any,
   floorGlow: { position: "absolute", left: 0, right: 0, bottom: 0, height: 90, backgroundColor: "rgba(245,179,1,0.06)" },
   wheelBadge: { position: "absolute", bottom: 14, alignSelf: "center", opacity: 0.85 },
-  brand: { position: "absolute", top: 14, left: 16, flexDirection: "row", alignItems: "center", gap: 8 },
-  brandGlyph: { width: 30, height: 30 },
-  brandWord: { width: 128, height: 22 },
+  brand: { position: "absolute", top: 14, left: 16, flexDirection: "row", alignItems: "center", gap: 14 },
+  brandGlyph: { width: 60, height: 60 },
+  brandWord: { width: 256, height: 44 },
   pausedBadge: { position: "absolute", top: 14, alignSelf: "center", backgroundColor: "rgba(0,0,0,0.5)", borderRadius: 999, padding: 4 },
 });
