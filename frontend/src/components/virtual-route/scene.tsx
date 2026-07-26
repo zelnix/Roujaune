@@ -218,7 +218,7 @@ export function VirtualRouteScene({ rider, backdrop, telemetry, showBrand = true
 const st = StyleSheet.create({
   wrap: { flex: 1, overflow: "hidden", backgroundColor: "#05060a" },
   bg: { ...StyleSheet.absoluteFillObject, width: "100%", height: "100%" },
-  riderWrap: { position: "absolute", left: 0, right: 0, bottom: "3%", top: "22%", alignItems: "center", justifyContent: "flex-end" },
+  riderWrap: { position: "absolute", left: 0, right: 0, bottom: "4%", top: "32%", alignItems: "center", justifyContent: "flex-end" },
   riderImg: { width: "100%", height: "100%" },
   plateWrap: { ...StyleSheet.absoluteFillObject },
   plate: { width: "100%", height: "100%" },
