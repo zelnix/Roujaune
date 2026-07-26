@@ -497,3 +497,9 @@ Home Alberto "Start Today's Ride" & sidebar Workouts → `/training`. Training "
   - `PlanUpdatedNudge` (top of Today screen) shows "<coach> updated your plan" when `usePlanBadge()` detects a fresh adaptation; tap/View → /plan (marks seen); X dismisses. `plan-badge` checks both coaches' timestamps.
 - **Data hygiene:** deduped `training_plans` (had duplicate `id` docs) + added a UNIQUE index on `id` so adaptation caches read/write deterministically.
 - KNOWN/optional (flagged by testing): Seated Mode / Smart Trainer toggles live on the pre-ride sheet & `/connections`, not `app/settings.tsx` — persistence layer is shared, so behaviour is equivalent; could surface them on Settings later.
+
+## Today hero/card copy + Settings consolidation (2026-07-26, batch 7)
+- Hero coach CTA now reads **"View Today's Workout"** only when the next activity `is_today`; otherwise **"View Next Scheduled Workout"** (rest → "View Today's Plan" / "View Next Scheduled Day").
+- **View Calendar button moved** from the hero coach card to the **Today's Training card** (testID `today-view-calendar`); the hero card now shows only "Message <coach>".
+- **`TodayTrainingCard`** reworked to reflect the SAME next-scheduled activity (any type) as the hero via `usePlan()`: its title flips between **"TODAY'S TRAINING"** and **"NEXT SCHEDULED WORKOUT"** (+ day label), shows the workout/steps for rides or a type note for strength/recovery, and buttons "Open Today's Training"/"Open Workout" + Calendar.
+- **Settings screen**: added an **"EQUIPMENT & RIDE"** card (testIDs tg-hasTrainer/tg-hasWearable/tg-hudEnabled/tg-seatedMode/tg-demoMode) wired to `useSettings` (server-persisted) — a single source of truth alongside the pre-ride sheet & Connections.

@@ -11,7 +11,7 @@ import { PrimaryButton } from "./ui";
 
 const KIND_LABEL: Record<string, string> = { recovery: "Recovery", rest: "Rest", strength: "Strength", balance: "Balance", mobility: "Mobility", cycling: "" };
 
-export function AlbertoCoachCard({ width, onStart, onMessage, onCalendar, compact = false }: { width: number; onStart: () => void; onMessage?: () => void; onCalendar?: () => void; compact?: boolean }) {
+export function AlbertoCoachCard({ width, onStart, onMessage, compact = false }: { width: number; onStart: () => void; onMessage?: () => void; compact?: boolean }) {
   const persona = useCoach();
   const { plan } = usePlan();
   // The next scheduled activity of ANY type (ride, strength, recovery, rest…).
@@ -34,7 +34,9 @@ export function AlbertoCoachCard({ width, onStart, onMessage, onCalendar, compac
         : `PHASE ${h.phase_number} · ${h.phase_name} · WEEK ${h.week_in_phase}`)
     : null;
 
-  const cta = isRest ? "View Today's Plan" : "View Today's Workout";
+  const cta = next?.is_today
+    ? (isRest ? "View Today's Plan" : "View Today's Workout")
+    : (isRest ? "View Next Scheduled Day" : "View Next Scheduled Workout");
   const portraitW = compact ? 108 : 138;
   return (
     <LinearGradient
@@ -88,19 +90,7 @@ export function AlbertoCoachCard({ width, onStart, onMessage, onCalendar, compac
               style={({ hovered }: any) => [styles.msgBtn, hovered && styles.msgBtnHover]}
             >
               <Ionicons name="chatbubble-ellipses-outline" size={15} color={colors.yellow} />
-              <Text style={styles.msgText} numberOfLines={1}>Message</Text>
-            </Pressable>
-          ) : null}
-          {onCalendar ? (
-            <Pressable
-              testID="home-view-calendar"
-              onPress={onCalendar}
-              accessibilityRole="button"
-              accessibilityLabel="View calendar"
-              style={({ hovered }: any) => [styles.msgBtn, hovered && styles.msgBtnHover]}
-            >
-              <Ionicons name="calendar-outline" size={15} color={colors.yellow} />
-              <Text style={styles.msgText} numberOfLines={1}>Calendar</Text>
+              <Text style={styles.msgText} numberOfLines={1}>Message {persona.name}</Text>
             </Pressable>
           ) : null}
         </View>

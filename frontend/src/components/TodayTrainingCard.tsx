@@ -1,86 +1,66 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing } from "../theme";
-import { useCalendarWeek } from "../lib/calendar";
+import { usePlan } from "../lib/plan";
 import { getWorkout, buildSegments } from "../lib/workout-catalog";
-import { SecondaryButton, SectionLabel, Touchable } from "./ui";
+import { SecondaryButton, SectionLabel } from "./ui";
 
-function TodayRow({ label, time, state, onPress, testID }: {
-  label: string; time: string; state: "done" | "active" | "todo"; onPress: () => void; testID: string;
-}) {
-  const icon =
-    state === "done" ? { name: "checkmark-circle" as const, color: colors.green }
-      : state === "active" ? { name: "ellipse" as const, color: colors.yellow }
-      : { name: "ellipse-outline" as const, color: colors.textFaint };
-  return (
-    <Touchable testID={testID} onPress={onPress} scaleTo={0.97} lift={false}>
-      <View style={[styles.todayRow, state === "active" && styles.todayRowActive]}>
-        <Text style={styles.todayLabel} numberOfLines={1}>{label}</Text>
-        <Text style={styles.todayTime}>{time}</Text>
-        <Ionicons name={icon.name} size={18} color={icon.color} style={{ marginLeft: 8 }} />
-      </View>
-    </Touchable>
-  );
-}
+const KIND_LABEL: Record<string, string> = { recovery: "Recovery", rest: "Rest", strength: "Strength", balance: "Balance", mobility: "Mobility" };
 
-/** Standalone "Today's Training" card — the detailed session for the live
- * "today" (headline + workout steps + any supplementary sessions). */
-export function TodayTrainingCard({ onOpenToday, onToast }: { onOpenToday?: () => void; onToast?: (m: string) => void }) {
-  const { week } = useCalendarWeek();
+/** "Today's Training" / "Next Scheduled Workout" card — reflects the same next
+ * scheduled activity (any type) as the coach hero. Title flips depending on
+ * whether that activity is actually scheduled for today. */
+export function TodayTrainingCard({ onOpenToday, onToast, onCalendar }: { onOpenToday?: () => void; onToast?: (m: string) => void; onCalendar?: () => void }) {
+  const { plan } = usePlan();
+  const next = (plan.workouts?.find((w) => !w.completed) ?? plan.workouts?.[0]) as any;
 
-  const today = React.useMemo(
-    () => (week?.days ?? []).find((d) => d.date === week?.selected_date) ?? null,
-    [week]
-  );
-  const todayMain = today?.cycling ?? null;
+  const isRide = !next?.type || next?.type === "cycling";
+  const isRest = next?.type === "rest";
+  const scheduledToday = !!next?.is_today;
 
-  const todaySteps = React.useMemo(() => {
-    if (!todayMain?.workout_id) return null;
-    const w = getWorkout(todayMain.workout_id);
+  const title = scheduledToday ? "TODAY'S TRAINING" : "NEXT SCHEDULED WORKOUT";
+  const dayLabel = scheduledToday ? "Today" : (next?.date_label ?? "");
+
+  const steps = React.useMemo(() => {
+    if (!isRide || !next?.id) return null;
+    const w = getWorkout(next.id);
     if (!w) return null;
     const segs = buildSegments(w);
     return segs.length ? segs : null;
-  }, [todayMain]);
-
-  const supplementary = React.useMemo(() => {
-    const state = (s?: string): "done" | "active" | "todo" =>
-      s === "completed" ? "done" : s === "today" ? "active" : "todo";
-    return [today?.fb50, today?.wellness]
-      .filter((s): s is NonNullable<typeof s> => !!s)
-      .map((s, i) => ({ key: `${s.type ?? "session"}-${s.id ?? i}`, label: s.title, time: s.duration || "—", state: state(s.status) }));
-  }, [today]);
-
-  const dayLabel = today?.day_num ? today.day_num : "";
+  }, [next, isRide]);
 
   return (
     <View style={styles.card} testID="today-training-card">
       <View style={styles.headRow}>
-        <SectionLabel color={colors.textDim}>TODAY'S TRAINING</SectionLabel>
-        {dayLabel ? <Text style={styles.dayLabel}>{dayLabel}</Text> : null}
+        <SectionLabel color={colors.textDim}>{title}</SectionLabel>
+        {dayLabel ? <Text style={styles.dayLabel}>{dayLabel.toUpperCase()}</Text> : null}
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 4 }}>
-        {todayMain ? (
+        {next ? (
           <View style={styles.detail} testID="today-training-detail">
-            <Text style={styles.detailTitle} numberOfLines={2}>{todayMain.title}</Text>
+            <Text style={styles.detailTitle} numberOfLines={2}>{isRest ? "Rest & Recovery" : next.title}</Text>
             <View style={styles.metaRow}>
               <Ionicons name="time-outline" size={13} color={colors.textDim} />
-              <Text style={styles.detailMeta}>{todayMain.duration || "—"}</Text>
-              {todayMain.zone ? (<>
+              <Text style={styles.detailMeta}>{next.duration || "—"}</Text>
+              {isRide && next.zone ? (<>
                 <Ionicons name="pulse" size={13} color={colors.green} style={{ marginLeft: 12 }} />
-                <Text style={styles.detailMeta}>{todayMain.zone}</Text>
+                <Text style={styles.detailMeta}>{next.zone}</Text>
               </>) : null}
-              {todayMain.tss ? (<>
+              {isRide && next.tss ? (<>
                 <Ionicons name="flash" size={13} color={colors.yellow} style={{ marginLeft: 12 }} />
-                <Text style={styles.detailMeta}>{todayMain.tss}</Text>
+                <Text style={styles.detailMeta}>{next.tss}</Text>
+              </>) : null}
+              {!isRide && next.subtitle ? (<>
+                <Ionicons name={(next.icon ?? "leaf-outline") as any} size={13} color={next.color ?? colors.textDim} style={{ marginLeft: 12 }} />
+                <Text style={styles.detailMeta}>{KIND_LABEL[next.type] ?? next.subtitle}</Text>
               </>) : null}
             </View>
-            {todayMain.subtitle ? <Text style={styles.detailDesc} numberOfLines={2}>{todayMain.subtitle}</Text> : null}
-            {todaySteps ? (
+            {steps ? (
               <View style={styles.steps} testID="today-training-steps">
                 <Text style={styles.stepsLabel}>WORKOUT STEPS</Text>
-                {todaySteps.map((seg, i) => (
+                {steps.map((seg, i) => (
                   <View key={i} style={styles.stepRow}>
                     <View style={[styles.stepDot, { backgroundColor: seg.color }]} />
                     <Text style={styles.stepName} numberOfLines={2}>{seg.label}</Text>
@@ -88,28 +68,40 @@ export function TodayTrainingCard({ onOpenToday, onToast }: { onOpenToday?: () =
                   </View>
                 ))}
               </View>
+            ) : !isRide ? (
+              <View style={styles.altBox}>
+                <Ionicons name={(next.icon ?? "leaf-outline") as any} size={20} color={next.color ?? colors.textDim} />
+                <Text style={styles.altText}>{next.subtitle ? `${next.subtitle} session` : "Supplementary session"}{dayLabel ? ` scheduled for ${dayLabel}.` : "."}</Text>
+              </View>
             ) : null}
           </View>
         ) : (
           <View style={styles.restBox} testID="today-training-rest">
             <Ionicons name="bed-outline" size={22} color={colors.textDim} />
-            <Text style={styles.restText}>Rest & recovery today — no ride scheduled.</Text>
-          </View>
-        )}
-
-        {supplementary.length > 0 && (
-          <View style={{ marginTop: spacing.sm, gap: 6 }}>
-            {supplementary.map((w) => (
-              <TodayRow key={w.key} testID={`today-${w.key}`} label={w.label} time={w.time} state={w.state}
-                onPress={() => onToast?.(`${w.label} selected`)} />
-            ))}
+            <Text style={styles.restText}>No upcoming session scheduled.</Text>
           </View>
         )}
       </ScrollView>
 
-      {onOpenToday ? (
-        <SecondaryButton testID="open-today-training" label="Open Today's Training" onPress={onOpenToday} />
-      ) : null}
+      <View style={styles.btnRow}>
+        {onOpenToday ? (
+          <View style={{ flex: 1 }}>
+            <SecondaryButton testID="open-today-training" label={scheduledToday ? "Open Today's Training" : "Open Workout"} onPress={onOpenToday} />
+          </View>
+        ) : null}
+        {onCalendar ? (
+          <Pressable
+            testID="today-view-calendar"
+            onPress={onCalendar}
+            accessibilityRole="button"
+            accessibilityLabel="View calendar"
+            style={({ hovered }: any) => [styles.calBtn, hovered && styles.calBtnHover]}
+          >
+            <Ionicons name="calendar-outline" size={16} color={colors.yellow} />
+            <Text style={styles.calText}>Calendar</Text>
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -120,19 +112,20 @@ const styles = StyleSheet.create({
   dayLabel: { color: colors.textFaint, fontSize: 11, fontWeight: "800", letterSpacing: 0.5 },
   detail: { marginTop: 8, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: colors.borderSoft, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10 },
   detailTitle: { color: colors.white, fontSize: 15, fontWeight: "800" },
-  metaRow: { flexDirection: "row", alignItems: "center", marginTop: 5, gap: 4 },
+  metaRow: { flexDirection: "row", alignItems: "center", marginTop: 5, gap: 4, flexWrap: "wrap" },
   detailMeta: { color: colors.textDim, fontSize: 12, fontWeight: "600", marginLeft: 3 },
-  detailDesc: { color: colors.textDim, fontSize: 11.5, lineHeight: 16, marginTop: 6 },
   steps: { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.borderSoft, gap: 6 },
   stepsLabel: { color: colors.textFaint, fontSize: 9.5, fontWeight: "800", letterSpacing: 1, marginBottom: 2 },
   stepRow: { flexDirection: "row", alignItems: "center", gap: 9 },
   stepDot: { width: 7, height: 7, borderRadius: 4 },
   stepName: { color: colors.white, fontSize: 12.5, fontWeight: "600", flex: 1 },
   stepMeta: { color: colors.textDim, fontSize: 11.5, fontWeight: "700" },
+  altBox: { marginTop: 10, flexDirection: "row", alignItems: "center", gap: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.borderSoft },
+  altText: { color: colors.textDim, fontSize: 12, lineHeight: 17, flex: 1 },
   restBox: { marginTop: 8, alignItems: "center", gap: 8, padding: 16, backgroundColor: "rgba(255,255,255,0.03)", borderRadius: radius.md, borderWidth: 1, borderColor: colors.borderSoft },
   restText: { color: colors.textDim, fontSize: 12.5, textAlign: "center", lineHeight: 18 },
-  todayRow: { flexDirection: "row", alignItems: "center", paddingVertical: 8, paddingHorizontal: 10, borderRadius: radius.sm },
-  todayRowActive: { backgroundColor: "rgba(255,255,255,0.05)" },
-  todayLabel: { color: colors.white, fontSize: 13.5, fontWeight: "600", flex: 1 },
-  todayTime: { color: colors.textDim, fontSize: 12.5 },
+  btnRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  calBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: "rgba(255,194,10,0.35)", borderRadius: radius.md, paddingVertical: 11, paddingHorizontal: 16, backgroundColor: "rgba(255,194,10,0.06)", minHeight: 42 },
+  calBtnHover: { backgroundColor: "rgba(255,194,10,0.14)" },
+  calText: { color: colors.yellow, fontSize: 12.5, fontWeight: "700" },
 });

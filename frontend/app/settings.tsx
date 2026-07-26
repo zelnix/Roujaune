@@ -197,6 +197,16 @@ export default function SettingsScreen() {
         </View>
       </Card>
 
+      <Card testID="equipment-prefs">
+        <SectionTitle label="EQUIPMENT & RIDE" color={CC.rouge} />
+        <PrefToggle label="Smart trainer" sub="Control resistance (ERG) from your workouts" on={settings.hasTrainer} onToggle={() => setSetting("hasTrainer", !settings.hasTrainer)} testID="tg-hasTrainer" divider />
+        <PrefToggle label="Heart-rate / wearable" sub="Show live heart rate and recovery data" on={settings.hasWearable} onToggle={() => setSetting("hasWearable", !settings.hasWearable)} testID="tg-hasWearable" divider />
+        <PrefToggle label="Live HUD overlay" sub="On-screen metrics during rides" on={settings.hudEnabled} onToggle={() => setSetting("hudEnabled", !settings.hudEnabled)} testID="tg-hudEnabled" divider />
+        <PrefToggle label="Seated mode" sub={`${persona.name} avoids standing-effort cues`} on={settings.seatedMode} onToggle={() => setSetting("seatedMode", !settings.seatedMode)} testID="tg-seatedMode" divider />
+        <PrefToggle label="Demo mode" sub="Simulate sensor data without hardware" on={settings.demoMode} onToggle={() => setSetting("demoMode", !settings.demoMode)} testID="tg-demoMode" />
+        <Text style={s.coachHint}>These stay in sync with the pre-ride setup and your Connections — one source of truth, saved to your account.</Text>
+      </Card>
+
       <Card testID="preferences">
         <SectionTitle label="TRAINING PREFERENCES" />
         <View style={[s.prefRow, s.divider]}>

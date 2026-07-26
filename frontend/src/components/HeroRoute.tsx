@@ -49,7 +49,6 @@ export function HeroRoute({
   onProfile,
   onFlame,
   onNotifications,
-  onCalendar,
   compact = false,
 }: {
   width: number;
@@ -59,7 +58,6 @@ export function HeroRoute({
   onProfile?: () => void;
   onFlame: () => void;
   onNotifications: () => void;
-  onCalendar?: () => void;
   compact?: boolean;
 }) {
   const persona = useCoach();
@@ -115,7 +113,6 @@ export function HeroRoute({
           width={compact ? Math.min(360, width * 0.7) : Math.min(430, width * 0.66)}
           onStart={onStart}
           onMessage={onMessage}
-          onCalendar={onCalendar}
           compact={compact}
         />
       </View>

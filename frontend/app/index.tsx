@@ -119,12 +119,11 @@ export default function Dashboard() {
                   onProfile={() => router.push("/profile")}
                   onFlame={() => setShowProgress(true)}
                   onNotifications={() => setShowNotifs(true)}
-                  onCalendar={() => router.push("/calendar")}
                   compact={compact}
                 />
               </View>
               <View style={{ flex: 1 }}>
-                <TodayTrainingCard onOpenToday={() => router.push("/training")} onToast={showToast} />
+                <TodayTrainingCard onOpenToday={() => router.push("/training")} onToast={showToast} onCalendar={() => router.push("/calendar")} />
               </View>
             </View>
 
