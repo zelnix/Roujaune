@@ -38,7 +38,7 @@ export function BenchmarkLibrary({ initialFilter = "all" }: { initialFilter?: Fi
   const [filter, setFilter] = React.useState<Filter>(initialFilter);
 
   const goDetails = (id: string) => router.push(`/benchmark/${id}`);
-  const goStart = (id: string) => router.push(`/benchmark/readiness/${id}`);
+  const goStart = (id: string) => router.push(`/benchmark/setup/${id}`);
 
   const filtered = BENCHMARK_TESTS.filter((t) => matches(t, filter));
   const grouped = filter === "all";

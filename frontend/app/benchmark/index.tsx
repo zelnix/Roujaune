@@ -103,7 +103,7 @@ export default function BenchmarkLandingScreen() {
           <Pressable testID="rec-schedule" onPress={() => setNotice("Scheduling arrives with the training-calendar integration.")} accessibilityRole="button" accessibilityLabel="Schedule the recommended test" style={s.btnGhost}>
             <Text style={s.btnGhostText}>Schedule Test</Text>
           </Pressable>
-          <Pressable testID="rec-start" onPress={() => router.push(`/benchmark/readiness/${rec.id}`)} accessibilityRole="button" accessibilityLabel="Start the recommended test" style={s.btnPrimary}>
+          <Pressable testID="rec-start" onPress={() => router.push(`/benchmark/setup/${rec.id}`)} accessibilityRole="button" accessibilityLabel="Start the recommended test" style={s.btnPrimary}>
             <Ionicons name="play" size={15} color="#fff" />
             <Text style={s.btnPrimaryText}>Start Test</Text>
           </Pressable>

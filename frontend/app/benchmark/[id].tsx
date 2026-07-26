@@ -131,7 +131,7 @@ export default function BenchmarkDetailScreen() {
 
         {/* Actions */}
         <View style={s.actions}>
-          <Pressable testID="detail-start" onPress={() => router.push(`/benchmark/readiness/${test.id}`)} accessibilityRole="button" accessibilityLabel={`Start the ${test.name}`} style={s.startBtn}>
+          <Pressable testID="detail-start" onPress={() => router.push(`/benchmark/setup/${test.id}`)} accessibilityRole="button" accessibilityLabel={`Start the ${test.name}`} style={s.startBtn}>
             <Ionicons name="play" size={18} color="#fff" />
             <Text style={s.startText}>Start Test</Text>
           </Pressable>
