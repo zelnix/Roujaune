@@ -546,3 +546,14 @@ Re-specified per detailed 5-part brief; SUPERSEDES batch-9/10 "Phase 1/2".
 - **Tested (screenshots):** full flow Overview→Begin (Level A shown, indoor/outdoor checklists differ, summary correct, session saved); Do-Not-Start gate (continue count 0, exit present); Caution restores Continue. Lint clean.
 - NEXT: Part 7 (reusable Workout Player: states, pause/stop/recovery, sim data, coaching prompts), Part 8 (4 protocols), Part 9 (versioned calc service + result pages + confidence/quality + reflection + accept/exclude), Part 10 (profile/history charts + FTP/zone review, configurable zones). Player Begin currently a placeholder to wire in Part 7.
 
+
+## Session update (Jun 2026 fork) — Today polish + Push (WP-F)
+- **Today screen UI (P0, done + verified via screenshot):**
+  - 7-day forecast now reliably tappable (added `hitSlop`), enlarged text (temp 22→27, place 16→18); hint is a highlighted yellow pill. Modal opens on tap.
+  - User avatar: fixed missing `avatarImg` style (root cause photo not rendering); no-photo fallback now a **gold-ring circular initials placeholder** (rider initials, gold tint). `HeroRoute.tsx`.
+  - Coach "Alberto" flash fixed: `coach-persona.ts` exposes `useCoachReady()`; `AlbertoCoachCard` masks portrait/name until hydrated. Weather location also gated on `settings.loaded`.
+- **Benchmark Notifications WP-F (Emergent-managed push):**
+  - Backend `push.py`: `POST /api/register-push` relay, `send_push()` helper, benchmark-week reminder loop (day-before + day-of), started on FastAPI startup. Confirmation push on `/benchmark/week/start`. All non-blocking. `EMERGENT_PUSH_KEY=placeholder` in backend/.env (deployer replaces).
+  - Frontend `_layout.tsx`: module-scope handler + Android channel, tap listeners (warm + cold-start), denied-permission weekly nudge (Alert → openSettings), `registerForPush()` on sign-in. `src/lib/push.ts` uses `getDevicePushTokenAsync`.
+  - `app.json`: `expo-notifications` plugin + `android.googleServicesFile: ./google-services.json` (user adds file at deploy).
+  - **CANNOT be tested in Expo Go/web** — requires native build. In dev, register-push returns 500 (placeholder key) — EXPECTED; benchmark scheduling still succeeds (verified via curl).

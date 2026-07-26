@@ -19,6 +19,7 @@ from rider_level import compute_rider_level
 import plans_admin
 import companion_plan
 import auth
+import push
 from auth import udb
 
 
@@ -1657,6 +1658,23 @@ async def start_benchmark_week(payload: Dict[str, Any] = Body(default={})):
     doc = {"id": "current", "user_id": uid, "active": True, "startDate": start.isoformat(),
            "days": days, "createdAt": datetime.now(timezone.utc).isoformat()}
     await udb.benchmark_week.update_one({"user_id": uid, "id": "current"}, {"$set": doc}, upsert=True)
+    # Confirmation push — fire-and-forget so a push failure never blocks scheduling.
+    first_test = next((d for d in days if d.get("kind") == "test"), None)
+    try:
+        await push.send_push(
+            recipients=[uid],
+            data={
+                "title": "Benchmark week scheduled",
+                "message": (
+                    f"Your benchmark week starts {start.strftime('%a %d %b')}"
+                    + (f" with {first_test['label']}." if first_test else ".")
+                ),
+                "action_url": "/benchmark",
+            },
+            idempotency_key=f"bmweek-{uid}-{start.isoformat()}-scheduled",
+        )
+    except Exception as e:
+        logging.warning(f"benchmark scheduling push failed (non-blocking): {e}")
     doc.pop("user_id", None)
     return doc
 
@@ -4176,6 +4194,8 @@ async def get_community():
 api_router.include_router(plans_admin.plans_router)
 api_router.include_router(auth.auth_router)
 app.include_router(api_router)
+app.include_router(push.router)
+push.init(db)
 
 app.add_middleware(auth.AuthMiddleware)
 app.add_middleware(
@@ -4237,6 +4257,12 @@ async def _seed_plans_on_startup():
             logger.info(f"Migrated single-user data to demo account {migrated}")
     except Exception:
         logging.exception("auth init failed")
+    # Kick off the benchmark-week push reminder loop (day-before / day-of).
+    try:
+        asyncio.create_task(push.reminder_loop())
+        logger.info("Benchmark reminder loop started")
+    except Exception:
+        logging.exception("failed to start benchmark reminder loop")
 
 
 @app.on_event("shutdown")
