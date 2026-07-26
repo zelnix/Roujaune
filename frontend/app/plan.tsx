@@ -9,6 +9,7 @@ import { useRouter } from "expo-router";
 import { useCoach } from "@/src/lib/coach-persona";
 import { usePlan, useAdaptation, useAdaptiveTargets } from "@/src/lib/plan";
 import { markPlanSeen } from "@/src/lib/plan-badge";
+import PlanBenchmarkGate from "@/src/components/benchmark/PlanBenchmarkGate";
 import {
   C, PlanPhase, KeyWorkout, PlanProvider,
   PlanHeader, PlanTabs,
@@ -146,6 +147,7 @@ export default function TrainingPlanScreen() {
   );
   const progress = <PlanProgressStrip onProgress={() => setShowProgress(true)} />;
   const tip = <AlbertoTipFooter />;
+  const benchmarkGate = <PlanBenchmarkGate planId={activePlanId} coachName={persona.name} coachGender={persona.gender} onReview={() => { setChatSeed("Can we review my benchmark for this plan?"); setShowChat(true); }} />;
 
   let body: React.ReactNode;
   if (tab === "Phases") {
@@ -157,7 +159,7 @@ export default function TrainingPlanScreen() {
   } else if (tab === "Adaptations") {
     body = (<><View style={styles.rowGap}><AlbertoAdaptationsCard persona={persona} onViewAll={() => setShowAdaptations(true)} text={adaptation.text} loading={adaptation.loading} onRefresh={adaptation.refresh} /><View style={{ width: 380 }}><AdaptiveTargetsCard targets={adaptiveTargets.targets} loading={adaptiveTargets.loading} width={380} /></View></View>{progress}{tip}</>);
   } else {
-    body = (<>{hero}{progress}{roadmapRow}{workoutsRow}{tip}</>);
+    body = (<>{benchmarkGate}{hero}{progress}{roadmapRow}{workoutsRow}{tip}</>);
   }
 
   const Grid = (

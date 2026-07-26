@@ -6,7 +6,7 @@ import { AppScaffold, Card, SectionTitle } from "@/src/components/app-scaffold";
 import { CC } from "@/src/components/calendar";
 import { getBenchmarkTest, CATEGORY_META } from "@/src/lib/benchmark/catalog";
 import { BenchmarkLibrary } from "@/src/components/benchmark/BenchmarkLibrary";
-import { useBenchmarkResults, useBenchmarkProfile, useBenchmarkZones, setBenchmarkResultDecision } from "@/src/lib/benchmark/api";
+import { useBenchmarkResults, useBenchmarkProfile, useBenchmarkZones, useBenchmarkRecommendation, setBenchmarkResultDecision } from "@/src/lib/benchmark/api";
 import type { BenchmarkProfile } from "@/src/lib/benchmark/types";
 
 const HISTORY_RANGES = ["4 Weeks", "3 Months", "6 Months", "12 Months", "All Time"];
@@ -36,12 +36,16 @@ export default function BenchmarkLandingScreen() {
   const { results, loading: resultsLoading, reload: reloadResults } = useBenchmarkResults();
   const { profile, loading: profileLoading, reload: reloadProfile } = useBenchmarkProfile();
   const { ftp: zoneFtp, zones, loading: zonesLoading, reload: reloadZones } = useBenchmarkZones();
+  const { rec: recommendation } = useBenchmarkRecommendation();
   const [range, setRange] = React.useState("3 Months");
   const [notice, setNotice] = React.useState<string | null>(null);
   const [busyId, setBusyId] = React.useState<string | null>(null);
 
-  const rec = getBenchmarkTest("ramp")!;
+  const recId = recommendation?.primary?.testId || "ramp";
+  const rec = getBenchmarkTest(recId) || getBenchmarkTest("ramp")!;
   const recCat = CATEGORY_META[rec.category];
+  const recReasons = recommendation?.primary?.reasons || [];
+  const recApproved = recommendation?.status === "approved";
 
   const decide = async (id: string, decision: "accepted" | "excluded") => {
     setBusyId(id);
@@ -116,10 +120,13 @@ export default function BenchmarkLandingScreen() {
           <RecFact icon="hardware-chip-outline" label="Equipment" value={rec.requiredEquipment.length > 0 ? "Trainer + power" : "None"} />
         </View>
         <View style={s.whyBox}>
-          <Text style={s.whyLabel}>WHY THIS TEST</Text>
+          <Text style={s.whyLabel}>{recApproved ? "YOUR CURRENT BENCHMARK IS STILL SUITABLE" : "WHY THIS TEST"}</Text>
           <Text style={s.whyText}>
-            It&apos;s the quickest way to establish your FTP — the foundation for personalising every training zone. A
-            great first benchmark to anchor your profile.
+            {recApproved
+              ? "Alberto or Adriana has reviewed your recent training and your existing benchmarks can personalise your plan. Retest when you're ready."
+              : recReasons.length > 0
+                ? `Recommended because ${recReasons.join(", ")}. ${rec.purpose}`
+                : rec.whoFor}
           </Text>
         </View>
         <View style={s.recActions}>

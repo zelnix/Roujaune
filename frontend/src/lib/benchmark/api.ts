@@ -67,6 +67,37 @@ export async function saveBenchmarkResult(payload: Record<string, unknown>): Pro
   }
 }
 
+export interface BenchmarkRecommendation {
+  primary: { testId: string; score: number; reasons: string[] };
+  ordered: { testId: string; score: number; reasons: string[] }[];
+  status: "recommended" | "approved" | string;
+  hasPower: boolean;
+  isNew: boolean;
+  capability: string;
+  lastBenchmarkDate: string | null;
+}
+
+export async function fetchBenchmarkRecommendation(): Promise<BenchmarkRecommendation | null> {
+  try {
+    const res = await fetch(`${apiBase()}/api/benchmark/recommendation`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export function useBenchmarkRecommendation() {
+  const [rec, setRec] = useState<BenchmarkRecommendation | null>(null);
+  const [loading, setLoading] = useState(true);
+  const reload = useCallback(async () => {
+    setRec(await fetchBenchmarkRecommendation());
+    setLoading(false);
+  }, []);
+  useEffect(() => { reload(); }, [reload]);
+  return { rec, loading, reload };
+}
+
 export interface TrainingZone { key: string; name: string; lowPct: number; highPct: number | null; lowW: number; highW: number | null; }
 
 export async function fetchBenchmarkZones(): Promise<{ ftp: number; zones: TrainingZone[] }> {

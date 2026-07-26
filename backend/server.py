@@ -1365,6 +1365,233 @@ async def get_benchmark_zones():
     return {"ftp": ftp, "zones": _training_zones(ftp)}
 
 
+# ---- WP-G: Benchmark requirement at plan start ----
+BM_STATUS_LABEL = {
+    "required": "Benchmark Required",
+    "recommended": "Benchmark Recommended",
+    "approved": "Existing Benchmark Approved",
+    "deferred": "Benchmark Deferred",
+    "submaximal": "Submaximal Assessment Recommended",
+    "coach_review": "Coach Review Required",
+}
+BM_STATUS_MESSAGE = {
+    "required": "Your recent training history suggests that a fresh benchmark will help set the right targets for this plan.",
+    "recommended": "A fresh benchmark would sharpen your targets, but your existing result can still be used to begin.",
+    "approved": "Your existing benchmark has been reviewed and is still suitable to personalise this plan.",
+    "deferred": "We'll use your existing data for now and revisit a benchmark once you're settled into the plan.",
+    "submaximal": "A lighter, submaximal assessment is enough to personalise this plan for now.",
+    "coach_review": "Your coach would like to review your recent training before setting a benchmark.",
+}
+FTP_RETEST_DAYS = 56
+
+
+async def _plan_level(plan_id: str) -> str:
+    try:
+        pdef = await plans_admin.get_plan_def(plan_id)
+        lvl = (pdef or {}).get("level")
+        if lvl:
+            return str(lvl)
+    except Exception:
+        pass
+    return "Intermediate"
+
+
+async def _coach_line(coach_name: str, coach_gender: str, prompt: str) -> Optional[str]:
+    """Best-effort one-sentence, in-persona explanation. Returns None on failure."""
+    key = os.environ.get("EMERGENT_LLM_KEY")
+    if not key:
+        return None
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(
+            api_key=key,
+            session_id=f"{coach_name.lower()}-plan-gate",
+            system_message=coach_system(coach_name, coach_gender),
+        ).with_model("anthropic", "claude-sonnet-4-6")
+        reply = await chat.send_message(UserMessage(text=prompt))
+        line = (reply or "").strip().strip('"').split("\n")[0]
+        return line or None
+    except Exception:
+        logging.exception("coach_line failed")
+        return None
+
+
+@api_router.get("/benchmark/plan-gate")
+async def benchmark_plan_gate(plan_id: str, coach_name: str = "Alberto", coach_gender: str = "male"):
+    uid = auth.current_user_id()
+    level = await _plan_level(plan_id)
+    profile = await udb.benchmark_profile.find_one({"user_id": uid}) or {}
+    rider = await udb.rider_profile.find_one({"user_id": uid}) or {}
+    checkin = await udb.daily_checkins.find_one({"user_id": uid, "id": "latest"}) or {}
+    rec = await _benchmark_recommendation()
+
+    results = await udb.benchmark_results.find(
+        {"user_id": uid, "decision": "accepted"}).sort("createdAt", -1).to_list(length=50)
+    last_ftp = next((r for r in results if (r.get("primaryMetric") or {}).get("key") == "ftp"), None)
+
+    ftp = profile.get("ftp")
+    last_days = _days_since(profile.get("lastBenchmarkDate"))
+    illness = bool(checkin.get("illness") or checkin.get("injury") or checkin.get("returning"))
+    equip_changed = bool(checkin.get("equipmentChanged"))
+    low_conf = bool(last_ftp and (last_ftp.get("confidence") or 0) < 50)
+
+    reasons: List[str] = []
+    if level.lower() == "beginner":
+        status = "submaximal"
+        reasons.append("beginner plan — a lighter assessment or your existing data is enough")
+    else:
+        if not ftp:
+            status = "required"; reasons.append("no valid FTP benchmark on record yet")
+        elif illness:
+            status = "required"; reasons.append("recent illness, injury or return to training")
+        elif equip_changed:
+            status = "required"; reasons.append("your equipment has changed")
+        elif last_days is None:
+            status = "required"; reasons.append("benchmark date unknown")
+        elif last_days > 2 * FTP_RETEST_DAYS:
+            status = "required"; reasons.append(f"last benchmark was {last_days} days ago")
+        elif last_days > FTP_RETEST_DAYS:
+            status = "recommended"; reasons.append(f"last benchmark was {last_days} days ago")
+        elif low_conf:
+            status = "recommended"; reasons.append("your previous FTP result had low confidence")
+        else:
+            status = "approved"; reasons.append("recent benchmark with good confidence and consistent training")
+
+    base_msg = BM_STATUS_MESSAGE[status]
+    prompt = (
+        f"You are advising a rider starting the '{plan_id}' ({level}) training plan. "
+        f"Benchmark decision: {BM_STATUS_LABEL[status]}. Reasons: {', '.join(reasons)}. "
+        f"Recommended benchmark if any: {BM_TEST_NAME.get(rec['primary']['testId'], 'a benchmark')}. "
+        "In ONE warm, plain-language sentence, explain the decision to the rider. "
+        "Do not use medical or pass/fail language."
+    )
+    coach_line = await _coach_line(coach_name, coach_gender, prompt)
+
+    return {
+        "planId": plan_id,
+        "planLevel": level,
+        "status": status,
+        "statusLabel": BM_STATUS_LABEL[status],
+        "message": base_msg,
+        "coachMessage": coach_line or base_msg,
+        "reasons": reasons,
+        "recommendedTestId": rec["primary"]["testId"],
+        "recommendedTestName": BM_TEST_NAME.get(rec["primary"]["testId"]),
+        "requiresBenchmark": status in ("required", "recommended"),
+        "hasPower": rec["hasPower"],
+        "lastBenchmarkDate": profile.get("lastBenchmarkDate"),
+    }
+
+
+
+# ---- Benchmark recommendation engine (Part 14 pt.1) ----
+BM_RETEST_DAYS = {
+    "ramp": 56, "twenty_min_ftp": 56, "five_min_aerobic": 70, "one_min_power": 70,
+    "sprint_power": 70, "aerobic_efficiency": 35, "cadence_control": 84, "recovery_response": 42,
+}
+BM_PRIMARY_METRIC = {
+    "ramp": "ftp", "twenty_min_ftp": "ftp", "five_min_aerobic": "fiveMinPower",
+    "one_min_power": "oneMinPower", "sprint_power": "sprintPower",
+    "aerobic_efficiency": "aerobicEfficiency", "cadence_control": "preferredCadence",
+    "recovery_response": "recoveryResponse",
+}
+BM_REQUIRES_POWER = {"ramp", "twenty_min_ftp", "five_min_aerobic", "one_min_power", "sprint_power"}
+BM_TEST_NAME = {
+    "ramp": "Ramp Test", "twenty_min_ftp": "Twenty-Minute FTP Test",
+    "five_min_aerobic": "Five-Minute Aerobic Power Test", "one_min_power": "One-Minute Power Test",
+    "sprint_power": "Sprint Power Test", "aerobic_efficiency": "Aerobic Efficiency Ride",
+    "cadence_control": "Cadence Control Assessment", "recovery_response": "Submaximal Recovery Response Test",
+}
+BM_ALL_TESTS = list(BM_PRIMARY_METRIC.keys())
+
+
+def _days_since(iso: Optional[str]) -> Optional[int]:
+    if not iso:
+        return None
+    try:
+        dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+        return (datetime.now(timezone.utc) - dt).days
+    except Exception:
+        return None
+
+
+async def _benchmark_recommendation() -> Dict[str, Any]:
+    uid = auth.current_user_id()
+    profile = await udb.benchmark_profile.find_one({"user_id": uid}) or {}
+    results = await udb.benchmark_results.find({"user_id": uid}).sort("createdAt", -1).to_list(length=200)
+    settings = await udb.settings.find_one({"user_id": uid}) or {}
+    rider = await udb.rider_profile.find_one({"user_id": uid}) or {}
+    capability = (rider.get("capability") or "intermediate").lower()
+    has_power = bool(settings.get("hasTrainer")) or bool(settings.get("ftp")) or bool(profile.get("ftp"))
+
+    accepted = [r for r in results if r.get("decision") == "accepted"]
+    is_new = len(accepted) == 0
+    # most recent accepted per test
+    last_by_test: Dict[str, Dict[str, Any]] = {}
+    for r in accepted:
+        t = r.get("testId")
+        if t and t not in last_by_test:
+            last_by_test[t] = r
+
+    scored = []
+    for t in BM_ALL_TESTS:
+        requires_power = t in BM_REQUIRES_POWER
+        if requires_power and not has_power:
+            continue
+        reasons: List[str] = []
+        score = 0
+        metric = BM_PRIMARY_METRIC[t]
+        if not profile.get(metric):
+            score += 50
+            reasons.append("not yet measured")
+        last = last_by_test.get(t)
+        if last:
+            age = _days_since(last.get("createdAt"))
+            interval = BM_RETEST_DAYS[t]
+            if age is not None and age > interval:
+                score += min(40, 20 + ((age - interval) // 7) * 3)
+                reasons.append(f"last tested {age} days ago")
+            if (last.get("confidence") or 0) < 50:
+                score += 25
+                reasons.append("previous result had low confidence")
+        # capability weighting
+        if t in ("sprint_power", "one_min_power"):
+            score += 10 if capability == "advanced" else (-40 if capability == "beginner" else 0)
+        if t in ("recovery_response", "aerobic_efficiency", "cadence_control"):
+            score += 8 if capability == "beginner" else 0
+        if t == "ramp":
+            score += 15  # reliable anchor for FTP
+        # new riders: prefer gentle, foundational assessments
+        if is_new and t in ("cadence_control", "aerobic_efficiency", "recovery_response"):
+            score += 6
+        scored.append({"testId": t, "score": score, "reasons": reasons})
+
+    scored.sort(key=lambda x: x["score"], reverse=True)
+    primary = scored[0] if scored else {"testId": "recovery_response", "score": 0, "reasons": []}
+    top_score = primary["score"]
+    if is_new:
+        status = "recommended"
+    elif top_score >= 40:
+        status = "recommended"
+    else:
+        status = "approved"
+    return {
+        "primary": primary,
+        "ordered": scored[:4],
+        "status": status,
+        "hasPower": has_power,
+        "isNew": is_new,
+        "capability": capability,
+        "lastBenchmarkDate": profile.get("lastBenchmarkDate"),
+    }
+
+
+@api_router.get("/benchmark/recommendation")
+async def get_benchmark_recommendation():
+    return await _benchmark_recommendation()
+
+
+
 
 
 # ---- Personal Records (Best Time / avg power per scenic route + segments) ----
