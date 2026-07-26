@@ -349,19 +349,21 @@ export function PlanGoalsCard({ onEdit }: { onEdit: () => void }) {
         <Ionicons name="disc-outline" size={16} color={C.rouge} />
         <Text style={[s.cardHeadText, { color: C.rouge }]}>PLAN GOALS</Text>
       </View>
-      <View style={{ flex: 1 }}>
-        {list.map((g, i) => (
-          <View key={g.id} style={[s.goalRow, i < list.length - 1 && s.rowDivider]}>
-            <View style={s.goalIcon}><Ionicons name="bicycle" size={16} color={C.dim} /></View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.goalTitle}>{g.title}</Text>
-              <Text style={s.goalDesc}>{g.description}</Text>
+      <View style={s.goalsRowH}>
+        {list.map((g) => (
+          <View key={g.id} style={s.goalChip}>
+            <View style={s.goalChipRow}>
+              <Text style={[s.goalTitle, { flex: 1 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{g.title}</Text>
+              <StatusCheck done />
             </View>
-            <StatusCheck done />
           </View>
         ))}
+        <Pressable onPress={onEdit} testID="edit-goals" accessibilityRole="button" accessibilityLabel="Edit goals"
+          style={({ hovered }: any) => [s.goalEditBtn, hovered && { backgroundColor: "rgba(224,30,43,0.16)" }]}>
+          <Ionicons name="create-outline" size={15} color={C.rouge} />
+          <Text style={s.goalEditText}>Edit</Text>
+        </Pressable>
       </View>
-      <SecondaryButton label="Edit Goals" onPress={onEdit} testID="edit-goals" />
     </View>
   );
 }
@@ -710,10 +712,16 @@ const s = StyleSheet.create({
 
   // goals
   goalsCard: { minWidth: 0 },
+  goalsRowH: { flexDirection: "row", flexWrap: "wrap", alignItems: "stretch", gap: 8 },
+  goalEditBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: "rgba(224,30,43,0.5)", backgroundColor: "rgba(224,30,43,0.08)" },
+  goalEditText: { color: C.rouge, fontSize: 12.5, fontWeight: "800" },
+  goalChip: { flex: 1, minWidth: 80, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: C.borderSoft, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 10, gap: 8 },
+  goalChipTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  goalChipRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
   goalRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 11 },
   rowDivider: { borderBottomWidth: 1, borderBottomColor: C.borderSoft },
   goalIcon: { width: 30, height: 30, borderRadius: 9, backgroundColor: "rgba(255,255,255,0.05)", alignItems: "center", justifyContent: "center" },
-  goalTitle: { color: C.white, fontSize: 13.5, fontWeight: "700" },
+  goalTitle: { color: C.white, fontSize: 11.5, fontWeight: "700" },
   goalDesc: { color: C.dim, fontSize: 11.5, marginTop: 1 },
   checkDone: { width: 24, height: 24, borderRadius: 12, backgroundColor: C.green, alignItems: "center", justifyContent: "center" },
   checkTodo: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: "rgba(255,255,255,0.25)" },

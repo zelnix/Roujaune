@@ -147,7 +147,7 @@ export function CalendarCard({ onToast, onOpenCalendar, onOpenToday, scope = "to
                     scaleTo={0.85}
                     lift={false}
                     onPress={() => inMonth && setSelected(num)}
-                    style={styles.dayCell}
+                    containerStyle={styles.dayCell}
                   >
                     <View style={[styles.dayInner, isSel && styles.daySelected]}>
                       <Text style={[styles.dayText, !inMonth && styles.dayFaint, isSel && styles.daySelectedText]}>

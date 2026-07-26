@@ -258,8 +258,8 @@ const styles = StyleSheet.create({
   rowGap: { flexDirection: "row", gap: 14, alignItems: "stretch" },
   heroCard: { flex: 1, minWidth: 170 },
   heroGoals: { width: 258 },
-  heroCol: { width: 340, gap: 14 },
-  heroCalendar: { flex: 1, minWidth: 460 },
+  heroCol: { flex: 1.4, minWidth: 380, gap: 14 },
+  heroCalendar: { flex: 0.82, minWidth: 340 },
   toast: { position: "absolute", bottom: 30, alignSelf: "center", backgroundColor: "rgba(20,22,21,0.96)", borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 18 },
   toastText: { color: C.white, fontSize: 13, fontWeight: "600" },
 });
