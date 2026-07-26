@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Polyline, Polygon as SvgPolygon } from "react-native-svg";
@@ -378,61 +378,79 @@ export function LiveControlBar({
   onErg: (d: number) => void; onControls: () => void; onReconnect: () => void; onSettings: () => void; onBluetooth: () => void; onLock: () => void; locked: boolean;
   onPauseToggle: () => void; onEnd: () => void;
 }) {
+  // Scale the bar down on small screens so nothing overflows and Pause/End
+  // always stay on the same row (never wrap to a second line).
+  const { width } = useWindowDimensions();
+  const compact = width < 1180;
+  const tiny = width < 900;
+  const H = tiny ? 48 : compact ? 58 : 76;          // control height
+  const ICON = tiny ? 17 : compact ? 20 : 26;       // secondary icon size
+  const PICON = tiny ? 19 : compact ? 22 : 28;      // pause icon size
+  const RTXT = tiny ? 10 : compact ? 11 : 13;       // secondary label
+  const PTXT = tiny ? 14 : compact ? 16 : 20;       // pause/end label
+  const MINW = tiny ? 56 : compact ? 68 : 92;       // secondary button min width
+  const PADH = tiny ? 8 : compact ? 12 : 20;        // secondary button padding
+  const PPADH = tiny ? 16 : compact ? 22 : 30;      // pause/end padding
+  const ERGV = tiny ? 16 : compact ? 18 : 22;       // erg value font
+
+  const roundStyle = [bc.round, { minWidth: MINW, height: H, paddingHorizontal: PADH }];
+  const rtxt = [bc.roundText, { fontSize: RTXT }];
+
   return (
     <View style={bc.bar}>
       <View style={bc.group}>
-        <Pressable onPress={onLive} style={[bc.pill, live ? bc.pillOn : bc.pillOff]} testID="bc-live">
+        <Pressable onPress={onLive} style={[bc.pill, { height: H }, live ? bc.pillOn : bc.pillOff]} testID="bc-live">
           <View style={[bc.pillDot, { backgroundColor: live ? colors.green : colors.textDim }]} />
-          <Text style={[bc.pillText, { color: live ? colors.green : colors.textDim }]}>{live ? "LIVE" : "DEMO"}</Text>
+          <Text style={[bc.pillText, { color: live ? colors.green : colors.textDim, fontSize: PTXT }]}>{live ? "LIVE" : "DEMO"}</Text>
         </Pressable>
-        <Pressable onPress={onAudio} style={bc.round} testID="bc-audio" accessibilityLabel="Audio">
-          <Ionicons name={audioOn ? "volume-high" : "volume-mute"} size={26} color={colors.white} />
-          <Text style={bc.roundText}>Audio</Text>
+        <Pressable onPress={onAudio} style={roundStyle} testID="bc-audio" accessibilityLabel="Audio">
+          <Ionicons name={audioOn ? "volume-high" : "volume-mute"} size={ICON} color={colors.white} />
+          <Text style={rtxt}>Audio</Text>
         </Pressable>
-        <Pressable onPress={onMirror} style={bc.round} testID="bc-mirror" accessibilityLabel="Mirror">
-          <Ionicons name="tv-outline" size={26} color={colors.white} />
-          <Text style={bc.roundText}>Mirror</Text>
+        <Pressable onPress={onMirror} style={roundStyle} testID="bc-mirror" accessibilityLabel="Mirror">
+          <Ionicons name="tv-outline" size={ICON} color={colors.white} />
+          <Text style={rtxt}>Mirror</Text>
         </Pressable>
 
-        <View style={bc.erg} testID="bc-erg">
+        <View style={[bc.erg, { height: H, paddingHorizontal: PADH }]} testID="bc-erg">
           <Text style={bc.ergLabel}>ERG INTENSITY</Text>
           <View style={bc.ergRow}>
-            <Pressable onPress={() => onErg(-5)} style={bc.ergBtn} testID="bc-erg-down" hitSlop={6}><Ionicons name="remove" size={24} color={colors.white} /></Pressable>
-            <Text style={bc.ergValue}>{erg}%</Text>
-            <Pressable onPress={() => onErg(5)} style={bc.ergBtn} testID="bc-erg-up" hitSlop={6}><Ionicons name="add" size={24} color={colors.white} /></Pressable>
+            <Pressable onPress={() => onErg(-5)} style={[bc.ergBtn, tiny && bc.ergBtnSm]} testID="bc-erg-down" hitSlop={6}><Ionicons name="remove" size={ICON} color={colors.white} /></Pressable>
+            <Text style={[bc.ergValue, { fontSize: ERGV, minWidth: tiny ? 42 : 60 }]}>{erg}%</Text>
+            <Pressable onPress={() => onErg(5)} style={[bc.ergBtn, tiny && bc.ergBtnSm]} testID="bc-erg-up" hitSlop={6}><Ionicons name="add" size={ICON} color={colors.white} /></Pressable>
           </View>
         </View>
 
-        <Pressable onPress={onReconnect} style={bc.round} testID="bc-reconnect" accessibilityLabel="Reconnect Trainer">
-          <Ionicons name="refresh" size={26} color={colors.white} />
-          <Text style={bc.roundText}>Reconnect</Text>
+        <Pressable onPress={onReconnect} style={roundStyle} testID="bc-reconnect" accessibilityLabel="Reconnect Trainer">
+          <Ionicons name="refresh" size={ICON} color={colors.white} />
+          <Text style={rtxt}>Reconnect</Text>
         </Pressable>
-        <Pressable onPress={onSettings} style={bc.round} testID="bc-settings" accessibilityLabel="Workout Settings">
-          <Ionicons name="settings-outline" size={26} color={colors.white} />
-          <Text style={bc.roundText}>Settings</Text>
+        <Pressable onPress={onSettings} style={roundStyle} testID="bc-settings" accessibilityLabel="Workout Settings">
+          <Ionicons name="settings-outline" size={ICON} color={colors.white} />
+          <Text style={rtxt}>Settings</Text>
         </Pressable>
-        <Pressable onPress={onBluetooth} style={bc.round} testID="bc-bluetooth" accessibilityLabel="Bluetooth Sensors">
-          <Ionicons name="bluetooth" size={26} color={colors.white} />
-          <Text style={bc.roundText}>Sensors</Text>
+        <Pressable onPress={onBluetooth} style={roundStyle} testID="bc-bluetooth" accessibilityLabel="Bluetooth Sensors">
+          <Ionicons name="bluetooth" size={ICON} color={colors.white} />
+          <Text style={rtxt}>Sensors</Text>
         </Pressable>
-        <Pressable onPress={onLock} style={bc.round} testID="bc-lock" accessibilityLabel="Touch Lock">
-          <Ionicons name={locked ? "lock-closed" : "lock-open-outline"} size={26} color={locked ? colors.yellow : colors.white} />
-          <Text style={bc.roundText}>Lock</Text>
+        <Pressable onPress={onLock} style={roundStyle} testID="bc-lock" accessibilityLabel="Touch Lock">
+          <Ionicons name={locked ? "lock-closed" : "lock-open-outline"} size={ICON} color={locked ? colors.yellow : colors.white} />
+          <Text style={rtxt}>Lock</Text>
         </Pressable>
-        <Pressable onPress={onControls} style={bc.round} testID="bc-controls" accessibilityLabel="Controls">
-          <Ionicons name="options-outline" size={26} color={colors.white} />
-          <Text style={bc.roundText}>Controls</Text>
+        <Pressable onPress={onControls} style={roundStyle} testID="bc-controls" accessibilityLabel="Controls">
+          <Ionicons name="options-outline" size={ICON} color={colors.white} />
+          <Text style={rtxt}>Controls</Text>
         </Pressable>
       </View>
 
       <View style={bc.primary}>
-        <Pressable onPress={onPauseToggle} style={bc.pause} testID="bc-pause">
-          <Ionicons name={paused ? "play" : "pause"} size={28} color={colors.bg} />
-          <Text style={bc.pauseText}>{paused ? "Resume" : "Pause"}</Text>
+        <Pressable onPress={onPauseToggle} style={[bc.pause, { height: H, paddingHorizontal: PPADH }]} testID="bc-pause">
+          <Ionicons name={paused ? "play" : "pause"} size={PICON} color={colors.bg} />
+          <Text style={[bc.pauseText, { fontSize: PTXT }]}>{paused ? "Resume" : "Pause"}</Text>
         </Pressable>
-        <Pressable onPress={onEnd} style={bc.end} testID="bc-end">
-          <Ionicons name="stop" size={26} color="#fff" />
-          <Text style={bc.endText}>End</Text>
+        <Pressable onPress={onEnd} style={[bc.end, { height: H, paddingHorizontal: PPADH }]} testID="bc-end">
+          <Ionicons name="stop" size={ICON} color="#fff" />
+          <Text style={[bc.endText, { fontSize: PTXT }]}>End</Text>
         </Pressable>
       </View>
     </View>
@@ -610,9 +628,9 @@ const wc = StyleSheet.create({
 
 const bc = StyleSheet.create({
   bar: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", rowGap: 8, columnGap: 8, ...card, backgroundColor: colors.nav, paddingHorizontal: 12, paddingVertical: 10 },
-  group: { flex: 1, minWidth: 240, flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 },
+  group: { flex: 1, minWidth: 180, flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 },
   primary: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 0 },
-  round: { alignItems: "center", justifyContent: "center", gap: 5, minWidth: 92, height: 76, borderRadius: radius.md, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12 },
+  round: { alignItems: "center", justifyContent: "center", gap: 4, minWidth: 92, height: 76, borderRadius: radius.md, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12 },
   roundText: { color: colors.textDim, fontSize: 13, fontWeight: "700" },
   pill: { flexDirection: "row", alignItems: "center", gap: 8, height: 76, borderRadius: radius.md, borderWidth: 1, paddingHorizontal: 16 },
   pillOn: { backgroundColor: "rgba(67,209,122,0.14)", borderColor: colors.green + "66" },
@@ -620,12 +638,13 @@ const bc = StyleSheet.create({
   pillDot: { width: 11, height: 11, borderRadius: 6 },
   pillText: { fontSize: 15, fontWeight: "800", letterSpacing: 0.5 },
   erg: { alignItems: "center", justifyContent: "center", height: 76, borderRadius: radius.md, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 16 },
-  ergLabel: { color: colors.textFaint, fontSize: 11, fontWeight: "800", letterSpacing: 1 },
-  ergRow: { flexDirection: "row", alignItems: "center", gap: 16, marginTop: 4 },
-  ergBtn: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.08)" },
+  ergLabel: { color: colors.textFaint, fontSize: 10, fontWeight: "800", letterSpacing: 1 },
+  ergRow: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 3 },
+  ergBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.08)" },
+  ergBtnSm: { width: 28, height: 28, borderRadius: 14 },
   ergValue: { color: colors.yellow, fontSize: 22, fontWeight: "800", minWidth: 60, textAlign: "center" },
-  pause: { flexDirection: "row", alignItems: "center", gap: 10, height: 76, paddingHorizontal: 30, borderRadius: radius.md, backgroundColor: colors.yellow },
+  pause: { flexDirection: "row", alignItems: "center", gap: 8, height: 76, paddingHorizontal: 30, borderRadius: radius.md, backgroundColor: colors.yellow },
   pauseText: { color: colors.bg, fontSize: 20, fontWeight: "800" },
-  end: { flexDirection: "row", alignItems: "center", gap: 10, height: 76, paddingHorizontal: 28, borderRadius: radius.md, backgroundColor: colors.red },
+  end: { flexDirection: "row", alignItems: "center", gap: 8, height: 76, paddingHorizontal: 28, borderRadius: radius.md, backgroundColor: colors.red },
   endText: { color: "#fff", fontSize: 20, fontWeight: "800" },
 });

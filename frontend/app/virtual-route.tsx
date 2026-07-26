@@ -14,6 +14,7 @@ import { RIDER_TYPES, BIKE_TYPES, CLOTHING_STYLES, DEFAULT_APPEARANCE, loadAppea
 import { VIRTUAL_ROUTES, getVRoute, routeStateAt, routeTerrainBias } from "@/src/lib/vroutes";
 import { VirtualRouteScene, SceneTelemetry } from "@/src/components/virtual-route/scene";
 import { VirtualRidePlayer } from "@/src/components/virtual-route/VirtualRidePlayer";
+import { prTracker, prToastMessages, PRRecords } from "@/src/lib/pr-tracker";
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
@@ -94,6 +95,7 @@ export default function VirtualRouteScreen() {
   const startElapsedRef = React.useRef(0);
   const [summary, setSummary] = React.useState<null | RideSummary>(null);
   const [saving, setSaving] = React.useState(false);
+  const [prRecords, setPrRecords] = React.useState<PRRecords | null>(null);
 
   // Local route distance integrated from speed while riding.
   const distRef = React.useRef(0);
@@ -123,6 +125,8 @@ export default function VirtualRouteScreen() {
       if (dt > 0 && dt < 5) {
         distRef.current = Math.min(vroute.distanceKm, distRef.current + (telemetry.speed / 3600) * dt);
         setDistanceKm(distRef.current);
+        const prog = vroute.distanceKm > 0 ? distRef.current / vroute.distanceKm : 0;
+        prTracker.mark(prog, telemetry.elapsed - startElapsedRef.current);
       }
     }
   }, [telemetry.elapsed, running]);
@@ -153,14 +157,23 @@ export default function VirtualRouteScreen() {
   const startRide = () => {
     distRef.current = 0; lastElRef.current = null; setDistanceKm(0);
     samplesRef.current = []; startElapsedRef.current = telemetry.elapsed;
-    setSummary(null); resume(); setPhase("riding");
+    setSummary(null); setPrRecords(null); prTracker.reset(vroute); resume(); setPhase("riding");
   };
   const pauseRide = () => { pause(); setPhase("paused"); };
   const resumeRide = () => { resume(); setPhase("riding"); };
   const endRide = () => {
     pause();
     setPhase("paused");
-    setSummary(buildSummary(samplesRef.current, distRef.current, telemetry.elapsed - startElapsedRef.current, vroute));
+    const dur = telemetry.elapsed - startElapsedRef.current;
+    const sum = buildSummary(samplesRef.current, distRef.current, dur, vroute);
+    setSummary(sum);
+    // Log this attempt against the rider's records for this scenic route.
+    const completed = distRef.current >= vroute.distanceKm - 0.05;
+    prTracker.submit({ avgPower: sum.avgPower, timeSec: dur, completed }).then((records) => {
+      if (records && (records.route_time || records.route_power || records.first_time || records.segments.length)) {
+        setPrRecords(records);
+      }
+    });
   };
   // Ending a ride returns to the setup screen (pick another route/rider).
   const exitRide = () => {
@@ -333,6 +346,17 @@ export default function VirtualRouteScreen() {
               <SumCell label="CALORIES" value={`${summary.calories}`} unit="kcal" />
             </View>
 
+            {prRecords && prToastMessages(prRecords, summary.routeName).length > 0 && (
+              <View style={s.prBanner} testID="vr-pr-banner">
+                <View style={s.prBadge}><Ionicons name="trophy" size={18} color={colors.bg} /></View>
+                <View style={{ flex: 1 }}>
+                  {prToastMessages(prRecords, summary.routeName).map((m, i) => (
+                    <Text key={i} style={s.prBannerText}>{m}</Text>
+                  ))}
+                </View>
+              </View>
+            )}
+
             <Pressable onPress={saveRide} disabled={saving} testID="vr-save-ride" style={[s.summarySave, saving && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel="Save ride">
               <Ionicons name="save" size={18} color={colors.bg} />
               <Text style={s.summarySaveText}>{saving ? "Saving…" : "Save Ride"}</Text>
@@ -461,6 +485,9 @@ const s = StyleSheet.create({
   sumLabel: { color: colors.textFaint, fontSize: 9, fontWeight: "800", letterSpacing: 0.8 },
   summarySave: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.yellow, borderRadius: radius.md, paddingVertical: 14, marginTop: 2, ...(shadow.glow as any) },
   summarySaveText: { color: colors.bg, fontSize: 15, fontWeight: "900", letterSpacing: 0.5 },
+  prBanner: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: colors.yellow + "18", borderWidth: 1, borderColor: colors.yellow + "66", borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 12 },
+  prBadge: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: colors.yellow },
+  prBannerText: { color: colors.white, fontSize: 13.5, fontWeight: "700", lineHeight: 19 },
   summaryDiscard: { alignItems: "center", justifyContent: "center", paddingVertical: 12, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
   summaryDiscardText: { color: colors.textDim, fontSize: 14, fontWeight: "800" },
 });

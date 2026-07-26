@@ -1090,10 +1090,120 @@ async def update_rider_appearance(req: AppearanceUpdate):
     return doc
 
 
+# ---- Personal Records (Best Time / avg power per scenic route + segments) ----
+class SegmentSplit(BaseModel):
+    label: str
+    km: float = 0
+    time_sec: int = 0
+
+
+class PRSubmit(BaseModel):
+    route_id: str
+    route_name: Optional[str] = None
+    time_sec: int = 0            # total route completion time (seconds)
+    avg_power: int = 0           # average power over the ride (W)
+    completed: bool = True       # only score the route time PR when the route finished
+    splits: List[SegmentSplit] = Field(default_factory=list)
+
+
+def _clean_pr(doc: dict) -> dict:
+    doc = dict(doc)
+    doc.pop("_id", None)
+    doc.pop("user_id", None)
+    doc.setdefault("segments", {})
+    return doc
+
+
+@api_router.get("/rider/prs")
+async def list_rider_prs():
+    """All of the rider's route personal records (for the Profile / picker)."""
+    docs = await udb.rider_prs.find().to_list(length=200)
+    return {"prs": [_clean_pr(d) for d in docs]}
+
+
+@api_router.get("/rider/prs/{route_id}")
+async def get_rider_pr(route_id: str):
+    doc = await udb.rider_prs.find_one({"id": route_id})
+    return _clean_pr(doc) if doc else {"id": route_id, "segments": {}}
+
+
+@api_router.post("/rider/prs")
+async def submit_rider_pr(body: PRSubmit):
+    """Compare a just-finished ride against the rider's stored records for this
+    scenic route (fastest time = primary PR, highest avg power = secondary badge)
+    plus per-segment split times. Updates any beaten records and returns which
+    records were set so the app can celebrate them."""
+    existing = await udb.rider_prs.find_one({"id": body.route_id})
+    doc = _clean_pr(existing) if existing else {
+        "id": body.route_id, "route_name": body.route_name,
+        "best_time_sec": None, "best_time_at": None,
+        "best_avg_power": None, "best_avg_power_at": None,
+        "segments": {}, "attempts": 0,
+    }
+    prev = {
+        "best_time_sec": doc.get("best_time_sec"),
+        "best_avg_power": doc.get("best_avg_power"),
+    }
+    first_time = existing is None or doc.get("best_time_sec") is None
+
+    route_time_pr = False
+    route_power_pr = False
+    segment_prs: List[str] = []
+
+    now = now_iso()
+    if body.route_name:
+        doc["route_name"] = body.route_name
+
+    # Route completion time — primary PR (only when the route actually finished).
+    if body.completed and body.time_sec > 0:
+        if doc.get("best_time_sec") is None or body.time_sec < doc["best_time_sec"]:
+            doc["best_time_sec"] = body.time_sec
+            doc["best_time_at"] = now
+            route_time_pr = not first_time  # first completion isn't a "beaten" record
+
+    # Highest average power — secondary badge.
+    if body.avg_power > 0:
+        if doc.get("best_avg_power") is None or body.avg_power > doc["best_avg_power"]:
+            was = doc.get("best_avg_power")
+            doc["best_avg_power"] = body.avg_power
+            doc["best_avg_power_at"] = now
+            route_power_pr = was is not None
+
+    # Per-segment split times.
+    segs = dict(doc.get("segments") or {})
+    for sp in body.splits:
+        if not sp.label or sp.time_sec <= 0:
+            continue
+        cur = segs.get(sp.label)
+        if cur is None or sp.time_sec < cur.get("best_time_sec", 10 ** 9):
+            beaten = cur is not None
+            segs[sp.label] = {"best_time_sec": sp.time_sec, "km": sp.km, "at": now}
+            if beaten:
+                segment_prs.append(sp.label)
+    doc["segments"] = segs
+    doc["attempts"] = int(doc.get("attempts", 0)) + 1
+    doc["updated_at"] = now
+
+    await udb.rider_prs.update_one({"id": body.route_id}, {"$set": doc}, upsert=True)
+
+    return {
+        "records": {
+            "route_time": route_time_pr,
+            "route_power": route_power_pr,
+            "segments": segment_prs,
+            "first_time": first_time and body.completed and body.time_sec > 0,
+        },
+        "previous": prev,
+        "pr": {
+            "best_time_sec": doc.get("best_time_sec"),
+            "best_avg_power": doc.get("best_avg_power"),
+        },
+    }
+
+
 class AssignPlanRequest(BaseModel):
     plan_id: str
     reset_progress: bool = False
-
 
 @api_router.get("/rider/plan")
 async def get_rider_plan():

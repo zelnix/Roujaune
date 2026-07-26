@@ -20,6 +20,7 @@ import { WORKOUT_TYPES } from "@/src/lib/workouts";
 import { VirtualRidePlayer } from "@/src/components/virtual-route/VirtualRidePlayer";
 import { VIRTUAL_ROUTES, getVRoute } from "@/src/lib/vroutes";
 import { vrouteIdForType, deriveVirtualRide } from "@/src/lib/workout-vroute";
+import { prTracker, prToastMessages } from "@/src/lib/pr-tracker";
 import { VRoutePicker } from "@/src/components/workout/VRoutePicker";
 import { loadAppearance, RiderAppearanceConfiguration, DEFAULT_APPEARANCE } from "@/src/lib/rider-config";
 import {
@@ -303,6 +304,9 @@ export default function LiveWorkout() {
   React.useEffect(() => {
     const r = getVRoute(vRouteId);
     rideRecorder.setRoute({ id: r.id, name: r.name, place: r.place, distance: `${r.distanceKm} km`, elevation: `${r.elevationM} m`, tag: r.tag });
+    // A route change starts a fresh record attempt (splits reset for the new scenery).
+    prTracker.reset(r);
+    prSubmittedRef.current = false;
   }, [vRouteId]);
 
   // Load the rider's saved appearance (identity + bike + clothing) for the scene.
@@ -429,7 +433,11 @@ export default function LiveWorkout() {
   // Ending a ride prompts to save or abandon. On abandon nothing is persisted
   // (the summary screen is what saves), so the ride is never recorded.
   const requestEnd = () => { setExpanded(false); if (!paused) { pause(); setPaused(true); } setEndPrompt(true); };
-  const onSaveRide = () => { setEndPrompt(false); router.replace("/summary"); };
+  const onSaveRide = () => {
+    submitRoutePR(segTotalSec > 0 && telemetryRef.current.elapsed >= segTotalSec);
+    setEndPrompt(false);
+    router.replace("/summary");
+  };
   const onAbandonRide = () => {
     setEndPrompt(false);
     rideRecorder.reset({ workout: workoutTitle, workoutId: selected?.id, ftp });
@@ -439,6 +447,7 @@ export default function LiveWorkout() {
 
   // ---- End-of-workout "Workout Complete" popup + ride extension ----
   const completeShownRef = React.useRef(false);
+  const prSubmittedRef = React.useRef(false);
   const extendMetaRef = React.useRef<{ type_id: string; wearable_on: boolean }>({ type_id: "endurance", wearable_on: false });
   // Ask the companion coach whether extending is wise (and by how much), given
   // the rider's effort/HR, the workout type and how long they've ridden.
@@ -511,6 +520,27 @@ export default function LiveWorkout() {
   const segTotalSec = React.useMemo(() => segments.reduce((a, s) => a + Math.max(0, s.durationSec), 0), [segments]);
   const totalSec = Math.max(60, segTotalSec || (selected?.duration ?? 60) * 60);
 
+  // Submit the finished scenic route to the PR tracker: fastest time (primary),
+  // highest avg power (secondary) + per-checkpoint splits. Celebrates via toast.
+  const submitRoutePR = React.useCallback((completed: boolean) => {
+    if (prSubmittedRef.current) return;
+    prSubmittedRef.current = true;
+    const el = telemetryRef.current.elapsed;
+    let avgPower = 0;
+    if (energyRef.current > 0 && el > 0) {
+      avgPower = energyRef.current / el;
+    } else {
+      let acc = 0; let t = el;
+      for (const s of segments) { if (t <= 0) break; const d = Math.min(t, s.durationSec); acc += targetWatts(s, ftp, zoneBias) * d; t -= d; }
+      avgPower = el > 0 ? acc / el : 0;
+    }
+    const rn = getVRoute(vRouteId).name;
+    prTracker.submit({ avgPower, timeSec: el, completed }).then((records) => {
+      const msgs = prToastMessages(records, rn);
+      msgs.forEach((m, i) => setTimeout(() => showToast(m), 500 + i * 2300));
+    });
+  }, [segments, ftp, zoneBias, vRouteId, showToast]);
+
   // Detect when every workout step is complete → show the "Workout Complete"
   // popup once (extension resets the guard so it can fire again).
   React.useEffect(() => {
@@ -521,6 +551,7 @@ export default function LiveWorkout() {
       if (!paused) { pause(); setPaused(true); }
       setCompletePrompt(true);
       fetchExtendAdvice();
+      submitRoutePR(true);
     }
   }, [telemetry.elapsed, segTotalSec, endPrompt, paused, pause, fetchExtendAdvice]);
 
@@ -528,6 +559,9 @@ export default function LiveWorkout() {
   const progress = trainerOn ? (terrain.km > 0 ? Math.min(1, telemetry.distance / terrain.km) : 0) : timeProgress;
   const riddenKm = trainerOn ? Math.min(terrain.km, telemetry.distance) : +(timeProgress * terrain.km).toFixed(1);
   const routeInfo = { title: vroute.name, place: vroute.place, km: terrain.km, elev: terrain.elev, grade: terrain.grade, isClimb: terrain.isClimb, tag: vroute.tag };
+
+  // Record per-checkpoint split times as the rider advances along the scenic route.
+  React.useEffect(() => { prTracker.mark(progress, telemetry.elapsed); }, [progress, telemetry.elapsed]);
 
   // Virtual route state: map the workout's progress onto the selected scenic route
   // (gradient / elevation / resistance / scene metrics). Feeds BOTH views.

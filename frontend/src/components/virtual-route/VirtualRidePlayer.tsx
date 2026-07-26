@@ -274,7 +274,7 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
             <Text style={st.pausePrimaryText}>{paused ? "Resume" : "Pause"}</Text>
           </Pressable>
           <Pressable onPress={onExitFullscreen} style={st.exitBtn} testID="vr-exit-fullscreen" accessibilityLabel={exitLabel}>
-            <Ionicons name={exitIcon} size={26} color={colors.white} />
+            <Ionicons name={exitIcon} size={40} color={colors.white} />
             <Text style={st.exitText}>{exitLabel}</Text>
           </Pressable>
         </View>
@@ -339,6 +339,6 @@ const st = StyleSheet.create({
   barSpacer: { flex: 1, minWidth: 8 },
   pausePrimary: { flexDirection: "row", alignItems: "center", gap: 10, height: 72, paddingHorizontal: 30, borderRadius: radius.md, backgroundColor: colors.yellow },
   pausePrimaryText: { color: colors.bg, fontSize: 20, fontWeight: "800" },
-  exitBtn: { flexDirection: "row", alignItems: "center", gap: 10, height: 72, paddingHorizontal: 26, borderRadius: radius.md, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: colors.border },
-  exitText: { color: colors.white, fontSize: 20, fontWeight: "800" },
+  exitBtn: { flexDirection: "row", alignItems: "center", gap: 14, height: 88, paddingHorizontal: 44, borderRadius: radius.lg, backgroundColor: "rgba(255,255,255,0.10)", borderWidth: 2, borderColor: colors.border },
+  exitText: { color: colors.white, fontSize: 30, fontWeight: "800" },
 });

@@ -392,22 +392,21 @@ metadata:
 
 test_plan:
   current_focus:
-    - "AUTH: Email verification (soft) + Forgot-password (email link) flows"
-    - "POST /api/auth/register creates user with email_verified=false and (best-effort) sends a verification email; response.user.email_verified present"
-    - "GET /api/auth/me returns email_verified in user object (true for OAuth/demo, false for new password users)"
-    - "POST /api/auth/resend-verification (authenticated) returns ok (email send itself uses a DEPLOY-injected key so it returns 502 in preview — that is EXPECTED, not a bug)"
-    - "GET /api/auth/verify-email?token=<verify_token> returns an HTML 'Email verified' page and flips email_verified=true in DB; invalid/expired token returns a graceful HTML error page"
-    - "POST /api/auth/forgot-password {email} always returns ok (no account enumeration); for an existing password account it stores reset_token+reset_expires"
-    - "GET /api/auth/reset-password?token=<reset_token> returns the HTML reset form page"
-    - "POST /api/auth/reset-password {token,password} updates password (min 6), invalidates old sessions; login works with new password; invalid/expired token rejected"
-    - "FRONTEND /login: 'Forgot password?' opens inline panel, 'Send reset link' shows 'Check your inbox' confirmation (already visually verified by main agent)"
-    - "FRONTEND dashboard (/): VerifyEmailBanner (testID verify-email-banner) shows for a password user with email_verified=false, 'Resend' (testID verify-resend) triggers resend, and it is dismissible; it does NOT show for the verified demo account"
+    - "PR TRACKER: per-scenic-route Personal Records (fastest time = primary, highest avg power = secondary badge) + per-checkpoint/segment split PRs"
+    - "POST /api/rider/prs {route_id,route_name,time_sec,avg_power,completed,splits[]} compares against stored records, updates any beaten, returns records:{route_time,route_power,segments[],first_time}"
+    - "GET /api/rider/prs lists all route PR docs; GET /api/rider/prs/{route_id} returns a single route's PR summary (best_time_sec,best_avg_power,segments{})"
+    - "PR logic: first completion is NOT a beaten record (first_time=true); a faster time_sec sets route_time; higher avg_power sets route_power; faster split per checkpoint label adds to segments[]; completed=false does NOT set route_time but still records segment splits"
+    - "rider_prs is user-scoped (auth.py USER_SCOPED) — PRs are per rider"
+    - "FRONTEND /workout: on natural workout completion (and manual Save Ride) submits the ride to /api/rider/prs and shows staggered celebration toasts for any records"
+    - "FRONTEND /virtual-route: on End Ride submits to /api/rider/prs; a trophy PR banner (testID vr-pr-banner) shows in the Ride Summary card for any records"
+    - "UI FIX: LiveControlBar (workout bottom bar) now scales down responsively on small screens (width<1180/<900) so Pause/End never wrap to a second line"
+    - "UI FIX: Virtual Routes fullscreen 'End Ride' exit button (testID vr-exit-fullscreen) doubled in size"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
     -agent: "main"
-    -comment: "NEW AUTH FEATURE: soft email verification + forgot-password (email LINK, not code), sender name 'ROUJAUNE'. Backend: emailer.py (Emergent-managed Resend via integrations.emergentagent.com, key read at call-time from EMERGENT_EMAIL_KEY). auth.py adds email_verified to users + _public_user, register now sets email_verified=false and sends verification, plus endpoints: POST /resend-verification (auth), GET /verify-email (HTML), POST /forgot-password, GET /reset-password (HTML form), POST /reset-password. Frontend: login.tsx 'Forgot password?' inline panel; auth-context adds forgotPassword+resendVerification and email_verified on AuthUser; new VerifyEmailBanner on dashboard. IMPORTANT FOR TESTER: the Emergent email KEY is injected at DEPLOY time (like push) — in preview the actual send returns 401/502, so resend-verification returns 502 and no real email arrives. THIS IS EXPECTED. Validate the ENDPOINTS/TOKENS/HTML-PAGES/flags directly (read reset_token/verify_token from mongo test_database to hit the GET pages), NOT inbox delivery. Main agent already self-verified via curl: register->verify-email page flips flag->reset-password page+POST->login with new pw works. Demo greenlantern@roujaune.app/rideon9900 is email_verified=true (banner must NOT show for it). To test the banner, register a temp user (e.g. bannertest@resend.dev / testpass123), log in, confirm banner shows on '/', then DELETE that temp user from mongo when done and leave Green Lantern on couch-to-road."
+    -comment: "NEW FEATURE — Best Time / PR tracker per scenic route + per-segment. Backend: rider_prs collection (user-scoped) + 3 endpoints (POST /api/rider/prs compare+update, GET /api/rider/prs list, GET /api/rider/prs/{route_id} single). Primary PR = fastest completion time; secondary = highest avg power; segment PRs = fastest split at each route checkpoint. Main agent already verified via curl: first completion (no PR, first_time=true), faster+stronger ride (route_time+route_power+segment PRs), slower ride (no PR). Frontend wired in workout.tsx (prTracker.mark on progress; submitRoutePR on completion + manual Save; staggered toasts via prToastMessages) and virtual-route.tsx (prTracker.reset on start, mark during ride, submit on endRide, trophy banner testID vr-pr-banner in summary). ALSO fixed two UI bugs (verified via screenshot): (1) LiveControlBar scales down on small screens so Pause/End stay on one row; (2) doubled the Virtual Routes fullscreen End Ride button. TEST REQUEST: focus on BACKEND PR endpoints (all comparison branches, user-scoping, GET list/single). Frontend: a no-regression SMOKE only (workout + virtual-route screens still render/operate) — do NOT attempt to ride a full route to completion (real-time sim, impractical to automate). Credentials greenlantern@roujaune.app / rideon9900. Clean up any rider_prs docs you create so Green Lantern stays pristine."
 
 #====================================================================================================
