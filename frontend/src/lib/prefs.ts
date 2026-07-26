@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const LAST_ROUTE_KEY = "roujaune:lastRouteId";
+const FAV_ROUTE_KEY = "roujaune:favRoute";
 const VOICE_KEY = "roujaune:voiceId";
 const COACH_KEY = "roujaune:coachId";
 const COACH_STYLE_KEY = "roujaune:coachStyle";
@@ -79,6 +80,24 @@ export async function setLastRouteId(id: string | null): Promise<void> {
   try {
     if (id) await AsyncStorage.setItem(LAST_ROUTE_KEY, id);
     else await AsyncStorage.removeItem(LAST_ROUTE_KEY);
+  } catch {
+    /* noop */
+  }
+}
+
+/** Persisted favourite scenic route pinned per workout type (across sessions). */
+export async function getFavoriteRoute(typeId: string): Promise<string | null> {
+  try {
+    return await AsyncStorage.getItem(`${FAV_ROUTE_KEY}:${typeId}`);
+  } catch {
+    return null;
+  }
+}
+
+export async function setFavoriteRoute(typeId: string, routeId: string | null): Promise<void> {
+  try {
+    if (routeId) await AsyncStorage.setItem(`${FAV_ROUTE_KEY}:${typeId}`, routeId);
+    else await AsyncStorage.removeItem(`${FAV_ROUTE_KEY}:${typeId}`);
   } catch {
     /* noop */
   }

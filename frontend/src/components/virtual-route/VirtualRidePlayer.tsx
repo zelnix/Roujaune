@@ -47,6 +47,7 @@ export type VirtualRidePlayerProps = {
   stepTimeLeft?: string;
   compact?: boolean;
   style?: StyleProp<ViewStyle>;
+  routeBadge?: { icon: keyof typeof Ionicons.glyphMap; label: string } | null;
   // Controls
   onFullscreen?: () => void;
   onExitFullscreen?: () => void;
@@ -68,7 +69,7 @@ export type VirtualRidePlayerProps = {
 export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
   const {
     mode, vroute, routeState, appearance = DEFAULT_APPEARANCE, metrics, paused, simulation,
-    hrOn, load = 100, reducedMotion, onToggleReducedMotion, cue, stepLabel, stepTimeLeft, compact, style,
+    hrOn, load = 100, reducedMotion, onToggleReducedMotion, cue, stepLabel, stepTimeLeft, compact, style, routeBadge,
     onFullscreen, onExitFullscreen, onPauseToggle, onOpenRoutes, onPreset, ergOn, onErgToggle, onReconnect,
   } = props;
 
@@ -97,10 +98,10 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
   if (mode === "embedded") {
     return (
       <View style={[st.embedWrap, style]}>
-        <VirtualRouteScene rider={rider} appearance={appearance} align={vroute.riderAlign} backdrop={vroute.backdrop} telemetry={scene} showBrand={false} />
+        <VirtualRouteScene rider={rider} appearance={appearance} align={vroute.riderAlign} bgScale={vroute.bgScale} bgShiftY={vroute.bgShiftY} backdrop={vroute.backdrop} telemetry={scene} showBrand={false} />
 
         {/* Minimal overlay only — no duplicated HUD/metrics */}
-        <View style={st.embedTopRow} pointerEvents="box-none">
+        <View style={[st.embedTopRow, { pointerEvents: "box-none" }]}>
           <Pressable onPress={onOpenRoutes} style={st.routeNamePill} testID="vr-embed-route" accessibilityRole="button" accessibilityLabel="Change route">
             <Ionicons name="location" size={13} color={colors.yellow} />
             <Text style={st.routeNameText} numberOfLines={1}>{vroute.name}</Text>
@@ -115,11 +116,17 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
           </Pressable>
         </View>
 
-        <View style={st.embedBottomRow} pointerEvents="none">
+        <View style={[st.embedBottomRow, { pointerEvents: "none" }]}>
           <View style={[st.gradePill, { borderColor: gradeTone + "99" }]}>
             <Ionicons name="trending-up" size={13} color={gradeTone} />
             <Text style={st.gradeText}>{routeState.gradient > 0 ? "+" : ""}{routeState.gradient}%</Text>
           </View>
+          {routeBadge && (
+            <View style={st.matchPill}>
+              <Ionicons name={routeBadge.icon} size={12} color={colors.yellow} />
+              <Text style={st.matchText} numberOfLines={1}>{routeBadge.label}</Text>
+            </View>
+          )}
         </View>
       </View>
     );
@@ -139,26 +146,25 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
 
   return (
     <View style={st.fsWrap} testID="vr-fullscreen">
-      <VirtualRouteScene rider={rider} appearance={appearance} align={vroute.riderAlign} backdrop={vroute.backdrop} telemetry={scene} showBrand={false} />
+      <VirtualRouteScene rider={rider} appearance={appearance} align={vroute.riderAlign} bgScale={vroute.bgScale} bgShiftY={vroute.bgShiftY} backdrop={vroute.backdrop} telemetry={scene} showBrand={false} />
 
       {/* Vertical HUD rail down the left — brand scales to screen, metrics stack top→bottom */}
       <ScrollView
-        style={[st.rail, { width: railW }]}
+        style={[st.rail, { width: railW, pointerEvents: "box-none" }]}
         contentContainerStyle={st.railContent}
         showsVerticalScrollIndicator={false}
-        pointerEvents="box-none"
         testID="vr-full-panel"
       >
-        <View style={st.brand} pointerEvents="none">
+        <View style={[st.brand, { pointerEvents: "none" }]}>
           <Image source={LOGO_GLYPH} style={{ width: glyphSize, height: glyphSize }} resizeMode="contain" />
           <Image source={WORDMARK} style={{ width: wordW, height: wordW * 0.17 }} resizeMode="contain" />
         </View>
 
-        <View style={st.railHead} pointerEvents="none">
+        <View style={[st.railHead, { pointerEvents: "none" }]}>
           <Ionicons name="location" size={12} color={colors.yellow} />
           <Text style={st.railRoute} numberOfLines={1}>Next: {routeState.segmentLabel}</Text>
         </View>
-        <Text style={st.railKm} pointerEvents="none">{routeState.remainingKm.toFixed(1)} km to go</Text>
+        <Text style={[st.railKm, { pointerEvents: "none" }]}>{routeState.remainingKm.toFixed(1)} km to go</Text>
         <View style={st.progressTrack}><View style={[st.progressFill, { width: `${routeState.progress * 100}%` }]} /></View>
         <RouteProfile vroute={vroute} progress={routeState.progress} height={smallTablet ? 30 : 38} />
 
@@ -176,7 +182,7 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
       </ScrollView>
 
       {/* Top-right: coaching cue, interval, camera/motion toggle */}
-      <View style={st.fsTopRight} pointerEvents="box-none">
+      <View style={[st.fsTopRight, { pointerEvents: "box-none" }]}>
         {(stepLabel || stepTimeLeft) && (
           <View style={st.fsInterval}>
             <Ionicons name="flag" size={13} color={colors.yellow} />
@@ -195,7 +201,7 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
       </View>
 
       {/* Control bar (bottom) — mirrors the Live Workout control bar, pinned across the bottom */}
-      <View style={st.controlsWrap} pointerEvents="box-none">
+      <View style={[st.controlsWrap, { pointerEvents: "box-none" }]}>
         <View style={st.bar}>
           {onPreset && PRESETS.map((p) => (
             <Pressable key={p.label} onPress={() => onPreset(p.w)} style={st.round} accessibilityLabel={`Set ${p.label} effort`}>
@@ -240,6 +246,8 @@ const st = StyleSheet.create({
   embedBottomRow: { position: "absolute", left: 10, bottom: 10, flexDirection: "row", alignItems: "center", gap: 8 },
   gradePill: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(0,0,0,0.6)", borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6 },
   gradeText: { color: colors.white, fontSize: 13, fontWeight: "900", fontVariant: ["tabular-nums"] },
+  matchPill: { flexDirection: "row", alignItems: "center", gap: 5, maxWidth: 210, backgroundColor: "rgba(0,0,0,0.6)", borderWidth: 1, borderColor: colors.yellow + "66", borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 6 },
+  matchText: { color: colors.yellow, fontSize: 11, fontWeight: "800" },
 
   fsWrap: { ...StyleSheet.absoluteFillObject, backgroundColor: "#05060a" },
 

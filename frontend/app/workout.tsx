@@ -10,7 +10,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing, shadow } from "@/src/theme";
 import { useTelemetry } from "@/src/hooks/useTelemetry";
 import { rideRecorder } from "@/src/lib/ride";
-import { getLastRouteId, setLastRouteId } from "@/src/lib/prefs";
+import { getFavoriteRoute, setFavoriteRoute } from "@/src/lib/prefs";
 import { useSettings } from "@/src/lib/settings";
 import { currentWorkout } from "@/src/data";
 import { getWorkout, buildSegments, currentSegment, mmss, targetWatts, planDayNumber, extensionSegment } from "@/src/lib/workout-catalog";
@@ -18,7 +18,9 @@ import { fetchZoneBias, ZoneBias } from "@/src/lib/targets";
 import { usePlan } from "@/src/lib/plan";
 import { WORKOUT_TYPES } from "@/src/lib/workouts";
 import { VirtualRidePlayer } from "@/src/components/virtual-route/VirtualRidePlayer";
-import { VIRTUAL_ROUTES, getVRoute, routeStateAt, routeTerrainBias } from "@/src/lib/vroutes";
+import { VIRTUAL_ROUTES, getVRoute } from "@/src/lib/vroutes";
+import { vrouteIdForType, deriveVirtualRide } from "@/src/lib/workout-vroute";
+import { VRoutePicker } from "@/src/components/workout/VRoutePicker";
 import { loadAppearance, RiderAppearanceConfiguration, DEFAULT_APPEARANCE } from "@/src/lib/rider-config";
 import {
   SettingsPanel, MusicPanel, CastPanel, RouteMapCard,
@@ -99,22 +101,6 @@ const ZONE_DESC: Record<string, string> = {
   Z6: "Anaerobic · all-out effort",
 };
 
-// Pick the virtual route whose terrain best matches the chosen workout's type.
-const TYPE_VROUTE: Record<string, string> = {
-  climbing: "alpine-sunset-pass",
-  threshold: "desert-climb",
-  vo2max: "city-night-crit",
-  sprints: "coastal-sprint",
-  tempo: "forest-loop",
-  endurance: "forest-loop",
-  recovery: "coastal-sprint",
-  restday: "coastal-sprint",
-  fb50: "forest-loop",
-};
-function vrouteIdForType(typeId?: string): string {
-  return TYPE_VROUTE[typeId ?? ""] ?? VIRTUAL_ROUTES[0].id;
-}
-
 // Estimate terrain + route length from the chosen workout (used when the route
 // can't be derived from a video). Avg speed & typical grade per workout type.
 const TYPE_SPEED: Record<string, number> = { climbing: 20, threshold: 27, endurance: 30, tempo: 29, vo2max: 30, sprints: 31, recovery: 25, restday: 22, fb50: 24 };
@@ -173,10 +159,10 @@ export default function LiveWorkout() {
   const [paused, setPaused] = React.useState(false);
   const [expanded, setExpanded] = React.useState(false);
   const [vRouteId, setVRouteId] = React.useState(() => vrouteIdForType(selected?.typeId));
-  const [vAuto, setVAuto] = React.useState(true);
+  const [routeSource, setRouteSource] = React.useState<"auto" | "favorite" | "manual">("auto");
+  const [favRouteId, setFavRouteId] = React.useState<string | null>(null);
   const [reducedMotion, setReducedMotion] = React.useState(false);
   const [appearance, setAppearance] = React.useState<RiderAppearanceConfiguration>(DEFAULT_APPEARANCE);
-  const [, setLastRouteIdState] = React.useState<string | null>(null);
   const [showRoutes, setShowRoutes] = React.useState(false);
   const [showControls, setShowControls] = React.useState(false);
   const [showSettings, setShowSettings] = React.useState(false);
@@ -317,20 +303,26 @@ export default function LiveWorkout() {
     return () => { alive = false; };
   }, []);
 
-  // Restore the rider's last virtual route across sessions (falls back to auto-match).
+  // Load a route pinned as favourite for THIS workout type (auto-loads it),
+  // otherwise the auto-matched route stays. Persists across sessions per type.
   React.useEffect(() => {
+    const tid = selected?.typeId;
+    if (!tid) return;
+    let alive = true;
     (async () => {
-      const id = await getLastRouteId();
-      if (!id) return;
-      const r = VIRTUAL_ROUTES.find((v) => v.id === id);
+      const fav = await getFavoriteRoute(tid);
+      if (!alive || !fav) return;
+      const r = VIRTUAL_ROUTES.find((v) => v.id === fav);
       if (r) {
+        setFavRouteId(r.id);
         setVRouteId(r.id);
-        setVAuto(false);
-        setLastRouteIdState(id);
-        showToast(`Resuming your last route: ${r.name}`);
+        setRouteSource("favorite");
+        showToast(`Loaded your pick for ${(selectedType?.name ?? "this ride")}: ${r.name}`);
       }
     })();
-  }, [showToast]);
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.typeId]);
 
   // Record live telemetry so the summary screen can compute real aggregates,
   // and integrate ACTUAL watts into a running energy total (joules) for an
@@ -529,20 +521,17 @@ export default function LiveWorkout() {
   const routeInfo = { title: vroute.name, place: vroute.place, km: terrain.km, elev: terrain.elev, grade: terrain.grade, isClimb: terrain.isClimb, tag: vroute.tag };
 
   // Virtual route state: map the workout's progress onto the selected scenic route
-  // so gradient / elevation / checkpoints track along with the ride. This single
-  // derived value feeds BOTH the embedded and fullscreen virtual-ride views.
-  const vState = routeStateAt(vroute, progress * vroute.distanceKm);
-  const vResistance = Math.round(Math.max(55, Math.min(150, 100 + vState.gradient * 7 + routeTerrainBias(vroute.id))));
-  // Metrics for the scene — keep the rider pedalling with a gentle default cadence
-  // and nominal speed when no trainer is connected (time-based ride).
-  const vMetrics = {
-    power: Math.round(telemetry.power),
-    cadence: trainerOn ? Math.round(telemetry.cadence) : (paused ? 0 : 84),
-    speed: trainerOn ? telemetry.speed : (paused ? 0 : Math.max(22, telemetry.speed)),
-    hr: Math.round(telemetry.hr),
-    elapsed: telemetry.elapsed,
-    riddenKm,
-  };
+  // (gradient / elevation / resistance / scene metrics). Feeds BOTH views.
+  const { vState, vResistance, vMetrics } = deriveVirtualRide(
+    vRouteId, progress, riddenKm,
+    { power: telemetry.power, cadence: telemetry.cadence, speed: telemetry.speed, hr: telemetry.hr, elapsed: telemetry.elapsed },
+    trainerOn, paused,
+  );
+  const routeTypeName = selectedType?.name ?? selected?.typeName ?? "your ride";
+  const routeBadge =
+    routeSource === "favorite" ? { icon: "star" as const, label: `Your pick · ${routeTypeName}` }
+    : routeSource === "auto" ? { icon: "sparkles" as const, label: `Auto-matched · ${routeTypeName}` }
+    : null;
 
   // ---- Alberto's live AI coaching cues ----
   // Prefers the AI-generated cue; falls back to the local rule-based line while
@@ -654,22 +643,35 @@ export default function LiveWorkout() {
   }, [activeSeg?.remaining, paused, generateCue]);
 
   const onSelectRoute = (id: string) => {
-    setVRouteId(id); setVAuto(false); setShowRoutes(false);
-    setLastRouteIdState(id); setLastRouteId(id);
+    setVRouteId(id); setShowRoutes(false);
+    setRouteSource(id === favRouteId ? "favorite" : "manual");
     showToast(`Route: ${getVRoute(id).name}`);
   };
   const onAutoRoute = () => {
     const id = vrouteIdForType(selected?.typeId);
-    setVRouteId(id); setVAuto(true); setShowRoutes(false);
-    setLastRouteIdState(null); setLastRouteId(null);
+    setVRouteId(id); setShowRoutes(false); setRouteSource("auto");
     showToast(`Auto-matched to your ${(selectedType?.name ?? selected?.typeName ?? "ride").toLowerCase()}: ${getVRoute(id).name}`);
   };
   const onShuffleRoute = () => {
     let id = vRouteId;
     if (VIRTUAL_ROUTES.length > 1) { while (id === vRouteId) id = VIRTUAL_ROUTES[Math.floor(Math.random() * VIRTUAL_ROUTES.length)].id; }
-    setVRouteId(id); setVAuto(false); setShowRoutes(false);
-    setLastRouteIdState(id); setLastRouteId(id);
+    setVRouteId(id); setRouteSource(id === favRouteId ? "favorite" : "manual");
     showToast(`Surprise route: ${getVRoute(id).name}`);
+  };
+  // Pin/unpin a route as the favourite for the current workout type (persisted).
+  const onPinRoute = (id: string) => {
+    const tid = selected?.typeId;
+    if (!tid) return;
+    if (favRouteId === id) {
+      setFavoriteRoute(tid, null); setFavRouteId(null);
+      if (vRouteId === id) setRouteSource("manual");
+      showToast(`Unpinned ${getVRoute(id).name}`);
+    } else {
+      setFavoriteRoute(tid, id); setFavRouteId(id);
+      setVRouteId(id);
+      setRouteSource("favorite");
+      showToast(`Pinned ${getVRoute(id).name} for ${(selectedType?.name ?? "this ride")}`);
+    }
   };
 
   // Tablet/TV (landscape): the layout fills the screen with a responsive
@@ -775,6 +777,7 @@ export default function LiveWorkout() {
                     onToggleReducedMotion={() => setReducedMotion((r) => !r)}
                     onFullscreen={() => setExpanded(true)}
                     onOpenRoutes={() => setShowRoutes(true)}
+                    routeBadge={routeBadge}
                     style={tablet ? styles.flex1 : { height: videoRenderH }}
                   />
                 )}
@@ -903,39 +906,17 @@ export default function LiveWorkout() {
       )}
 
       {showRoutes && (
-        <Pressable style={styles.overlay} testID="vroute-picker-overlay" onPress={() => setShowRoutes(false)}>
-          <Pressable style={styles.routePickerPanel} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.panelHead}>
-              <Text style={styles.panelTitle}>Choose your route</Text>
-              <Pressable testID="vroute-picker-close" onPress={() => setShowRoutes(false)} hitSlop={10}><Ionicons name="close" size={22} color={colors.white} /></Pressable>
-            </View>
-            <View style={styles.routePickerActions}>
-              <Pressable onPress={onAutoRoute} style={[styles.routeActionBtn, vAuto && styles.routeActionOn]} testID="vroute-auto">
-                <Ionicons name="sparkles-outline" size={15} color={vAuto ? colors.bg : colors.yellow} />
-                <Text style={[styles.routeActionText, vAuto && { color: colors.bg }]}>Auto-match</Text>
-              </Pressable>
-              <Pressable onPress={onShuffleRoute} style={styles.routeActionBtn} testID="vroute-shuffle">
-                <Ionicons name="shuffle-outline" size={15} color={colors.yellow} />
-                <Text style={styles.routeActionText}>Shuffle</Text>
-              </Pressable>
-            </View>
-            <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
-              {VIRTUAL_ROUTES.map((rt) => {
-                const sel = rt.id === vRouteId;
-                return (
-                  <Pressable key={rt.id} onPress={() => onSelectRoute(rt.id)} testID={`vroute-${rt.id}`} style={[styles.routeOpt, sel && styles.routeOptSel]}>
-                    <Image source={rt.backdrop} style={styles.routeOptThumb} contentFit="cover" />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.routeOptName} numberOfLines={1}>{rt.name}</Text>
-                      <Text style={styles.routeOptMeta} numberOfLines={1}>{rt.place} · {rt.distanceKm} km · {rt.tag}</Text>
-                    </View>
-                    <Ionicons name={sel ? "checkmark-circle" : "chevron-forward"} size={20} color={sel ? colors.yellow : colors.textFaint} />
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </Pressable>
-        </Pressable>
+        <VRoutePicker
+          vRouteId={vRouteId}
+          favRouteId={favRouteId}
+          auto={routeSource === "auto"}
+          workoutTypeName={routeTypeName}
+          onSelect={onSelectRoute}
+          onAuto={onAutoRoute}
+          onShuffle={onShuffleRoute}
+          onPin={onPinRoute}
+          onClose={() => setShowRoutes(false)}
+        />
       )}
 
       {showSettings && (

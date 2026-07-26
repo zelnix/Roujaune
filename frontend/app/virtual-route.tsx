@@ -210,10 +210,10 @@ export default function VirtualRouteScreen() {
     <View style={s.root}>
       <StatusBar hidden />
       {/* Cinematic wide scene */}
-      <VirtualRouteScene rider={rider} appearance={appearance} align={vroute.riderAlign} backdrop={vroute.backdrop} telemetry={scene} showBrand />
+      <VirtualRouteScene rider={rider} appearance={appearance} align={vroute.riderAlign} bgScale={vroute.bgScale} bgShiftY={vroute.bgShiftY} backdrop={vroute.backdrop} telemetry={scene} showBrand />
 
       {/* Connection status pill (top-right) */}
-      <SafeAreaView style={s.topRight} pointerEvents="box-none" edges={["top", "right"]}>
+      <SafeAreaView style={[s.topRight, { pointerEvents: "box-none" }]} edges={["top", "right"]}>
         <View style={[s.connPill, { borderColor: conn.tone + "88", backgroundColor: conn.tone + "22" }]}>
           <View style={[s.connDot, { backgroundColor: conn.tone }]} />
           <Text style={s.connText}>{conn.label}</Text>
@@ -243,7 +243,7 @@ export default function VirtualRouteScreen() {
 
       {/* Bottom control bar */}
       {phase !== "setup" && (
-        <SafeAreaView style={s.controls} edges={["bottom"]} pointerEvents="box-none">
+        <SafeAreaView style={[s.controls, { pointerEvents: "box-none" }]} edges={["bottom"]}>
           <View style={s.controlRow}>
             {running ? (
               <CtrlBtn icon="pause" label="Pause" onPress={pauseRide} />
@@ -424,7 +424,7 @@ function TelemetryPanel({ sm, route, vroute, elapsed, dist, load, compact, hrOn 
     { label: "ELAPSED", value: mmss(elapsed), unit: "", icon: "time-outline" as const, tone: colors.white },
   ];
   return (
-    <View style={[s.panel, compact && s.panelCompact]} pointerEvents="box-none" testID="vr-full-panel">
+    <View style={[s.panel, compact && s.panelCompact, { pointerEvents: "box-none" }]} testID="vr-full-panel">
       <View style={s.panelHead}>
         <Ionicons name="location" size={13} color={colors.yellow} />
         <Text style={s.panelRoute} numberOfLines={1}>Next: {route.segmentLabel} · {route.remainingKm.toFixed(1)} km to go</Text>

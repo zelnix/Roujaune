@@ -34,7 +34,7 @@ export type SceneTelemetry = {
  * markers, drifting particles, camera bob, bike lean, dynamic light & motion
  * blur) driven by smoothed telemetry via a rAF phase loop.
  */
-export function VirtualRouteScene({ rider, appearance = DEFAULT_APPEARANCE, align, backdrop, telemetry, showBrand = true }: { rider: VirtualRider; appearance?: RiderAppearanceConfiguration; align?: RiderAlign; backdrop?: any; telemetry: SceneTelemetry; showBrand?: boolean }) {
+export function VirtualRouteScene({ rider, appearance = DEFAULT_APPEARANCE, align, bgScale = 1, bgShiftY = 0, backdrop, telemetry, showBrand = true }: { rider: VirtualRider; appearance?: RiderAppearanceConfiguration; align?: RiderAlign; bgScale?: number; bgShiftY?: number; backdrop?: any; telemetry: SceneTelemetry; showBrand?: boolean }) {
   const tRef = React.useRef(telemetry);
   tRef.current = telemetry;
 
@@ -121,10 +121,10 @@ export function VirtualRouteScene({ rider, appearance = DEFAULT_APPEARANCE, alig
       return (
         <AView
           key={`${side}-${i}`}
-          pointerEvents="none"
           style={[
             st.edgeStreak,
             side === "left" ? st.edgeLeft : st.edgeRight,
+            { pointerEvents: "none" },
             { transform: [{ translateY: ty as any }, { skewY: `${tx * 12}deg` }] },
           ]}
         />
@@ -135,7 +135,7 @@ export function VirtualRouteScene({ rider, appearance = DEFAULT_APPEARANCE, alig
   const dashes = [0, 0.25, 0.5, 0.75].map((off, i) => {
     const ty = streak.interpolate({ inputRange: [0, 1], outputRange: [`${-10 + off * 120}%`, `${110 + off * 120}%`] });
     const sc = streak.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.4] });
-    return <AView key={`d-${i}`} pointerEvents="none" style={[st.dash, { transform: [{ translateY: ty as any }, { scale: sc as any }] }]} />;
+    return <AView key={`d-${i}`} style={[st.dash, { pointerEvents: "none" }, { transform: [{ translateY: ty as any }, { scale: sc as any }] }]} />;
   });
 
   return (
@@ -143,10 +143,10 @@ export function VirtualRouteScene({ rider, appearance = DEFAULT_APPEARANCE, alig
       {backdrop ? (
         <>
           {/* Route scenery backdrop (AI-generated, per route). */}
-          <Image source={backdrop} style={st.bg} resizeMode="cover" />
+          <Image source={backdrop} style={[st.bg, { transform: [{ scale: bgScale }, { translateY: `${bgShiftY * 100}%` }] }]} resizeMode="cover" />
 
           {/* Road-direction speed streaks + center markers (forward motion). */}
-          <View style={st.roadLayer} pointerEvents="none">
+          <View style={[st.roadLayer, { pointerEvents: "none" }]}>
             {edgeStreaks("left")}
             {edgeStreaks("right")}
             <View style={st.centerLane}>{dashes}</View>
@@ -180,7 +180,7 @@ export function VirtualRouteScene({ rider, appearance = DEFAULT_APPEARANCE, alig
           <AView style={[st.plateWrap, { transform: [{ translateX: swayX }, { translateY: bobY }, { rotate: leanDeg }, { scale }] }]}>
             <Image source={rider.image} style={st.plate} resizeMode="cover" />
           </AView>
-          <View style={st.roadLayer} pointerEvents="none">
+          <View style={[st.roadLayer, { pointerEvents: "none" }]}>
             {edgeStreaks("left")}
             {edgeStreaks("right")}
             <View style={st.centerLane}>{dashes}</View>
@@ -189,14 +189,14 @@ export function VirtualRouteScene({ rider, appearance = DEFAULT_APPEARANCE, alig
       )}
 
       {/* Speed haze / motion blur intensifying with speed. */}
-      <AView pointerEvents="none" style={[st.blur, { opacity: blur.interpolate({ inputRange: [0, 1], outputRange: [0, 0.45] }) }]} />
+      <AView style={[st.blur, { pointerEvents: "none" }, { opacity: blur.interpolate({ inputRange: [0, 1], outputRange: [0, 0.45] }) }]} />
 
       {/* Cinematic vignette + dynamic bottom light. */}
-      <View pointerEvents="none" style={st.vignette} />
-      <View pointerEvents="none" style={st.floorGlow} />
+      <View style={[st.vignette, { pointerEvents: "none" }]} />
+      <View style={[st.floorGlow, { pointerEvents: "none" }]} />
 
       {/* Rotating drivetrain indicator (wheel/cadence) — subtle, bottom-centre. */}
-      <View pointerEvents="none" style={st.wheelBadge}>
+      <View style={[st.wheelBadge, { pointerEvents: "none" }]}>
         <AView style={{ transform: [{ rotate: wheelDeg.interpolate({ inputRange: [0, 360], outputRange: ["0deg", "360deg"] }) }] }}>
           <Svg width={40} height={40} viewBox="0 0 40 40">
             <Circle cx={20} cy={20} r={17} stroke={colors.yellow} strokeWidth={2} fill="none" opacity={0.9} />
@@ -215,14 +215,14 @@ export function VirtualRouteScene({ rider, appearance = DEFAULT_APPEARANCE, alig
 
       {/* Brand lockup, upper-left (never baked into artwork). */}
       {showBrand && (
-        <View pointerEvents="none" style={st.brand}>
+        <View style={[st.brand, { pointerEvents: "none" }]}>
           <Image source={LOGO_GLYPH} style={st.brandGlyph} resizeMode="contain" />
           <Image source={WORDMARK} style={st.brandWord} resizeMode="contain" />
         </View>
       )}
 
       {!telemetry.connected && (
-        <View pointerEvents="none" style={st.pausedBadge}>
+        <View style={[st.pausedBadge, { pointerEvents: "none" }]}>
           <Ionicons name="pause-circle" size={16} color={colors.white} />
         </View>
       )}

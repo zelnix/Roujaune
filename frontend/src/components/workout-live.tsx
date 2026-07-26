@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Polyline, Polygon as SvgPolygon } from "react-native-svg";
-import { colors, radius, spacing } from "@/src/theme";
+import { colors, radius, spacing, textShadow } from "@/src/theme";
 
 const WORDMARK = require("../../assets/images/auth_wordmark.png");
 const LOGO_GLYPH = require("../../assets/images/auth_logo_glyph.png");
@@ -156,7 +156,7 @@ export function ElevationProfile({ progress, grade }: { progress: number; grade:
   const pts = [`0,${H}`, `20,${H - H * peak * 0.3}`, `45,${H - H * peak * 0.6}`, `70,${H - H * peak}`, `100,${H - H * peak * 0.5}`];
   const x = Math.max(0, Math.min(1, progress)) * W;
   return (
-    <View style={ep.wrap} pointerEvents="none">
+    <View style={[ep.wrap, { pointerEvents: "none" }]}>
       <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
         <SvgPolygon points={`0,${H} ${pts.join(" ")} ${W},${H}`} fill="rgba(245,179,1,0.16)" />
         <Polyline points={pts.join(" ")} fill="none" stroke={colors.yellow} strokeWidth={1.4} />
@@ -226,7 +226,7 @@ function ProfileSeg({ step, status, width, fill, onPress }: { step: TimelineStep
     <Pressable onPress={onPress} testID={`step-seg-${step.index}`} style={[st.seg, { width }]}>
       <View style={[st.segBar, { height: h, backgroundColor: base, borderColor: status === "current" ? colors.yellow : "rgba(255,255,255,0.10)" }]}>
         {fillPct > 0 ? <View style={[st.segFill, { width: `${fillPct}%` }]} /> : null}
-        <View style={st.segLabel} pointerEvents="none">
+        <View style={[st.segLabel, { pointerEvents: "none" }]}>
           <Text style={[st.segName, dim && { color: colors.textDim }]} numberOfLines={1}>{step.index + 1}. {step.label}</Text>
           {step.desc ? <Text style={[st.segDesc, dim && { color: colors.textFaint }]} numberOfLines={1}>{step.desc}</Text> : null}
           <Text style={[st.segMeta, dim && { color: colors.textFaint }]} numberOfLines={1}>{step.duration}{step.watts > 0 ? ` · ${step.watts} W` : ""}</Text>
@@ -561,9 +561,9 @@ const st = StyleSheet.create({
   segBar: { width: "100%", borderRadius: 5, borderWidth: 1, overflow: "hidden", justifyContent: "flex-end" },
   segFill: { position: "absolute", left: 0, top: 0, bottom: 0, backgroundColor: colors.yellow + "3A", borderRightWidth: 2, borderRightColor: colors.yellow },
   segLabel: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, paddingHorizontal: 6, paddingVertical: 5, justifyContent: "flex-end", gap: 1 },
-  segName: { color: colors.white, fontSize: 10.5, fontWeight: "800", textShadowColor: "rgba(0,0,0,0.85)", textShadowRadius: 3 },
-  segDesc: { color: "rgba(244,240,233,0.82)", fontSize: 9, fontWeight: "600", textShadowColor: "rgba(0,0,0,0.85)", textShadowRadius: 3 },
-  segMeta: { color: colors.yellow, fontSize: 9.5, fontWeight: "800", fontVariant: ["tabular-nums"], textShadowColor: "rgba(0,0,0,0.85)", textShadowRadius: 3 },
+  segName: { color: colors.white, fontSize: 10.5, fontWeight: "800", ...textShadow("rgba(0,0,0,0.85)", 3) },
+  segDesc: { color: "rgba(244,240,233,0.82)", fontSize: 9, fontWeight: "600", ...textShadow("rgba(0,0,0,0.85)", 3) },
+  segMeta: { color: colors.yellow, fontSize: 9.5, fontWeight: "800", fontVariant: ["tabular-nums"], ...textShadow("rgba(0,0,0,0.85)", 3) },
 });
 
 const sd = StyleSheet.create({

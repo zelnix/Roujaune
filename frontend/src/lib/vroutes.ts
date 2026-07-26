@@ -22,6 +22,8 @@ export type VRoute = {
   points: VPoint[];
   checkpoints: VCheckpoint[];
   riderAlign?: RiderAlign;
+  bgScale?: number;   // zoom the backdrop so the road reads larger (default 1)
+  bgShiftY?: number;  // vertical backdrop nudge as a fraction of height (default 0)
 };
 
 export type RouteState = {
@@ -74,9 +76,11 @@ export const VIRTUAL_ROUTES: VRoute[] = [
     distanceKm: 12,
     tag: "Fast & Flat",
     elevationM: 180,
-    // Road sits slightly left of centre and the deck is lower on this backdrop —
-    // nudge the rider left + down a touch and scale in so he rides on the tarmac.
-    riderAlign: { x: -0.035, bottom: 1, scale: 0.9 },
+    // Keep the rider natural size; zoom the backdrop so the road is bigger and the
+    // wheels meet the tarmac. Small left nudge to sit on the road centre.
+    riderAlign: { x: -0.03, bottom: -2 },
+    bgScale: 1.34,
+    bgShiftY: 0.06,
     points: [
       { km: 0, gradient: 0, curve: 0 },
       { km: 1.5, gradient: 1.5, curve: 0.4 },
@@ -103,8 +107,10 @@ export const VIRTUAL_ROUTES: VRoute[] = [
     distanceKm: 15,
     tag: "Rolling Hills",
     elevationM: 340,
-    // Forest trail sits a touch left of centre and is narrower — nudge left + scale in.
-    riderAlign: { x: -0.03, scale: 0.95 },
+    // Forest trail sits a touch left of centre — nudge left; a gentle backdrop zoom
+    // brings the trail up so the wheels meet the ground.
+    riderAlign: { x: -0.03, bottom: -1 },
+    bgScale: 1.12,
     points: [
       { km: 0, gradient: 2, curve: 0 },
       { km: 2, gradient: 4, curve: 0.4 },

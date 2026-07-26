@@ -124,7 +124,7 @@ export function ShareCardModal({
 const s = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(6,7,7,0.9)", alignItems: "center", justifyContent: "center", padding: 20 },
   sheet: { width: "100%", maxWidth: 440, alignItems: "center" },
-  cardWrap: { borderRadius: 22, shadowColor: "#000", shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 12 },
+  cardWrap: { borderRadius: 22, ...Platform.select({ web: { boxShadow: "0px 12px 24px rgba(0,0,0,0.5)" }, default: { shadowColor: "#000", shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 12 } }) },
   notice: { marginTop: 16, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 12, borderWidth: 1, borderColor: C.border, paddingVertical: 10, paddingHorizontal: 14, maxWidth: 360, alignItems: "center" },
   noticeText: { color: C.white, fontSize: 12.5, textAlign: "center", lineHeight: 18 },
   settingsBtn: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 },
