@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, radius, spacing } from "../theme";
 import { coach } from "../data";
-import { useCoach } from "../lib/coach-persona";
+import { useCoach, useCoachReady } from "../lib/coach-persona";
 import { usePlan } from "../lib/plan";
 import { PrimaryButton } from "./ui";
 
@@ -13,6 +13,7 @@ const KIND_LABEL: Record<string, string> = { recovery: "Recovery", rest: "Rest",
 
 export function AlbertoCoachCard({ width, onStart, onMessage, compact = false }: { width: number; onStart: () => void; onMessage?: () => void; compact?: boolean }) {
   const persona = useCoach();
+  const ready = useCoachReady();
   const { plan } = usePlan();
   // The next scheduled activity of ANY type (ride, strength, recovery, rest…).
   const next = (plan.workouts?.find((w) => !w.completed) ?? plan.workouts?.[0]) as any;
@@ -47,7 +48,9 @@ export function AlbertoCoachCard({ width, onStart, onMessage, compact = false }:
       style={[styles.card, { width }, compact && { minHeight: 150 }]}
     >
       <View style={[styles.portraitWrap, { width: portraitW }, compact && { minHeight: 150 }]}>
-        <Image source={persona.image} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition="top center" accessibilityLabel={`Coach ${persona.name}`} />
+        {ready ? (
+          <Image source={persona.image} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition="top center" accessibilityLabel={`Coach ${persona.name}`} />
+        ) : null}
         <LinearGradient
           colors={["transparent", "rgba(10,9,8,0.9)"]}
           start={{ x: 0, y: 0.5 }}
@@ -65,7 +68,7 @@ export function AlbertoCoachCard({ width, onStart, onMessage, compact = false }:
         ) : null}
         <View style={styles.headRow}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.name, compact && { fontSize: 15 }]}>{persona.name}</Text>
+            <Text style={[styles.name, compact && { fontSize: 15 }, !ready && { opacity: 0 }]}>{ready ? persona.name : "•"}</Text>
             <Text style={styles.role}>{plan.title ?? coach.role}</Text>
           </View>
           <Text style={[styles.quoteMark, compact && { fontSize: 34, lineHeight: 34 }]}>&#8220;</Text>
@@ -90,7 +93,7 @@ export function AlbertoCoachCard({ width, onStart, onMessage, compact = false }:
               style={({ hovered }: any) => [styles.msgBtn, hovered && styles.msgBtnHover]}
             >
               <Ionicons name="chatbubble-ellipses-outline" size={15} color={colors.yellow} />
-              <Text style={styles.msgText} numberOfLines={1}>Message {persona.name}</Text>
+              <Text style={styles.msgText} numberOfLines={1}>Message{ready ? ` ${persona.name}` : ""}</Text>
             </Pressable>
           ) : null}
         </View>

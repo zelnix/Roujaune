@@ -14,7 +14,14 @@ import { GlassPill } from "./ui";
 
 const heroImg = require("../../assets/images/hero_cyclist_b2.jpg");
 
-function StatusBar({ onFlame, onNotifications, onProfile, avatar }: { onFlame: () => void; onNotifications: () => void; onProfile?: () => void; avatar?: string | null }) {
+function initials(name?: string): string {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "R";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function StatusBar({ onFlame, onNotifications, onProfile, avatar, initialsText }: { onFlame: () => void; onNotifications: () => void; onProfile?: () => void; avatar?: string | null; initialsText: string }) {
   return (
     <View style={styles.statusRow}>
       <GlassPill testID="flame-pill" onPress={onFlame}>
@@ -33,7 +40,7 @@ function StatusBar({ onFlame, onNotifications, onProfile, avatar }: { onFlame: (
         {avatar ? (
           <Image source={{ uri: avatar }} style={styles.avatarImg} contentFit="cover" contentPosition="top center" />
         ) : (
-          <Ionicons name="person" size={18} color="#fff" />
+          <Text style={styles.avatarInitials}>{initialsText}</Text>
         )}
       </GlassPill>
     </View>
@@ -61,8 +68,8 @@ export function HeroRoute({
   compact?: boolean;
   sideSlot?: React.ReactNode;
 }) {
-  const { avatar } = useRiderProfile();
-  const { settings } = useSettings();
+  const { avatar, profile } = useRiderProfile();
+  const { settings, loaded: settingsLoaded } = useSettings();
   const weather = useWeather({ city: settings.homeCity, lat: settings.homeLat, lon: settings.homeLon });
   const [showForecast, setShowForecast] = React.useState(false);
   return (
@@ -93,25 +100,27 @@ export function HeroRoute({
       </View>
 
       {/* top-right status */}
-      <StatusBar onFlame={onFlame} onNotifications={onNotifications} onProfile={onProfile} avatar={avatar} />
+      <StatusBar onFlame={onFlame} onNotifications={onNotifications} onProfile={onProfile} avatar={avatar} initialsText={initials(profile?.name)} />
 
       {/* right: local weather → tap for the 7-day forecast */}
       <Pressable
         testID="weather-forecast-open"
         onPress={() => setShowForecast(true)}
+        hitSlop={{ top: 12, bottom: 16, left: 20, right: 20 }}
         style={[styles.signatureArea, compact && { top: "22%" }]}
         accessibilityRole="button"
         accessibilityLabel="Open seven-day forecast"
       >
         <View style={styles.weatherTop}>
-          <Ionicons name={weather.icon} size={compact ? 15 : 18} color={colors.yellow} />
-          <Text style={[styles.temp, compact && { fontSize: 18 }]}>{weather.temp}</Text>
+          <Ionicons name={weather.icon} size={compact ? 17 : 21} color={colors.yellow} />
+          <Text style={[styles.temp, compact && { fontSize: 21 }, !settingsLoaded && { opacity: 0 }]}>{weather.temp}</Text>
         </View>
-        <Text style={[styles.place, compact && { fontSize: 14 }]} numberOfLines={1}>{weather.place}</Text>
+        <Text style={[styles.place, compact && { fontSize: 15 }, !settingsLoaded && { opacity: 0 }]} numberOfLines={1}>{settingsLoaded ? weather.place : "—"}</Text>
         <Text style={styles.dateText}>{weather.dateLabel}</Text>
         <View style={styles.forecastHint}>
-          <Ionicons name="chevron-forward" size={11} color={colors.textDim} />
+          <Ionicons name="calendar-outline" size={13} color={colors.yellow} />
           <Text style={styles.forecastHintText}>7-day forecast</Text>
+          <Ionicons name="chevron-forward" size={13} color={colors.yellow} />
         </View>
       </Pressable>
 
@@ -171,6 +180,8 @@ const styles = StyleSheet.create({
   statusRow: { position: "absolute", top: spacing.lg, right: spacing.lg, flexDirection: "row", gap: 10, alignItems: "center" },
   pillText: { color: "#fff", fontWeight: "800", fontSize: 14, marginLeft: 6 },
   avatar: { width: 44, height: 44, paddingHorizontal: 0, borderColor: colors.yellow },
+  avatarImg: { width: "100%", height: "100%", borderRadius: radius.pill },
+  avatarInitials: { color: colors.white, fontSize: 15, fontWeight: "800", letterSpacing: 0.5 },
   badge: {
     position: "absolute",
     top: 4,
@@ -186,11 +197,11 @@ const styles = StyleSheet.create({
   badgeText: { color: "#fff", fontSize: 9, fontWeight: "800" },
   signatureArea: { position: "absolute", right: spacing.xl, top: "30%", alignItems: "flex-end" },
   weatherTop: { flexDirection: "row", alignItems: "center", gap: 6 },
-  temp: { color: colors.white, fontSize: 22, fontWeight: "800" },
-  place: { color: colors.white, fontSize: 16, fontWeight: "700", marginTop: 2 },
-  dateText: { color: colors.textDim, fontSize: 12.5, fontWeight: "600", marginTop: 3 },
-  forecastHint: { flexDirection: "row", alignItems: "center", gap: 2, marginTop: 6 },
-  forecastHintText: { color: colors.textDim, fontSize: 11.5, fontWeight: "700" },
+  temp: { color: colors.white, fontSize: 27, fontWeight: "800" },
+  place: { color: colors.white, fontSize: 18, fontWeight: "700", marginTop: 2 },
+  dateText: { color: colors.textDim, fontSize: 13.5, fontWeight: "600", marginTop: 3 },
+  forecastHint: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 7, backgroundColor: "rgba(255,194,10,0.12)", borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 4 },
+  forecastHintText: { color: colors.yellow, fontSize: 12.5, fontWeight: "800" },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center", padding: spacing.lg },
   forecastCard: { width: "100%", maxWidth: 420, maxHeight: "80%", backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.lg },
   forecastHead: { marginBottom: spacing.md },

@@ -83,6 +83,23 @@ export function getCoach(): CoachId {
   return current;
 }
 
+/** True once the persisted coach choice has hydrated (prevents Alberto flash). */
+export function getCoachReady(): boolean {
+  return localReady;
+}
+
+/** Subscribe to the hydration state of the active coach persona. */
+export function useCoachReady(): boolean {
+  const [, force] = React.useReducer((x) => x + 1, 0);
+  React.useEffect(() => {
+    initCoach();
+    const l = () => force();
+    listeners.add(l);
+    return () => { listeners.delete(l); };
+  }, []);
+  return localReady;
+}
+
 export function setCoach(id: CoachId) {
   if (current === id) return;
   current = id;
