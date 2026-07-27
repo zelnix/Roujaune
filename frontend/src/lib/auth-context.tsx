@@ -5,6 +5,7 @@ import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
 import { getToken, setToken, loadToken, installFetchAuth } from "./session";
 import { refreshCoachFromServer, resetCoach } from "./coach-persona";
+import { resetRiderProfile } from "./rider-profile";
 
 const API = (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
 const AUTH_BASE = "https://auth.emergentagent.com";
@@ -184,6 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       /* ignore cache clear errors */
     }
     resetCoach();
+    resetRiderProfile();
     await setToken(null);
     setUser(null);
   }, []);
@@ -205,6 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       /* ignore cache clear errors */
     }
     resetCoach();
+    resetRiderProfile();
     await setToken(null);
     setUser(null);
   }, []);

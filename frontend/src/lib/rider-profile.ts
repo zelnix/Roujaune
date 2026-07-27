@@ -10,18 +10,35 @@ const DEFAULT: RiderProfile = { name: "Rider One", weight_kg: 78, age: 42, gende
 const AVATAR_KEY = "roujaune:riderAvatar";
 const PROFILE_KEY = "roujaune:riderProfile";
 
-// Module-level snapshot so non-React code (coach context builders) can read it.
+// Module-level snapshots so non-React code (coach context builders) can read
+// them AND so every mounted useRiderProfile() consumer (Home hero, Profile…)
+// stays in sync the instant the avatar/profile changes.
 let _snap: RiderProfile = { ...DEFAULT };
+let _avatarSnap: string | null = null;
+const _listeners = new Set<() => void>();
+function _emit() { _listeners.forEach((l) => l()); }
+
 export function getRiderProfile(): RiderProfile {
   return _snap;
 }
 
-// Hydrate the module snapshot from the last-known cached profile as early as
-// possible so no screen ever shows the "Rider One" placeholder on cold start.
+/** Clear cached rider identity from memory (call on logout / account delete
+ *  so nothing leaks into the next account signing in on this runtime). */
+export function resetRiderProfile() {
+  _snap = { ...DEFAULT };
+  _avatarSnap = null;
+  _emit();
+}
+
+// Hydrate the module snapshots from the last-known cache as early as possible
+// so no screen shows a placeholder avatar/name on cold start.
 AsyncStorage.getItem(PROFILE_KEY).then((raw) => {
   if (raw) {
-    try { _snap = { ...DEFAULT, ...JSON.parse(raw) }; } catch { /* ignore */ }
+    try { _snap = { ...DEFAULT, ...JSON.parse(raw) }; _emit(); } catch { /* ignore */ }
   }
+}).catch(() => {});
+AsyncStorage.getItem(AVATAR_KEY).then((a) => {
+  if (a) { _avatarSnap = a; _emit(); }
 }).catch(() => {});
 
 function base(): string {
@@ -30,8 +47,16 @@ function base(): string {
 
 export function useRiderProfile() {
   const [profile, setProfile] = useState<RiderProfile>(_snap);
-  const [avatar, setAvatarState] = useState<string | null>(null);
+  const [avatar, setAvatarState] = useState<string | null>(_avatarSnap);
   const [loaded, setLoaded] = useState(false);
+
+  // Keep every mounted consumer in sync with the shared snapshots.
+  useEffect(() => {
+    const l = () => { setProfile(_snap); setAvatarState(_avatarSnap); };
+    _listeners.add(l);
+    l();
+    return () => { _listeners.delete(l); };
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -39,16 +64,15 @@ export function useRiderProfile() {
       try {
         const cached = await AsyncStorage.getItem(PROFILE_KEY);
         if (cached) {
-          const c: RiderProfile = { ...DEFAULT, ...JSON.parse(cached) };
-          _snap = c;
-          setProfile(c);
+          _snap = { ...DEFAULT, ...JSON.parse(cached) };
+          _emit();
         }
       } catch {
         /* ignore cache */
       }
       try {
         const a = await AsyncStorage.getItem(AVATAR_KEY);
-        if (a) setAvatarState(a);
+        if (a) { _avatarSnap = a; _emit(); }
       } catch {
         /* no avatar */
       }
@@ -57,14 +81,16 @@ export function useRiderProfile() {
         const res = await fetch(`${base()}/api/rider/profile`);
         if (res.ok) {
           const d = await res.json();
-          const p: RiderProfile = { name: d.name, weight_kg: d.weight_kg, age: d.age, gender: d.gender, city: d.city ?? "", region: d.region ?? "", country: d.country ?? "", capability: d.capability ?? "intermediate" };
-          _snap = p;
-          setProfile(p);
-          AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(p)).catch(() => {});
-          if (d.avatar) {
-            setAvatarState(d.avatar);
-            AsyncStorage.setItem(AVATAR_KEY, d.avatar).catch(() => {});
+          _snap = { name: d.name, weight_kg: d.weight_kg, age: d.age, gender: d.gender, city: d.city ?? "", region: d.region ?? "", country: d.country ?? "", capability: d.capability ?? "intermediate" };
+          AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(_snap)).catch(() => {});
+          // Avatar: backend is the source of truth across devices. An explicit
+          // empty string means "no avatar" and should clear a stale local one.
+          if (typeof d.avatar === "string") {
+            _avatarSnap = d.avatar || null;
+            if (d.avatar) AsyncStorage.setItem(AVATAR_KEY, d.avatar).catch(() => {});
+            else AsyncStorage.removeItem(AVATAR_KEY).catch(() => {});
           }
+          _emit();
         }
       } catch {
         /* keep cache/defaults */
@@ -74,10 +100,9 @@ export function useRiderProfile() {
   }, []);
 
   const update = useCallback(async (patch: Partial<RiderProfile>) => {
-    const next = { ..._snap, ...patch };
-    _snap = next;
-    setProfile(next);
-    AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(next)).catch(() => {});
+    _snap = { ..._snap, ...patch };
+    _emit();
+    AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(_snap)).catch(() => {});
     try {
       await fetch(`${base()}/api/rider/profile`, {
         method: "PUT",
@@ -90,7 +115,8 @@ export function useRiderProfile() {
   }, []);
 
   const setAvatar = useCallback(async (uri: string) => {
-    setAvatarState(uri);
+    _avatarSnap = uri;
+    _emit();
     AsyncStorage.setItem(AVATAR_KEY, uri).catch(() => {});
     try {
       await fetch(`${base()}/api/rider/profile`, {
