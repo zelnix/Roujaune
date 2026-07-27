@@ -579,3 +579,12 @@ Completed the interrupted "before go-live" batch AND the remainder of `/app/memo
 - **Hardening:** admin user list/get strip `password_hash`/`reset_token`/`verify_token`; cursor pagination on users+audit; metrics carry no PII; `GET /api/admin/health` now `{status,db,version,uptime}`; admin self-delete blocked (400).
 - **NOT built (per contract's own conditional language):** §5.4 server-managed workout catalog (catalog is client-side; "expose IF console must edit") and §8.8 production infra provisioning (deploy-time ops, not code).
 - Verified: testing agent iter52 — 19/19 backend pass (`tests/test_iter52_admin_console.py`), incl. RBAC (403 rider / 401 anon), suspend-blocks-login, cursor pagination, secret stripping, audit, GDPR cascade, and rider-flow regression. Global benchmark config restored to defaults.
+
+## HWG console — exact-path surface completed (2026-07-27 fork, iter53)
+The console team reported only /login + /coaches were reachable; added the FULL set the console polls, under `/api/admin/*` (admin JWT):
+- `GET /me` (admin identity — was the hard blocker), `GET /nav-badges`, `GET /dashboard` (rollup superset of /metrics), `GET /analytics/growth` (6-month new+cumulative rider series).
+- Riders: `GET /riders` (alias of /users), `GET /riders/{id}`, `POST /riders/{id}/suspend|reactivate|reset-password` (reset returns a one-time temp password + force-logs-out), `DELETE /riders/{id}` (GDPR cascade), `GET /riders/export/csv` (declared before the path-param route so it isn't shadowed).
+- Plans: `GET /plans` (with `status`), `POST /plans/{id}/publish|archive`, `DELETE /plans/{id}` (all reload the in-memory plan cache via `on_plan_change` + audited).
+- `GET /integrations?health=1` (llm/push/email/weather/google_auth + a `database` entry when health=1), `GET /catalog` + `DELETE /catalog/{id}` (Mongo `workout_catalog`), `GET/PUT /config/benchmarks` (alias of /benchmark/config).
+- Every mutation writes to `admin_audit`. RBAC enforced (rider→403, anon→401).
+- Verified: testing agent iter53 — 22/22 backend pass (`tests/test_iter53_admin_console_paths.py`), incl. full rider lifecycle (suspend blocks login, reset temp pw logs in), plan publish/archive audit, CSV export not shadowed, 6-item growth series, and rider-flow regression. Global state restored (benchmark 56/56, couch-to-road published).
