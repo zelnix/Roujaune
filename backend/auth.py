@@ -62,6 +62,7 @@ USER_SCOPED = {
 _PUBLIC = {
     "/api/auth/register", "/api/auth/login", "/api/auth/google", "/api/auth/apple",
     "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/verify-email",
+    "/api/admin/login", "/api/admin/logout",
 }
 
 
@@ -183,15 +184,29 @@ async def _resolve_token(token: str):
     if not token:
         return None
     sess = await _db.user_sessions.find_one({"session_token": token}, {"_id": 0})
-    if not sess:
-        return None
-    exp = sess.get("expires_at")
-    if isinstance(exp, datetime.datetime):
-        if exp.tzinfo is None:
-            exp = exp.replace(tzinfo=datetime.timezone.utc)
-        if exp < _now():
-            return None
-    return await _db.users.find_one({"user_id": sess["user_id"]}, {"_id": 0, "password_hash": 0})
+    if sess:
+        exp = sess.get("expires_at")
+        if isinstance(exp, datetime.datetime):
+            if exp.tzinfo is None:
+                exp = exp.replace(tzinfo=datetime.timezone.utc)
+            if exp < _now():
+                return None
+        return await _db.users.find_one({"user_id": sess["user_id"]}, {"_id": 0, "password_hash": 0})
+    # Fall back to the SEPARATE admin store (password-based console admins).
+    asess = await _db.admin_sessions.find_one({"session_token": token}, {"_id": 0})
+    if asess:
+        exp = asess.get("expires_at")
+        if isinstance(exp, datetime.datetime):
+            if exp.tzinfo is None:
+                exp = exp.replace(tzinfo=datetime.timezone.utc)
+            if exp < _now():
+                return None
+        adm = await _db.admins.find_one({"admin_id": asess["admin_id"]}, {"_id": 0, "password_hash": 0})
+        if adm:
+            return {"user_id": adm["admin_id"], "email": adm.get("email"),
+                    "name": adm.get("name") or "Admin", "role": "admin",
+                    "provider": "admin-store", "is_admin_store": True}
+    return None
 
 
 def _public_user(u: dict) -> dict:
@@ -248,6 +263,80 @@ async def ensure_indexes():
     await _db.user_sessions.create_index("session_token", unique=True)
     await _db.user_sessions.create_index("user_id")
     await _db.user_sessions.create_index("expires_at", expireAfterSeconds=0)
+    # Separate admin store (password-based console admins).
+    await _db.admins.create_index("email", unique=True)
+    await _db.admins.create_index("admin_id", unique=True)
+    await _db.admin_sessions.create_index("session_token", unique=True)
+    await _db.admin_sessions.create_index("expires_at", expireAfterSeconds=0)
+
+
+# --------------------------------------------------------------------------- #
+#  Separate password-based admin store (Harmony Wellness Group console)        #
+#  Kept fully separate from rider 'users' (Google/Apple OAuth).                #
+# --------------------------------------------------------------------------- #
+_DUMMY_HASH = bcrypt.hashpw(b"timing-mitigation", bcrypt.gensalt()).decode()
+ADMIN_SESSION_TTL_HOURS = 12
+
+
+async def _create_admin_session(admin_id: str) -> str:
+    token = secrets.token_urlsafe(32)
+    await _db.admin_sessions.insert_one({
+        "session_token": token,
+        "admin_id": admin_id,
+        "created_at": _now(),
+        "expires_at": _now() + datetime.timedelta(hours=ADMIN_SESSION_TTL_HOURS),
+    })
+    return token
+
+
+async def seed_login_admin() -> bool:
+    """Idempotently create/update the shared console admin from env vars.
+    Password is re-synced from env on every startup; never stored in plaintext."""
+    email = os.environ.get("ADMIN_LOGIN_EMAIL", "").strip().lower()
+    password = os.environ.get("ADMIN_LOGIN_PASSWORD", "")
+    if not email or not password:
+        return False
+    existing = await _db.admins.find_one({"email": email})
+    if existing:
+        await _db.admins.update_one(
+            {"email": email},
+            {"$set": {"password_hash": hash_pw(password), "role": "admin", "updated_at": _now()}},
+        )
+    else:
+        await _db.admins.insert_one({
+            "admin_id": f"admin_{uuid.uuid4().hex[:12]}",
+            "email": email, "name": "Admin",
+            "password_hash": hash_pw(password), "role": "admin", "created_at": _now(),
+        })
+    return True
+
+
+admin_auth_router = APIRouter(prefix="/admin", tags=["admin-auth"])
+
+
+class AdminLoginReq(BaseModel):
+    email: str
+    password: str
+
+
+@admin_auth_router.post("/login")
+async def admin_login(req: AdminLoginReq):
+    email = (req.email or "").strip().lower()
+    adm = await _db.admins.find_one({"email": email})
+    # Constant-time-ish: always run verify (dummy hash on miss) to avoid enumeration.
+    ok = verify_pw(req.password, adm["password_hash"] if adm else _DUMMY_HASH)
+    if not adm or not ok:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    token = await _create_admin_session(adm["admin_id"])
+    return {"token": token, "admin": {"email": adm["email"], "name": adm.get("name") or "Admin", "role": "admin"}}
+
+
+@admin_auth_router.post("/logout")
+async def admin_logout(request: Request):
+    auth_h = request.headers.get("authorization") or ""
+    if auth_h.lower().startswith("bearer "):
+        await _db.admin_sessions.delete_one({"session_token": auth_h.split(" ", 1)[1].strip()})
+    return {"status": "ok"}
 
 
 async def seed_admins() -> int:

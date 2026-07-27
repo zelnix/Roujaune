@@ -4276,6 +4276,7 @@ async def get_community():
 
 api_router.include_router(plans_admin.plans_router, dependencies=[Depends(auth.require_admin)])
 api_router.include_router(auth.auth_router)
+api_router.include_router(auth.admin_auth_router)
 app.include_router(api_router)
 app.include_router(push.router)
 app.include_router(admin_routes.admin_router)
@@ -4340,6 +4341,8 @@ async def _seed_plans_on_startup():
         seeded = await auth.seed_admins()
         if seeded:
             logger.info(f"Seeded {seeded} admin user(s) from ADMIN_EMAILS")
+        if await auth.seed_login_admin():
+            logger.info("Seeded password-based console admin from ADMIN_LOGIN_EMAIL")
         migrated = await auth.migrate_singleton("greenlantern@roujaune.app", "rideon9900")
         if migrated:
             logger.info(f"Migrated single-user data to demo account {migrated}")
