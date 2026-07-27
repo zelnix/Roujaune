@@ -25,7 +25,6 @@ import {
   EquipmentCard,
   PreRideCard,
   FB50RecommendationCard,
-  MPCRecommendationCard,
 } from "@/src/components/training";
 
 function Toast({ message }: { message: { id: number; text: string } | null }) {
@@ -150,7 +149,6 @@ export default function TodaysTraining() {
                     <PreRideCard />
                   </View>
                   <FB50RecommendationCard onPress={() => showToast("Starting Pre-Ride Activation")} />
-                  <MPCRecommendationCard onPress={() => showToast("Starting Calm Start")} />
                 </View>
               </View>
 

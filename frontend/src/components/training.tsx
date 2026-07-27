@@ -10,8 +10,6 @@ import Svg, {
   Defs,
   LinearGradient as SvgGrad,
   Stop,
-  Path,
-  Circle,
 } from "react-native-svg";
 import { colors, radius, spacing, shadow } from "../theme";
 import { PrimaryButton, SecondaryButton, ReadinessScale, SectionLabel, Touchable } from "./ui";
@@ -380,38 +378,8 @@ export function FB50RecommendationCard({ onPress }: { onPress: () => void }) {
 }
 
 /* ------------------------- MPC ------------------------- */
-function SunsetArt() {
-  return (
-    <Svg style={StyleSheet.absoluteFill} preserveAspectRatio="xMidYMid slice" viewBox="0 0 300 160">
-      <Defs>
-        <SvgGrad id="mpc" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#4A2A28" />
-          <Stop offset="0.5" stopColor="#8A3E1C" />
-          <Stop offset="0.8" stopColor="#3A1A12" />
-          <Stop offset="1" stopColor="#0C0706" />
-        </SvgGrad>
-      </Defs>
-      <Path d="M0 0 H300 V160 H0 Z" fill="url(#mpc)" />
-      <Circle cx={225} cy={95} r={22} fill="#F0A044" opacity={0.75} />
-      <Path d="M225 120 c-13 0 -24 6 -24 13 h48 c0 -7 -11 -13 -24 -13 Z M225 92 a8 8 0 1 1 0.1 0 Z M212 120 c0 -11 5 -18 13 -20 c8 2 13 9 13 20 Z" fill="#140B09" />
-    </Svg>
-  );
-}
-
-export function MPCRecommendationCard({ onPress }: { onPress: () => void }) {
-  return (
-    <Touchable testID="mpc-card" onPress={onPress} lift style={{ flex: 1 }} containerStyle={{ flex: 1, flexBasis: 0, minWidth: 0 }}>
-      <View style={styles.bottomCard}>
-        <SunsetArt />
-        <LinearGradient colors={["rgba(5,5,5,0.72)", "rgba(5,5,5,0.2)"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
-        <SectionLabel color={colors.white}>MY PEACEFUL COMPANION</SectionLabel>
-        <Text style={[styles.recTitle, { marginTop: 8 }]}>Calm Start</Text>
-        <Text style={styles.recDur}>5 min</Text>
-        <Text style={styles.recDesc}>Breathing and focus{"\n"}before your ride</Text>
-      </View>
-    </Touchable>
-  );
-}
+// Removed: the standalone "My Peaceful Companion" wellbeing recommendation card
+// is no longer part of Roujaune (cycling-training only).
 
 const styles = StyleSheet.create({
   /* coach */

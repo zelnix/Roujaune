@@ -86,16 +86,13 @@ export const summaryContent = {
     rec: "Recovery ride or mobility tomorrow",
     items: [
       { icon: "body", label: "FB50 Recommendation", value: "Post-Ride Mobility  •  10 min", chevron: true },
-      { icon: "flower", label: "My Peaceful Companion", value: "Cool Down Reflection  •  5 min", chevron: true },
-      { icon: "water", label: "Hydrate well", value: "Aim for 750–1000 ml today" },
-      { icon: "moon", label: "Sleep well", value: "7–9 hours for best recovery" },
+      { icon: "bicycle", label: "Recovery ride", value: "Easy spin tomorrow  •  30 min", chevron: true },
     ],
   },
   sync: [
     { key: "strava", label: "Strava", status: "Synced", icon: "logo-strava" },
     { key: "garmin", label: "Garmin Connect", status: "Synced", icon: "sync-circle" },
     { key: "apple", label: "Apple Health", status: "Synced", icon: "heart" },
-    { key: "wellness", label: "My Wellness Journey", status: "Synced", icon: "flower" },
   ],
 };
 

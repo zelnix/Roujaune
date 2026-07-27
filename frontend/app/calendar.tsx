@@ -228,8 +228,8 @@ export default function CalendarScreen() {
                   ))}
                 </GridRow>
 
-                {/* wellness row */}
-                <GridRow icon="flower-outline" label={"RECOVERY &\nWELLNESS"} color={CC.purple}>
+                {/* recovery row */}
+                <GridRow icon="bicycle-outline" label={"RECOVERY"} color={CC.purple}>
                   {days.map((d, i) => (
                     <View key={d.date} style={[styles.col, i === selected && styles.colSel]}>
                       {d.wellness ? (
