@@ -7,6 +7,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing } from "@/src/theme";
 import { submitCheckin, readinessTone, ReadinessResult } from "@/src/lib/checkin";
+import { useCoach } from "@/src/lib/coach-persona";
 
 const SCALE_LABELS: Record<string, [string, string]> = {
   sleep_quality: ["Poor", "Great"],
@@ -55,6 +56,7 @@ function Scale({ label, hint, value, onChange }: { label: string; hint: [string,
 
 export default function CheckinScreen() {
   const router = useRouter();
+  const coach = useCoach();
   const { width } = useWindowDimensions();
   const twoCol = width >= 720;
   const goBack = () => (router.canGoBack() ? router.back() : router.replace("/"));
@@ -105,7 +107,7 @@ export default function CheckinScreen() {
           </Pressable>
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>Daily Check-in</Text>
-            <Text style={styles.subtitle}>A quick honest check so Alberto can tune today&apos;s ride.</Text>
+            <Text style={styles.subtitle}>A quick honest check so {coach.name} can tune today&apos;s ride.</Text>
           </View>
         </View>
 

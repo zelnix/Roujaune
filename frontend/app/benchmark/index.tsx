@@ -8,6 +8,7 @@ import { getBenchmarkTest, CATEGORY_META } from "@/src/lib/benchmark/catalog";
 import { BenchmarkLibrary } from "@/src/components/benchmark/BenchmarkLibrary";
 import BenchmarkWeekCard from "@/src/components/benchmark/BenchmarkWeekCard";
 import PlanReviewCard from "@/src/components/benchmark/PlanReviewCard";
+import { useCoach } from "@/src/lib/coach-persona";
 import { useBenchmarkResults, useBenchmarkProfile, useBenchmarkZones, useBenchmarkRecommendation, setBenchmarkResultDecision } from "@/src/lib/benchmark/api";
 import type { BenchmarkProfile } from "@/src/lib/benchmark/types";
 
@@ -35,6 +36,7 @@ const PROFILE_STATS: Stat[] = [
 
 export default function BenchmarkLandingScreen() {
   const router = useRouter();
+  const coach = useCoach();
   const { results, loading: resultsLoading, reload: reloadResults } = useBenchmarkResults();
   const { profile, loading: profileLoading, reload: reloadProfile } = useBenchmarkProfile();
   const { ftp: zoneFtp, zones, loading: zonesLoading, reload: reloadZones } = useBenchmarkZones();
@@ -102,7 +104,7 @@ export default function BenchmarkLandingScreen() {
       </Card>
 
       {/* ── Proposed training change (WP-E) ── */}
-      <PlanReviewCard onReview={() => router.push("/plan")} />
+      <PlanReviewCard coachName={coach.name} onReview={() => router.push("/plan")} />
 
       {/* ── Recommended Next Benchmark ── */}
       <Card testID="bm-recommended">
@@ -128,7 +130,7 @@ export default function BenchmarkLandingScreen() {
           <Text style={s.whyLabel}>{recApproved ? "YOUR CURRENT BENCHMARK IS STILL SUITABLE" : "WHY THIS TEST"}</Text>
           <Text style={s.whyText}>
             {recApproved
-              ? "Alberto or Adriana has reviewed your recent training and your existing benchmarks can personalise your plan. Retest when you're ready."
+              ? `${coach.name} has reviewed your recent training and your existing benchmarks can personalise your plan. Retest when you're ready.`
               : recReasons.length > 0
                 ? `Recommended because ${recReasons.join(", ")}. ${rec.purpose}`
                 : rec.whoFor}

@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { colors, radius, spacing } from "../theme";
-import { ReadinessScale } from "./ui";
 import { useRiderSeason } from "../lib/rider-profile";
 import { useSettings } from "../lib/settings";
 import { usePlan } from "../lib/plan";
@@ -72,9 +71,9 @@ export function MetricSummaryStrip() {
           {i > 0 && <View style={styles.divider} />}
           <Ionicons name={m.icon} size={24} color={m.iconColor} style={{ marginRight: 10 }} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.label}>{m.label}</Text>
-            <Text style={styles.value}>{m.value}</Text>
-            <Text style={styles.status}>{m.status}</Text>
+            <Text numberOfLines={1} style={styles.label}>{m.label}</Text>
+            <Text numberOfLines={1} style={styles.value}>{m.value}</Text>
+            <Text numberOfLines={1} style={styles.status}>{m.status}</Text>
           </View>
         </View>
       ))}
@@ -83,11 +82,10 @@ export function MetricSummaryStrip() {
         <View style={styles.divider} />
         <Ionicons name="heart-outline" size={24} color={rTone.color} style={{ marginRight: 10 }} />
         <View style={{ flex: 1 }}>
-          <Text style={styles.label}>READINESS</Text>
-          <Text style={styles.value}>{readinessValue}</Text>
-          <Text style={[styles.status, { color: rTone.color }]}>{readiness.available ? rTone.label : "Tap to check in"}</Text>
+          <Text numberOfLines={1} style={styles.label}>READINESS</Text>
+          <Text numberOfLines={1} style={styles.value}>{readinessValue}</Text>
+          <Text numberOfLines={1} style={[styles.status, { color: rTone.color }]}>{readiness.available ? rTone.label : "Tap to check in"}</Text>
         </View>
-        {readiness.available && !readiness.safetyOverride ? <ReadinessScale /> : <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />}
       </Pressable>
     </View>
   );
