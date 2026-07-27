@@ -11,6 +11,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { AuthProvider, useAuth } from "@/src/lib/auth-context";
 import { registerForPush } from "@/src/lib/push";
+import { loadCatalog } from "@/src/lib/catalog";
 import { colors } from "@/src/theme";
 
 // Disable logbox errors etc so that users can see the app
@@ -57,6 +58,12 @@ function AuthGate() {
   // Register this device for push once the rider is signed in (native only).
   useEffect(() => {
     if (user?.user_id) registerForPush(user.user_id);
+  }, [user?.user_id]);
+
+  // Warm the workout-catalog cache from the backend once signed in, so the
+  // Live HUD picks up the rider's assigned/edited copies + coach overrides.
+  useEffect(() => {
+    if (user?.user_id) loadCatalog();
   }, [user?.user_id]);
 
   // Notification tap handling + denied-permission weekly nudge (native only).

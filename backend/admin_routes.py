@@ -437,12 +437,45 @@ async def integrations(health: int = 0):
 
 
 # --------------------------------------------------------------------------- #
-#  Workout catalog (server-managed content the console can prune)             #
+#  Workout catalog (server-managed content the console manages)               #
 # --------------------------------------------------------------------------- #
 @admin_router.get("/catalog")
 async def list_catalog():
-    items = await _db.workout_catalog.find({}, {"_id": 0}).to_list(1000)
+    items = await _db.workout_catalog.find({}, {"_id": 0}).to_list(2000)
     return {"items": items}
+
+
+@admin_router.get("/catalog/{item_id}")
+async def get_catalog_item(item_id: str):
+    w = await _db.workout_catalog.find_one({"id": item_id}, {"_id": 0})
+    if not w:
+        raise HTTPException(status_code=404, detail="Catalog item not found")
+    return w
+
+
+class CatalogItem(BaseModel):
+    id: str
+    definition: dict
+
+
+@admin_router.post("/catalog")
+async def create_catalog_item(body: CatalogItem):
+    if await _db.workout_catalog.find_one({"id": body.id}):
+        raise HTTPException(status_code=409, detail="Workout id already exists")
+    doc = {**body.definition, "id": body.id, "created_at": _now()}
+    await _db.workout_catalog.update_one({"id": body.id}, {"$set": doc}, upsert=True)
+    await _audit("catalog.create", body.id, {})
+    return {"item": {k: v for k, v in doc.items() if k != "_id"}}
+
+
+@admin_router.put("/catalog/{item_id}")
+async def update_catalog_item(item_id: str, definition: dict):
+    definition.pop("_id", None)
+    definition["id"] = item_id
+    definition["updated_at"] = _now()
+    res = await _db.workout_catalog.update_one({"id": item_id}, {"$set": definition}, upsert=True)
+    await _audit("catalog.update", item_id, {"upserted": res.upserted_id is not None})
+    return {"item": definition}
 
 
 @admin_router.delete("/catalog/{item_id}")
@@ -452,3 +485,69 @@ async def delete_catalog_item(item_id: str):
         raise HTTPException(status_code=404, detail="Catalog item not found")
     await _audit("catalog.delete", item_id, {})
     return {"deleted": item_id}
+
+
+# --- Per-rider workout copies (coach assigns / edits on a rider's behalf) ---- #
+async def _resolve_wk_for(user_id: str, wid: str) -> Optional[dict]:
+    c = await _db.rider_workouts.find_one({"user_id": user_id, "id": wid}, {"_id": 0, "user_id": 0})
+    if c:
+        return c
+    return await _db.workout_catalog.find_one({"id": wid}, {"_id": 0})
+
+
+@admin_router.get("/riders/{user_id}/workouts")
+async def list_rider_workouts(user_id: str):
+    items = await _db.rider_workouts.find({"user_id": user_id}, {"_id": 0, "user_id": 0}).to_list(2000)
+    return {"items": items}
+
+
+@admin_router.post("/riders/{user_id}/workouts/{workout_id}/assign")
+async def assign_rider_workout(user_id: str, workout_id: str):
+    """Coach/console: create a rider-scoped copy of a workout (copy-on-assign)."""
+    if not await _db.users.find_one({"user_id": user_id}):
+        raise HTTPException(status_code=404, detail="Rider not found")
+    src = await _resolve_wk_for(user_id, workout_id)
+    if not src:
+        raise HTTPException(status_code=404, detail="Workout not found")
+    doc = {k: v for k, v in src.items() if k != "seeded_at"}
+    doc["id"] = workout_id
+    doc.setdefault("origin_id", workout_id)
+    doc["assigned_at"] = _now()
+    doc["assigned_by"] = auth.require_user().get("email")
+    await _db.rider_workouts.update_one(
+        {"user_id": user_id, "id": workout_id}, {"$set": {**doc, "user_id": user_id}}, upsert=True)
+    await _audit("rider.workout.assign", user_id, {"workout_id": workout_id})
+    return {"assigned": workout_id, "workout": {k: v for k, v in doc.items() if k != "user_id"}}
+
+
+_CATALOG_EDITABLE = {"name", "typeId", "typeName", "color", "icon", "duration", "tss", "if",
+                     "difficulty", "description", "focus", "zones", "level", "environment", "segmentSpec"}
+
+
+@admin_router.put("/riders/{user_id}/workouts/{workout_id}")
+async def edit_rider_workout(user_id: str, workout_id: str, body: dict):
+    """Coach/console: edit a rider's copy (auto-forks from global on first edit)."""
+    existing = await _db.rider_workouts.find_one({"user_id": user_id, "id": workout_id}, {"_id": 0, "user_id": 0})
+    if not existing:
+        src = await _resolve_wk_for(user_id, workout_id)
+        if not src:
+            raise HTTPException(status_code=404, detail="Workout not found")
+        existing = {**{k: v for k, v in src.items() if k != "seeded_at"}, "origin_id": workout_id}
+    patch = body.get("patch", body) if isinstance(body, dict) else {}
+    for k, v in patch.items():
+        if k in _CATALOG_EDITABLE:
+            existing[k] = v
+    existing["id"] = workout_id
+    existing["edited_at"] = _now()
+    existing["edited_by"] = auth.require_user().get("email")
+    await _db.rider_workouts.update_one(
+        {"user_id": user_id, "id": workout_id}, {"$set": {**existing, "user_id": user_id}}, upsert=True)
+    await _audit("rider.workout.edit", user_id, {"workout_id": workout_id})
+    return {"workout": {k: v for k, v in existing.items() if k != "user_id"}}
+
+
+@admin_router.delete("/riders/{user_id}/workouts/{workout_id}")
+async def reset_rider_workout(user_id: str, workout_id: str):
+    res = await _db.rider_workouts.delete_one({"user_id": user_id, "id": workout_id})
+    await _audit("rider.workout.reset", user_id, {"workout_id": workout_id})
+    return {"reset": workout_id, "reverted": res.deleted_count > 0}

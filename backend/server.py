@@ -2960,6 +2960,59 @@ async def _reload_rb_from_db():
     _RB_PLANNED_TSS = {d["workout_id"]: d.get("tss", 0) for w in doc["weeks"] for d in w["days"] if d.get("kind") == "cycling" and d.get("workout_id")}
 
 
+# ── Workout catalog (server-managed; seeded from bundled JSON) ───────────────
+with open(ROOT_DIR / "workout_catalog.json", encoding="utf-8") as _f:
+    CATALOG_SEED = json.load(_f)
+
+_CATALOG_EDITABLE = {
+    "name", "typeId", "typeName", "color", "icon", "duration", "tss", "if",
+    "difficulty", "description", "focus", "zones", "level", "environment", "segmentSpec",
+}
+
+
+async def seed_workout_catalog():
+    """Non-destructive seed of the global `workout_catalog` collection so live
+    edits made via the console are never overwritten on restart."""
+    for w in CATALOG_SEED:
+        payload = {k: v for k, v in w.items() if k != "id"}
+        await db.workout_catalog.update_one(
+            {"id": w["id"]},
+            {"$setOnInsert": {**payload, "seeded_at": datetime.now(timezone.utc).isoformat()}},
+            upsert=True,
+        )
+
+
+async def _global_catalog() -> list:
+    docs = await db.workout_catalog.find({}, {"_id": 0}).to_list(2000)
+    return docs or [dict(w) for w in CATALOG_SEED]
+
+
+async def _resolve_catalog(uid: Optional[str]) -> list:
+    """The rider's effective catalog: global overlaid by their personal copies."""
+    base = {w["id"]: w for w in await _global_catalog()}
+    if uid:
+        copies = await db.rider_workouts.find({"user_id": uid}, {"_id": 0, "user_id": 0}).to_list(2000)
+        for c in copies:
+            base[c["id"]] = c
+    return list(base.values())
+
+
+async def _resolve_workout(uid: Optional[str], wid: str) -> Optional[dict]:
+    """A single workout, preferring the rider's copy, then global, then bundled."""
+    if uid:
+        c = await db.rider_workouts.find_one({"user_id": uid, "id": wid}, {"_id": 0, "user_id": 0})
+        if c:
+            return c
+    g = await db.workout_catalog.find_one({"id": wid}, {"_id": 0})
+    if g:
+        return g
+    for w in CATALOG_SEED:
+        if w["id"] == wid:
+            return dict(w)
+    return None
+
+
+
 # Registry of structured plans driven by the generalized plan engine below.
 def _struct_ctx(plan_id: str):
     """Return (plan_doc, weeks_map, planned_tss, ride_prefix) for a structured plan."""
@@ -4274,6 +4327,73 @@ async def get_community():
     return COMMUNITY_DATA
 
 
+# --------------------------------------------------------------------------- #
+#  Rider workout catalog — read + copy-on-assign + personal edits             #
+# --------------------------------------------------------------------------- #
+@api_router.get("/catalog")
+async def get_catalog():
+    """The current rider's effective catalog (global overlaid by their copies)."""
+    return {"items": await _resolve_catalog(auth.current_user_id())}
+
+
+@api_router.get("/catalog/{workout_id}")
+async def get_catalog_item(workout_id: str):
+    w = await _resolve_workout(auth.current_user_id(), workout_id)
+    if not w:
+        raise HTTPException(status_code=404, detail="Workout not found")
+    return w
+
+
+@api_router.post("/catalog/{workout_id}/assign")
+async def assign_catalog_workout(workout_id: str):
+    """Copy-on-assign: give the current rider their own editable copy of a workout."""
+    uid = auth.current_user_id()
+    src = await _resolve_workout(uid, workout_id)
+    if not src:
+        raise HTTPException(status_code=404, detail="Workout not found")
+    doc = {k: v for k, v in src.items() if k not in ("seeded_at",)}
+    doc["id"] = workout_id
+    doc.setdefault("origin_id", workout_id)
+    doc["assigned_at"] = datetime.now(timezone.utc).isoformat()
+    await db.rider_workouts.update_one(
+        {"user_id": uid, "id": workout_id}, {"$set": {**doc, "user_id": uid}}, upsert=True)
+    doc.pop("user_id", None)
+    return {"assigned": workout_id, "workout": doc}
+
+
+class WorkoutEdit(BaseModel):
+    patch: Dict[str, Any] = Field(default_factory=dict)
+
+
+@api_router.put("/catalog/{workout_id}")
+async def edit_my_workout(workout_id: str, body: WorkoutEdit):
+    """Edit the rider's own copy (auto-forks from global on first edit)."""
+    uid = auth.current_user_id()
+    existing = await db.rider_workouts.find_one({"user_id": uid, "id": workout_id}, {"_id": 0, "user_id": 0})
+    if not existing:
+        src = await _resolve_workout(uid, workout_id)
+        if not src:
+            raise HTTPException(status_code=404, detail="Workout not found")
+        existing = {**{k: v for k, v in src.items() if k != "seeded_at"}, "origin_id": workout_id}
+    for k, v in (body.patch or {}).items():
+        if k in _CATALOG_EDITABLE:
+            existing[k] = v
+    existing["id"] = workout_id
+    existing["edited_at"] = datetime.now(timezone.utc).isoformat()
+    await db.rider_workouts.update_one(
+        {"user_id": uid, "id": workout_id}, {"$set": {**existing, "user_id": uid}}, upsert=True)
+    existing.pop("user_id", None)
+    return {"workout": existing}
+
+
+@api_router.delete("/catalog/{workout_id}/reset")
+async def reset_my_workout(workout_id: str):
+    """Discard the rider's copy and revert to the global workout."""
+    uid = auth.current_user_id()
+    res = await db.rider_workouts.delete_one({"user_id": uid, "id": workout_id})
+    return {"reset": workout_id, "reverted": res.deleted_count > 0}
+
+
 @api_router.get("/openapi.json")
 async def api_openapi():
     """Expose the OpenAPI schema through the /api ingress so the HWG console can
@@ -4459,6 +4579,11 @@ async def _seed_plans_on_startup():
         logger.info("Plan definitions seeded/loaded from MongoDB")
     except Exception:
         logging.exception("plan seeding failed")
+    try:
+        await seed_workout_catalog()
+        logger.info("Workout catalog seeded/loaded from MongoDB")
+    except Exception:
+        logging.exception("workout catalog seeding failed")
     try:
         await auth.ensure_indexes()
         seeded = await auth.seed_admins()

@@ -1,0 +1,43 @@
+{
+  "summary": "Iter54 — server-managed workout catalog (backend + frontend smoke). 9/9 pytest cases PASS in test_iter54_catalog_backend.py against external EXPO_PUBLIC_BACKEND_URL. Verified: (1) rider GET /api/catalog returns items[] with 171 workouts and includes threshold-climb + ctr-ride-1; GET /api/catalog/threshold-climb returns name='Threshold Climb', duration=60. (2) Copy-on-assign: POST /api/catalog/threshold-climb/assign creates rider copy with origin_id='threshold-climb' and duration=60 cloned from global; PUT /api/catalog/threshold-climb {patch:{duration:45,name:'My copy'}} mutates ONLY the rider copy (rider GET returns 45/'My copy') while admin GET /api/admin/catalog/threshold-climb still shows 60/'Threshold Climb' — isolation confirmed. DELETE /api/catalog/threshold-climb/reset reverts (rider GET back to 60). (3) Edit allowlist: PUT /api/catalog/{id} with junk keys {id:'hacked-id', user_id:'attacker', origin_id:'spoofed', arbitrary_junk, assigned_at, duration:30, name:'Renamed'} applies only duration+name; id is forced back to path id, origin_id stays bound to real global id, user_id and arbitrary_junk are dropped from the response. (4) Admin catalog CRUD on a throwaway id test-wk-<uuid>: LIST returns items[] ≥170, POST /api/admin/catalog creates, duplicate POST -> 409, PUT updates, GET reflects update, DELETE removes, follow-up GET -> 404, and audit log contains catalog.create/update/delete rows for that id. (5) Coach per-rider workflow on a throwaway rider (registered via /api/auth/register): POST /api/admin/riders/{id}/workouts/ctr-ride-1/assign creates rider copy stamped with assigned_by=<admin email>, PUT edits duration to 30, GET /api/admin/riders/{id}/workouts lists it, the rider’s own GET /api/catalog/ctr-ride-1 (with the rider’s token) returns duration=30 (coach override visible), audit rows rider.workout.assign + rider.workout.edit present, DELETE reverts (reverted=true), rider GET no longer shows 30. (6) GDPR cascade: after re-assigning ctr-ride-1 to the throwaway rider, DELETE /api/admin/users/{id} returns deleted.rider_workouts >=1; follow-up GET /api/admin/users/{id} -> 404. (7) Regression: greenlantern rider still 200 on /api/plan (title='From Couch to Road', duration_weeks=16) and /api/calendar/week; admin /api/admin/dashboard still 200. FRONTEND smoke (Expo web, mobile viewport 390x844): greenlantern login OK → dashboard-scroll present → /workouts hub renders (Endurance/Climbing/Threshold/FB50 sections) → FB50 Sessions list opens → 'FB50 Glute Activation' detail with data-testid='start-workout' fires the Live Workout HUD showing 'Step 1 of 3', target watts, elapsed timer, and the 3-segment interval timeline (Warm-up → Endurance → …) — catalog cache + bundled fallback did not break launch. Post-run DB clean: greenlantern rider_workouts count = 0, no test-wk-* items remain, global threshold-climb duration=60, catalog total=171.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter54_catalog_backend.py",
+    "/app/test_reports/pytest/iter54.xml",
+    "/app/test_reports/screens/iter54_workouts.jpeg",
+    "/app/test_reports/screens/iter54_list.jpeg",
+    "/app/test_reports/screens/iter54_live.jpeg"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py:2973-2987 — seed_workout_catalog uses $setOnInsert so per-rider live edits on the global catalog are never overwritten on restart; _global_catalog falls back to CATALOG_SEED if the collection is empty, so read-side is safe even before the seeder runs.",
+    "server.py:2990-3013 — _resolve_catalog and _resolve_workout implement the exact precedence rider copy > global > bundled seed; both strip _id and user_id from responses so no ObjectId or cross-user leakage.",
+    "server.py:4368-4386 — rider PUT /api/catalog/{id} applies only keys in _CATALOG_EDITABLE (name,typeId,typeName,color,icon,duration,tss,if,difficulty,description,focus,zones,level,environment,segmentSpec) and forces existing['id']=path id after the patch, so 'id','user_id','origin_id','arbitrary_junk','assigned_at' can never be spoofed via the patch payload — verified by TestEditAllowlist.",
+    "admin_routes.py:504-546 — coach assign/edit path mirrors the rider path but stamps assigned_by/edited_by from the admin session and writes to admin_audit; the same _CATALOG_EDITABLE allowlist is enforced. Verified assign→edit→list→reset end-to-end.",
+    "auth.py:54-68 — USER_SCOPED now includes 'rider_workouts', so auth.erase_user_data() cascades rider workout copies on GDPR delete; TestCoachOverridesAndGDPR asserted deleted.rider_workouts >= 1.",
+    "admin_routes.py:461-468 — POST /api/admin/catalog correctly rejects duplicate ids with 409 (idempotent guard) and writes a catalog.create audit row.",
+    "frontend/src/lib/catalog.ts — loadCatalog() is called from app/_layout.tsx effect on user login (user?.user_id) and warms catalog-cache; workout-catalog.getWorkout() checks cachedWorkout() first then falls back to the bundled CATALOG. Verified via UI smoke: Live HUD launched correctly, so cache + fallback do not race the workout launch."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter54_catalog_backend.py (new — 9 tests, 100% passing)",
+    "/app/test_reports/iteration_54.json (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (9/9)",
+    "frontend": "100% smoke (login → workouts hub → FB50 detail → Live HUD with Step 1/3 + target watts)"
+  },
+  "seed_data_creation": "One throwaway rider registered via POST /api/auth/register (email test-i54-<uuid>@roujaune.app) inside TestCoachOverridesAndGDPR; the same test then DELETEs the rider via /api/admin/users/{id} and asserts GDPR cascade removed rider_workouts. Test-only catalog id test-wk-<uuid> created + deleted inside TestAdminCatalogCRUD. Post-run verification via curl confirmed: greenlantern rider_workouts count = 0, no test-wk-* items in /api/admin/catalog, global threshold-climb still name='Threshold Climb' duration=60, catalog total=171. greenlantern was not mutated.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Server-managed workout catalog is live and correct. Rider surface = /api/catalog (list) + /api/catalog/{id} (get) + POST /api/catalog/{id}/assign (copy-on-assign) + PUT /api/catalog/{id} {patch:{...}} (edit rider copy, auto-forks) + DELETE /api/catalog/{id}/reset (revert to global). Coach surface = /api/admin/catalog CRUD (throwaway ids only!) + /api/admin/riders/{id}/workouts assign/edit/list/reset — audits every mutation. Enforcement: rider PUT and coach PUT both apply only _CATALOG_EDITABLE keys (server.py:2967-2970); id/user_id/origin_id/arbitrary junk are stripped. Resolution precedence: rider_workouts > workout_catalog > bundled CATALOG_SEED (workout_catalog.json, 171 items). auth.USER_SCOPED includes 'rider_workouts' so DELETE /api/admin/users/{id} cascades that collection. Frontend loads /api/catalog into an in-memory cache on login (app/_layout.tsx effect → src/lib/catalog.loadCatalog); getWorkout() checks the cache before falling back to the bundled catalog. Live HUD boots with a valid 3-segment interval timeline. Test file /app/backend/tests/test_iter54_catalog_backend.py is re-runnable and self-cleaning.",
+  "rca_of_issue": "No defects. All assertions passed on first run; the throwaway rider + test-wk catalog id were both cleaned up in-suite and verified clean via out-of-band curl."
+}

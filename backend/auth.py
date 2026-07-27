@@ -56,6 +56,7 @@ USER_SCOPED = {
     "training_plans", "coach_chats", "connected_accounts", "workout_sessions",
     "scheduled_workouts", "daily_checkins", "workout_prefs", "cycling_activities",
     "settings", "calendar_weeks", "rider_prs", "rider_prefs", "rider_appearance", "kv_prefs",
+    "rider_workouts",
 }
 
 # Per-user benchmark collections (scoped by explicit user_id filters, not via udb).

@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { COUCH_TO_ROAD, ctrRideId, type Interval, type Session } from "./programs/couch-to-road";
 import { RIDE_STRONGER, rsRideId } from "./programs/ride-stronger";
 import { RIDE_BEYOND, rbRideId } from "./programs/ride-beyond";
+import { cachedWorkout } from "./catalog-cache";
 
 type Ion = keyof typeof Ionicons.glyphMap;
 
@@ -525,7 +526,7 @@ export const WORKOUTS: Workout[] = [
 ];
 
 export function getWorkout(id?: string | null): Workout | undefined {
-  return WORKOUTS.find((w) => w.id === id);
+  return cachedWorkout(id) ?? WORKOUTS.find((w) => w.id === id);
 }
 export function workoutsByType(typeId?: string | null): Workout[] {
   if (!typeId || typeId === "all") return WORKOUTS;
