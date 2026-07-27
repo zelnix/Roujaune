@@ -1,0 +1,135 @@
+{
+  "summary": "READ-ONLY UX audit of Roujaune landscape-tablet Expo web preview as Green Lantern (couch-to-road, week 1). All 10 nav destinations open (Today, Workouts, Virtual Routes, Benchmark Workouts, Training Plan, Progress, Community, Wellness, Connections + Settings/Help). Nav ORDER matches the locked spec except the first item is labelled 'Today' instead of 'Home' (data.ts:11) and long labels ('Benchmark W...') are truncated with ellipsis in the rail even at 1180px. Persona swap works for hero descriptor, Message-<coach> CTAs, coach card, plan card 'Adapted by ...' and plan-gate coach copy, but LEAKS remain: (a) Benchmark plan-review banner CTA 'Review with Alberto' stays literal when Adriana is selected; (b) Daily Check-in subtitle still reads 'A quick honest check so Alberto can tune today's ride.' All 9 journeys were exercised end-to-end read-only; screenshots saved under /app/test_reports/screens/. Overall UX rating: 7/10 — the hierarchy, colour language and coach system are strong; the returning-user Today screen is banner-heavy, the READINESS metric-cell label is broken (renders letter-per-line 'RE / AD / IN / ES / S'), and several safety/tone items and coach-consistency leaks need attention before shipping to the 55–70 audience. NO CODE was modified.",
+
+  "backend_issues": {"critical": [], "minor": []},
+
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "MetricSummaryStrip / ReadinessCell (Today)", "issue": "The 'READINESS' column label renders one letter per line ('RE / AD / IN / ES / S') — column is too narrow and text is not truncated/wrapped correctly. Visible on /app/test_reports/screens/03_home_after_login.png bottom-right.", "testID": "readiness-cell", "priority": "HIGH"},
+      {"component": "SideNavigation labels", "issue": "'Benchmark Workouts' rail item is truncated to 'Benchmark W...' at 1180px landscape. Full label is a core nav requirement and truncation hurts the low-confidence persona.", "testID": "railnav-benchmark", "priority": "HIGH"},
+      {"component": "SideNavigation first item label", "issue": "Locked spec requires the first item to read 'Home'; the app renders 'Today' (src/data.ts:11). Report only — do not change silently, confirm with product.", "testID": "railnav-home", "priority": "MEDIUM"},
+      {"component": "Today screen banner stack", "issue": "For a returning user THREE stacked banners render above the hero (plan-updated-nudge, plan-review-banner FTP 287→305W, benchmark-reminder-banner). High cognitive load for the 67yo persona and pushes hero + Today's Workout below the fold at 820h landscape.", "testID": "plan-updated-nudge, plan-review-banner, benchmark-reminder-banner", "priority": "HIGH"},
+      {"component": "Progress timeline range labels", "issue": "Two adjacent range pickers use inconsistent labels — training-timeline uses 'Week / Month / 3 Months / 6 Months / 1 Year' while benchmark-trends uses '4w / 3m / 6m / 12m / All'. Confusing for the low-confidence persona.", "testID": "tl-range-week, bmt-range-4w", "priority": "MEDIUM"},
+      {"component": "Wellness — Sleep this week", "issue": "The sleep bar chart has no day-of-week x-axis labels and no y-axis scale; a bar being purple vs yellow is not explained anywhere on screen.", "testID": "sleep-week", "priority": "MEDIUM"},
+      {"component": "Virtual Routes rider identity", "issue": "'YOUR RIDER' shows 'Younger Male · Road Bike · Get Fit Rider' — 'Younger Male' as a persistent identity chip reads oddly for the 55+/67yo target and may feel off-brand for an age-inclusive app.", "testID": "hero-route", "priority": "MEDIUM"},
+      {"component": "Wellness page — medical framing", "issue": "The wellness hero says 'Well recovered. Your body is ready for a strong week.' but there is no visible disclaimer that this is guidance, not medical advice. Recovery vitals (HRV, Resting HR, Stress: Low/Well managed) are presented as clinical readings without a 'not a diagnosis' cue.", "testID": "wellness-hero, vitals", "priority": "MEDIUM"},
+      {"component": "Home hero — TODAY'S TRAINING duplication", "issue": "The right overlay card ('Beginner Cycling Strength · ~15 min · Strength · Strength session scheduled for Today.') repeats the same title/details as the Alberto/Adriana coach card below the RoujAune wordmark; two CTAs ('View Today's Workout' and 'Open Today's Training') do the same thing. Confusing for low-confidence users.", "testID": "start-ride-button, open-today-training", "priority": "MEDIUM"}
+    ],
+
+    "integration_issues": [
+      {"flow": "Coach persona propagation — Benchmark plan-review", "issue": "After switching coach to Adriana in Settings, /benchmark still shows 'Review with Alberto' on the proposed FTP change and 'Discover where your cycling fitness is today, track how it changes over time, and help Alberto or Adriana personalise every part of your training.' is fine, but 'Review with Alberto' is a hard-coded leak.", "affected_testIDs": ["plan-review-coach", "plan-review"]},
+      {"flow": "Coach persona propagation — Daily Check-in", "issue": "After switching to Adriana, /checkin subtitle still reads 'A quick honest check so Alberto can tune today's ride.' Coach voice not applied to the readiness flow that then feeds a persona-driven recommendation.", "affected_testIDs": ["checkin-back"]},
+      {"flow": "Plan review CTA hierarchy", "issue": "On /plan the gate offers 'Start Aerobic Efficiency Ride' (large red primary) with 'Schedule' and 'Review with Alberto/Adriana' as equal boxes, and 'Choose another test or a submaximal option' as a small link. A tired/time-limited persona cannot easily see the shorter/lighter option — safe alternative is de-emphasised.", "affected_testIDs": ["plan-gate-start", "plan-gate-other"]}
+    ],
+
+    "design_issues": [
+      {"screen": "Today", "issues": ["READINESS label vertical letter-per-line rendering", "3-banner stack above hero raises cognitive load", "GL avatar chip and flame/bell pills are ~28-32px — below the 44x44 touch-target minimum", "Duplicate 'View/Open Today\u2019s Workout' CTAs"]},
+      {"screen": "Side navigation rail", "issues": ["Rail width truncates 'Benchmark Workouts' -> 'Benchmark W...'", "Small red dot on 'Training Plan' has no explanatory label/tooltip", "Active-state red is high-contrast (good), but focus/keyboard-focus ring not visible on tab"]},
+      {"screen": "Benchmark", "issues": ["'Review with Alberto' CTA is stale after coach swap", "'Proposed training change' explains WHAT (Z1..Z5 preview) but not WHY the FTP moved 287->305W — no plain-language rationale for the 67yo/low-confidence persona"]},
+      {"screen": "Training Plan / gate", "issues": ["Tertiary 'Choose another test or a submaximal option' link is small and low-contrast red on dark card"]},
+      {"screen": "Wellness", "issues": ["Sleep chart missing axis labels", "No 'not medical advice' framing", "'Stress: Low / Well managed' color-only indicator (small colored dot) is a contrast/colour-alone concern for accessibility"]},
+      {"screen": "Progress", "issues": ["Two neighbouring range pickers use different label vocabularies (Week/Month vs 4w/3m)"]},
+      {"screen": "Login", "issues": ["No visible testID on email/password/submit — reduces test coverage", "'Continue with Google' offered on web preview where it typically won\u2019t complete — no note explaining that"]}
+    ],
+
+    "react_native_issues": [
+      {"component": "root Views", "issue": "Console warning 'props.pointerEvents is deprecated. Use style.pointerEvents' emitted on load — a deprecated RN Web prop is used somewhere in the tree (likely in a Modal/Toast). Reference: /app/frontend/app/index.tsx Toast pointerEvents prop line ~45."}
+    ]
+  },
+
+  "test_report_links": [
+    "/app/test_reports/iteration_50.json",
+    "/app/test_reports/screens/03_home_after_login.png",
+    "/app/test_reports/screens/nav_wellness.png",
+    "/app/test_reports/screens/nav_community.png",
+    "/app/test_reports/screens/nav_connections.png",
+    "/app/test_reports/screens/nav_virtual-route.png",
+    "/app/test_reports/screens/nav_help.png",
+    "/app/test_reports/screens/pg_workouts.png",
+    "/app/test_reports/screens/pg_progress.png",
+    "/app/test_reports/screens/pg_plan.png",
+    "/app/test_reports/screens/pg_benchmark.png",
+    "/app/test_reports/screens/pg_settings.png",
+    "/app/test_reports/screens/coach_adriana_selected.png",
+    "/app/test_reports/screens/home_after_adriana.png",
+    "/app/test_reports/screens/plan_after_adriana.png",
+    "/app/test_reports/screens/checkin.png",
+    "/app/test_reports/screens/onboarding.png"
+  ],
+
+  "action_items": [
+    "Fix READINESS metric-cell in MetricSummaryStrip — allow wider column or wrap the label properly (currently rendering vertically letter-per-line at 1180x820).",
+    "Widen or elide sidebar rail so 'Benchmark Workouts' is fully visible, or shorten to 'Benchmarks' (locked spec permitting) — 'Benchmark W...' is unacceptable for accessibility.",
+    "Decide whether first nav item should read 'Home' (locked spec) or 'Today' (current code) — align data.ts:11 with the requirement.",
+    "Replace hard-coded 'Review with Alberto' on /benchmark plan-review banner with a persona-aware label ({coachName}).",
+    "Replace 'A quick honest check so Alberto can tune today's ride.' on /checkin with persona-aware subtitle.",
+    "Reduce Today-screen banner stack: consolidate plan-updated-nudge + plan-review-banner + benchmark-reminder-banner into a single 'What\u2019s new' surface or gate them to one at a time.",
+    "Add plain-language WHY on Benchmark proposed FTP change (e.g., 'Your recent rides show your steady-state power is now 305W, up ~6% from 287W — we\u2019ll adjust your zones so intervals feel right').",
+    "Elevate the 'Choose another test or a submaximal option' link on /plan gate so a tired persona can find the lighter option without hunting.",
+    "Add 'This is wellness guidance, not medical advice' on /wellness and on Stress/HRV cards.",
+    "Normalise Progress range labels ('Week/Month/3M/6M/1Y' vs '4w/3m/6m/12m/All') to a single vocabulary.",
+    "Add day-of-week x-axis labels + y-axis scale (hours) to the Sleep This Week chart on /wellness.",
+    "Add testIDs on /login (email, password, submit) to unblock login tests.",
+    "Increase Today header pills (flame-pill, bell-pill, profile-pill) to at least 44x44 for touch.",
+    "Rename 'Younger Male' rider identity chip on /virtual-route to something age-inclusive (e.g., 'Rider Avatar 1' or the actual saved rider name).",
+    "Silence or migrate the deprecated `props.pointerEvents` usage (RN Web warning) — likely in the Toast in app/index.tsx.",
+    "Ensure keyboard focus ring is visible for railnav-* items and buttons for keyboard-only users.",
+    "Consider hiding /onboarding for already-onboarded users, or gate it behind a confirmation, so a returning user cannot accidentally re-answer setup questions from a bookmarked URL."
+  ],
+
+  "critical_code_review_comments": [
+    "src/data.ts:11 uses label 'Today' for the home rail item while the locked-spec requires 'Home' — one-line mismatch to reconcile.",
+    "src/data.ts:29 hard-codes brand descriptor 'Personalised cycling training with Alberto.'; the runtime hero already substitutes the current coach name — good — but any surface reading `brand.descriptor` directly will show 'Alberto' for Adriana users. Search for `brand.descriptor` references.",
+    "BenchmarkReminderBanner + PlanUpdatedNudge + plan-review-banner render unconditionally on /index.tsx above the hero, all three at once for the demo state. Consider a priority/rotation strategy.",
+    "app/checkin.tsx subtitle appears to be a static string; refactor to `useCoach()` name interpolation.",
+    "Rail item label truncation likely due to fixed width in SideNavigation.tsx — consider min-width or two-line label for the 'Benchmark Workouts' item only.",
+    "app/index.tsx Toast component: `pointerEvents: 'none'` should be in style, not on props — triggers RN Web deprecation warning on every load."
+  ],
+
+  "updated_files": [],
+
+  "success_rate": {"backend": "n/a", "frontend": "9/9 journeys exercised — 0 blocked, 3 partial (persona leaks on Benchmark & Check-in; sleep chart interpretability; tertiary CTA hierarchy on Plan gate)"},
+
+  "seed_data_creation": "None (READ-ONLY audit).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login via https://roujaune-train.preview.emergentagent.com/login (greenlantern@roujaune.app / rideon9900). Coach state persists per-account — always reset coach back to Alberto after any Adriana test. Journeys walked: 1 Onboarding (reachable at /onboarding read-only); 2 Today (banners + hero); 3 /checkin readiness (subtitle bug); 4 /workouts + /calendar; 5 /benchmark (plan-review leak); 6 /plan (gate + calendar); 7 /progress; 8 /wellness (medical framing); 9 /help + /settings. Screens saved in /app/test_reports/screens/. Nav testIDs are railnav-<key>, NOT nav-<key>. Home first-item label is 'Today' not 'Home'.",
+
+  "executive_summary": {
+    "overall_ux_rating": "7/10",
+    "journeys": {
+      "J1_onboarding": {"result": "Partial", "notes": "Reachable at /onboarding for already-onboarded users (no redirect). Questions are short, plain-language and age-appropriate. 'See my recommendation' button is prominent. Did not verify WHY-copy for the recommended plan (out of read-only scope for the fresh path)."},
+      "J2_todays_workout": {"result": "Partial", "notes": "Duration (~15 min), type (Strength) and coach are visible. 'View Today's Workout' primary CTA is obvious. FTP, TSS, zones not explained inline; jargon appears elsewhere without tooltips."},
+      "J3_adjust_workout": {"result": "Partial", "notes": "/checkin captures sleep, energy, motivation, leg soreness, stress + red-flag safety symptoms (chest pain, dizziness, SOB, illness, new pain) — solid safety net. However subtitle still references Alberto after coach swap; and there is no visible '45 minutes only' shortcut."},
+      "J4_missed_workout": {"result": "Not observed", "notes": "No missed-session simulation possible read-only; calendar shows day dots — could not evaluate catch-up messaging."},
+      "J5_benchmark": {"result": "Partial", "notes": "Ramp Test recommendation with WHY copy; Zone preview clear; Proposed FTP change shown numerically but no plain-language reason; 'Review with Alberto' CTA leaks when Adriana is selected."},
+      "J6_training_plan": {"result": "Completed", "notes": "Beginner Plan gate at top with persona-aware coach copy; 16-week 'From Couch to Road' hero, goals, calendar, this-week plan all render. 'Advanced' is not shown as universal — good."},
+      "J7_progress": {"result": "Partial", "notes": "Training Timeline + Benchmark Trends + Fitness Trend + Power Records + Recent Activities render. Range pickers use two vocabularies. 4-week improvement not surfaced as a single headline number."},
+      "J8_wellness": {"result": "Partial", "notes": "Well-recovered narrative + FB50 Strength + Recovery Vitals + Sleep chart + peaceful companion. No explicit 'not medical advice' framing; sleep chart axes missing."},
+      "J9_help_error": {"result": "Completed", "notes": "Help hub with 5 FAQs and Message-<coach> CTA; back button works on every page; no dead ends observed."}
+    },
+    "positive_aspects_to_preserve": [
+      "Coach system is high-quality: persona swap propagates to hero descriptor, plan 'Adapted by …', coach card face + name, and plan-gate LLM copy.",
+      "Plan gate (SUBMAXIMAL ASSESSMENT RECOMMENDED) uses warm, plain language — great for 67yo persona.",
+      "Daily Check-in explicitly asks about chest pain / dizziness / SOB / illness / new pain — excellent safety gating.",
+      "Landscape layout uses the full width well; heroes and cards are visually clear.",
+      "Connections page honestly labels Apple Health as 'Needs app build' rather than hiding it.",
+      "Benchmark screen exposes zone preview before + after FTP change — good transparency."
+    ],
+    "prioritised_backlog": [
+      "P0 — Persona leak fixes: Benchmark 'Review with Alberto' + Check-in subtitle.",
+      "P0 — READINESS metric-cell vertical-letters layout bug on Today.",
+      "P1 — Sidebar 'Benchmark W...' truncation.",
+      "P1 — Today banner-stack consolidation (3 -> 1).",
+      "P1 — Plan-gate CTA hierarchy: elevate the lighter option.",
+      "P1 — Wellness 'not medical advice' framing.",
+      "P2 — Progress range label consistency + Sleep chart axes.",
+      "P2 — 'Younger Male' rider identity rename.",
+      "P2 — Enlarge Today header pills to 44x44.",
+      "P3 — Nav label 'Today' vs 'Home' spec alignment.",
+      "P3 — Deprecated pointerEvents warning cleanup."
+    ]
+  },
+
+  "rca_of_issue": "Persona leaks (Benchmark + Check-in) stem from hard-coded 'Alberto' strings in the JSX (rather than reading useCoach().name). Banner stack on Today stems from PlanUpdatedNudge + BenchmarkReminderBanner + plan-review-banner all rendering unconditionally in app/index.tsx above the hero without a priority queue. READINESS letter-per-line rendering is a layout width bug in MetricSummaryStrip where the last cell has insufficient width and each character wraps."
+}
