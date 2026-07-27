@@ -4276,6 +4276,9 @@ async def _seed_plans_on_startup():
         logging.exception("plan seeding failed")
     try:
         await auth.ensure_indexes()
+        seeded = await auth.seed_admins()
+        if seeded:
+            logger.info(f"Seeded {seeded} admin user(s) from ADMIN_EMAILS")
         migrated = await auth.migrate_singleton("greenlantern@roujaune.app", "rideon9900")
         if migrated:
             logger.info(f"Migrated single-user data to demo account {migrated}")

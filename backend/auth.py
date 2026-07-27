@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import contextvars
 import datetime
+import os
 import secrets
 import uuid
 
@@ -32,9 +33,22 @@ _current_user: contextvars.ContextVar = contextvars.ContextVar("current_user", d
 
 APPLE_KEYS_URL = "https://appleid.apple.com/auth/keys"
 APPLE_ISSUER = "https://appleid.apple.com"
-APPLE_AUDIENCE = "com.emergent.coachalbertodash.wsjvnf"  # iOS bundle id (app.json)
+APPLE_AUDIENCE = "com.hgw.roujaune"  # iOS bundle id (app.json)
 EMERGENT_SESSION_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data"
 SESSION_TTL_DAYS = 7
+
+# Emails that should always be granted the admin role (comma-separated in env).
+# Resolved lazily at call time because .env is loaded after this module imports.
+def _admin_emails() -> set:
+    return {e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()}
+
+
+def _role_for(email: str | None, existing: str | None = None) -> str:
+    """Resolve a user's role: allow-listed emails become admin; otherwise keep
+    their existing role (never demote) or default to rider."""
+    if email and email.lower() in _admin_emails():
+        return "admin"
+    return existing or "rider"
 
 # Collections that hold per-user data (auto-scoped by `udb`).
 USER_SCOPED = {
@@ -70,6 +84,19 @@ def require_user() -> dict:
     u = _current_user.get()
     if not u:
         raise HTTPException(status_code=401, detail="Not authenticated")
+    return u
+
+
+def is_admin() -> bool:
+    u = _current_user.get()
+    return bool(u and u.get("role") == "admin")
+
+
+def require_admin() -> dict:
+    """Gate for /api/admin/* routes — requires an authenticated admin user."""
+    u = require_user()
+    if u.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
     return u
 
 
@@ -170,6 +197,7 @@ async def _resolve_token(token: str):
 def _public_user(u: dict) -> dict:
     out = {k: u.get(k) for k in ("user_id", "email", "name", "picture", "provider", "assigned_plan_id")}
     out["onboarded"] = bool(u.get("onboarded"))
+    out["role"] = u.get("role") or "rider"
     # Email verification only applies to password accounts; OAuth users are trusted.
     out["email_verified"] = bool(u.get("email_verified")) or u.get("provider") in ("google", "apple")
     return out
@@ -200,10 +228,15 @@ async def _send_verification(user: dict, request: Request) -> bool:
 async def _upsert_oauth_user(email: str, name: str, picture: str, provider: str) -> dict:
     existing = await _db.users.find_one({"email": email.lower()}, {"_id": 0})
     if existing:
+        # Enforce admin allow-list on every login (promote only; never demote).
+        role = _role_for(email, existing.get("role"))
+        if role != existing.get("role"):
+            await _db.users.update_one({"user_id": existing["user_id"]}, {"$set": {"role": role}})
+            existing["role"] = role
         return existing
     uid = f"user_{uuid.uuid4().hex[:12]}"
     doc = {"user_id": uid, "email": email.lower(), "name": name or email.split("@")[0],
-           "picture": picture, "provider": provider, "created_at": _now()}
+           "picture": picture, "provider": provider, "role": _role_for(email), "created_at": _now()}
     await _db.users.insert_one(doc)
     return doc
 
@@ -215,6 +248,17 @@ async def ensure_indexes():
     await _db.user_sessions.create_index("session_token", unique=True)
     await _db.user_sessions.create_index("user_id")
     await _db.user_sessions.create_index("expires_at", expireAfterSeconds=0)
+
+
+async def seed_admins() -> int:
+    """Idempotent: promote every allow-listed email to admin on startup."""
+    emails = list(_admin_emails())
+    if not emails:
+        return 0
+    res = await _db.users.update_many(
+        {"email": {"$in": emails}}, {"$set": {"role": "admin"}}
+    )
+    return res.modified_count
 
 
 async def migrate_singleton(demo_email: str, demo_password: str, demo_name: str = "Green Lantern") -> dict | None:
@@ -317,6 +361,7 @@ async def register(req: RegisterReq, request: Request):
     uid = f"user_{uuid.uuid4().hex[:12]}"
     doc = {"user_id": uid, "email": email, "name": req.name or email.split("@")[0],
            "password_hash": hash_pw(req.password), "provider": "password",
+           "role": _role_for(email),
            "onboarded": False, "email_verified": False, "created_at": _now()}
     await _db.users.insert_one(doc)
     try:
