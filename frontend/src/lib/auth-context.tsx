@@ -4,6 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
 import { getToken, setToken, loadToken, installFetchAuth } from "./session";
+import { refreshCoachFromServer, resetCoach } from "./coach-persona";
 
 const API = (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
 const AUTH_BASE = "https://auth.emergentagent.com";
@@ -119,6 +120,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => sub.remove();
   }, [exchangeGoogle]);
 
+  // Once authenticated, re-sync the rider's chosen coach from the server. This
+  // fixes the case where coach init ran while logged out (401) and stuck on the
+  // default Alberto — now every device reflects the actual selection.
+  useEffect(() => {
+    if (user) refreshCoachFromServer();
+  }, [user]);
+
   const signIn = useCallback(async (email: string, password: string) => {
     const d = await post("/api/auth/login", { email, password });
     await setToken(d.token);
@@ -168,12 +176,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const keys = await AsyncStorage.getAllKeys();
       const stale = keys.filter(
-        (k) => k.startsWith("roujaune:plan") || k === "roujaune:riderProfile" || k === "roujaune:riderAvatar",
+        (k) => k.startsWith("roujaune:plan") || k === "roujaune:riderProfile" || k === "roujaune:riderAvatar" || k === "roujaune:coachId",
       );
       if (stale.length) await AsyncStorage.multiRemove(stale);
     } catch {
       /* ignore cache clear errors */
     }
+    resetCoach();
     await setToken(null);
     setUser(null);
   }, []);

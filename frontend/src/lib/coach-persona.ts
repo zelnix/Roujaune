@@ -62,6 +62,14 @@ export function initCoach() {
     localReady = true;
     emit();
   }).catch(() => { localReady = true; emit(); });
+  refreshCoachFromServer();
+}
+
+/** Re-read the rider's saved coach (and coaching prefs) from the server. Safe to
+ * call repeatedly — call it AFTER auth so the choice syncs on this device even if
+ * initCoach first ran while logged out (which would otherwise 401 and stick to
+ * the default Alberto). */
+export function refreshCoachFromServer() {
   fetch(`${PREFS_API}/api/rider/prefs`)
     .then((r) => (r.ok ? r.json() : null))
     .then((d) => {
@@ -77,6 +85,15 @@ export function initCoach() {
   // from the server so all coaching preferences follow the rider across devices.
   hydrateRiderPrefs();
   hydrateKvPrefs();
+}
+
+/** Reset the coach to the default on sign-out so the next rider on this device
+ * doesn't inherit the previous rider's coach. */
+export function resetCoach() {
+  current = DEFAULT_COACH;
+  localReady = false;
+  loaded = false;
+  emit();
 }
 
 export function getCoach(): CoachId {

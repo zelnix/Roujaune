@@ -21,10 +21,10 @@ export const DEFAULT_APPEARANCE: RiderAppearanceConfiguration = {
 };
 
 export const RIDER_TYPES: { id: RiderType; label: string }[] = [
-  { id: "younger_male", label: "Younger Male" },
-  { id: "younger_female", label: "Younger Female" },
-  { id: "mature_male", label: "Mature Male" },
-  { id: "mature_female", label: "Mature Female" },
+  { id: "younger_male", label: "Male Rider" },
+  { id: "younger_female", label: "Female Rider" },
+  { id: "mature_male", label: "Male Rider — Silver" },
+  { id: "mature_female", label: "Female Rider — Silver" },
 ];
 
 export const BIKE_TYPES: { id: BikeType; label: string; sub: string }[] = [
