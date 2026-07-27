@@ -1,10 +1,11 @@
-from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Query, Body
+from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Query, Body, Depends
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import json
 import re
+import copy
 import asyncio
 import random
 import logging
@@ -20,6 +21,7 @@ import plans_admin
 import companion_plan
 import auth
 import push
+import admin_routes
 from auth import udb
 
 
@@ -1973,6 +1975,18 @@ async def assign_rider_plan(req: AssignPlanRequest):
             {"$set": {"current_week": 1}, "$unset": {"eased_weeks": ""}},
             upsert=True,
         )
+    # Give the rider their OWN copy of the plan definition so subsequent edits to
+    # the shared plan-list template never alter a rider already on this plan.
+    if req.plan_id and req.plan_id != "none":
+        existing = await udb.training_plans.find_one({"id": req.plan_id})
+        if req.reset_progress or not (existing and existing.get("definition")):
+            snap = await _snapshot_plan_def(req.plan_id)
+            if snap is not None:
+                await udb.training_plans.update_one(
+                    {"id": req.plan_id},
+                    {"$set": {"id": req.plan_id, "definition": snap, "snapshot_at": datetime.now(timezone.utc).isoformat()}},
+                    upsert=True,
+                )
     return {"active_plan_id": req.plan_id, "title": title}
 
 
@@ -2956,6 +2970,61 @@ def _struct_ctx(plan_id: str):
     return CTR_PLAN, CTR_WEEKS, _CTR_PLANNED_TSS, "ctr-ride-"
 
 
+STRUCTURED_PLAN_IDS = {"couch-to-road", "ride-stronger", "ride-beyond"}
+_RIDE_PREFIX = {"couch-to-road": "ctr-ride-", "ride-stronger": "rs-ride-", "ride-beyond": "rb-ride-"}
+
+
+async def _snapshot_plan_def(plan_id: str):
+    """Deep-copy the current plan-list template into a standalone definition dict."""
+    template = await plans_admin.get_plan_def(plan_id)
+    if not template and plan_id == "build-and-climb":
+        template = dict(BUILD_AND_CLIMB)
+    if not template:
+        return None
+    snap = copy.deepcopy(template)
+    snap.pop("_id", None)
+    return snap
+
+
+async def _rider_plan_def(plan_id: str):
+    """The rider's OWN copy of the assigned plan definition. Snapshotted on first
+    access, so later edits to the shared plan-list template never retroactively
+    change a rider who is already on the plan."""
+    doc = await udb.training_plans.find_one({"id": plan_id})
+    if doc and isinstance(doc.get("definition"), dict) and doc["definition"]:
+        d = dict(doc["definition"])
+        d.pop("_id", None)
+        return d
+    snap = await _snapshot_plan_def(plan_id)
+    if snap is None:
+        return None
+    await udb.training_plans.update_one(
+        {"id": plan_id},
+        {"$set": {"id": plan_id, "definition": snap, "snapshot_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True,
+    )
+    return snap
+
+
+def _weeks_and_tss(def_doc: dict):
+    weeks_map = {w["number"]: w for w in def_doc.get("weeks", [])}
+    planned = {d["workout_id"]: d.get("tss", 0)
+               for w in def_doc.get("weeks", []) for d in w.get("days", [])
+               if d.get("kind") == "cycling" and d.get("workout_id")}
+    return weeks_map, planned
+
+
+async def _struct_ctx_for_rider(plan_id: str):
+    """Rider-scoped equivalent of _struct_ctx that reads the rider's snapshot
+    definition. Falls back to the global default if no snapshot can be built."""
+    d = await _rider_plan_def(plan_id)
+    prefix = _RIDE_PREFIX.get(plan_id, "ctr-ride-")
+    if not d or not d.get("weeks"):
+        return _struct_ctx(plan_id)
+    weeks_map, planned = _weeks_and_tss(d)
+    return d, weeks_map, planned, prefix
+
+
 async def _on_plan_change(plan_id: str):
     """Callback fired by plans_admin after any plan edit."""
     if plan_id == "couch-to-road":
@@ -3344,25 +3413,15 @@ async def get_plan(id: str = "build-and-climb"):
             return {"id": "none", "title": "Free Riding", "label": "FREE RIDING", "free": True,
                     "description": "You're riding without a structured plan. Jump into any ride whenever you like.",
                     "workouts": [], "goals": [], "progress_pct": 0}
-        if active == "couch-to-road" or id == "couch-to-road":
-            cur, ride_map, supp = await _ctr_state()
-            prog = await _ctr_progress(ride_map)
-            done = _plan_done(CTR_WEEKS, cur, int(CTR_PLAN.get("duration_weeks") or 16), ride_map, supp)
-            return await _with_adaptation_meta(_ctr_plan_response(cur, ride_map, prog, plan_complete=done, supp_dates=supp), "couch-to-road")
-        if active == "ride-stronger" or id == "ride-stronger":
-            pdoc, weeks_map, planned, prefix = _struct_ctx("ride-stronger")
-            cur, ride_map, supp = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id="ride-stronger", ride_prefix=prefix)
+        if active in STRUCTURED_PLAN_IDS or id in STRUCTURED_PLAN_IDS:
+            spid = active if active in STRUCTURED_PLAN_IDS else id
+            pdoc, weeks_map, planned, prefix = await _struct_ctx_for_rider(spid)
+            cur, ride_map, supp = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id=spid, ride_prefix=prefix)
             prog = await _ctr_progress(ride_map, ride_prefix=prefix, planned_tss=planned)
-            done = _plan_done(weeks_map, cur, int(pdoc.get("duration_weeks") or 12), ride_map, supp)
-            return await _with_adaptation_meta(_ctr_plan_response(cur, ride_map, prog, weeks=weeks_map, plan_doc=pdoc, plan_id="ride-stronger", plan_complete=done, supp_dates=supp), "ride-stronger")
-        if active == "ride-beyond" or id == "ride-beyond":
-            pdoc, weeks_map, planned, prefix = _struct_ctx("ride-beyond")
-            cur, ride_map, supp = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id="ride-beyond", ride_prefix=prefix)
-            prog = await _ctr_progress(ride_map, ride_prefix=prefix, planned_tss=planned)
-            done = _plan_done(weeks_map, cur, int(pdoc.get("duration_weeks") or 12), ride_map, supp)
-            return await _with_adaptation_meta(_ctr_plan_response(cur, ride_map, prog, weeks=weeks_map, plan_doc=pdoc, plan_id="ride-beyond", plan_complete=done, supp_dates=supp), "ride-beyond")
+            done = _plan_done(weeks_map, cur, int(pdoc.get("duration_weeks") or 16), ride_map, supp)
+            return await _with_adaptation_meta(_ctr_plan_response(cur, ride_map, prog, weeks=weeks_map, plan_doc=pdoc, plan_id=spid, plan_complete=done, supp_dates=supp), spid)
         doc = await udb.training_plans.find_one({"id": id})
-        base = await plans_admin.get_plan_def(id)
+        base = await _rider_plan_def(id)
         if not base:
             base = dict(BUILD_AND_CLIMB)
         base.pop("_id", None)
@@ -4215,11 +4274,13 @@ async def get_community():
     return COMMUNITY_DATA
 
 
-api_router.include_router(plans_admin.plans_router)
+api_router.include_router(plans_admin.plans_router, dependencies=[Depends(auth.require_admin)])
 api_router.include_router(auth.auth_router)
 app.include_router(api_router)
 app.include_router(push.router)
+app.include_router(admin_routes.admin_router)
 push.init(db)
+admin_routes.init(db)
 
 app.add_middleware(auth.AuthMiddleware)
 app.add_middleware(
