@@ -3098,18 +3098,38 @@ async def _on_plan_change(plan_id: str):
 
 
 async def _active_plan_id() -> str:
-    """The plan the current rider is on. An explicit `assigned_plan_id` on the rider
-    wins; otherwise Green Lantern → couch-to-road, everyone else → build-and-climb."""
+    """The plan the current rider is on. An explicit `assigned_plan_id` (on the
+    rider profile, or failing that the user account) wins. Otherwise we infer the
+    plan from the rider's real training state, then fall back to the beginner
+    plan — we NEVER default a logged-in rider onto the 'Build & Climb' demo."""
     try:
         rider = await _rider_doc()
         pid = (rider.get("assigned_plan_id") or "").strip()
         if pid:
             return pid
+        # Fallback: an explicit assignment stored on the user account.
+        try:
+            u = await auth._db.users.find_one({"user_id": auth.current_user_id()}) or {}
+            upid = (u.get("assigned_plan_id") or "").strip()
+            if upid:
+                return upid
+        except Exception:
+            pass
+        # Infer from the rider's actual training progress (structured plans only).
+        try:
+            st = await udb.plan_state.find_one(
+                {"id": {"$in": list(STRUCTURED_PLAN_IDS)}},
+                sort=[("updated_at", -1)],
+            )
+            if st and st.get("id"):
+                return st["id"]
+        except Exception:
+            pass
         if (rider.get("name") or "").strip().lower() == "green lantern":
             return "couch-to-road"
     except Exception:
         pass
-    return "build-and-climb"
+    return "couch-to-road"
 
 
 async def _apply_companion_ops(plan_id: str, ops: list, source: str, reason: str) -> list:

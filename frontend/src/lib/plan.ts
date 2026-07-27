@@ -7,7 +7,11 @@ function apiBase(): string {
   return (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
 }
 
-const planCacheKey = (id: string) => `roujaune:plan:${id}`;
+// Cache key is versioned + rider-active-scoped (NOT keyed by the requested id,
+// which is always the "build-and-climb" default). Bumping the version purges any
+// legacy `roujaune:plan:build-and-climb` cache that could otherwise keep showing
+// the wrong (demo) plan for a rider whose real plan is different.
+const planCacheKey = (_id?: string) => `roujaune:plan:active:v2`;
 
 // Neutral placeholder shown only until the rider's real (cached or live) plan
 // arrives. Avoids flashing the bundled "Build & Climb" demo plan name to riders
@@ -53,6 +57,14 @@ export function usePlan(id = "build-and-climb") {
   useEffect(() => {
     let alive = true;
     (async () => {
+      // One-time purge of legacy per-id caches that may hold a stale "Build &
+      // Climb" plan for a rider who has since moved to a different plan.
+      AsyncStorage.multiRemove([
+        "roujaune:plan:build-and-climb",
+        "roujaune:plan:couch-to-road",
+        "roujaune:plan:ride-stronger",
+        "roujaune:plan:ride-beyond",
+      ]).catch(() => {});
       // Instant paint from the last-fetched plan (prevents the bundled
       // "Build & Climb" demo plan flashing before the real plan loads).
       try {
