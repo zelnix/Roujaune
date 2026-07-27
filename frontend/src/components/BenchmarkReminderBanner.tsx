@@ -31,13 +31,15 @@ function whenLabel(iso: string): string {
 }
 
 /**
- * In-app benchmark reminders on the Today screen (works on every platform, no
- * native build required). Surfaces two actionable items when present:
- *   1. A pending plan-review FTP change (approve/adjust your training targets).
- *   2. The next upcoming scheduled benchmark test.
- * Both tap through to the Benchmark hub.
+ * In-app benchmark reminder for Home (works on every platform, no native build
+ * required). Surfaces a single actionable item when present:
+ *   - "review": a pending plan-review FTP change (approve/adjust your targets).
+ *   - "test":   the next upcoming scheduled benchmark test.
+ * The `only` prop lets the parent notification area pick exactly one notice so
+ * Home never shows two benchmark rows at once. When omitted, it prefers a
+ * time-sensitive test (today/tomorrow), otherwise the FTP review.
  */
-export function BenchmarkReminderBanner() {
+export function BenchmarkReminderBanner({ only }: { only?: "review" | "test" }) {
   const router = useRouter();
   const { week, loading } = useBenchmarkWeek();
   const { review, loading: reviewLoading } = useBenchmarkPlanReview();
@@ -50,12 +52,24 @@ export function BenchmarkReminderBanner() {
     return upcoming[0] ?? null;
   }, [week]);
 
-  const showReview = !reviewLoading && review.hasProposal && typeof review.next === "number";
+  const hasReview = !reviewLoading && review.hasProposal && typeof review.next === "number";
+  const hasTest = !!next;
   if (loading && reviewLoading) return null;
-  if (!showReview && !next) return null;
+  if (!hasReview && !hasTest) return null;
 
   const delta = next ? daysUntil(next.date) : 99;
   const soon = delta <= 1; // today / tomorrow → stronger accent
+
+  // Resolve which single notice to render.
+  let mode: "review" | "test";
+  if (only === "review" && hasReview) mode = "review";
+  else if (only === "test" && hasTest) mode = "test";
+  else if (hasTest && soon) mode = "test"; // time-sensitive default
+  else if (hasReview) mode = "review";
+  else mode = "test";
+
+  const showReview = mode === "review" && hasReview;
+  const showTest = mode === "test" && hasTest;
 
   return (
     <View style={{ gap: spacing.sm }}>
@@ -84,7 +98,7 @@ export function BenchmarkReminderBanner() {
         </Pressable>
       )}
 
-      {next && (
+      {showTest && next && (
         <Pressable
           testID="benchmark-reminder-banner"
           onPress={() => router.push("/benchmark")}

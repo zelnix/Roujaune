@@ -33,15 +33,24 @@ export function HomeNotificationArea() {
   const { review } = useBenchmarkPlanReview();
 
   const verifyActive = !!user && user.provider === "password" && !user.email_verified;
-  const benchmarkActive =
-    (week.active && (week.days || []).some((d) => d.kind === "test" && d.status === "scheduled" && daysUntil(d.date) >= 0)) ||
-    (review.hasProposal && typeof review.next === "number");
+  const upcomingTests = (week.active ? (week.days || []) : [])
+    .filter((d) => d.kind === "test" && d.status === "scheduled" && daysUntil(d.date) >= 0)
+    .sort((a, b) => daysUntil(a.date) - daysUntil(b.date));
+  const hasTest = upcomingTests.length > 0;
+  const hasReview = review.hasProposal && typeof review.next === "number";
+  const benchmarkActive = hasTest || hasReview;
   const missedActive = missed.count > 0;
+
+  // Pick exactly one benchmark notice: a today/tomorrow test wins (time-sensitive),
+  // otherwise the FTP review, otherwise the next scheduled test.
+  const testSoon = hasTest && daysUntil(upcomingTests[0].date) <= 1;
+  const benchmarkOnly: "review" | "test" =
+    testSoon ? "test" : hasReview ? "review" : "test";
 
   const items: { key: string; node: React.ReactNode }[] = [];
   if (verifyActive) items.push({ key: "verify", node: <VerifyEmailBanner /> });
   if (missedActive) items.push({ key: "missed", node: <MissedWorkoutBanner data={missed} /> });
-  if (benchmarkActive) items.push({ key: "benchmark", node: <BenchmarkReminderBanner /> });
+  if (benchmarkActive) items.push({ key: "benchmark", node: <BenchmarkReminderBanner only={benchmarkOnly} /> });
   if (planUpdated) items.push({ key: "plan", node: <PlanUpdatedNudge /> });
 
   if (items.length === 0) return null;

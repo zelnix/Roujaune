@@ -1,0 +1,34 @@
+{
+  "summary": "Frontend-only Phase 3 verification (Home & Training clarity) for ROUJAUNE. All key acceptance criteria pass on mobile viewport (390x844) as Green Lantern rider. (1) Home renders a single [data-testid=home-notifications] region containing exactly one notice — the benchmark-reminder-banner (Ramp Test) — proving the consolidated single-highest-priority pattern. (2) BENCHMARK DOUBLE-RENDER FIX verified: only 1 of {benchmark-reminder-banner, plan-review-banner} is present at any time on Home; total page count = 1 test row / 0 review rows for this account (no FTP proposal, no today/tomorrow test). (3) 'Short on time' entry point [data-testid=short-on-time] on Today's Training tapped → navigates to /workout-list?band=short. (4) Deduped 'Start Workout' CTA on Today's Training: exactly 1 'Start Workout' textual button on the page. (5) Regression: Home, /training, /workouts, /calendar, /benchmark, /progress all render without red-screen or blank. (6) /wellness redirects to Home. (7) No 'My Peaceful Companion' / 'Recovery & Wellness' / 'Peaceful Pause' wording on Home, Training, or any regression route. (8) Coach text on Training is dynamic (Alberto for this rider, no Adriana leakage). One caveat: 'notif-more' expander could not be tested because the Green Lantern demo currently has only ONE active notification (verify email = false since user is verified, missed=0, single benchmark, no plan-update badge) — code path is correct by inspection (items.length-1 → 0 → no +N more shown).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/rider/missed", "issue": "Endpoint requires auth (401 without Bearer). Frontend useMissedWorkouts() fetches without waiting for auth hydration on cold-load, producing transient 401 console noise on the /login screen; response is caught silently and count stays 0. Not user-facing but pollutes console."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_57.json", "/app/test_reports/screens/i57_home.jpeg", "/app/test_reports/screens/i57_training.jpeg", "/app/test_reports/screens/i57_workoutlist.jpeg", "/app/test_reports/screens/i57_afterlogin.jpeg"],
+  "action_items": [
+    "OPTIONAL: To exercise the notif-more/+N-more expander in future test runs, seed one of {unverified email, missed workouts > 0, plan-updated badge} for the Green Lantern demo account so multiple notices coexist and the expander can be verified live.",
+    "OPTIONAL (minor): Consider suppressing the pre-auth /api/rider/missed fetch (skip when no auth token) or noise-only 401 log to keep the login-screen console clean."
+  ],
+  "critical_code_review_comments": [
+    "HomeNotificationArea correctly hoists the benchmark 'only' decision to the parent (testSoon → 'test' | hasReview → 'review' | else 'test') and passes it via prop, guaranteeing BenchmarkReminderBanner shows at most one of {plan-review-banner, benchmark-reminder-banner}.",
+    "BenchmarkReminderBanner respects the `only` prop but also falls back safely when omitted (time-sensitive test wins, else review, else test), keeping the standalone usage safe.",
+    "Priority order in HomeNotificationArea matches spec: verify > missed > benchmark > plan-updated.",
+    "'Short on time' Pressable on training.tsx passes `band: 'short'` via router params — matches spec exactly.",
+    "/wellness route is a hard Redirect to '/' — feature is properly removed from user-facing surfaces."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only scope)", "frontend": "100% on tested criteria"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login: greenlantern@roujaune.app / rideon9900. Green Lantern currently has exactly ONE active Home notification (the Ramp Test benchmark reminder), which is why notif-more/+N-more could not be exercised — the code is correct (extra=0). To live-test the expander, temporarily flip user.email_verified=false OR create a missed scheduled_workout with date < today OR set the plan-updated flag so items.length > 1. All Phase 3 acceptance criteria (single benchmark notice, short-on-time nav, deduped Start Workout, regression clean, /wellness redirect, no forbidden wording, dynamic coach) verified.",
+  "rca_of_issue": "N/A — no bugs found. The previously flagged double benchmark render is resolved by the new `only` prop wiring; the previously flagged 'MY PEACEFUL COMPANION' / 'RECOVERY & WELLNESS' / summary wellness items are all gone from user-facing text (confirmed via body inner_text scans on Home, /training, /workouts, /calendar, /benchmark, /progress)."
+}
