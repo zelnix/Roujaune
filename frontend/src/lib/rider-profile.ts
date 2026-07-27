@@ -35,7 +35,7 @@ export function useRiderProfile() {
 
   useEffect(() => {
     (async () => {
-      // 1) Instant paint from the cached profile (prevents the "Rider One" flash).
+      // 1) Instant paint from the cached profile + avatar (prevents flashes).
       try {
         const cached = await AsyncStorage.getItem(PROFILE_KEY);
         if (cached) {
@@ -46,6 +46,12 @@ export function useRiderProfile() {
       } catch {
         /* ignore cache */
       }
+      try {
+        const a = await AsyncStorage.getItem(AVATAR_KEY);
+        if (a) setAvatarState(a);
+      } catch {
+        /* no avatar */
+      }
       // 2) Reconcile with the backend (source of truth) and refresh the cache.
       try {
         const res = await fetch(`${base()}/api/rider/profile`);
@@ -55,15 +61,13 @@ export function useRiderProfile() {
           _snap = p;
           setProfile(p);
           AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(p)).catch(() => {});
+          if (d.avatar) {
+            setAvatarState(d.avatar);
+            AsyncStorage.setItem(AVATAR_KEY, d.avatar).catch(() => {});
+          }
         }
       } catch {
         /* keep cache/defaults */
-      }
-      try {
-        const a = await AsyncStorage.getItem(AVATAR_KEY);
-        if (a) setAvatarState(a);
-      } catch {
-        /* no avatar */
       }
       setLoaded(true);
     })();
@@ -87,10 +91,15 @@ export function useRiderProfile() {
 
   const setAvatar = useCallback(async (uri: string) => {
     setAvatarState(uri);
+    AsyncStorage.setItem(AVATAR_KEY, uri).catch(() => {});
     try {
-      await AsyncStorage.setItem(AVATAR_KEY, uri);
+      await fetch(`${base()}/api/rider/profile`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ avatar: uri }),
+      });
     } catch {
-      /* ignore */
+      /* offline: kept locally in AsyncStorage */
     }
   }, []);
 

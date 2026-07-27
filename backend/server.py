@@ -1062,6 +1062,7 @@ class RiderProfileUpdate(BaseModel):
     region: Optional[str] = None
     country: Optional[str] = None
     capability: Optional[str] = None
+    avatar: Optional[str] = None
 
 
 async def _rider_doc() -> dict:
@@ -2058,6 +2059,16 @@ async def update_rider_profile(req: RiderProfileUpdate):
     upd = {k: v for k, v in req.dict().items() if v is not None}
     await udb.rider_profile.update_one({"id": "me"}, {"$set": {**upd, "id": "me"}}, upsert=True)
     return await _rider_doc()
+
+
+@api_router.delete("/rider/account")
+async def delete_rider_account():
+    """Rider-facing self-serve account deletion (GDPR cascade). Removes the
+    authenticated rider and every user-scoped document plus active sessions."""
+    actor = auth.require_user()
+    uid = actor.get("user_id")
+    result = await auth.erase_user_data(uid)
+    return {"ok": True, **result}
 
 
 def _http_get_json(url: str):

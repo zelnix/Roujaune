@@ -4,7 +4,7 @@ import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 
-import { AppScaffold, Card, SectionTitle } from "@/src/components/app-scaffold";
+import { AppScaffold, Card, SectionTitle, Toggle } from "@/src/components/app-scaffold";
 import { CC } from "@/src/components/calendar";
 import { ProgressPanel } from "@/src/components/ProgressPanel";
 import { useSettings } from "@/src/lib/settings";
@@ -43,13 +43,28 @@ export default function ProfileScreen() {
   const { settings, setSetting } = useSettings();
   const persona = useCoach();
   const { profile, avatar, loaded: profileLoaded, update, setAvatar } = useRiderProfile();
-  const { user, signOut } = useAuth();
+  const { user, signOut, deleteAccount } = useAuth();
   const router = useRouter();
   const achievements = useRiderAchievements() ?? ACHIEVEMENTS;
   const { width } = useWindowDimensions();
   const twoCol = width >= 900;
 
   const [editing, setEditing] = React.useState(false);
+  const [confirmDelete, setConfirmDelete] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
+
+  const doDeleteAccount = async () => {
+    setDeleting(true);
+    try {
+      await deleteAccount();
+      setConfirmDelete(false);
+      router.replace("/login");
+    } catch (e: any) {
+      Alert.alert("Couldn't delete account", e?.message || "Please try again in a moment.");
+    } finally {
+      setDeleting(false);
+    }
+  };
   const genderLabel = GENDERS.find((g) => g.id === profile.gender)?.label ?? "—";
   const capLabel = CAPS.find((c) => c.id === profile.capability)?.label ?? "Intermediate";
   const capColor = LEVEL_META[CAPABILITY_TO_LEVEL[profile.capability]].color;
@@ -98,14 +113,14 @@ export default function ProfileScreen() {
                 <Ionicons name="camera" size={14} color="#241B00" />
               </View>
             </Pressable>
-            <View style={{ flex: 1 }}>
+            <View style={s.identityInfo}>
               {profileLoaded ? (
-                <Text style={s.name}>{profile.name}</Text>
+                <Text style={s.name} numberOfLines={1} adjustsFontSizeToFit>{profile.name}</Text>
               ) : (
                 <View style={s.nameSkeleton} />
               )}
               <Text style={s.org}>Roujaune · Harmony Wellness Group</Text>
-              {user?.email ? <Text style={s.acctEmail}>{user.email} · {user.provider}</Text> : null}
+              {user?.email ? <Text style={s.acctEmail} numberOfLines={1}>{user.email} · {user.provider}</Text> : null}
               {locationText ? (
                 <View style={s.locRow}>
                   <Ionicons name="location" size={13} color={CC.yellow} />
@@ -123,18 +138,20 @@ export default function ProfileScreen() {
                 </View>
               </View>
             </View>
-            <Pressable testID="edit-profile" onPress={() => setEditing(true)} style={({ hovered }: any) => [s.editBtn, hovered && s.hover]}>
-              <Ionicons name="create-outline" size={15} color={CC.white} />
-              <Text style={s.editText}>Edit</Text>
-            </Pressable>
-            <Pressable testID="change-plan" onPress={() => router.push("/onboarding")} style={({ hovered }: any) => [s.editBtn, hovered && s.hover]}>
-              <Ionicons name="swap-horizontal" size={15} color={CC.white} />
-              <Text style={s.editText}>Change plan</Text>
-            </Pressable>
-            <Pressable testID="sign-out" onPress={signOut} style={({ hovered }: any) => [s.signOutBtn, hovered && s.hover]}>
-              <Ionicons name="log-out-outline" size={15} color={CC.red ?? "#E01E2B"} />
-              <Text style={s.signOutText}>Sign out</Text>
-            </Pressable>
+            <View style={s.actionRow}>
+              <Pressable testID="edit-profile" onPress={() => setEditing(true)} style={({ hovered }: any) => [s.editBtn, hovered && s.hover]}>
+                <Ionicons name="create-outline" size={15} color={CC.white} />
+                <Text style={s.editText}>Edit</Text>
+              </Pressable>
+              <Pressable testID="change-plan" onPress={() => router.push("/onboarding")} style={({ hovered }: any) => [s.editBtn, hovered && s.hover]}>
+                <Ionicons name="swap-horizontal" size={15} color={CC.white} />
+                <Text style={s.editText}>Change plan</Text>
+              </Pressable>
+              <Pressable testID="sign-out" onPress={signOut} style={({ hovered }: any) => [s.signOutBtn, hovered && s.hover]}>
+                <Ionicons name="log-out-outline" size={15} color={CC.red ?? "#E01E2B"} />
+                <Text style={s.signOutText}>Sign out</Text>
+              </Pressable>
+            </View>
           </View>
 
           <View style={s.statsRow}>
@@ -155,6 +172,38 @@ export default function ProfileScreen() {
           <ProgressPanel />
         </Card>
       </View>
+
+      {/* Power profile (FTP) — canonical editor lives here */}
+      <Card testID="power-profile">
+        <SectionTitle label="POWER PROFILE" color={CC.rouge} />
+        <View style={s.ftpRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.prefTitle}>Functional Threshold Power</Text>
+            <Text style={s.prefSub}>Sets your live ERG target power across every workout segment.</Text>
+          </View>
+          <View style={s.ftpStepper}>
+            <Pressable testID="ftp-minus" disabled={settings.ftpAuto} onPress={() => setSetting("ftp", Math.max(80, settings.ftp - 1))}
+              style={[s.ftpBtn, settings.ftpAuto && s.ftpBtnOff]}>
+              <Ionicons name="remove" size={18} color={settings.ftpAuto ? CC.dim : CC.white} />
+            </Pressable>
+            <View style={s.ftpValueWrap}>
+              <Text style={s.ftpValue}>{settings.ftp}</Text>
+              <Text style={s.ftpUnit}>W</Text>
+            </View>
+            <Pressable testID="ftp-plus" disabled={settings.ftpAuto} onPress={() => setSetting("ftp", Math.min(600, settings.ftp + 1))}
+              style={[s.ftpBtn, settings.ftpAuto && s.ftpBtnOff]}>
+              <Ionicons name="add" size={18} color={settings.ftpAuto ? CC.dim : CC.white} />
+            </Pressable>
+          </View>
+        </View>
+        <View style={[s.prefRow, { borderTopWidth: 1, borderTopColor: CC.borderSoft, marginTop: 6 }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.prefTitle}>Auto-update from training progress</Text>
+            <Text style={s.prefSub}>Keep FTP in sync with your measured fitness gains.</Text>
+          </View>
+          <Toggle testID="tg-ftpAuto" on={settings.ftpAuto} onToggle={() => setSetting("ftpAuto", !settings.ftpAuto)} />
+        </View>
+      </Card>
 
       {/* Achievements */}
       <Card testID="profile-achievements">
@@ -180,16 +229,51 @@ export default function ProfileScreen() {
         )}
       </Card>
 
-      <EditModal visible={editing} profile={profile} ftp={settings.ftp} onClose={() => setEditing(false)} onSave={(p, ftp) => { update(p); setSetting("ftp", ftp); setSetting("ftpAuto", false); setEditing(false); }} />
+      {/* Danger zone — self-serve account deletion */}
+      <Card testID="danger-zone">
+        <SectionTitle label="ACCOUNT" color={CC.rouge} />
+        <View style={s.dangerRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.prefTitle}>Delete my account</Text>
+            <Text style={s.prefSub}>Permanently remove your account, training plan, rides and all personal data. This can&apos;t be undone.</Text>
+          </View>
+          <Pressable testID="delete-account" onPress={() => setConfirmDelete(true)}
+            style={({ hovered }: any) => [s.deleteBtn, hovered && s.deleteHover]}>
+            <Ionicons name="trash-outline" size={15} color="#E01E2B" />
+            <Text style={s.deleteText}>Delete</Text>
+          </Pressable>
+        </View>
+      </Card>
+
+      <Modal visible={confirmDelete} transparent animationType="fade" onRequestClose={() => !deleting && setConfirmDelete(false)}>
+        <View style={s.modalBackdrop}>
+          <View style={s.modalCard} testID="delete-account-modal">
+            <View style={s.dangerIcon}>
+              <Ionicons name="warning" size={22} color="#E01E2B" />
+            </View>
+            <Text style={s.modalTitle}>Delete your account?</Text>
+            <Text style={s.modalSub}>This permanently erases your profile, training plan, ride history, benchmarks and connected data. There is no way to recover it.</Text>
+            <View style={s.modalActions}>
+              <Pressable testID="cancel-delete" disabled={deleting} onPress={() => setConfirmDelete(false)} style={[s.modalBtn, s.modalBtnGhost]}>
+                <Text style={s.modalBtnGhostText}>Cancel</Text>
+              </Pressable>
+              <Pressable testID="confirm-delete" disabled={deleting} onPress={doDeleteAccount} style={[s.modalBtn, s.modalBtnDanger, deleting && { opacity: 0.6 }]}>
+                <Text style={s.modalBtnDangerText}>{deleting ? "Deleting…" : "Delete forever"}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <EditModal visible={editing} profile={profile} onClose={() => setEditing(false)} onSave={(p) => { update(p); setEditing(false); }} />
     </AppScaffold>
   );
 }
 
-function EditModal({ visible, profile, ftp: ftpInit, onClose, onSave }: { visible: boolean; profile: RiderProfile; ftp: number; onClose: () => void; onSave: (p: Partial<RiderProfile>, ftp: number) => void }) {
+function EditModal({ visible, profile, onClose, onSave }: { visible: boolean; profile: RiderProfile; onClose: () => void; onSave: (p: Partial<RiderProfile>) => void }) {
   const [name, setName] = React.useState(profile.name);
   const [weight, setWeight] = React.useState(String(Math.round(profile.weight_kg)));
   const [age, setAge] = React.useState(String(profile.age));
-  const [ftp, setFtp] = React.useState(String(ftpInit));
   const [gender, setGender] = React.useState(profile.gender);
   const [capability, setCapability] = React.useState(profile.capability);
   const [city, setCity] = React.useState(profile.city);
@@ -201,18 +285,17 @@ function EditModal({ visible, profile, ftp: ftpInit, onClose, onSave }: { visibl
       setName(profile.name);
       setWeight(String(Math.round(profile.weight_kg)));
       setAge(String(profile.age));
-      setFtp(String(ftpInit));
       setGender(profile.gender);
       setCapability(profile.capability);
       setCity(profile.city);
       setRegion(profile.region);
       setCountry(profile.country);
     }
-  }, [visible, profile, ftpInit]);
+  }, [visible, profile]);
 
   const save = () => {
     onSave({
-      name: name.trim() || "Rider One",
+      name: name.trim() || profile.name,
       weight_kg: Math.max(30, Math.min(200, parseInt(weight, 10) || 78)),
       age: Math.max(12, Math.min(100, parseInt(age, 10) || 42)),
       gender,
@@ -220,7 +303,7 @@ function EditModal({ visible, profile, ftp: ftpInit, onClose, onSave }: { visibl
       city: city.trim(),
       region: region.trim(),
       country: country.trim(),
-    }, Math.max(50, Math.min(600, parseInt(ftp, 10) || 200)));
+    });
   };
 
   return (
@@ -242,12 +325,7 @@ function EditModal({ visible, profile, ftp: ftpInit, onClose, onSave }: { visibl
               <Text style={s.fieldLabel}>Age</Text>
               <TextInput testID="input-age" value={age} onChangeText={setAge} keyboardType="number-pad" maxLength={3} style={s.input} />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.fieldLabel}>FTP (W)</Text>
-              <TextInput testID="input-ftp" value={ftp} onChangeText={setFtp} keyboardType="number-pad" maxLength={3} style={s.input} />
-            </View>
           </View>
-          <Text style={s.locHint}>Editing FTP turns off auto-sync so your value sticks.</Text>
 
           <Text style={s.fieldLabel}>Gender</Text>
           <View style={s.genderRow}>
@@ -305,7 +383,9 @@ function EditModal({ visible, profile, ftp: ftpInit, onClose, onSave }: { visibl
 const s = StyleSheet.create({
   row: { flexDirection: "row", gap: 16 },
 
-  identityRow: { flexDirection: "row", alignItems: "flex-start", gap: 16 },
+  identityRow: { flexDirection: "row", alignItems: "flex-start", gap: 16, flexWrap: "wrap" },
+  identityInfo: { flex: 1, minWidth: 200 },
+  actionRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
   avatarWrap: { width: 84, height: 84, borderRadius: 42, borderWidth: 2, borderColor: CC.yellow },
   avatar: { width: "100%", height: "100%", borderRadius: 42 },
   cameraBadge: { position: "absolute", right: -2, bottom: -2, width: 28, height: 28, borderRadius: 14, backgroundColor: CC.yellow, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: CC.bg },
@@ -325,7 +405,7 @@ const s = StyleSheet.create({
   hover: { borderColor: "rgba(255,255,255,0.3)" },
   editText: { color: CC.white, fontSize: 13, fontWeight: "700" },
   acctEmail: { color: CC.dim, fontSize: 12, marginTop: 3 },
-  signOutBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "rgba(224,30,43,0.4)", borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: "rgba(224,30,43,0.08)", marginLeft: 8 },
+  signOutBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "rgba(224,30,43,0.4)", borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: "rgba(224,30,43,0.08)" },
   signOutText: { color: "#E01E2B", fontSize: 13, fontWeight: "700" },
 
   statsRow: { flexDirection: "row", gap: 12, marginTop: 18, borderTopWidth: 1, borderTopColor: CC.borderSoft, paddingTop: 16 },
@@ -333,6 +413,27 @@ const s = StyleSheet.create({
   statVal: { color: CC.white, fontSize: 22, fontWeight: "900" },
   statLbl: { color: CC.dim, fontSize: 11, fontWeight: "700", letterSpacing: 0.4, marginTop: 3 },
   feedNote: { color: CC.dim, fontSize: 11.5, lineHeight: 16, marginTop: 14 },
+
+  // power profile (FTP)
+  prefRow: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 14 },
+  ftpRow: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 6 },
+  ftpStepper: { flexDirection: "row", alignItems: "center", gap: 10 },
+  ftpBtn: { width: 44, height: 44, borderRadius: 12, borderWidth: 1.5, borderColor: CC.border, backgroundColor: "rgba(255,255,255,0.04)", alignItems: "center", justifyContent: "center" },
+  ftpBtnOff: { opacity: 0.4 },
+  ftpValueWrap: { flexDirection: "row", alignItems: "flex-end", minWidth: 66, justifyContent: "center" },
+  ftpValue: { color: CC.white, fontSize: 24, fontWeight: "900" },
+  ftpUnit: { color: CC.dim, fontSize: 13, fontWeight: "700", marginBottom: 3, marginLeft: 2 },
+  prefTitle: { color: CC.white, fontSize: 14, fontWeight: "700" },
+  prefSub: { color: CC.dim, fontSize: 12, marginTop: 1 },
+
+  // danger zone
+  dangerRow: { flexDirection: "row", alignItems: "center", gap: 14, flexWrap: "wrap" },
+  deleteBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "rgba(224,30,43,0.5)", borderRadius: 10, paddingVertical: 10, paddingHorizontal: 16, backgroundColor: "rgba(224,30,43,0.08)", minHeight: 44 },
+  deleteHover: { backgroundColor: "rgba(224,30,43,0.16)" },
+  deleteText: { color: "#E01E2B", fontSize: 13, fontWeight: "800" },
+  dangerIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(224,30,43,0.12)", alignItems: "center", justifyContent: "center", marginBottom: 12 },
+  modalBtnDanger: { backgroundColor: "#E01E2B" },
+  modalBtnDangerText: { color: "#fff", fontSize: 14, fontWeight: "900" },
 
   seasonRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 9 },
   seasonIcon: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.03)" },

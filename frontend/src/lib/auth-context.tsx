@@ -28,6 +28,7 @@ type AuthCtx = {
   signInGoogle: () => Promise<void>;
   signInApple: () => Promise<void>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   refresh: () => Promise<AuthUser | null>;
   forgotPassword: (email: string) => Promise<void>;
   resendVerification: () => Promise<void>;
@@ -187,6 +188,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
+  const deleteAccount = useCallback(async () => {
+    const r = await fetch(`${API}/api/rider/account`, { method: "DELETE" });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d?.detail || "Couldn't delete your account right now");
+    }
+    // Account is gone on the server; clear local session + cached rider data.
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      const stale = keys.filter(
+        (k) => k.startsWith("roujaune:plan") || k === "roujaune:riderProfile" || k === "roujaune:riderAvatar" || k === "roujaune:coachId",
+      );
+      if (stale.length) await AsyncStorage.multiRemove(stale);
+    } catch {
+      /* ignore cache clear errors */
+    }
+    resetCoach();
+    await setToken(null);
+    setUser(null);
+  }, []);
+
   const forgotPassword = useCallback(async (email: string) => {
     await post("/api/auth/forgot-password", { email });
   }, []);
@@ -198,7 +220,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <Ctx.Provider value={{ user, loading, signIn, signUp, signInGoogle, signInApple, signOut, refresh, forgotPassword, resendVerification }}>
+    <Ctx.Provider value={{ user, loading, signIn, signUp, signInGoogle, signInApple, signOut, deleteAccount, refresh, forgotPassword, resendVerification }}>
       {children}
     </Ctx.Provider>
   );

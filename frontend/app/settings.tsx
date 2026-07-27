@@ -61,7 +61,7 @@ export default function SettingsScreen() {
   React.useEffect(() => () => { Speech.stop(); }, []);
 
   return (
-    <AppScaffold active="settings" title="Settings" subtitle="Your profile, coach and training preferences.">
+    <AppScaffold active="settings" title="Settings" subtitle="Coach, equipment and app preferences.">
       <View style={s.row}>
         <Card testID="coach-select" style={{ flex: 1 }}>
           <SectionTitle label="YOUR COMPANION COACH" color={CC.rouge} />
@@ -165,37 +165,6 @@ export default function SettingsScreen() {
         <Text style={s.coachHint}>Pick which installed Spanish voice {persona.name} uses. Tapping a voice previews it. Switch coaches above to tune the other.</Text>
       </Card>
 
-      <Card testID="power-profile">
-        <SectionTitle label="POWER PROFILE" color={CC.rouge} />
-        <View style={s.ftpRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.prefTitle}>Functional Threshold Power</Text>
-            <Text style={s.prefSub}>Sets your live ERG target power across every workout segment.</Text>
-          </View>
-          <View style={s.ftpStepper}>
-            <Pressable testID="ftp-minus" disabled={settings.ftpAuto} onPress={() => setSetting("ftp", Math.max(80, settings.ftp - 1))}
-              style={[s.ftpBtn, settings.ftpAuto && s.ftpBtnOff]}>
-              <Ionicons name="remove" size={18} color={settings.ftpAuto ? CC.dim : CC.white} />
-            </Pressable>
-            <View style={s.ftpValueWrap}>
-              <Text style={s.ftpValue}>{settings.ftp}</Text>
-              <Text style={s.ftpUnit}>W</Text>
-            </View>
-            <Pressable testID="ftp-plus" disabled={settings.ftpAuto} onPress={() => setSetting("ftp", Math.min(600, settings.ftp + 1))}
-              style={[s.ftpBtn, settings.ftpAuto && s.ftpBtnOff]}>
-              <Ionicons name="add" size={18} color={settings.ftpAuto ? CC.dim : CC.white} />
-            </Pressable>
-          </View>
-        </View>
-        <View style={[s.prefRow, { borderTopWidth: 1, borderTopColor: CC.borderSoft, marginTop: 6 }]}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.prefTitle}>Auto-update from training progress</Text>
-            <Text style={s.prefSub}>Keep FTP in sync with your measured fitness gains.</Text>
-          </View>
-          <Toggle testID="tg-ftpAuto" on={settings.ftpAuto} onToggle={() => setSetting("ftpAuto", !settings.ftpAuto)} />
-        </View>
-      </Card>
-
       <Card testID="equipment-prefs">
         <SectionTitle label="EQUIPMENT & RIDE" color={CC.rouge} />
         <PrefToggle label="Smart trainer" sub="Control resistance (ERG) from your workouts" on={settings.hasTrainer} onToggle={() => setSetting("hasTrainer", !settings.hasTrainer)} testID="tg-hasTrainer" divider />
@@ -297,17 +266,6 @@ function PrefToggle({ label, sub, on, onToggle, testID, divider }: { label: stri
 
 const s = StyleSheet.create({
   row: { flexDirection: "row", gap: 16, alignItems: "stretch" },
-  profRow: { flexDirection: "row", alignItems: "center", gap: 14 },
-  avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: "rgba(255,255,255,0.06)", alignItems: "center", justifyContent: "center" },
-  profName: { color: CC.white, fontSize: 18, fontWeight: "800" },
-  profSub: { color: CC.dim, fontSize: 12, marginTop: 2 },
-  editBtn: { borderWidth: 1, borderColor: CC.border, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 16, backgroundColor: "rgba(255,255,255,0.03)", minHeight: 38, justifyContent: "center" },
-  hover: { borderColor: "rgba(255,255,255,0.28)", backgroundColor: "rgba(255,255,255,0.06)" },
-  editText: { color: CC.white, fontSize: 12.5, fontWeight: "700" },
-  statsRow: { flexDirection: "row", gap: 20, marginTop: 18, borderTopWidth: 1, borderTopColor: CC.borderSoft, paddingTop: 14 },
-  stat: {},
-  statV: { color: CC.white, fontSize: 18, fontWeight: "800" },
-  statL: { color: CC.dim, fontSize: 11, marginTop: 1 },
   coachRow: { flexDirection: "row", gap: 12 },
   coachCard: { flex: 1, alignItems: "center", backgroundColor: "rgba(255,255,255,0.02)", borderRadius: 12, borderWidth: 1.5, borderColor: CC.borderSoft, padding: 14 },
   coachOn: { borderColor: CC.rouge, backgroundColor: "rgba(201,23,39,0.06)" },
@@ -341,7 +299,6 @@ const s = StyleSheet.create({
   ftpRow: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 6 },
   ftpStepper: { flexDirection: "row", alignItems: "center", gap: 10 },
   ftpBtn: { width: 40, height: 40, borderRadius: 12, borderWidth: 1.5, borderColor: CC.border, backgroundColor: "rgba(255,255,255,0.04)", alignItems: "center", justifyContent: "center" },
-  ftpBtnOff: { opacity: 0.4 },
   ftpValueWrap: { flexDirection: "row", alignItems: "flex-end", minWidth: 66, justifyContent: "center" },
   ftpValue: { color: CC.white, fontSize: 24, fontWeight: "900" },
   ftpUnit: { color: CC.dim, fontSize: 13, fontWeight: "700", marginBottom: 3, marginLeft: 2 },
