@@ -58,11 +58,19 @@ USER_SCOPED = {
     "settings", "calendar_weeks", "rider_prs", "rider_prefs", "rider_appearance", "kv_prefs",
 }
 
+# Per-user benchmark collections (scoped by explicit user_id filters, not via udb).
+_BENCHMARK_COLLECTIONS = {
+    "benchmark_profile", "benchmark_results", "benchmark_sessions", "benchmark_week",
+}
+# Every collection that holds data owned by a single rider — used for GDPR
+# export & account erasure so the cascade never misses a collection.
+ALL_USER_COLLECTIONS = USER_SCOPED | _BENCHMARK_COLLECTIONS
+
 # Public HTTP paths (no auth required).
 _PUBLIC = {
     "/api/auth/register", "/api/auth/login", "/api/auth/google", "/api/auth/apple",
     "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/verify-email",
-    "/api/admin/login", "/api/admin/logout",
+    "/api/admin/login", "/api/admin/logout", "/api/openapi.json",
 }
 
 
@@ -372,6 +380,43 @@ async def migrate_singleton(demo_email: str, demo_password: str, demo_name: str 
     return {"user_id": uid, "email": demo_email}
 
 
+# ---- GDPR export / erase (shared by admin + rider self-service) -------------
+async def export_user_data(user_id: str) -> dict:
+    """Gather every stored document owned by a rider into a portable JSON bundle
+    (users doc with secrets stripped + all user-scoped collections)."""
+    user = await _db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0, "reset_token": 0, "verify_token": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    collections: dict[str, list] = {}
+    for coll in sorted(ALL_USER_COLLECTIONS):
+        docs = await getattr(_db, coll).find({"user_id": user_id}, {"_id": 0}).to_list(1000)
+        if docs:
+            collections[coll] = docs
+    return {
+        "user_id": user_id,
+        "exported_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "user": user,
+        "collections": collections,
+    }
+
+
+async def erase_user_data(user_id: str) -> dict:
+    """Permanently delete a rider account and cascade-delete every user-scoped
+    document plus their active sessions. Returns per-collection delete counts."""
+    if not await _db.users.find_one({"user_id": user_id}):
+        raise HTTPException(status_code=404, detail="User not found")
+    deleted: dict[str, int] = {}
+    for coll in sorted(ALL_USER_COLLECTIONS):
+        res = await getattr(_db, coll).delete_many({"user_id": user_id})
+        if res.deleted_count:
+            deleted[coll] = res.deleted_count
+    sess = await _db.user_sessions.delete_many({"user_id": user_id})
+    deleted["user_sessions"] = sess.deleted_count
+    usr = await _db.users.delete_one({"user_id": user_id})
+    deleted["users"] = usr.deleted_count
+    return {"user_id": user_id, "deleted": deleted}
+
+
 # ---- ASGI middleware -------------------------------------------------------
 def _requires_auth(path: str, method: str) -> bool:
     if method == "OPTIONS":
@@ -511,6 +556,20 @@ async def apple(req: AppleReq):
 @auth_router.get("/me")
 async def me():
     return {"user": _public_user(require_user())}
+
+
+@auth_router.get("/me/export")
+async def export_me():
+    """GDPR: let a rider download all of their own stored data."""
+    return await export_user_data(require_user()["user_id"])
+
+
+@auth_router.delete("/me")
+async def delete_me(request: Request):
+    """GDPR: let a rider permanently delete their own account + all data."""
+    uid = require_user()["user_id"]
+    result = await erase_user_data(uid)
+    return {"ok": True, **result}
 
 
 @auth_router.post("/logout")

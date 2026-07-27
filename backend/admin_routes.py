@@ -9,6 +9,7 @@ Contract reference: /app/memory/roujaune_admin_api_contract.md
 from __future__ import annotations
 
 import datetime
+import time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -19,6 +20,8 @@ import auth
 admin_router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(auth.require_admin)])
 
 _db = None
+_STARTED = time.monotonic()
+_VERSION = "1.0.0"
 
 
 def init(db) -> None:
@@ -52,7 +55,13 @@ async def health():
         db_ok = True
     except Exception:
         db_ok = False
-    return {"status": "ok", "db": db_ok, "time": _now()}
+    return {
+        "status": "ok" if db_ok else "degraded",
+        "db": db_ok,
+        "version": _VERSION,
+        "uptime": round(time.monotonic() - _STARTED, 1),
+        "time": _now(),
+    }
 
 
 @admin_router.get("/metrics")
@@ -70,7 +79,9 @@ async def metrics():
 #  Users                                                                      #
 # --------------------------------------------------------------------------- #
 @admin_router.get("/users")
-async def list_users(q: Optional[str] = None, limit: int = 50, skip: int = 0):
+async def list_users(q: Optional[str] = None, limit: int = 50, skip: int = 0, cursor: Optional[str] = None):
+    """List/search users. Supports both skip/limit and cursor pagination
+    (`cursor` = the `created_at` of the last item from the previous page)."""
     limit = max(1, min(limit, 200))
     filt: dict = {}
     if q:
@@ -78,20 +89,40 @@ async def list_users(q: Optional[str] = None, limit: int = 50, skip: int = 0):
             {"email": {"$regex": q, "$options": "i"}},
             {"name": {"$regex": q, "$options": "i"}},
         ]}
-    cur = _db.users.find(filt, {"_id": 0, "password_hash": 0}).sort("created_at", -1).skip(max(0, skip)).limit(limit)
+    if cursor:
+        filt = {"$and": [filt, {"created_at": {"$lt": cursor}}]} if filt else {"created_at": {"$lt": cursor}}
+    proj = {"_id": 0, "password_hash": 0, "reset_token": 0, "reset_expires": 0, "verify_token": 0}
+    cur = _db.users.find(filt, proj).sort("created_at", -1).skip(max(0, skip)).limit(limit)
     items = await cur.to_list(limit)
-    total = await _db.users.count_documents(filt)
-    return {"items": items, "total": total, "skip": skip, "limit": limit}
+    total = await _db.users.count_documents({} if not q else {"$or": [
+        {"email": {"$regex": q, "$options": "i"}}, {"name": {"$regex": q, "$options": "i"}},
+    ]})
+    next_cursor = items[-1].get("created_at") if len(items) == limit else None
+    return {"items": items, "total": total, "skip": skip, "limit": limit, "next_cursor": next_cursor}
 
 
 @admin_router.get("/users/{user_id}")
 async def get_user(user_id: str):
-    u = await _db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0})
+    u = await _db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0, "reset_token": 0, "verify_token": 0})
     if not u:
         raise HTTPException(status_code=404, detail="User not found")
     profile = await _db.rider_profile.find_one({"user_id": user_id}, {"_id": 0})
     bench = await _db.benchmark_profile.find_one({"user_id": user_id}, {"_id": 0})
-    return {"user": u, "rider_profile": profile, "benchmark_profile": bench}
+    latest_result = await _db.benchmark_results.find_one(
+        {"user_id": user_id}, {"_id": 0}, sort=[("createdAt", -1)])
+    plan = None
+    pid = u.get("assigned_plan_id")
+    if pid and pid != "none":
+        p = await _db.plans.find_one({"id": pid}, {"_id": 0, "weeks": 0})
+        if p:
+            plan = {"id": p.get("id"), "title": p.get("title"), "level": p.get("level")}
+    return {
+        "user": u,
+        "rider_profile": profile,
+        "benchmark_profile": bench,
+        "latest_benchmark": latest_result,
+        "plan": plan,
+    }
 
 
 class UserPatch(BaseModel):
@@ -121,11 +152,33 @@ async def patch_user(user_id: str, body: UserPatch):
     return {"user": u}
 
 
+@admin_router.post("/users/{user_id}/export")
+async def export_user(user_id: str):
+    """GDPR export of all documents owned by a rider."""
+    bundle = await auth.export_user_data(user_id)
+    await _audit("user.export", user_id, {"collections": list(bundle.get("collections", {}).keys())})
+    return bundle
+
+
+@admin_router.delete("/users/{user_id}")
+async def delete_user(user_id: str):
+    """GDPR erasure — deletes the user + every user-scoped collection + sessions."""
+    actor = auth.require_user()
+    if actor.get("user_id") == user_id:
+        raise HTTPException(status_code=400, detail="Admins cannot delete their own account here")
+    result = await auth.erase_user_data(user_id)
+    await _audit("user.delete", user_id, result.get("deleted", {}))
+    return {"ok": True, **result}
+
+
 # --------------------------------------------------------------------------- #
 #  Audit log                                                                  #
 # --------------------------------------------------------------------------- #
 @admin_router.get("/audit")
-async def audit_log(limit: int = 50, skip: int = 0):
+async def audit_log(limit: int = 50, skip: int = 0, cursor: Optional[str] = None):
     limit = max(1, min(limit, 200))
-    cur = _db.admin_audit.find({}, {"_id": 0}).sort("at", -1).skip(max(0, skip)).limit(limit)
-    return {"items": await cur.to_list(limit)}
+    filt: dict = {"at": {"$lt": cursor}} if cursor else {}
+    cur = _db.admin_audit.find(filt, {"_id": 0}).sort("at", -1).skip(max(0, skip)).limit(limit)
+    items = await cur.to_list(limit)
+    next_cursor = items[-1].get("at") if len(items) == limit else None
+    return {"items": items, "next_cursor": next_cursor}

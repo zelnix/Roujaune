@@ -25,13 +25,17 @@ plans_router = APIRouter(prefix="/plans", tags=["plans-admin"])
 # ---- injected dependencies -------------------------------------------------
 _db = None
 _on_change = None
+_on_audit = None
 
 
-def init(db, on_change=None) -> None:
-    """Wire the module to a database handle and an optional change callback."""
-    global _db, _on_change
+def init(db, on_change=None, on_audit=None) -> None:
+    """Wire the module to a database handle and optional callbacks:
+    `on_change(plan_id)` fires after any mutation; `on_audit(action, plan_id, meta)`
+    records the mutation to the consuming app's admin audit log."""
+    global _db, _on_change, _on_audit
     _db = db
     _on_change = on_change
+    _on_audit = on_audit
 
 
 def _now() -> str:
@@ -42,6 +46,14 @@ async def _notify(plan_id: str) -> None:
     if _on_change:
         try:
             await _on_change(plan_id)
+        except Exception:
+            pass
+
+
+async def _audit(action: str, plan_id: str, meta: dict | None = None) -> None:
+    if _on_audit:
+        try:
+            await _on_audit(action, plan_id, meta or {})
         except Exception:
             pass
 
@@ -146,7 +158,9 @@ async def create_plan(req: CreatePlan):
     doc["id"] = req.id
     doc.setdefault("title", req.id)
     doc["created_at"] = _now()
-    return await _persist(doc)
+    saved = await _persist(doc)
+    await _audit("plan.create", req.id, {"title": doc.get("title")})
+    return saved
 
 
 @plans_router.put("/{plan_id}")
@@ -155,7 +169,9 @@ async def replace_plan(plan_id: str, definition: dict):
     doc = copy.deepcopy(definition)
     doc["id"] = plan_id
     doc["created_at"] = (existing or {}).get("created_at", _now())
-    return await _persist(doc)
+    saved = await _persist(doc)
+    await _audit("plan.replace", plan_id, {"existed": bool(existing)})
+    return saved
 
 
 @plans_router.patch("/{plan_id}")
@@ -165,7 +181,9 @@ async def patch_plan(plan_id: str, fields: dict):
         raise HTTPException(status_code=404, detail="Plan not found")
     fields.pop("id", None)
     doc.update(fields)
-    return await _persist(doc)
+    saved = await _persist(doc)
+    await _audit("plan.patch", plan_id, {"fields": list(fields.keys())})
+    return saved
 
 
 @plans_router.delete("/{plan_id}")
@@ -174,6 +192,7 @@ async def delete_plan(plan_id: str):
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Plan not found")
     await _notify(plan_id)
+    await _audit("plan.delete", plan_id, {})
     return {"deleted": plan_id}
 
 
@@ -190,7 +209,9 @@ async def replace_week(plan_id: str, number: int, week: dict):
         weeks.sort(key=lambda w: int(w.get("number", 0)))
     else:
         weeks[idx] = week
-    return await _persist(doc)
+    saved = await _persist(doc)
+    await _audit("plan.week.replace", plan_id, {"week": number})
+    return saved
 
 
 @plans_router.patch("/{plan_id}/weeks/{number}/days/{day_index}")
@@ -205,7 +226,9 @@ async def patch_day(plan_id: str, number: int, day_index: int, body: DayPatch):
     if day_index < 0 or day_index >= len(days):
         raise HTTPException(status_code=404, detail="Day not found")
     days[day_index].update(body.patch or {})
-    return await _persist(doc)
+    saved = await _persist(doc)
+    await _audit("plan.day.patch", plan_id, {"week": number, "day_index": day_index})
+    return saved
 
 
 @plans_router.post("/{plan_id}/adapt")
@@ -241,4 +264,5 @@ async def adapt_plan(plan_id: str, req: AdaptRequest):
     history.insert(0, entry)
     doc["edit_history"] = history[:30]
     await _persist(doc)
+    await _audit("plan.adapt", plan_id, {"source": req.source, "applied": applied})
     return {"plan_id": plan_id, "applied": applied, "entry": entry}

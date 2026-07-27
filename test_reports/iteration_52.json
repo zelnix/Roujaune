@@ -1,0 +1,39 @@
+{
+  "summary": "Backend-only HWG admin console contract test. 19/19 tests PASS in test_iter52_admin_console.py. Verified: (1) GET /api/openapi.json is public and returns a valid OpenAPI schema listing /api/admin/* paths; (2) POST /api/admin/login returns {token, admin} for correct creds and 401 for wrong password; (3) admin RBAC — /api/admin/metrics returns 403 with rider token and 401 anonymous; (4) /api/admin/health returns {status, db, version, uptime, time}; (5) /api/admin/metrics returns integer counts (users, admins, plans, benchmark_results) with NO PII; (6) /api/admin/users?limit=2 returns {items,total,skip,limit,next_cursor} and items strip password_hash/reset_token/verify_token, cursor pagination yields non-overlapping pages; (7) /api/admin/users/{user_id} returns {user, rider_profile, benchmark_profile, latest_benchmark, plan}; (8) PATCH suspended=true on a throwaway rider invalidates their existing Bearer session (subsequent /api/auth/me = 401) AND blocks fresh login with 403 mentioning 'suspend'; unsuspend restores login to 200; (9) POST /api/admin/users/{id}/export returns {user_id, exported_at, user, collections} with password_hash stripped and writes an audit row; DELETE /api/admin/users/{id} cascades (deleted.users=1) and follow-up GET 404s; admin deleting their OWN admin_id returns 400; (10) GET/PUT /api/admin/benchmark/config round-trips changes and persists — mutated {ftp_retest_days:77, retest_days.ramp:33} then RESTORED to 56/56 as required; (11) GET/PUT /api/admin/coaches — extra fields (SECRET_INJECT, salary) are stripped, only {id,name,gender,voice,style} persisted, safety_policy is fixed read-only string (attempted overwrite ignored); (12) PATCH /api/plans/couch-to-road (admin token) writes an audit row 'plan.patch' visible in GET /api/admin/audit?limit=5 which also returns {items,next_cursor}; (13) rider self-service GDPR — GET /api/auth/me/export returns own bundle, DELETE /api/auth/me erases account and invalidates session; (14) regression — GET /api/plan, /api/calendar/week, /api/rider/profile, /api/progress all 200 for greenlantern rider token. Global config restored (verified via curl after suite): ftp_retest_days=56, retest_days.ramp=56.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter52_admin_console.py",
+    "/app/test_reports/pytest/iter52.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "admin_routes.py:104-125 — GET /api/admin/users/{id} correctly excludes password_hash/reset_token/verify_token via projection. Latest benchmark uses createdAt desc (matches the schema in server.py:1321).",
+    "admin_routes.py:81-101 — cursor pagination uses `created_at < cursor` with a compound $and when a text query is also provided. Correct and deterministic given the -1 sort on created_at.",
+    "auth.py:203-220 — _resolve_token returns None for suspended riders, which makes AuthMiddleware answer 401 for any /api/* call after suspend. That is what /api/auth/login (403 'suspended') then handles for the login path. Behaviour matches the contract.",
+    "auth.py:167-171 — DELETE /api/admin/users/{id} correctly raises 400 when actor.user_id == target. Because the admin store maps admin_id to user_id via _resolve_token, the self-delete guard fires before erase_user_data's 404 (verified in the test).",
+    "server.py:4362-4368 — PUT /api/admin/coaches strips to an allowlist of {id,name,gender,voice,style}. safety_policy in the request body is ignored and the response always echoes the constant COACH_SAFETY_POLICY — verified by attempting to overwrite with 'HACKED' string.",
+    "server.py:4287-4295 — _admin_audit_write catches exceptions; the plan.patch audit row was still written and returned by GET /api/admin/audit within the same request cycle.",
+    "auth.py:70-74 — /api/openapi.json is on the _PUBLIC set, so AuthMiddleware doesn't demand a token."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter52_admin_console.py (new — 19 tests)"
+  ],
+  "success_rate": {
+    "backend": "100% (19/19)",
+    "frontend": "not tested (backend-only request)"
+  },
+  "seed_data_creation": "Three throwaway riders registered via POST /api/auth/register (email test-throw-<uuid>@roujaune.app). Each was fully cleaned up: suspend-test rider deleted via DELETE /api/admin/users/{id}; export/delete-test rider deleted by the test itself; self-GDPR rider deleted via DELETE /api/auth/me. No lingering test data in users, user_sessions, or user-scoped collections.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Admin login uses POST /api/admin/login (separate password-based admin store; not the rider users collection). The returned token is resolved by AuthMiddleware via admin_sessions -> admins collection and surfaces as {user_id: admin_id, role: 'admin'}. That means auth.require_admin passes and audit rows carry actor=admin_id (not a users.user_id). GET /api/plans/* is currently gated router-wide by Depends(require_admin) (see prior iteration_51 minor note) — reads return 401/403 for anon/rider; the plan.patch write path used in this iteration exercises the admin token correctly. Global benchmark config was verified post-suite via curl and is at 56/56.",
+  "rca_of_issue": "Not applicable — all features covered by the review request behave per contract. One test-script defect during the first run (Pydantic EmailStr rejects reserved .test TLD) was fixed by using the @roujaune.app domain for throwaway riders."
+}

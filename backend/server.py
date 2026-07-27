@@ -4274,12 +4274,107 @@ async def get_community():
     return COMMUNITY_DATA
 
 
+@api_router.get("/openapi.json")
+async def api_openapi():
+    """Expose the OpenAPI schema through the /api ingress so the HWG console can
+    import the contract (the root /openapi.json is not reachable via ingress)."""
+    return app.openapi()
+
+
+# --------------------------------------------------------------------------- #
+#  Admin audit writer (shared by plan CRUD + admin config mutations)          #
+# --------------------------------------------------------------------------- #
+async def _admin_audit_write(action: str, target: str, meta: dict | None = None) -> None:
+    """Record an admin mutation to `admin_audit`. Best-effort; never blocks."""
+    try:
+        actor = auth._current_user.get() or {}
+        await db.admin_audit.insert_one({
+            "actor": actor.get("user_id"),
+            "actor_email": actor.get("email"),
+            "action": action,
+            "target": target,
+            "meta": meta or {},
+            "at": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception:
+        pass
+
+
+# --------------------------------------------------------------------------- #
+#  Admin config surface — benchmark thresholds + coach presentation config    #
+#  (HWG contract §5.5 / §5.6). Gated by require_admin, mounted at /api/admin.  #
+# --------------------------------------------------------------------------- #
+admin_cfg_router = APIRouter(prefix="/api/admin", tags=["admin-config"], dependencies=[Depends(auth.require_admin)])
+
+# Safety policy is FIXED in code and MUST NOT be editable via the console.
+COACH_SAFETY_POLICY = (
+    "Coaches never override medical safety rules. On any red-flag symptom "
+    "(chest pain/discomfort, fainting, severe breathlessness, palpitations, "
+    "dizziness, fever/illness, or new/worsening pain) the app halts training and "
+    "advises the rider to seek medical guidance, regardless of persona or "
+    "presentation configuration."
+)
+DEFAULT_COACHES = [
+    {"id": "alberto", "name": "Alberto", "gender": "male", "voice": "spanish-male", "style": "balanced"},
+    {"id": "adriana", "name": "Adriana", "gender": "female", "voice": "spanish-female", "style": "balanced"},
+]
+
+
+@admin_cfg_router.get("/benchmark/config")
+async def get_benchmark_config():
+    return {"retest_days": dict(BM_RETEST_DAYS), "ftp_retest_days": FTP_RETEST_DAYS, "tests": BM_ALL_TESTS}
+
+
+class BenchmarkConfigPatch(BaseModel):
+    retest_days: Optional[Dict[str, int]] = None
+    ftp_retest_days: Optional[int] = None
+
+
+@admin_cfg_router.put("/benchmark/config")
+async def put_benchmark_config(body: BenchmarkConfigPatch):
+    global FTP_RETEST_DAYS
+    if body.retest_days:
+        for k, v in body.retest_days.items():
+            if k in BM_RETEST_DAYS and isinstance(v, int) and v > 0:
+                BM_RETEST_DAYS[k] = v
+    if body.ftp_retest_days and body.ftp_retest_days > 0:
+        FTP_RETEST_DAYS = int(body.ftp_retest_days)
+    await db.admin_config.update_one(
+        {"_id": "benchmark"},
+        {"$set": {"retest_days": dict(BM_RETEST_DAYS), "ftp_retest_days": FTP_RETEST_DAYS}},
+        upsert=True,
+    )
+    await _admin_audit_write("benchmark.config.update", "benchmark", {"ftp_retest_days": FTP_RETEST_DAYS})
+    return {"retest_days": dict(BM_RETEST_DAYS), "ftp_retest_days": FTP_RETEST_DAYS}
+
+
+@admin_cfg_router.get("/coaches")
+async def get_coaches_config():
+    doc = await db.admin_config.find_one({"_id": "coaches"}, {"_id": 0})
+    coaches = (doc or {}).get("coaches", DEFAULT_COACHES)
+    return {"coaches": coaches, "safety_policy": COACH_SAFETY_POLICY}
+
+
+class CoachesConfig(BaseModel):
+    coaches: List[Dict[str, Any]]
+
+
+@admin_cfg_router.put("/coaches")
+async def put_coaches_config(body: CoachesConfig):
+    allowed = {"id", "name", "gender", "voice", "style"}
+    cleaned = [{k: c.get(k) for k in allowed if k in c} for c in body.coaches]
+    await db.admin_config.update_one({"_id": "coaches"}, {"$set": {"coaches": cleaned}}, upsert=True)
+    await _admin_audit_write("coaches.config.update", "coaches", {"count": len(cleaned)})
+    return {"coaches": cleaned, "safety_policy": COACH_SAFETY_POLICY}
+
+
 api_router.include_router(plans_admin.plans_router, dependencies=[Depends(auth.require_admin)])
 api_router.include_router(auth.auth_router)
 api_router.include_router(auth.admin_auth_router)
 app.include_router(api_router)
 app.include_router(push.router)
 app.include_router(admin_routes.admin_router)
+app.include_router(admin_cfg_router)
 push.init(db)
 admin_routes.init(db)
 
@@ -4305,7 +4400,19 @@ logger = logging.getLogger(__name__)
 async def _seed_plans_on_startup():
     """Move plan DEFINITIONS into MongoDB (non-destructive) and refresh the
     couch-to-road cache from the DB so edits made via plans_admin take effect."""
-    plans_admin.init(db, on_change=_on_plan_change)
+    plans_admin.init(db, on_change=_on_plan_change, on_audit=_admin_audit_write)
+    # Apply any admin-configured benchmark thresholds persisted in admin_config.
+    try:
+        global FTP_RETEST_DAYS
+        cfg = await db.admin_config.find_one({"_id": "benchmark"})
+        if cfg:
+            for k, v in (cfg.get("retest_days") or {}).items():
+                if k in BM_RETEST_DAYS and isinstance(v, int) and v > 0:
+                    BM_RETEST_DAYS[k] = v
+            if isinstance(cfg.get("ftp_retest_days"), int) and cfg["ftp_retest_days"] > 0:
+                FTP_RETEST_DAYS = cfg["ftp_retest_days"]
+    except Exception:
+        pass
     try:
         await plans_admin.seed_plans({
             "couch-to-road": {**CTR_PLAN, "type": "structured", "title": CTR_PLAN.get("title", "From Couch to Road")},
