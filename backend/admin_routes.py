@@ -421,6 +421,7 @@ _INTEGRATION_META = {
     "weather":     {"billing": "flat", "default": 0.0,  "budget": 5.0},
     "google_auth": {"billing": "flat", "default": 0.0,  "budget": 5.0},
     "database":    {"billing": "flat", "default": 15.0, "budget": 60.0},
+    "route_data":  {"billing": "flat", "default": 19.0, "budget": 30.0},
 }
 _FLAT_INTEGRATIONS = {k for k, v in _INTEGRATION_META.items() if v["billing"] == "flat"}
 
@@ -442,6 +443,16 @@ async def _cost_overrides() -> dict:
     return (doc or {}).get("overrides", {}) or {}
 
 
+async def _cost_estimates() -> dict:
+    """Per-integration flat-fee estimates persisted via the
+    PUT /integrations/{id}/cost-estimate endpoint (collection keyed by _id)."""
+    try:
+        docs = await _db.integration_cost_estimates.find().to_list(length=200)
+    except Exception:
+        docs = []
+    return {d["_id"]: float(d.get("usd", 0) or 0) for d in docs}
+
+
 @admin_router.get("/integrations")
 async def integrations(health: int = 1):
     import os
@@ -456,6 +467,9 @@ async def integrations(health: int = 1):
          "configured": bool(os.environ.get("EMERGENT_EMAIL_KEY")), "status": _st(bool(os.environ.get("EMERGENT_EMAIL_KEY")))},
         {"id": "weather", "name": "Weather (Open-Meteo)", "type": "weather", "configured": True, "status": "healthy"},
         {"id": "google_auth", "name": "Google Sign-In (Emergent)", "type": "auth", "configured": True, "status": "healthy"},
+        {"id": "route_data", "name": "Route/Map Data", "type": "data", "provider": "MapTiler",
+         "category": "Data", "cost_type": "flat", "configured": True, "status": "healthy",
+         "health": {"status": "ok"}},
     ]
     if health:
         try:
@@ -466,13 +480,19 @@ async def integrations(health: int = 1):
         items.append({"id": "database", "name": "MongoDB", "type": "database", "configured": True,
                       "status": "healthy" if db_ok else "down"})
     overrides = await _cost_overrides()
+    estimates = await _cost_estimates()
     for it in items:
         meta = _INTEGRATION_META.get(it["id"], {"billing": "flat", "default": 0.0, "budget": 0.0})
         if meta["billing"] == "metered":
             est = await _metered_llm_cost()
             editable = False
         else:
-            est = float(overrides.get(it["id"], meta["default"]))
+            # Precedence for flat fees: persisted per-integration estimate →
+            # legacy console override → meta default.
+            if it["id"] in estimates:
+                est = estimates[it["id"]]
+            else:
+                est = float(overrides.get(it["id"], meta["default"]))
             editable = True
         est = round(est, 2)
         budget = float(meta.get("budget", 0.0))
@@ -518,6 +538,18 @@ async def update_integration_costs(body: CostOverrides):
     await _db.admin_config.update_one({"_id": "integration_costs"}, {"$set": {"overrides": cur}}, upsert=True)
     await _audit("integrations.costs.update", "integrations", {"applied": applied, "rejected": rejected})
     return {"overrides": cur, "applied": applied, "rejected": rejected, "editable": sorted(_FLAT_INTEGRATIONS)}
+
+
+@admin_router.put("/integrations/{iid}/cost-estimate")
+async def set_cost_estimate(iid: str, body: dict):
+    """Persist a flat-fee monthly estimate for a single integration. Stored in
+    `integration_cost_estimates` (keyed by integration id) and used by
+    GET /integrations for flat items."""
+    usd = max(0.0, float(body.get("usd", 0)))
+    await _db.integration_cost_estimates.update_one(
+        {"_id": iid}, {"$set": {"_id": iid, "usd": usd}}, upsert=True)
+    await _audit("integrations.cost_estimate.set", iid, {"usd": usd})
+    return {"ok": True, "id": iid, "usd": usd}
 
 
 # --------------------------------------------------------------------------- #
