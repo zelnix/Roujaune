@@ -4,7 +4,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle, Path, Defs, LinearGradient as SvgGrad, Stop } from "react-native-svg";
 import { colors, radius, spacing } from "./../theme";
-import { community, wellness, achievement } from "../data";
+import { community, readiness, achievement } from "../data";
 import { SecondaryButton, SectionLabel } from "./ui";
 import { useSettings } from "../lib/settings";
 
@@ -143,7 +143,7 @@ function SunsetBackdrop() {
 export function WellnessCard() {
   const { settings } = useSettings();
   return (
-    <View style={styles.card} testID="wellness-card">
+    <View style={styles.card} testID="readiness-card">
       <SunsetBackdrop />
       <LinearGradient
         colors={["rgba(5,5,5,0.72)", "rgba(5,5,5,0.25)"]}
@@ -152,21 +152,24 @@ export function WellnessCard() {
         style={StyleSheet.absoluteFill}
       />
       <View style={styles.iconLabel}>
-        <Ionicons name="leaf" size={13} color={colors.green} />
-        <SectionLabel color={colors.green}>WELLNESS</SectionLabel>
+        <Ionicons name="pulse" size={13} color={colors.green} />
+        <SectionLabel color={colors.green}>READINESS</SectionLabel>
       </View>
       {settings.hasWearable ? (
         <>
-          <Text style={styles.title}>{wellness.title}</Text>
-          <Text style={styles.score}>{wellness.score}</Text>
-          <Text style={styles.good}>{wellness.status}</Text>
-          <Text style={styles.note}>{wellness.note}</Text>
+          <Text style={styles.title}>{readiness.title}</Text>
+          <Text style={styles.score}>{readiness.score}</Text>
+          <Text style={styles.good}>{readiness.status}</Text>
+          <Text style={styles.note}>{readiness.note}</Text>
+          <Text style={styles.src} testID="readiness-source">
+            <Ionicons name="watch-outline" size={10} color={colors.textDim} /> {readiness.source} · synced {readiness.synced}
+          </Text>
         </>
       ) : (
         <View style={styles.wellnessNC} testID="wellness-not-connected">
           <Ionicons name="watch-outline" size={26} color={colors.textDim} />
           <Text style={styles.ncTitle}>No wearable connected</Text>
-          <Text style={styles.ncSub}>Connect a wearable to track readiness, HRV and recovery.</Text>
+          <Text style={styles.ncSub}>Connect a wearable to feed readiness, HRV and recovery into your training.</Text>
         </View>
       )}
     </View>
@@ -253,6 +256,7 @@ const styles = StyleSheet.create({
   score: { color: colors.white, fontSize: 34, fontWeight: "900", marginTop: 4 },
   good: { color: colors.greenText, fontSize: 13, fontWeight: "700" },
   note: { color: colors.textDim, fontSize: 11.5, marginTop: 6, maxWidth: "62%", lineHeight: 16 },
+  src: { color: colors.textDim, fontSize: 10, marginTop: 8, opacity: 0.85 },
   wellnessNC: { flex: 1, justifyContent: "center", alignItems: "flex-start", gap: 4, marginTop: 6 },
   ncTitle: { color: colors.white, fontSize: 14, fontWeight: "800", marginTop: 4 },
   ncSub: { color: colors.textDim, fontSize: 11.5, lineHeight: 16, maxWidth: "80%" },

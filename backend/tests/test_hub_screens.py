@@ -87,19 +87,6 @@ class TestRoutes:
                 assert f in rt
 
 
-# ─────────────── Wellness ───────────────
-class TestWellness:
-    def test_wellness_shape(self, api):
-        r = api.get(f"{BASE_URL}/api/wellness", timeout=15)
-        assert r.status_code == 200, r.text
-        d = r.json()
-        assert "readiness" in d and "score" in d["readiness"]
-        assert isinstance(d["vitals"], list) and len(d["vitals"]) == 4
-        assert isinstance(d["sleep_week"], list) and len(d["sleep_week"]) == 7
-        assert isinstance(d["companion"], list) and len(d["companion"]) >= 1
-        assert "fb50" in d and "completed" in d["fb50"]
-
-
 # ─────────────── Community ───────────────
 class TestCommunity:
     def test_community_shape(self, api):

@@ -12,7 +12,7 @@ import { CC } from "./calendar";
 
 const ROUTE: Record<string, string> = {
   home: "/", training: "/plan", calendar: "/calendar", workouts: "/workouts",
-  routes: "/virtual-route", progress: "/progress", wellness: "/wellness",
+  routes: "/virtual-route", progress: "/progress",
   community: "/community", connections: "/connections", settings: "/settings", help: "/help",
   benchmark: "/benchmark",
 };

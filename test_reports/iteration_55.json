@@ -1,0 +1,47 @@
+{
+  "summary": "iter55 — Verified rider Assign/Edit workout flow, /api/wellness removal, coach guardrails, and regression. Backend: 11/11 pytest cases PASS in /app/backend/tests/test_iter55_customize_and_wellness_removal.py against external EXPO_PUBLIC_BACKEND_URL. Confirmed: (a) rider POST /api/catalog/threshold-climb/assign + PUT {patch:{name,duration}} creates a personal copy visible only to the rider (rider GET returns EDITED name/duration; admin GET /api/admin/catalog/threshold-climb still returns name='Threshold Climb', duration=60); DELETE /api/catalog/threshold-climb/reset reverts. (b) GET /api/wellness returns 404 (route deleted). (c) Coach guardrails: POST /api/coach/chat with 'How can I sleep better and reduce my stress?' — Alberto redirected to a doctor/wellness professional for sleep/stress and pivoted to cycling training ('readiness is still reading 82%, HRV solid, let's keep the focus on that controlled endurance session'); with 'Adjust today based on my recovery' — framed as a cycling-training decision (60-70 min steady endurance, no hard efforts, train stress). No forbidden lifestyle/medical/sleep-hygiene/stress-management/nutrition/hydration/supplement terms detected. (d) Regression: rider /api/plan title='From Couch to Road' duration_weeks=16; /api/calendar/week returns days that include cycling + fb50 + readiness blocks (readiness carries source/metrics/score); /api/progress, /api/rider/profile, /api/admin/metrics, /api/admin/integrations all 200. Frontend (Expo web, viewport 390x844, greenlantern signed in): /wellness redirects to '/' — 'My Peaceful Companion', 'RECOVERY VITALS', 'SLEEP THIS WEEK' all absent, no 'Wellness' nav item visible. Home renders readiness-card labelled 'READINESS' (not 'WELLNESS'); greenlantern has hasWearable=false so the not-connected variant (testID 'wellness-not-connected') is displayed as designed — readiness-source not shown (that testID only appears when a wearable is connected, per code). Workouts hub → workout-list (Endurance) → row 'workout-ctr-ride-1' → detail panel shows 'Assign / Edit' (testID customize-workout). Tapping opens the Customise modal (testID customize-modal) with Name/Notes and segment steppers (seg-plus-0 present); typed 'My Test Version', tapped seg-plus-0, tapped customize-save — modal closed on success. Reopened → customize-reset visible, tapped it → modal closed and rider copy removed. Post-run cleanup verified: greenlantern rider_workouts count = 0; admin GET /api/admin/catalog/ctr-ride-1 unchanged (name='Welcome Ride', duration=20); admin GET /api/admin/catalog/threshold-climb unchanged (name='Threshold Climb', duration=60).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter55_customize_and_wellness_removal.py",
+    "/app/test_reports/pytest/iter55.xml",
+    "/app/test_reports/screens/iter55_home.jpeg",
+    "/app/test_reports/screens/iter55_hub.jpeg",
+    "/app/test_reports/screens/iter55_list.jpeg",
+    "/app/test_reports/screens/iter55_detail.jpeg",
+    "/app/test_reports/screens/iter55_modal.jpeg",
+    "/app/test_reports/screens/iter55_after_reset.jpeg"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py:722-748 coach_chat_system now hard-limits Alberto/Adriana to cycling-training decisions and forbids wellness/medical/sleep/stress/lifestyle advice; the observed replies obeyed the rule and referenced readiness only as a training-readiness input.",
+    "server.py:704-711 coach_system for the ride-time voice cues carries the same wellness/medical/sleep/stress/lifestyle hard limit.",
+    "server.py wellness route removed — GET /api/wellness returns 404 while WELLNESS_DATA is still used internally at /api/calendar/week to hydrate the readiness block on days (source, metrics, score preserved).",
+    "frontend/app/wellness.tsx is a single-line <Redirect href='/' /> — direct navigation to /wellness lands on Home; no forbidden Wellness copy renders.",
+    "frontend/src/data.ts navItems has no 'wellness' key — SideNavigation has no way to render a Wellness item on any screen.",
+    "frontend/src/components/BottomCards.tsx WellnessCard renders testID='readiness-card' with the label 'READINESS'; when settings.hasWearable is false it exposes testID='wellness-not-connected'; otherwise it exposes testID='readiness-source' with 'source · synced <time>'.",
+    "frontend/src/components/WorkoutCustomizeModal.tsx uses testIDs customize-modal/customize-name/customize-desc/seg-plus-*/seg-minus-*/dur-plus/dur-minus/customize-save/customize-reset. It POSTs /api/catalog/{id}/assign then PUTs {patch:{name,description,segmentSpec,duration}} — the global fetch auth patch in src/lib/session.ts:57-79 injects the Bearer token so the modal calls hit the right rider scope. On reset it DELETEs /api/catalog/{id}/reset.",
+    "workout-list.tsx:337 exposes the Assign / Edit button (testID customize-workout) on the detail panel; verified live for Endurance→Welcome Ride and Threshold catalog rows."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter55_customize_and_wellness_removal.py (new — 11 tests, 100% passing)",
+    "/app/test_reports/iteration_55.json (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (11/11)",
+    "frontend": "100% smoke — /wellness redirect, home readiness-card, workout Assign/Edit modal open→save→reopen→reset all verified"
+  },
+  "seed_data_creation": "No seed data required. Test only touched greenlantern's rider_workouts for threshold-climb (backend suite) and ctr-ride-1 (UI test); both were reset in-suite and by an out-of-band DELETE after the UI run. Verified rider_workouts count for greenlantern = 0, and the global admin catalog for threshold-climb + ctr-ride-1 is unchanged. No throwaway riders were created this iteration.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Rider Assign/Edit uses the existing catalog endpoints: POST /api/catalog/{id}/assign, PUT /api/catalog/{id} {patch:{name,description,segmentSpec,duration,...allowlisted}}, DELETE /api/catalog/{id}/reset — server-side allowlist and id/user_id spoof-guards remain enforced (see iter54). Wellness is fully removed from the rider surface: /api/wellness is 404, /wellness (frontend) redirects to '/', no side-nav item exists. WELLNESS_DATA is kept only as the source of the readiness blocks in /api/calendar/week. Alberto/Adriana system prompts (coach_system + coach_chat_system) forbid wellness/medical/sleep/stress/lifestyle advice; readiness signals are used only as cycling-training-readiness inputs. Home dashboard uses testIDs: readiness-card, readiness-source (only when wearable connected), wellness-not-connected (only when not connected). greenlantern currently has hasWearable=false in the frontend settings, so UI tests will see the not-connected variant; to smoke-test the readiness-source line, toggle settings.hasWearable=true first or use a fixture. Backend suite /app/backend/tests/test_iter55_customize_and_wellness_removal.py is self-cleaning and safe to re-run.",
+  "rca_of_issue": "No defects. All backend and frontend assertions passed on the first (successful) run. Belt-and-suspenders cleanup of greenlantern's rider_workouts confirmed post-run via admin API."
+}

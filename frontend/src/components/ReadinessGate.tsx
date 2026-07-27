@@ -65,13 +65,7 @@ export function ReadinessGate() {
               <Text style={styles.ghostBtnText}>Browse recovery</Text>
             </Pressable>
           </View>
-        ) : (
-          <View style={styles.actions}>
-            <Pressable testID="gate-wellness" onPress={() => router.push("/wellness")} style={styles.ghostBtn}>
-              <Text style={styles.ghostBtnText}>Open wellbeing support</Text>
-            </Pressable>
-          </View>
-        )}
+        ) : null}
       </View>
     </View>
   );

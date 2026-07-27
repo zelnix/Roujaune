@@ -74,7 +74,6 @@ const SIDE_ITEMS = [
   { key: "workouts", label: "Workouts", icon: "fitness-outline" as const },
   { key: "routes", label: "Routes", icon: "map-outline" as const },
   { key: "progress", label: "Progress", icon: "stats-chart-outline" as const },
-  { key: "wellness", label: "Wellness", icon: "heart-outline" as const },
   { key: "connections", label: "Connections", icon: "git-network-outline" as const },
   { key: "settings", label: "Settings", icon: "settings-outline" as const },
 ];

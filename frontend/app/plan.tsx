@@ -110,7 +110,7 @@ export default function TrainingPlanScreen() {
     if (key === "training") return;
     if (key === "calendar") { router.replace("/calendar"); return; }
     if (key === "workouts") { router.push("/workouts"); return; }
-    const routes: Record<string, string> = { routes: "/virtual-route", progress: "/progress", wellness: "/wellness", community: "/community", connections: "/connections", settings: "/settings", help: "/help" };
+    const routes: Record<string, string> = { routes: "/virtual-route", progress: "/progress", community: "/community", connections: "/connections", settings: "/settings", help: "/help" };
     if (routes[key]) { router.replace(routes[key] as any); return; }
     showToast(`${key.charAt(0).toUpperCase() + key.slice(1)} — coming soon`);
   };

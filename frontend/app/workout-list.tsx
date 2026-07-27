@@ -8,6 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { CC } from "@/src/components/calendar";
 import { SideNavigation } from "@/src/components/SideNavigation";
+import { WorkoutCustomizeModal } from "@/src/components/WorkoutCustomizeModal";
 import { useCoach } from "@/src/lib/coach-persona";
 import { useRiderProfile } from "@/src/lib/rider-profile";
 import { markPlanSeen } from "@/src/lib/plan-badge";
@@ -21,7 +22,7 @@ import {
 
 const ROUTE: Record<string, string> = {
   home: "/", training: "/plan", routes: "/virtual-route", calendar: "/calendar",
-  progress: "/progress", community: "/community", wellness: "/wellness",
+  progress: "/progress", community: "/community",
   connections: "/connections", settings: "/settings", help: "/help",
 };
 
@@ -100,6 +101,7 @@ export default function WorkoutListScreen() {
   const [selectedId, setSelectedId] = React.useState<string | null>(params.workout ?? null);
   const [favs, setFavs] = React.useState<Set<string>>(new Set());
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
+  const [customizeOpen, setCustomizeOpen] = React.useState(false);
   const showToast = React.useCallback((t: string) => setToast({ id: Date.now(), text: t }), []);
 
   React.useEffect(() => { fetchFavorites().then((ids) => setFavs(new Set(ids))); }, []);
@@ -331,6 +333,13 @@ export default function WorkoutListScreen() {
                       <Ionicons name="calendar-outline" size={16} color={CC.white} />
                       <Text style={s.secText}>Add to Calendar</Text>
                     </Pressable>
+                    {detail.duration > 0 ? (
+                      <Pressable testID="customize-workout" onPress={() => setCustomizeOpen(true)}
+                        style={({ hovered }: any) => [s.secBtn, hovered && s.secHover]}>
+                        <Ionicons name="create-outline" size={16} color={CC.white} />
+                        <Text style={s.secText}>Assign / Edit</Text>
+                      </Pressable>
+                    ) : null}
                   </View>
                 </ScrollView>
               ) : null}
@@ -338,6 +347,12 @@ export default function WorkoutListScreen() {
           </View>
         </View>
         <Toast message={toast} />
+        <WorkoutCustomizeModal
+          workoutId={detail?.id ?? null}
+          visible={customizeOpen}
+          onClose={() => setCustomizeOpen(false)}
+          onSaved={(msg) => setToast({ id: Date.now(), text: msg })}
+        />
       </SafeAreaView>
     </GestureHandlerRootView>
   );

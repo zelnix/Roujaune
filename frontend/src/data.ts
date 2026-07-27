@@ -15,7 +15,6 @@ export const navItems: NavItem[] = [
   { key: "training", label: "Training Plan", icon: "clipboard-outline" },
   { key: "progress", label: "Progress", icon: "stats-chart-outline" },
   { key: "community", label: "Community", icon: "people-outline" },
-  { key: "wellness", label: "Wellness", icon: "heart-outline" },
   { key: "connections", label: "Connections", icon: "link-outline" },
 ];
 
@@ -111,11 +110,13 @@ export const community = {
   cta: "Join a Group Ride",
 };
 
-export const wellness = {
-  title: "Recovery Score",
+export const readiness = {
+  title: "Training Readiness",
   score: "78%",
   status: "Good",
-  note: "Focus on hydration and quality sleep.",
+  note: "Recovery signals support today's planned intensity.",
+  source: "Garmin",
+  synced: "12 min ago",
 };
 
 export const achievement = {

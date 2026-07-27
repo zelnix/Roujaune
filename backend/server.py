@@ -706,14 +706,15 @@ def coach_system(name: str = "Alberto", gender: str = "male") -> str:
         "hardest moments of a race. Blend physiology, tactics and psychology.\n"
         "Rules: reply with ONE short spoken sentence (max 16 words). No emojis, no lists, "
         "no quotation marks. Be specific to the numbers you are given. Vary your wording. "
-        "It must sound natural read aloud."
+        "It must sound natural read aloud. Keep every cue to cycling training only — never give wellness, "
+        "medical, sleep, stress or lifestyle advice."
     )
 
 
 STYLE_TONE = {
     "balanced": "Balance encouragement with practical, performance-minded advice.",
     "performance": "Lean into performance: be direct, data-driven and results-focused, while staying supportive and never shaming.",
-    "calm": "Be especially calm, warm and reassuring. Reduce pressure and support the rider's wellbeing.",
+    "calm": "Be especially calm, warm and reassuring. Reduce race-day pressure while keeping the focus on cycling training.",
     "essential": "Be concise and to the point. Keep answers brief and actionable.",
 }
 
@@ -728,10 +729,18 @@ def coach_chat_system(name: str = "Alberto", gender: str = "male", style: str = 
         f"You are a professor of cycling coaching, a team director and a sports psychologist. Your pronouns are {pronoun}.\n"
         "You are having a warm, one-to-one chat with your rider. Speak in first person, human and encouraging, never robotic.\n"
         "You can help with: training plans and periodisation, individual workouts and pacing, climbing and "
-        "tactics, smart-trainer and ERG guidance, route choices, post-ride analysis, recovery and nutrition basics, "
-        "motivation and race psychology, FB50 (Fit Beyond 50) cyclist strength, mobility, balance, posture, core, "
-        "glute activation and pre/post-ride mobility, and My Peaceful Companion wellbeing (Calm Start, Peaceful Pause, "
-        "breathing, readiness check-ins, reflection). When you suggest an FB50 exercise, briefly explain why it helps their cycling.\n"
+        "tactics, smart-trainer and ERG guidance, route choices, post-ride analysis, cycling recovery load and "
+        "session timing, motivation and race psychology, and FB50 (Fit Beyond 50) cyclist strength, mobility, "
+        "balance, posture, core, glute activation and pre/post-ride mobility. When you suggest an FB50 exercise, "
+        "briefly explain why it helps their cycling.\n"
+        "You may read wearable-derived readiness signals (sleep, stress, HRV, resting heart rate, recovery, "
+        "Body Battery / readiness) ONLY as cycling training-readiness inputs, and use them to adjust workout "
+        "intensity, duration, type, recovery load, session timing or whether to recommend a rest day. "
+        "Frame every explanation strictly as a cycling-training decision, e.g. 'your recovery signals are below "
+        "your recent baseline, so today's ride is shorter.'\n"
+        "Hard limits: never give wellness, medical, diagnostic, treatment, mental-health, sleep-improvement, "
+        "stress-management or general lifestyle advice, and never tell the rider how to sleep, eat or manage stress. "
+        "Keep all guidance to cycling training.\n"
         f"{tone}\n"
         "Rules: reply in 2 to 4 short sentences (a little more only if the rider asks for detail). Plain conversational "
         "text only. No markdown, no bullet lists, no headings, no emojis, no quotation marks. Never say you are an AI, a "
@@ -3266,7 +3275,7 @@ def _ctr_calendar_week(week, ride_map, supp_dates, today):
                                 "zone": "", "tss": "", "status": "completed" if done else "rest", "color": "purple", "created_by": "Alberto"}
         elif kind == "recovery":
             done = dt.isoformat() in supp_dates
-            entry["wellness"] = {"type": "wellness", "title": day["title"], "brand": "My Peaceful Companion",
+            entry["wellness"] = {"type": "wellness", "title": day["title"], "brand": "Recovery",
                                  "duration": day.get("duration", "10 min"), "status": "completed" if done else "scheduled"}
         else:
             done = dt.isoformat() in supp_dates
@@ -3302,7 +3311,7 @@ def _ctr_plan_response(cur, ride_map, prog, weeks=None, plan_doc=None, plan_id="
     # Presentation metadata for the non-cycling day types shown on the card.
     _TYPE_META = {
         "rest":     {"icon": "bed-outline",      "color": "#8A6FE0", "subtitle": "Rest & Recovery"},
-        "recovery": {"icon": "leaf-outline",     "color": "#55C850", "subtitle": "My Peaceful Companion"},
+        "recovery": {"icon": "leaf-outline",     "color": "#55C850", "subtitle": "Recovery Focus"},
         "strength": {"icon": "barbell-outline",  "color": "#E0A93A", "subtitle": "Strength"},
         "mobility": {"icon": "body-outline",     "color": "#E0A93A", "subtitle": "Mobility"},
         "balance":  {"icon": "walk-outline",     "color": "#E0A93A", "subtitle": "Balance"},
@@ -3804,7 +3813,6 @@ CALENDAR_WEEK = {
             "date": "2025-05-12", "day_name": "MON", "day_num": "12 MAY", "focus": "Endurance Base",
             "cycling": {"id": "c1", "type": "cycling", "title": "Endurance Ride", "duration": "1h 30m", "zone": "Z2", "tss": "65 TSS", "status": "completed", "color": "green", "created_by": "Alberto"},
             "fb50": {"id": "f1", "type": "fb50", "title": "Lower Body Strength", "duration": "20 min", "status": "completed", "category": "FB50"},
-            "wellness": {"id": "r1", "type": "wellness", "title": "Evening Reflection", "brand": "My Peaceful Companion", "duration": "5 min", "status": "completed"},
             "readiness": {"score": 82, "status": "Good", "source": "Garmin Connect", "metrics": [
                 {"key": "energy", "label": "Energy", "value": 82, "display": "High"},
                 {"key": "soreness", "label": "Soreness", "value": 78, "display": "Low"},
@@ -3815,7 +3823,6 @@ CALENDAR_WEEK = {
             "date": "2025-05-13", "day_name": "TUE", "day_num": "13 MAY", "focus": "Threshold Power",
             "cycling": {"id": "c2", "type": "cycling", "title": "Threshold Climb", "duration": "1h 00m", "zone": "Z4", "tss": "92 TSS", "status": "today", "color": "rouge", "target_power": 251, "created_by": "Alberto", "profile": [0.5, 0.7, 0.6, 0.85, 0.7, 0.95, 0.75, 0.9, 0.65, 0.88, 0.7, 0.5, 0.6, 0.8]},
             "fb50": {"id": "f2", "type": "fb50", "title": "Mobility Flow", "duration": "15 min", "status": "scheduled", "category": "FB50"},
-            "wellness": {"id": "r2", "type": "wellness", "title": "Breathing Reset Session", "brand": "My Peaceful Companion", "duration": "6 min", "status": "scheduled"},
             "readiness": {"score": 76, "status": "Good", "source": "Garmin Connect", "metrics": [
                 {"key": "energy", "label": "Energy", "value": 74, "display": "Good"},
                 {"key": "soreness", "label": "Soreness", "value": 72, "display": "Low"},
@@ -3826,7 +3833,6 @@ CALENDAR_WEEK = {
             "date": "2025-05-14", "day_name": "WED", "day_num": "14 MAY", "focus": "Recovery",
             "cycling": {"id": "c3", "type": "cycling", "title": "Recovery Ride", "duration": "1h 15m", "zone": "Z1", "tss": "45 TSS", "status": "completed", "color": "blue", "created_by": "Alberto"},
             "fb50": {"id": "f3", "type": "fb50", "title": "Core Stability", "duration": "20 min", "status": "planned", "category": "FB50"},
-            "wellness": {"id": "r3", "type": "wellness", "title": "Body Scan Meditation", "brand": "My Peaceful Companion", "duration": "10 min", "status": "planned"},
             "readiness": {"score": 68, "status": "Moderate", "source": "Apple Health", "metrics": [
                 {"key": "energy", "label": "Energy", "value": 64, "display": "Moderate"},
                 {"key": "soreness", "label": "Soreness", "value": 58, "display": "Moderate"},
@@ -3837,7 +3843,6 @@ CALENDAR_WEEK = {
             "date": "2025-05-15", "day_name": "THU", "day_num": "15 MAY", "focus": "Sweet Spot Power",
             "cycling": {"id": "c4", "type": "cycling", "title": "Sweet Spot", "duration": "1h 20m", "zone": "Z3", "tss": "75 TSS", "status": "planned", "color": "amber", "created_by": "Alberto"},
             "fb50": {"id": "f4", "type": "fb50", "title": "Hip Mobility", "duration": "15 min", "status": "planned", "category": "FB50"},
-            "wellness": {"id": "r4", "type": "wellness", "title": "Gratitude Reflection", "brand": "My Peaceful Companion", "duration": "5 min", "status": "planned"},
             "readiness": {"score": 78, "status": "Good", "source": "Garmin Connect", "metrics": [
                 {"key": "energy", "label": "Energy", "value": 76, "display": "Good"},
                 {"key": "soreness", "label": "Soreness", "value": 75, "display": "Low"},
@@ -3848,7 +3853,6 @@ CALENDAR_WEEK = {
             "date": "2025-05-16", "day_name": "FRI", "day_num": "16 MAY", "focus": "Endurance Base",
             "cycling": {"id": "c5", "type": "cycling", "title": "Endurance Ride", "duration": "1h 45m", "zone": "Z2", "tss": "70 TSS", "status": "planned", "color": "green", "created_by": "Alberto"},
             "fb50": {"id": "f5", "type": "fb50", "title": "Upper Body Strength", "duration": "20 min", "status": "planned", "category": "FB50"},
-            "wellness": {"id": "r5", "type": "wellness", "title": "Mindful Visualization", "brand": "My Peaceful Companion", "duration": "8 min", "status": "planned"},
             "readiness": {"score": 72, "status": "Good", "source": "Garmin Connect", "metrics": [
                 {"key": "energy", "label": "Energy", "value": 70, "display": "Good"},
                 {"key": "soreness", "label": "Soreness", "value": 64, "display": "Moderate"},
@@ -3859,7 +3863,6 @@ CALENDAR_WEEK = {
             "date": "2025-05-17", "day_name": "SAT", "day_num": "17 MAY", "focus": "Long Ride Endurance",
             "cycling": {"id": "c6", "type": "cycling", "title": "Long Ride", "duration": "3h 00m", "zone": "Z2", "tss": "120 TSS", "status": "planned", "color": "green", "created_by": "Alberto"},
             "fb50": {"id": "f6", "type": "fb50", "title": "Post-Ride Mobility", "duration": "20 min", "status": "planned", "category": "FB50"},
-            "wellness": {"id": "r6", "type": "wellness", "title": "Recovery Reflection", "brand": "My Peaceful Companion", "duration": "5 min", "status": "planned"},
             "readiness": {"score": 65, "status": "Moderate", "source": "Apple Health", "metrics": [
                 {"key": "energy", "label": "Energy", "value": 62, "display": "Moderate"},
                 {"key": "soreness", "label": "Soreness", "value": 55, "display": "Moderate"},
@@ -3870,7 +3873,6 @@ CALENDAR_WEEK = {
             "date": "2025-05-18", "day_name": "SUN", "day_num": "18 MAY", "focus": "Recovery",
             "cycling": {"id": "c7", "type": "cycling", "title": "Rest Day", "subtitle": "Wellness Focus", "duration": "", "zone": "", "tss": "", "status": "rest", "color": "purple", "created_by": "Alberto"},
             "fb50": {"id": "f7", "type": "fb50", "title": "Active Recovery Walk", "duration": "30 min", "status": "planned", "category": "Recovery"},
-            "wellness": {"id": "r7", "type": "wellness", "title": "Weekly Check-In", "brand": "My Peaceful Companion", "duration": "10 min", "status": "planned", "checkin": True},
             "readiness": {"score": 84, "status": "Good", "source": "Garmin Connect", "metrics": [
                 {"key": "energy", "label": "Energy", "value": 85, "display": "High"},
                 {"key": "soreness", "label": "Soreness", "value": 82, "display": "Low"},
@@ -4315,11 +4317,6 @@ async def get_progress_timeline(rng: str = Query("3m", alias="range"), offset: i
 @api_router.get("/routes")
 async def get_routes():
     return ROUTES_DATA
-
-
-@api_router.get("/wellness")
-async def get_wellness():
-    return WELLNESS_DATA
 
 
 @api_router.get("/community")

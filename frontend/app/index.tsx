@@ -82,7 +82,7 @@ export default function Dashboard() {
       router.push("/workouts");
       return;
     }
-    const routes: Record<string, string> = { calendar: "/calendar", routes: "/virtual-route", progress: "/progress", benchmark: "/benchmark", wellness: "/wellness", community: "/community", connections: "/connections", settings: "/settings", help: "/help" };
+    const routes: Record<string, string> = { calendar: "/calendar", routes: "/virtual-route", progress: "/progress", benchmark: "/benchmark", community: "/community", connections: "/connections", settings: "/settings", help: "/help" };
     if (routes[key]) {
       router.push(routes[key] as any);
       return;

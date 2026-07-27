@@ -193,7 +193,6 @@ const NAV = [
   { key: "workouts", label: "Workouts", icon: "fitness-outline" },
   { key: "routes", label: "Virtual Routes", icon: "git-network-outline" },
   { key: "progress", label: "Progress", icon: "stats-chart-outline" },
-  { key: "wellness", label: "Wellness", icon: "heart-outline" },
   { key: "community", label: "Community", icon: "people-outline" },
   { key: "connections", label: "Connections", icon: "link-outline" },
   { key: "settings", label: "Settings", icon: "settings-outline" },

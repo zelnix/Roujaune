@@ -21,7 +21,7 @@ import {
 
 const ROUTE: Record<string, string> = {
   home: "/", training: "/plan", routes: "/virtual-route", calendar: "/calendar",
-  progress: "/progress", community: "/community", wellness: "/wellness",
+  progress: "/progress", community: "/community",
   connections: "/connections", settings: "/settings", help: "/help",
 };
 
