@@ -1,0 +1,39 @@
+{
+  "summary": "Backend-only iter53 — HWG admin console EXACT path surface. 22/22 tests PASS in test_iter53_admin_console_paths.py against external EXPO_PUBLIC_BACKEND_URL. Verified: (1) GET /api/admin/me returns {admin_id,email,name,role='admin',provider} for admin token, 401 with no token, 403 with rider token — HARD BLOCKER GREEN; (2) GET /api/admin/dashboard 200 with full rollup {riders,active,suspended,onboarded,new_this_week,admins,plans,benchmark_results,catalog,time} and 401/403 RBAC same as /me; (3) GET /api/admin/nav-badges returns {riders,suspended,plans,catalog} all int≥0; (4) GET /api/admin/analytics/growth returns a 6-item 'series' array — every row has {month:YYYY-MM,label:3-letter,new_users:int,total_users:int}; cumulative total_users is non-decreasing; (5) GET /api/admin/riders?limit=5 returns paginated list with password_hash stripped; (6) GET /api/admin/riders/export/csv returns 200 with content-type text/csv and header row exactly `user_id,email,name,provider,role,assigned_plan_id,onboarded,email_verified,suspended,created_at` — route NOT shadowed by /riders/{id}; (7) Full rider lifecycle on a throwaway rider (register→login OK→suspend→login 403→reactivate→login 200→reset-password returns {ok:true,temporary_password:<9+chars>}, old pw now 401, temp pw logs in 200→DELETE→GET rider now 404); (8) GET /api/admin/plans includes couch-to-road with a `status` field; POST /plans/couch-to-road/{publish,archive,publish} each returns {id,status}, and audit log GET /api/admin/audit?limit=25 shows both `plan.published` and `plan.archived` actions; (9) GET /api/admin/integrations?health=1 includes a `database` entry (id:'database') plus llm/email/push/weather/google_auth; without health=1 the database entry is absent; (10) GET /api/admin/catalog returns {items:[...]}; (11) GET/PUT /api/admin/config/benchmarks alias behaves identically to /benchmark/config — mutated to {ftp_retest_days:71, retest_days.ramp:42} via alias, canonical endpoint reflected the change, then RESTORED to 56/56; (12) GET /api/admin/coaches 200; (13) Regression — greenlantern rider still 200 on /api/plan (title='From Couch to Road', duration_weeks=16), /api/calendar/week, /api/rider/profile, /api/progress; existing /api/admin/{users,metrics,health} all 200. Global state restored end-of-suite (verified post-run via curl): ftp_retest_days=56, retest_days.ramp=56, couch-to-road.status=published.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter53_admin_console_paths.py",
+    "/app/test_reports/pytest/iter53.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "admin_routes.py:296-312 — /riders/export/csv is declared BEFORE /riders/{user_id} so FastAPI does not shadow it as a path param. CSV header column order matches the spec (user_id,email,name,provider,role,assigned_plan_id,onboarded,email_verified,suspended,created_at). Cell escaping quotes fields containing commas or quote chars. Content-Disposition set to attachment.",
+    "admin_routes.py:341-352 — reset-password uses secrets.token_urlsafe(9) (>=12 chars post-encoding), rehashes via auth.hash_pw, sets provider='password' so magic-link/oauth-only accounts can now login with pw, and deletes existing sessions to force re-login. Audit row rider.reset_password written. Verified end-to-end that the returned temporary_password logs in.",
+    "admin_routes.py:320-338 — _set_suspended toggles users.suspended and, on suspend=True, wipes user_sessions to force logout. Verified: after suspend, subsequent /api/auth/login returns 403 (auth.py path) as required.",
+    "admin_routes.py:249-285 — analytics/growth builds 6 monthly buckets by walking back from today; seeds cumulative with users created BEFORE the window then adds per-month new_users. Series length is exactly 6 and total_users is monotonic — matches contract.",
+    "admin_routes.py:201-211 — /api/admin/me returns exactly {admin_id,email,name,role,provider}. Verified role='admin' and admin_id matches admin store id. RBAC 401/403 comes from require_admin dependency at router level.",
+    "admin_routes.py:390-407 — plan.publish|archive|delete each emit audit row `plan.<status>` and notify plan-change hook. `list_plans` defaults status to 'published' when absent so the response is always non-null.",
+    "admin_routes.py:413-436 — integrations?health=1 pings MongoDB before appending the `database` item, so 'status' reflects actual DB state (healthy in this env)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter53_admin_console_paths.py (new — 22 tests, all passing)"
+  ],
+  "success_rate": {
+    "backend": "100% (22/22)",
+    "frontend": "not tested (backend-only request)"
+  },
+  "seed_data_creation": "One throwaway rider registered via POST /api/auth/register (email test-i53-<uuid>@roujaune.app) inside test_rider_lifecycle_full and fully cleaned up by the same test via DELETE /api/admin/riders/{id}; follow-up GET returned 404 so no lingering test data. greenlantern rider was NOT mutated.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "New iter53 exact-path admin console surface is fully green. All contract paths (me, nav-badges, dashboard, analytics/growth, riders + lifecycle, riders/export/csv, plans + lifecycle, integrations?health=1, catalog, config/benchmarks alias, coaches) are wired and behave per spec. Suspending a rider both (a) forces 403 on subsequent password login (auth.py handles the suspended flag on login) and (b) invalidates existing bearer sessions (admin_routes._set_suspended wipes user_sessions). CSV export route is declared before the /{user_id} capture so it's not shadowed. Global state end-of-run: ftp_retest_days=56, retest_days.ramp=56, couch-to-road.status=published (verified via curl post-suite). Test file /app/backend/tests/test_iter53_admin_console_paths.py can be re-run standalone; it self-restores mutations at end (test_zz_restore_*).",
+  "rca_of_issue": "One test-script defect during first run: regression assertion checked len(j['weeks'])==16 but /api/plan does not return a nested 'weeks' array — it returns duration_weeks: 16 (plus other fields like phases, week_targets, weekly_load). Fixed the assertion to `j.get('duration_weeks') == 16`; all 22 tests then passed. No backend defect."
+}

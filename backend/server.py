@@ -4348,6 +4348,17 @@ async def put_benchmark_config(body: BenchmarkConfigPatch):
     return {"retest_days": dict(BM_RETEST_DAYS), "ftp_retest_days": FTP_RETEST_DAYS}
 
 
+# Console-contract aliases: GET/PUT /api/admin/config/benchmarks
+@admin_cfg_router.get("/config/benchmarks")
+async def get_config_benchmarks():
+    return await get_benchmark_config()
+
+
+@admin_cfg_router.put("/config/benchmarks")
+async def put_config_benchmarks(body: BenchmarkConfigPatch):
+    return await put_benchmark_config(body)
+
+
 @admin_cfg_router.get("/coaches")
 async def get_coaches_config():
     doc = await db.admin_config.find_one({"_id": "coaches"}, {"_id": 0})
@@ -4376,7 +4387,7 @@ app.include_router(push.router)
 app.include_router(admin_routes.admin_router)
 app.include_router(admin_cfg_router)
 push.init(db)
-admin_routes.init(db)
+admin_routes.init(db, on_plan_change=_on_plan_change)
 
 app.add_middleware(auth.AuthMiddleware)
 # CORS origins are env-driven (comma-separated CORS_ORIGINS). Defaults to "*" when

@@ -9,10 +9,11 @@ Contract reference: /app/memory/roujaune_admin_api_contract.md
 from __future__ import annotations
 
 import datetime
+import secrets
 import time
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 
 import auth
@@ -20,13 +21,23 @@ import auth
 admin_router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(auth.require_admin)])
 
 _db = None
+_on_plan_change = None
 _STARTED = time.monotonic()
 _VERSION = "1.0.0"
 
 
-def init(db) -> None:
-    global _db
+def init(db, on_plan_change=None) -> None:
+    global _db, _on_plan_change
     _db = db
+    _on_plan_change = on_plan_change
+
+
+async def _notify_plan(plan_id: str) -> None:
+    if _on_plan_change:
+        try:
+            await _on_plan_change(plan_id)
+        except Exception:
+            pass
 
 
 def _now() -> str:
@@ -182,3 +193,262 @@ async def audit_log(limit: int = 50, skip: int = 0, cursor: Optional[str] = None
     items = await cur.to_list(limit)
     next_cursor = items[-1].get("at") if len(items) == limit else None
     return {"items": items, "next_cursor": next_cursor}
+
+
+# --------------------------------------------------------------------------- #
+#  Console identity + navigation                                              #
+# --------------------------------------------------------------------------- #
+@admin_router.get("/me")
+async def me():
+    """Current authenticated admin identity (console session bootstrap)."""
+    a = auth.require_user()
+    return {
+        "admin_id": a.get("user_id"),
+        "email": a.get("email"),
+        "name": a.get("name") or "Admin",
+        "role": a.get("role", "admin"),
+        "provider": a.get("provider", "admin-store"),
+    }
+
+
+@admin_router.get("/nav-badges")
+async def nav_badges():
+    """Counts the console renders as sidebar/nav badges."""
+    riders = await _db.users.count_documents({"role": {"$ne": "admin"}})
+    suspended = await _db.users.count_documents({"suspended": True})
+    plans = await _db.plans.count_documents({})
+    catalog = await _db.workout_catalog.count_documents({})
+    return {"riders": riders, "suspended": suspended, "plans": plans, "catalog": catalog}
+
+
+# --------------------------------------------------------------------------- #
+#  Dashboard + analytics                                                      #
+# --------------------------------------------------------------------------- #
+@admin_router.get("/dashboard")
+async def dashboard():
+    """Rollup metrics for the console home (superset of /metrics)."""
+    week_ago = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)).isoformat()
+    total = await _db.users.count_documents({"role": {"$ne": "admin"}})
+    suspended = await _db.users.count_documents({"suspended": True})
+    new_week = await _db.users.count_documents({"created_at": {"$gte": week_ago}})
+    onboarded = await _db.users.count_documents({"onboarded": True})
+    return {
+        "riders": total,
+        "active": total - suspended,
+        "suspended": suspended,
+        "onboarded": onboarded,
+        "new_this_week": new_week,
+        "admins": await _db.users.count_documents({"role": "admin"}),
+        "plans": await _db.plans.count_documents({}),
+        "benchmark_results": await _db.benchmark_results.count_documents({}),
+        "catalog": await _db.workout_catalog.count_documents({}),
+        "time": _now(),
+    }
+
+
+@admin_router.get("/analytics/growth")
+async def analytics_growth():
+    """6-month rider growth series (new + cumulative) for the HWG rollup."""
+    now = datetime.datetime.now(datetime.timezone.utc)
+    # Build the last 6 month buckets (oldest → newest).
+    buckets: list[dict] = []
+    y, m = now.year, now.month
+    months = []
+    for _ in range(6):
+        months.append((y, m))
+        m -= 1
+        if m == 0:
+            m = 12
+            y -= 1
+    months.reverse()
+    labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    docs = await _db.users.find({"role": {"$ne": "admin"}}, {"created_at": 1, "_id": 0}).to_list(100000)
+    def _ym(s):
+        try:
+            return (int(str(s)[0:4]), int(str(s)[5:7]))
+        except Exception:
+            return None
+    created = [_ym(d.get("created_at")) for d in docs if d.get("created_at")]
+    cumulative = 0
+    start = months[0]
+    # seed cumulative with everyone created before the window
+    cumulative = sum(1 for c in created if c and c < start)
+    for (yy, mm) in months:
+        new_count = sum(1 for c in created if c == (yy, mm))
+        cumulative += new_count
+        buckets.append({
+            "month": f"{yy}-{mm:02d}",
+            "label": labels[mm - 1],
+            "new_users": new_count,
+            "total_users": cumulative,
+        })
+    return {"series": buckets}
+
+
+# --------------------------------------------------------------------------- #
+#  Riders (alias of /users + lifecycle actions)                               #
+# --------------------------------------------------------------------------- #
+@admin_router.get("/riders")
+async def list_riders(q: Optional[str] = None, limit: int = 50, skip: int = 0, cursor: Optional[str] = None):
+    return await list_users(q=q, limit=limit, skip=skip, cursor=cursor)
+
+
+@admin_router.get("/riders/export/csv")
+async def export_riders_csv():
+    """Download all riders as CSV (no secrets)."""
+    fields = ["user_id", "email", "name", "provider", "role", "assigned_plan_id",
+              "onboarded", "email_verified", "suspended", "created_at"]
+    docs = await _db.users.find({"role": {"$ne": "admin"}},
+                                {"_id": 0, "password_hash": 0, "reset_token": 0, "verify_token": 0}
+                                ).sort("created_at", -1).to_list(100000)
+    def _cell(v):
+        s = "" if v is None else str(v)
+        return '"' + s.replace('"', '""') + '"' if ("," in s or '"' in s) else s
+    lines = [",".join(fields)]
+    for d in docs:
+        lines.append(",".join(_cell(d.get(f)) for f in fields))
+    await _audit("riders.export.csv", "riders", {"count": len(docs)})
+    return Response(content="\n".join(lines), media_type="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=roujaune-riders.csv"})
+
+
+@admin_router.get("/riders/{user_id}")
+async def get_rider(user_id: str):
+    return await get_user(user_id)
+
+
+async def _set_suspended(user_id: str, value: bool) -> dict:
+    res = await _db.users.update_one({"user_id": user_id}, {"$set": {"suspended": value}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Rider not found")
+    if value:
+        await _db.user_sessions.delete_many({"user_id": user_id})  # force logout
+    await _audit("rider.suspend" if value else "rider.reactivate", user_id, {"suspended": value})
+    u = await _db.users.find_one({"user_id": user_id}, {"_id": 0, "password_hash": 0, "reset_token": 0, "verify_token": 0})
+    return {"user": u}
+
+
+@admin_router.post("/riders/{user_id}/suspend")
+async def suspend_rider(user_id: str):
+    return await _set_suspended(user_id, True)
+
+
+@admin_router.post("/riders/{user_id}/reactivate")
+async def reactivate_rider(user_id: str):
+    return await _set_suspended(user_id, False)
+
+
+@admin_router.post("/riders/{user_id}/reset-password")
+async def reset_rider_password(user_id: str):
+    """Issue a temporary password and invalidate the rider's active sessions.
+    Returns the temp password once so the admin can relay it to the rider."""
+    u = await _db.users.find_one({"user_id": user_id})
+    if not u:
+        raise HTTPException(status_code=404, detail="Rider not found")
+    temp = secrets.token_urlsafe(9)
+    await _db.users.update_one({"user_id": user_id}, {"$set": {"password_hash": auth.hash_pw(temp), "provider": "password"}})
+    await _db.user_sessions.delete_many({"user_id": user_id})
+    await _audit("rider.reset_password", user_id, {})
+    return {"ok": True, "temporary_password": temp}
+
+
+@admin_router.delete("/riders/{user_id}")
+async def delete_rider(user_id: str):
+    return await delete_user(user_id)
+
+
+# --------------------------------------------------------------------------- #
+#  Plans (admin list + lifecycle)                                             #
+# --------------------------------------------------------------------------- #
+@admin_router.get("/plans")
+async def list_plans():
+    docs = await _db.plans.find({}, {"_id": 0}).to_list(200)
+    out = []
+    for d in docs:
+        out.append({
+            "id": d.get("id"),
+            "title": d.get("title"),
+            "level": d.get("level"),
+            "label": d.get("label"),
+            "type": d.get("type"),
+            "status": d.get("status", "published"),
+            "week_count": len(d.get("weeks", []) or []),
+            "updated_at": d.get("updated_at"),
+        })
+    return {"items": out}
+
+
+async def _plan_status(plan_id: str, status: str) -> dict:
+    res = await _db.plans.update_one({"id": plan_id}, {"$set": {"status": status}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    await _notify_plan(plan_id)
+    await _audit(f"plan.{status}", plan_id, {"status": status})
+    return {"id": plan_id, "status": status}
+
+
+@admin_router.post("/plans/{plan_id}/publish")
+async def publish_plan(plan_id: str):
+    return await _plan_status(plan_id, "published")
+
+
+@admin_router.post("/plans/{plan_id}/archive")
+async def archive_plan(plan_id: str):
+    return await _plan_status(plan_id, "archived")
+
+
+@admin_router.delete("/plans/{plan_id}")
+async def delete_plan(plan_id: str):
+    res = await _db.plans.delete_one({"id": plan_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    await _notify_plan(plan_id)
+    await _audit("plan.delete", plan_id, {})
+    return {"deleted": plan_id}
+
+
+# --------------------------------------------------------------------------- #
+#  Integrations health                                                        #
+# --------------------------------------------------------------------------- #
+@admin_router.get("/integrations")
+async def integrations(health: int = 0):
+    import os
+    def _st(configured: bool) -> str:
+        return "healthy" if configured else "not_configured"
+    items = [
+        {"id": "llm", "name": "Coach AI (Claude via Emergent)", "type": "llm",
+         "configured": bool(os.environ.get("EMERGENT_LLM_KEY")), "status": _st(bool(os.environ.get("EMERGENT_LLM_KEY")))},
+        {"id": "push", "name": "Push Notifications (Emergent)", "type": "push",
+         "configured": bool(os.environ.get("EMERGENT_PUSH_KEY")), "status": _st(bool(os.environ.get("EMERGENT_PUSH_KEY")))},
+        {"id": "email", "name": "Transactional Email (Resend)", "type": "email",
+         "configured": bool(os.environ.get("EMERGENT_EMAIL_KEY")), "status": _st(bool(os.environ.get("EMERGENT_EMAIL_KEY")))},
+        {"id": "weather", "name": "Weather (Open-Meteo)", "type": "weather", "configured": True, "status": "healthy"},
+        {"id": "google_auth", "name": "Google Sign-In (Emergent)", "type": "auth", "configured": True, "status": "healthy"},
+    ]
+    if health:
+        try:
+            await _db.command("ping")
+            db_ok = True
+        except Exception:
+            db_ok = False
+        items.append({"id": "database", "name": "MongoDB", "type": "database", "configured": True,
+                      "status": "healthy" if db_ok else "down"})
+    return {"items": items}
+
+
+# --------------------------------------------------------------------------- #
+#  Workout catalog (server-managed content the console can prune)             #
+# --------------------------------------------------------------------------- #
+@admin_router.get("/catalog")
+async def list_catalog():
+    items = await _db.workout_catalog.find({}, {"_id": 0}).to_list(1000)
+    return {"items": items}
+
+
+@admin_router.delete("/catalog/{item_id}")
+async def delete_catalog_item(item_id: str):
+    res = await _db.workout_catalog.delete_one({"id": item_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Catalog item not found")
+    await _audit("catalog.delete", item_id, {})
+    return {"deleted": item_id}
