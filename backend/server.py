@@ -4319,6 +4319,34 @@ async def get_routes():
     return ROUTES_DATA
 
 
+@api_router.get("/rider/missed")
+async def rider_missed():
+    """Safe missed-workout handling: count past scheduled cycling sessions that
+    weren't completed. Guidance intentionally never encourages stacking or unsafe
+    catch-up — the plan simply continues from today."""
+    uid = auth.current_user_id()
+    today = datetime.now(timezone.utc).date().isoformat()
+    try:
+        sched = await udb.scheduled_workouts.find().to_list(500)
+    except Exception:
+        sched = []
+    missed = [
+        w for w in sched
+        if str(w.get("date", "")) < today and w.get("status") not in ("completed", "skipped")
+    ]
+    missed.sort(key=lambda w: str(w.get("date", "")), reverse=True)
+    count = len(missed)
+    guidance = (
+        "No need to make these up — don't stack hard sessions. Pick up today's ride "
+        "as planned; your plan continues safely from here."
+    ) if count else ""
+    return {
+        "count": count,
+        "missed": [{"date": w.get("date"), "title": w.get("title") or w.get("name")} for w in missed[:5]],
+        "guidance": guidance,
+    }
+
+
 @api_router.get("/community")
 async def get_community():
     return COMMUNITY_DATA

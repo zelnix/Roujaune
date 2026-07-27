@@ -87,14 +87,14 @@ export default function WorkoutListScreen() {
   const router = useRouter();
   const persona = useCoach();
   const { profile } = useRiderProfile();
-  const params = useLocalSearchParams<{ type?: string; workout?: string }>();
+  const params = useLocalSearchParams<{ type?: string; workout?: string; band?: string }>();
   const { width, height } = useWindowDimensions();
   const compact = width < 900;
   const navCompact = height < 560;
   const navWidth = navCompact ? Math.max(72, Math.min(88, width * 0.09)) : Math.max(84, Math.min(104, width * 0.085));
 
   const [typeFilter, setTypeFilter] = React.useState<string>(params.type ?? "all");
-  const [band, setBand] = React.useState<DurationBand>("any");
+  const [band, setBand] = React.useState<DurationBand>((params.band as DurationBand) ?? "any");
   const [sort, setSort] = React.useState<SortKey>("recommended");
   const [levelFilter, setLevelFilter] = React.useState<string>("all");
   const [levelTouched, setLevelTouched] = React.useState(false);

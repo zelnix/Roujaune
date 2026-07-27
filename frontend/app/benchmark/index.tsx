@@ -153,6 +153,27 @@ export default function BenchmarkLandingScreen() {
         )}
       </Card>
 
+      {/* ── Easier / Submaximal option (equal prominence to the harder test) ── */}
+      <Card testID="bm-submaximal">
+        <SectionTitle label="PREFER AN EASIER TEST?" />
+        <Text style={s.lead}>
+          Submaximal tests estimate your numbers without an all-out effort — a
+          gentler, joint-friendly way to set your training zones.
+        </Text>
+        <View style={s.recActions}>
+          <Pressable
+            testID="submax-choose"
+            onPress={() => router.push("/benchmark/library?filter=submaximal")}
+            accessibilityRole="button"
+            accessibilityLabel="Choose an easier submaximal benchmark test"
+            style={s.btnPrimary}
+          >
+            <Ionicons name="leaf" size={15} color="#fff" />
+            <Text style={s.btnPrimaryText}>Choose an easier test</Text>
+          </Pressable>
+        </View>
+      </Card>
+
       {/* ── Recent Results ── */}
       <Card testID="bm-recent">
         <SectionTitle label="RECENT RESULTS" />

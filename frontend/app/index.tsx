@@ -12,8 +12,7 @@ import { HeroRoute } from "@/src/components/HeroRoute";
 import { MetricSummaryStrip } from "@/src/components/MetricSummaryStrip";
 import { TrainingPlanCard } from "@/src/components/TrainingPlanCard";
 import { TodayTrainingCard } from "@/src/components/TodayTrainingCard";
-import { PlanUpdatedNudge } from "@/src/components/PlanUpdatedNudge";
-import { BenchmarkReminderBanner } from "@/src/components/BenchmarkReminderBanner";
+import { HomeNotificationArea } from "@/src/components/HomeNotificationArea";
 import { ReadinessGate } from "@/src/components/ReadinessGate";
 import { ProgressCard, CommunityCard, WellnessCard, AchievementCard } from "@/src/components/BottomCards";
 import { navItems, navFooter } from "@/src/data";
@@ -21,7 +20,6 @@ import { useCoach } from "@/src/lib/coach-persona";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
 import { ProgressPanel } from "@/src/components/ProgressPanel";
 import { NotificationsModal } from "@/src/components/NotificationsModal";
-import { VerifyEmailBanner } from "@/src/components/VerifyEmailBanner";
 import { CC } from "@/src/components/calendar";
 
 function Toast({ message }: { message: { id: number; text: string } | null }) {
@@ -107,8 +105,7 @@ export default function Dashboard() {
             showsVerticalScrollIndicator={false}
             testID="dashboard-scroll"
           >
-            <PlanUpdatedNudge />
-            <BenchmarkReminderBanner />
+            <HomeNotificationArea />
 
             <View style={[styles.heroRow, { height: heroHeight }]}>
               <HeroRoute
@@ -120,13 +117,11 @@ export default function Dashboard() {
                 onFlame={() => setShowProgress(true)}
                 onNotifications={() => setShowNotifs(true)}
                 compact={compact}
-                sideSlot={<TodayTrainingCard overlay onOpenToday={() => router.push("/training")} onToast={showToast} onCalendar={() => router.push("/calendar")} />}
+                sideSlot={<TodayTrainingCard overlay onToast={showToast} onCalendar={() => router.push("/calendar")} />}
               />
             </View>
 
             <MetricSummaryStrip />
-
-            <VerifyEmailBanner />
 
             <ReadinessGate />
 

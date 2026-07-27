@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, Animated, useWindowDimensions, LayoutChangeEvent, Platform } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Animated, useWindowDimensions, LayoutChangeEvent, Platform, Pressable } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -156,6 +156,17 @@ export default function TodaysTraining() {
                 <ReadinessCard />
                 <TrainingLoadCard width={rightColW} />
                 <WorkoutBreakdownCard onStart={startRide} workout={activeWorkout} />
+                <Pressable
+                  testID="short-on-time"
+                  onPress={() => router.push({ pathname: "/workout-list", params: { band: "short" } } as any)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Short on time? Find a ride you can finish in about 45 minutes"
+                  style={styles.shortOnTime}
+                >
+                  <Ionicons name="time-outline" size={16} color={colors.yellow} />
+                  <Text style={styles.shortOnTimeText}>Only 45 minutes today? Find a shorter ride</Text>
+                  <Ionicons name="chevron-forward" size={15} color={colors.textDim} />
+                </Pressable>
                 <EquipmentCard onItemPress={(label) => showToast(`${label} status`)} />
               </View>
             </View>
@@ -169,6 +180,13 @@ export default function TodaysTraining() {
 }
 
 const styles = StyleSheet.create({
+  shortOnTime: {
+    flexDirection: "row", alignItems: "center", gap: spacing.sm,
+    backgroundColor: "rgba(255,194,10,0.08)", borderColor: "rgba(255,194,10,0.28)",
+    borderWidth: 1, borderRadius: radius.lg, paddingVertical: 12, paddingHorizontal: spacing.md,
+    marginTop: spacing.sm,
+  },
+  shortOnTimeText: { flex: 1, color: colors.white, fontSize: 13, fontWeight: "700" },
   container: { flex: 1, backgroundColor: colors.bg },
   row: { flex: 1, flexDirection: "row" },
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.xl, gap: spacing.md },
