@@ -244,6 +244,9 @@ def _requires_auth(path: str, method: str) -> bool:
         return False
     if path in _PUBLIC:
         return False
+    # Static report downloads are public in preview (filename allow-list enforced).
+    if path == "/api/reports" or path.startswith("/api/reports/"):
+        return False
     return True
 
 
