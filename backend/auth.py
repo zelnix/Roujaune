@@ -33,7 +33,7 @@ _current_user: contextvars.ContextVar = contextvars.ContextVar("current_user", d
 
 APPLE_KEYS_URL = "https://appleid.apple.com/auth/keys"
 APPLE_ISSUER = "https://appleid.apple.com"
-APPLE_AUDIENCE = "com.hgw.roujaune"  # iOS bundle id (app.json)
+APPLE_AUDIENCE = "com.hwg.roujaune"  # iOS bundle id (app.json)
 EMERGENT_SESSION_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data"
 SESSION_TTL_DAYS = 7
 

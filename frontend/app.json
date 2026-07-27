@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "usesAppleSignIn": true,
-      "bundleIdentifier": "com.hgw.roujaune",
+      "bundleIdentifier": "com.hwg.roujaune",
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "Find nearby TVs to cast your ride",
         "NSBonjourServices": [
@@ -36,7 +36,7 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
-      "package": "com.hgw.roujaune",
+      "package": "com.hwg.roujaune",
       "googleServicesFile": "./google-services.json"
     },
     "web": {
