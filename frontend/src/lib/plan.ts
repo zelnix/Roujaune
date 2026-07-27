@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import React from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { PLAN, TrainingPlan } from "../components/plan";
 
 function apiBase(): string {
   return (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
 }
+
+const planCacheKey = (id: string) => `roujaune:plan:${id}`;
 
 /** Map the FastAPI /api/plan document (snake_case) into the UI plan shape. */
 function normalize(d: any): TrainingPlan {
@@ -45,6 +48,14 @@ export function usePlan(id = "build-and-climb") {
   useEffect(() => {
     let alive = true;
     (async () => {
+      // Instant paint from the last-fetched plan (prevents the bundled
+      // "Build & Climb" demo plan flashing before the real plan loads).
+      try {
+        const cached = await AsyncStorage.getItem(planCacheKey(id));
+        if (cached && alive) { setPlan(JSON.parse(cached)); setLive(true); }
+      } catch {
+        /* ignore cache */
+      }
       try {
         const ctrl = new AbortController();
         const timer = setTimeout(() => ctrl.abort(), 8000);
@@ -52,9 +63,13 @@ export function usePlan(id = "build-and-climb") {
         clearTimeout(timer);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        if (alive) { setPlan(normalize(data)); setLive(true); }
+        if (alive) {
+          const p = normalize(data);
+          setPlan(p); setLive(true);
+          AsyncStorage.setItem(planCacheKey(id), JSON.stringify(p)).catch(() => {});
+        }
       } catch {
-        if (alive) setPlan(PLAN); // keep the bundled plan
+        /* keep the cached (or bundled) plan already in state */
       } finally {
         if (alive) setLoading(false);
       }

@@ -563,3 +563,9 @@ Re-specified per detailed 5-part brief; SUPERSEDES batch-9/10 "Phase 1/2".
 - **Signal-loss behaviour (was 🟠):** `rider-animation.ts` adds a `degraded = signalLost && !frozen` state — pedalling stops, cadence/power/effort/bob ease to 0, speed spins down (tau 1.8s), posture/lean centre, coast→1. Distinct from the hard paused/emergency freeze.
 - **Customise preview → live Rive rig (was 🟠):** `rider-customise.tsx` preview now renders `<RiveRider>` with idle sim telemetry (falls back to sprite on web / until real `.riv`).
 - **Today plan-review banner:** `BenchmarkReminderBanner.tsx` now also surfaces a pending FTP plan-review (`useBenchmarkPlanReview`) as a green "FTP update ready NNNW→MMMW" row above the benchmark-test row; both tap to `/benchmark`. Verified: both render for demo (287→305W + Ramp Test tomorrow).
+
+## Session update (Jun 2026 fork) — placeholder audit + local caching
+- Root issue: several client hooks initialised with hardcoded defaults that flashed before their backend fetch resolved.
+- `rider-profile.ts`: caches profile to AsyncStorage (`roujaune:riderProfile`), hydrates `_snap` + hook instantly; no "Rider One" flash. HeroRoute avatar initials gated on `profileLoaded`.
+- `plan.ts` `usePlan`: caches per-id (`roujaune:plan:<id>`), paints last real plan instantly then reconciles; no bundled "Build & Climb" flash.
+- Settings (home location) already AsyncStorage-cached + weather gated on `settingsLoaded`; coach gated on `useCoachReady()`. Verified Today shows "From Couch to Road" + "GL" with no placeholders.
