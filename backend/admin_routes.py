@@ -410,18 +410,36 @@ async def delete_plan(plan_id: str):
 # --------------------------------------------------------------------------- #
 #  Integrations health + estimated monthly spend (HWG cost rollup)            #
 # --------------------------------------------------------------------------- #
-# Flat monthly cost estimates (USD) + soft budgets per integration. When real
-# token/request usage tracking lands, replace the flat estimate with
-# monthly_units × unit_price. The one field the HWG rollup reads is
-# totals.est_cost_month_usd.
-_INTEGRATION_COST = {
-    "llm":         {"est": 40.0, "budget": 150.0},
-    "push":        {"est": 5.0,  "budget": 25.0},
-    "email":       {"est": 10.0, "budget": 40.0},
-    "weather":     {"est": 0.0,  "budget": 5.0},
-    "google_auth": {"est": 0.0,  "budget": 5.0},
-    "database":    {"est": 15.0, "budget": 60.0},
+# Hybrid billing model:
+#   • FLAT   — fixed/subscription fee. Editable from the console (persisted to
+#              admin_config → integration_costs.overrides).
+#   • METERED — usage-based. Auto-computed from real activity; NOT editable.
+_INTEGRATION_META = {
+    "llm":         {"billing": "metered", "unit_price": 0.012, "calls_per_ride": 9, "budget": 200.0},
+    "push":        {"billing": "flat", "default": 5.0,  "budget": 25.0},
+    "email":       {"billing": "flat", "default": 10.0, "budget": 40.0},
+    "weather":     {"billing": "flat", "default": 0.0,  "budget": 5.0},
+    "google_auth": {"billing": "flat", "default": 0.0,  "budget": 5.0},
+    "database":    {"billing": "flat", "default": 15.0, "budget": 60.0},
 }
+_FLAT_INTEGRATIONS = {k for k, v in _INTEGRATION_META.items() if v["billing"] == "flat"}
+
+
+async def _metered_llm_cost() -> float:
+    """Auto usage-based estimate for the LLM coach: rides in the last 30 days ×
+    est. LLM calls per ride (cues + debrief) × unit price."""
+    meta = _INTEGRATION_META["llm"]
+    since = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=30)).isoformat()
+    try:
+        rides = await _db.ride_history.count_documents({"created_at": {"$gte": since}})
+    except Exception:
+        rides = 0
+    return round(rides * meta["calls_per_ride"] * meta["unit_price"], 2)
+
+
+async def _cost_overrides() -> dict:
+    doc = await _db.admin_config.find_one({"_id": "integration_costs"}, {"_id": 0})
+    return (doc or {}).get("overrides", {}) or {}
 
 
 @admin_router.get("/integrations")
@@ -447,11 +465,19 @@ async def integrations(health: int = 1):
             db_ok = False
         items.append({"id": "database", "name": "MongoDB", "type": "database", "configured": True,
                       "status": "healthy" if db_ok else "down"})
-    # Attach per-integration estimated monthly cost + budget/over-budget flag.
+    overrides = await _cost_overrides()
     for it in items:
-        cfg = _INTEGRATION_COST.get(it["id"], {"est": 0.0, "budget": 0.0})
-        est = round(float(cfg["est"]), 2)
-        budget = float(cfg["budget"])
+        meta = _INTEGRATION_META.get(it["id"], {"billing": "flat", "default": 0.0, "budget": 0.0})
+        if meta["billing"] == "metered":
+            est = await _metered_llm_cost()
+            editable = False
+        else:
+            est = float(overrides.get(it["id"], meta["default"]))
+            editable = True
+        est = round(est, 2)
+        budget = float(meta.get("budget", 0.0))
+        it["billing"] = meta["billing"]
+        it["editable"] = editable
         it["est_cost_month_usd"] = est
         it["budget_month_usd"] = budget
         it["over_budget"] = bool(budget) and est > budget
@@ -469,6 +495,29 @@ async def integrations(health: int = 1):
         },
         "generated_at": _now(),
     }
+
+
+class CostOverrides(BaseModel):
+    overrides: dict
+
+
+@admin_router.put("/integrations/costs")
+async def update_integration_costs(body: CostOverrides):
+    """Edit the FLAT-fee estimates only. Metered integrations (usage-based) are
+    auto-computed and cannot be overridden."""
+    applied: dict = {}
+    rejected: list = []
+    for k, v in (body.overrides or {}).items():
+        if k in _FLAT_INTEGRATIONS and isinstance(v, (int, float)) and float(v) >= 0:
+            applied[k] = round(float(v), 2)
+        else:
+            rejected.append(k)
+    doc = await _db.admin_config.find_one({"_id": "integration_costs"}) or {}
+    cur = doc.get("overrides", {}) or {}
+    cur.update(applied)
+    await _db.admin_config.update_one({"_id": "integration_costs"}, {"$set": {"overrides": cur}}, upsert=True)
+    await _audit("integrations.costs.update", "integrations", {"applied": applied, "rejected": rejected})
+    return {"overrides": cur, "applied": applied, "rejected": rejected, "editable": sorted(_FLAT_INTEGRATIONS)}
 
 
 # --------------------------------------------------------------------------- #
