@@ -8,7 +8,7 @@ type Ion = ComponentProps<typeof Ionicons>["name"];
 export type NavItem = { key: string; label: string; icon: Ion };
 
 export const navItems: NavItem[] = [
-  { key: "home", label: "Home", icon: "home" },
+  { key: "home", label: "Today", icon: "home" },
   { key: "workouts", label: "Workouts", icon: "fitness-outline" },
   { key: "routes", label: "Virtual Routes", icon: "git-network-outline" },
   { key: "benchmark", label: "Benchmark Workouts", icon: "speedometer-outline" },

@@ -98,14 +98,19 @@ export function useWeather(home: HomeLocation): WeatherState {
         }
       } catch { /* fall through to home location */ }
 
-      // 2) Fall back to the saved home location.
-      const w = await fetchWeather(home.lat, home.lon);
-      if (!alive) return;
-      if (w) {
-        setState({ ...w, place: home.city, dateLabel: todayLabel(), source: "home", loading: false });
-      } else {
-        setState((s) => ({ ...s, place: home.city, dateLabel: todayLabel(), loading: false }));
+      // 2) Fall back to the rider's saved home location (only if they've set
+      // one — we never fabricate a default city like "Nice, France").
+      if (home.lat && home.lon) {
+        const w = await fetchWeather(home.lat, home.lon);
+        if (!alive) return;
+        if (w) {
+          setState({ ...w, place: home.city, dateLabel: todayLabel(), source: "home", loading: false });
+          return;
+        }
       }
+      if (!alive) return;
+      // No GPS and no saved home → show nothing rather than a fabricated place.
+      setState((s) => ({ ...s, temp: "—", place: home.city, dateLabel: todayLabel(), loading: false }));
     })();
     return () => { alive = false; };
   }, [home.lat, home.lon, home.city]);

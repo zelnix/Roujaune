@@ -188,7 +188,7 @@ export const ProgressRing = React.memo(function ProgressRing({ pct, size = 66 }:
 
 /* ── sidebar ────────────────────────────────────────────────────────────── */
 const NAV = [
-  { key: "home", label: "Home", icon: "home-outline" },
+  { key: "home", label: "Today", icon: "home-outline" },
   { key: "training", label: "Training Plan", icon: "clipboard-outline" },
   { key: "calendar", label: "Calendar", icon: "calendar-outline" },
   { key: "workouts", label: "Workouts", icon: "fitness-outline" },

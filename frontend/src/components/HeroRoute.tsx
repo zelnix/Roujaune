@@ -117,9 +117,9 @@ export function HeroRoute({
       >
         <View style={styles.weatherTop}>
           <Ionicons name={weather.icon} size={compact ? 17 : 21} color={colors.yellow} />
-          <Text style={[styles.temp, compact && { fontSize: 21 }, !settingsLoaded && { opacity: 0 }]}>{weather.temp}</Text>
+          <Text style={[styles.temp, compact && { fontSize: 21 }, (!settingsLoaded || weather.loading) && { opacity: 0 }]}>{weather.temp}</Text>
         </View>
-        <Text style={[styles.place, compact && { fontSize: 15 }, !settingsLoaded && { opacity: 0 }]} numberOfLines={1}>{settingsLoaded ? weather.place : "—"}</Text>
+        <Text style={[styles.place, compact && { fontSize: 15 }]} numberOfLines={1}>{!weather.loading && weather.place ? weather.place : "—"}</Text>
         <Text style={styles.dateText}>{weather.dateLabel}</Text>
         <View style={styles.forecastHint}>
           <Ionicons name="calendar-outline" size={13} color={colors.yellow} />

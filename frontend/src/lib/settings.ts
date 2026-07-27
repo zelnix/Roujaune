@@ -20,7 +20,7 @@ export type Settings = {
   restReminders: boolean; // reminders to take scheduled rest days
 };
 
-const DEFAULTS: Settings = { hasTrainer: false, hasWearable: false, demoMode: false, hudEnabled: true, ftp: 287, ftpAuto: true, wheelCircumference: 2105, seatedMode: false, homeCity: "Nice, France", homeLat: 43.7102, homeLon: 7.262, units: "metric", coachAudio: true, autoSync: true, weeklyReport: true, restReminders: false };
+const DEFAULTS: Settings = { hasTrainer: false, hasWearable: false, demoMode: false, hudEnabled: true, ftp: 287, ftpAuto: true, wheelCircumference: 2105, seatedMode: false, homeCity: "", homeLat: 0, homeLon: 0, units: "metric", coachAudio: true, autoSync: true, weeklyReport: true, restReminders: false };
 const KEY = "roujaune:settings";
 
 // Common tyre roll-outs (mm) — matches standard cycling speed-sensor tables.
