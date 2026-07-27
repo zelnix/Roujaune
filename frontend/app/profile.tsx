@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable, useWindowDimensions, Modal, TextInpu
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 
 import { AppScaffold, Card, SectionTitle, Toggle } from "@/src/components/app-scaffold";
 import { CC } from "@/src/components/calendar";
@@ -93,11 +94,19 @@ export default function ProfileScreen() {
       mediaTypes: ["images"],
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.6,
-      base64: true,
+      quality: 1,
     });
-    if (!res.canceled && res.assets?.[0]?.base64) {
-      setAvatar(`data:image/jpeg;base64,${res.assets[0].base64}`);
+    if (res.canceled || !res.assets?.[0]?.uri) return;
+    // Downscale to a 256px square JPEG so the stored/synced avatar stays small
+    // and loads instantly on every screen and device.
+    try {
+      const rendered = await ImageManipulator.manipulate(res.assets[0].uri)
+        .resize({ width: 256, height: 256 })
+        .renderAsync();
+      const out = await rendered.saveAsync({ format: SaveFormat.JPEG, compress: 0.7, base64: true });
+      if (out.base64) setAvatar(`data:image/jpeg;base64,${out.base64}`);
+    } catch {
+      Alert.alert("Couldn't set photo", "That image couldn't be processed. Please try another one.");
     }
   };
 
