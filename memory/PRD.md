@@ -569,3 +569,13 @@ Re-specified per detailed 5-part brief; SUPERSEDES batch-9/10 "Phase 1/2".
 - `rider-profile.ts`: caches profile to AsyncStorage (`roujaune:riderProfile`), hydrates `_snap` + hook instantly; no "Rider One" flash. HeroRoute avatar initials gated on `profileLoaded`.
 - `plan.ts` `usePlan`: caches per-id (`roujaune:plan:<id>`), paints last real plan instantly then reconciles; no bundled "Build & Climb" flash.
 - Settings (home location) already AsyncStorage-cached + weather gated on `settingsLoaded`; coach gated on `useCoachReady()`. Verified Today shows "From Couch to Road" + "GL" with no placeholders.
+
+## HWG admin console — full API contract implemented (2026-07-27 fork)
+Completed the interrupted "before go-live" batch AND the remainder of `/app/memory/roujaune_admin_api_contract.md`:
+- **Go-live:** `suspended` enforced on rider login/session (pre-existing), env-driven CORS allow-list `CORS_ORIGINS` (pre-existing), **`GET /api/openapi.json` now public** (ingress-reachable OpenAPI for contract import).
+- **GDPR (F-07):** `POST /api/admin/users/{id}/export` + `DELETE /api/admin/users/{id}` (cascade over all user-scoped + benchmark collections + sessions), plus rider self-service `GET /api/auth/me/export` + `DELETE /api/auth/me`. Shared helpers `auth.export_user_data` / `auth.erase_user_data`.
+- **Audit (§8.4):** every admin mutation now logs to `admin_audit` — plan CRUD (create/replace/patch/delete/week/day/adapt via `plans_admin.on_audit` → `_admin_audit_write`), benchmark/coach config, user patch/export/delete. `GET /api/admin/audit` + cursor pagination.
+- **Config surface:** `GET/PUT /api/admin/benchmark/config` (retest windows/thresholds, persisted to `admin_config`, applied to live `BM_RETEST_DAYS`/`FTP_RETEST_DAYS` at startup + on PUT) and `GET/PUT /api/admin/coaches` (persona presentation only; `safety_policy` fixed/read-only, extra fields stripped).
+- **Hardening:** admin user list/get strip `password_hash`/`reset_token`/`verify_token`; cursor pagination on users+audit; metrics carry no PII; `GET /api/admin/health` now `{status,db,version,uptime}`; admin self-delete blocked (400).
+- **NOT built (per contract's own conditional language):** §5.4 server-managed workout catalog (catalog is client-side; "expose IF console must edit") and §8.8 production infra provisioning (deploy-time ops, not code).
+- Verified: testing agent iter52 — 19/19 backend pass (`tests/test_iter52_admin_console.py`), incl. RBAC (403 rider / 401 anon), suspend-blocks-login, cursor pagination, secret stripping, audit, GDPR cascade, and rider-flow regression. Global benchmark config restored to defaults.
