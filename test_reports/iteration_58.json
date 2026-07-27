@@ -1,0 +1,32 @@
+{
+  "summary": "Independent E2E verification of the 'Build & Climb' vs 'From Couch to Road' cache/default bug for rider Green Lantern. All 6 requested checks PASS. HOME's training-plan-card renders 'From Couch to Road' (Phase 1 · Get Moving · Weeks 1-4, 0%) with beginner NEXT WORKOUTS (Beginner Cycling Strength, Welcome Ride, Recovery and Mobility, Pedal Smoothly, Balance and Cycling Support) - no 'Threshold Climb' or 'Build & Climb' text anywhere on home. /plan hero renders 'FROM COUCH TO ROAD / From Couch to Road / A 16-week beginner plan... / 16 Weeks Duration / 3 Rides/Week' with '1 / 16' progress, 'PLAN GOALS' and 'Beginner' copy; no 12-week or 3/12 markers. Backend GET /api/plan?id=build-and-climb (authed as Green Lantern) returns id='couch-to-road', title='From Couch to Road', duration_label='16 Weeks', progress.weeks='1 / 16'. GET /api/rider/plan returns active_plan_id='couch-to-road'. localStorage after load contains ONLY 'roujaune:plan:active:v2' with 'From Couch to Road'; the legacy 'roujaune:plan:build-and-climb' key is ABSENT (purged). Regression test: injecting the stale legacy key and reloading /plan still renders 'From Couch to Road' AND the legacy key is removed on next load. Conclusion: the applied fixes (versioned active-scoped cache key + legacy purge in usePlan; _active_plan_id no longer defaulting to build-and-climb) are working. Any residual 'Build & Climb' the user sees is a stale client bundle/browser cache on their machine, not an app bug.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/tmp/1_login.jpeg",
+    "/tmp/2_after_login.jpeg",
+    "/tmp/3_home.jpeg",
+    "/tmp/plan1.jpeg",
+    "/tmp/plan2_after_reload.jpeg"
+  ],
+  "action_items": [
+    "None required for this bug — verification is complete and fixes are effective.",
+    "Optional: advise the reporting user to hard-refresh / clear site data once so their browser picks up the new bundle that purges the legacy 'roujaune:plan:build-and-climb' key."
+  ],
+  "critical_code_review_comments": [
+    "usePlan(id='build-and-climb') still calls GET /api/plan?id=build-and-climb. It only works because the server ignores the query id when an authenticated rider has an active_plan_id. Consider passing the active id (or dropping the id param) from the client to avoid this ambiguity for future readers.",
+    "Backend /api/plan silently returns an empty document (id/title = null) when called without auth. Consider returning either 401 or the demo plan explicitly instead of nulls."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "100%", "frontend": "100%" },
+  "seed_data_creation": "None. Used existing Green Lantern demo account.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Rider Green Lantern (greenlantern@roujaune.app / rideon9900) is fully migrated to 'couch-to-road'. Backend endpoints /api/plan (auth) and /api/rider/plan both return couch-to-road/'From Couch to Road' with 16 weeks and progress 1/16. Frontend usePlan cache key is now 'roujaune:plan:active:v2' and one-time purges legacy per-plan-id keys on mount. If future tests need to confirm the legacy purge, inject window.localStorage.setItem('roujaune:plan:build-and-climb', '{...}') then reload — expected: legacy key removed, hero still 'From Couch to Road'.",
+  "rca_of_issue": "Root cause: (1) frontend usePlan previously cached the plan under a key derived from the requested id ('roujaune:plan:build-and-climb'), so a browser that had ever loaded the demo plan kept showing 'Build & Climb' for the rider even after the backend was moved to 'From Couch to Road'; (2) backend _active_plan_id() also defaulted to 'build-and-climb' when it could not resolve the rider's assignment. Fix verified: cache key bumped to a versioned active-scoped key ('roujaune:plan:active:v2') with an idempotent multiRemove of legacy per-id keys, and _active_plan_id() now falls back to 'couch-to-road' (never build-and-climb). Reproduction of the pre-fix bug is no longer possible even by manually reseeding the legacy localStorage entry — it is wiped on the next mount before the plan card renders."
+}
