@@ -42,7 +42,7 @@ const ACHIEVEMENTS: { icon: any; label: string; sub: string; color: string }[] =
 export default function ProfileScreen() {
   const { settings, setSetting } = useSettings();
   const persona = useCoach();
-  const { profile, avatar, update, setAvatar } = useRiderProfile();
+  const { profile, avatar, loaded: profileLoaded, update, setAvatar } = useRiderProfile();
   const { user, signOut } = useAuth();
   const router = useRouter();
   const achievements = useRiderAchievements() ?? ACHIEVEMENTS;
@@ -99,7 +99,11 @@ export default function ProfileScreen() {
               </View>
             </Pressable>
             <View style={{ flex: 1 }}>
-              <Text style={s.name}>{profile.name}</Text>
+              {profileLoaded ? (
+                <Text style={s.name}>{profile.name}</Text>
+              ) : (
+                <View style={s.nameSkeleton} />
+              )}
               <Text style={s.org}>Roujaune · Harmony Wellness Group</Text>
               {user?.email ? <Text style={s.acctEmail}>{user.email} · {user.provider}</Text> : null}
               {locationText ? (
@@ -306,6 +310,7 @@ const s = StyleSheet.create({
   avatar: { width: "100%", height: "100%", borderRadius: 42 },
   cameraBadge: { position: "absolute", right: -2, bottom: -2, width: 28, height: 28, borderRadius: 14, backgroundColor: CC.yellow, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: CC.bg },
   name: { color: CC.white, fontSize: 24, fontWeight: "900" },
+  nameSkeleton: { width: 170, height: 26, borderRadius: 6, backgroundColor: "rgba(255,255,255,0.08)", marginBottom: 4 },
   org: { color: CC.dim, fontSize: 13, marginTop: 2 },
   locRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 6 },
   locText: { color: CC.white, fontSize: 13, fontWeight: "600" },

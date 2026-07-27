@@ -9,6 +9,11 @@ function apiBase(): string {
 
 const planCacheKey = (id: string) => `roujaune:plan:${id}`;
 
+// Neutral placeholder shown only until the rider's real (cached or live) plan
+// arrives. Avoids flashing the bundled "Build & Climb" demo plan name to riders
+// who are on a different plan (e.g. Green Lantern → "From Couch to Road").
+const PLAN_PLACEHOLDER: TrainingPlan = { ...PLAN, title: "Training Plan", label: "TRAINING PLAN", description: "" };
+
 /** Map the FastAPI /api/plan document (snake_case) into the UI plan shape. */
 function normalize(d: any): TrainingPlan {
   return {
@@ -40,7 +45,7 @@ function normalize(d: any): TrainingPlan {
 /** Fetch the rider's training plan from the backend, with a skeleton loading
  * state and a graceful fallback to the bundled plan so the screen never breaks. */
 export function usePlan(id = "build-and-climb") {
-  const [plan, setPlan] = useState<TrainingPlan>(PLAN);
+  const [plan, setPlan] = useState<TrainingPlan>(PLAN_PLACEHOLDER);
   const [loading, setLoading] = useState(true);
   const [live, setLive] = useState(false);
   const [nonce, setNonce] = useState(0);
