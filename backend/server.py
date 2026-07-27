@@ -4284,10 +4284,15 @@ push.init(db)
 admin_routes.init(db)
 
 app.add_middleware(auth.AuthMiddleware)
+# CORS origins are env-driven (comma-separated CORS_ORIGINS). Defaults to "*" when
+# unset so the app keeps working; set CORS_ORIGINS to lock down to the console +
+# app origins for production. allow_credentials is disabled with the "*" wildcard
+# because browsers reject credentialed wildcard responses.
+_cors_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()] or ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=["*"],
+    allow_credentials=("*" not in _cors_origins),
+    allow_origins=_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

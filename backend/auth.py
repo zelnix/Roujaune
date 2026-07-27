@@ -191,7 +191,10 @@ async def _resolve_token(token: str):
                 exp = exp.replace(tzinfo=datetime.timezone.utc)
             if exp < _now():
                 return None
-        return await _db.users.find_one({"user_id": sess["user_id"]}, {"_id": 0, "password_hash": 0})
+        u = await _db.users.find_one({"user_id": sess["user_id"]}, {"_id": 0, "password_hash": 0})
+        if u and u.get("suspended"):
+            return None  # suspended riders cannot use existing sessions
+        return u
     # Fall back to the SEPARATE admin store (password-based console admins).
     asess = await _db.admin_sessions.find_one({"session_token": token}, {"_id": 0})
     if asess:
@@ -466,6 +469,8 @@ async def login(req: LoginReq):
     user = await _db.users.find_one({"email": req.email.lower()})
     if not user or not user.get("password_hash") or not verify_pw(req.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    if user.get("suspended"):
+        raise HTTPException(status_code=403, detail="This account has been suspended. Please contact support.")
     token = await _create_session(user["user_id"])
     return {"token": token, "user": _public_user(user)}
 
@@ -478,6 +483,8 @@ async def google(req: GoogleReq):
         raise HTTPException(status_code=401, detail="Google sign-in failed")
     data = r.json()
     user = await _upsert_oauth_user(data.get("email", ""), data.get("name", ""), data.get("picture", ""), "google")
+    if user.get("suspended"):
+        raise HTTPException(status_code=403, detail="This account has been suspended. Please contact support.")
     token = await _create_session(user["user_id"])
     return {"token": token, "user": _public_user(user)}
 
@@ -495,6 +502,8 @@ async def apple(req: AppleReq):
         raise HTTPException(status_code=401, detail="Apple sign-in failed")
     email = claims.get("email") or f"{claims.get('sub')}@appleid.roujaune.app"
     user = await _upsert_oauth_user(email, req.name or "Rider", "", "apple")
+    if user.get("suspended"):
+        raise HTTPException(status_code=403, detail="This account has been suspended. Please contact support.")
     token = await _create_session(user["user_id"])
     return {"token": token, "user": _public_user(user)}
 
