@@ -25,6 +25,13 @@ const SYMPTOMS: { key: string; label: string }[] = [
   { key: "new_pain", label: "New or worsening pain" },
 ];
 
+// Non-medical flags that affect benchmark/target accuracy (not a safety stop).
+const CHANGE_FLAGS: { key: string; label: string; icon: string }[] = [
+  { key: "injury", label: "Injury or niggle", icon: "bandage-outline" },
+  { key: "returning", label: "Returning after a break", icon: "refresh-outline" },
+  { key: "equipmentChanged", label: "New bike or trainer setup", icon: "construct-outline" },
+];
+
 function Scale({ label, hint, value, onChange }: { label: string; hint: [string, string]; value: number; onChange: (v: number) => void }) {
   return (
     <View style={styles.field}>
@@ -68,14 +75,17 @@ export default function CheckinScreen() {
   const [stress, setStress] = React.useState(2);
   const [motivation, setMotivation] = React.useState(4);
   const [symptoms, setSymptoms] = React.useState<Record<string, boolean>>({});
+  const [flags, setFlags] = React.useState<Record<string, boolean>>({});
   const [saving, setSaving] = React.useState(false);
   const [result, setResult] = React.useState<ReadinessResult | null>(null);
 
   const toggleSymptom = (k: string) => setSymptoms((s) => ({ ...s, [k]: !s[k] }));
+  const toggleFlag = (k: string) => setFlags((f) => ({ ...f, [k]: !f[k] }));
 
   const onSubmit = async () => {
     setSaving(true);
     const activeSymptoms = Object.fromEntries(Object.entries(symptoms).filter(([, v]) => v));
+    const activeFlags = Object.fromEntries(Object.entries(flags).filter(([, v]) => v));
     try {
       const r = await submitCheckin({
         checkin: {
@@ -87,6 +97,7 @@ export default function CheckinScreen() {
           motivation: motivation * 2,
         },
         symptoms: activeSymptoms,
+        flags: activeFlags,
         date: new Date().toISOString().slice(0, 10),
       });
       setResult(r);
@@ -182,6 +193,31 @@ export default function CheckinScreen() {
               </View>
             </View>
 
+            {/* Benchmark-relevant changes (not a safety stop) */}
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Anything changed lately?</Text>
+              <View style={styles.symptomWrap}>
+                {CHANGE_FLAGS.map((f) => {
+                  const on = !!flags[f.key];
+                  return (
+                    <Pressable
+                      key={f.key}
+                      testID={`flag-${f.key}`}
+                      onPress={() => toggleFlag(f.key)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: on }}
+                      accessibilityLabel={f.label}
+                      style={[styles.flagChip, on && styles.flagChipOn]}
+                    >
+                      <Ionicons name={f.icon as any} size={15} color={on ? "#241B00" : colors.textDim} />
+                      <Text style={[styles.flagText, on && styles.flagTextOn]}>{f.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={styles.flagHint}>Helps {coach.name} decide if a fresh benchmark is needed before your next block.</Text>
+            </View>
+
             <Pressable testID="checkin-submit" onPress={onSubmit} disabled={saving} style={[styles.primaryBtn, saving && { opacity: 0.6 }]}>
               {saving ? <ActivityIndicator color="#241B00" /> : <Text style={styles.primaryBtnText}>Get my readiness</Text>}
             </Pressable>
@@ -221,6 +257,12 @@ const styles = StyleSheet.create({
   symptomChip: { flexDirection: "row", alignItems: "center", gap: 7, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: colors.border, minHeight: 44 },
   symptomChipOn: { backgroundColor: colors.red, borderColor: colors.red },
   symptomText: { color: colors.textDim, fontSize: 13, fontWeight: "600" },
+
+  flagChip: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: colors.border, minHeight: 44 },
+  flagChipOn: { backgroundColor: colors.yellow, borderColor: colors.yellow },
+  flagText: { color: colors.textDim, fontSize: 13, fontWeight: "600" },
+  flagTextOn: { color: "#241B00", fontWeight: "700" },
+  flagHint: { color: colors.textFaint, fontSize: 11.5, marginTop: 10, lineHeight: 16 },
 
   primaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.yellow, borderRadius: 14, paddingVertical: 15, minHeight: 52, marginTop: 4 },
   primaryBtnText: { color: "#241B00", fontSize: 15, fontWeight: "800" },

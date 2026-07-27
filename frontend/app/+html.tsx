@@ -24,6 +24,10 @@ export default function Root({ children }: PropsWithChildren) {
               body > div:first-child { position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; }
               [role="tablist"] [role="tab"] * { overflow: visible !important; }
               [role="heading"], [role="heading"] * { overflow: visible !important; }
+              /* Accessibility: visible keyboard-focus ring for sighted keyboard users. */
+              :focus-visible { outline: 2px solid #FFC20A !important; outline-offset: 2px; border-radius: 8px; }
+              input:focus-visible, textarea:focus-visible { outline: 2px solid #FFC20A !important; outline-offset: 1px; }
+              :focus:not(:focus-visible) { outline: none; }
             `,
           }}
         />

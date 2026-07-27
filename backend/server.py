@@ -16,6 +16,7 @@ import uuid
 from datetime import datetime, timezone
 
 from readiness import compute_readiness
+from benchmark_decision import decide_benchmark, BenchmarkDecisionInput
 from rider_level import compute_rider_level
 import plans_admin
 import companion_plan
@@ -1468,31 +1469,23 @@ async def benchmark_plan_gate(plan_id: str, coach_name: str = "Alberto", coach_g
 
     ftp = profile.get("ftp")
     last_days = _days_since(profile.get("lastBenchmarkDate"))
-    illness = bool(checkin.get("illness") or checkin.get("injury") or checkin.get("returning"))
-    equip_changed = bool(checkin.get("equipmentChanged"))
     low_conf = bool(last_ftp and (last_ftp.get("confidence") or 0) < 50)
 
-    reasons: List[str] = []
-    if level.lower() == "beginner":
-        status = "submaximal"
-        reasons.append("beginner plan — a lighter assessment or your existing data is enough")
-    else:
-        if not ftp:
-            status = "required"; reasons.append("no valid FTP benchmark on record yet")
-        elif illness:
-            status = "required"; reasons.append("recent illness, injury or return to training")
-        elif equip_changed:
-            status = "required"; reasons.append("your equipment has changed")
-        elif last_days is None:
-            status = "required"; reasons.append("benchmark date unknown")
-        elif last_days > 2 * FTP_RETEST_DAYS:
-            status = "required"; reasons.append(f"last benchmark was {last_days} days ago")
-        elif last_days > FTP_RETEST_DAYS:
-            status = "recommended"; reasons.append(f"last benchmark was {last_days} days ago")
-        elif low_conf:
-            status = "recommended"; reasons.append("your previous FTP result had low confidence")
-        else:
-            status = "approved"; reasons.append("recent benchmark with good confidence and consistent training")
+    # Deterministic decision (F-03) — pure logic, no DB/LLM. Safety flags now
+    # come from the persisted canonical daily check-in (F-02).
+    decision = decide_benchmark(BenchmarkDecisionInput(
+        plan_level=level,
+        has_ftp=bool(ftp),
+        days_since_last=last_days,
+        illness=bool(checkin.get("illness")),
+        injury=bool(checkin.get("injury")),
+        returning=bool(checkin.get("returning")),
+        equipment_changed=bool(checkin.get("equipmentChanged")),
+        low_confidence=low_conf,
+        ftp_retest_days=FTP_RETEST_DAYS,
+    ))
+    status = decision.status
+    reasons = decision.reasons
 
     base_msg = BM_STATUS_MESSAGE[status]
     prompt = (
@@ -1514,7 +1507,7 @@ async def benchmark_plan_gate(plan_id: str, coach_name: str = "Alberto", coach_g
         "reasons": reasons,
         "recommendedTestId": rec["primary"]["testId"],
         "recommendedTestName": BM_TEST_NAME.get(rec["primary"]["testId"]),
-        "requiresBenchmark": status in ("required", "recommended"),
+        "requiresBenchmark": decision.requires_benchmark,
         "hasPower": rec["hasPower"],
         "lastBenchmarkDate": profile.get("lastBenchmarkDate"),
     }
@@ -2334,6 +2327,15 @@ async def rider_checkin(payload: dict):
     result = compute_readiness(enriched)
     d = payload.get("date") or date.today().isoformat()
     checkin = payload.get("checkin") or {}
+    symptoms = payload.get("symptoms") or {}
+    flags = payload.get("flags") or {}
+    # Canonical safety flags persisted at the top level so the deterministic
+    # benchmark gate (F-02/F-03) can actually read them. Illness is derived from
+    # the medical symptom screen; injury/return/equipment come from the check-in.
+    illness = bool(symptoms.get("illness") or flags.get("illness"))
+    injury = bool(flags.get("injury"))
+    returning = bool(flags.get("returning"))
+    equipment_changed = bool(flags.get("equipmentChanged"))
     doc = {
         "score": result.get("readinessScore", 0),
         "status": result.get("status"),
@@ -2343,6 +2345,11 @@ async def rider_checkin(payload: dict):
         "safetyOverride": result.get("safetyOverride", False),
         "metrics": _checkin_metrics(checkin),
         "checkin": checkin,
+        "symptoms": symptoms,
+        "illness": illness,
+        "injury": injury,
+        "returning": returning,
+        "equipmentChanged": equipment_changed,
         "date": d,
         "at": now_iso(),
     }

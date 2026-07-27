@@ -410,11 +410,11 @@ const s = StyleSheet.create({
   coachChipImg: { width: 20, height: 20, borderRadius: 10 },
   coachChipText: { color: CC.white, fontSize: 12, fontWeight: "600" },
 
-  editBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: CC.border, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: "rgba(255,255,255,0.04)" },
+  editBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: CC.border, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: "rgba(255,255,255,0.04)", minHeight: 44, justifyContent: "center" },
   hover: { borderColor: "rgba(255,255,255,0.3)" },
   editText: { color: CC.white, fontSize: 13, fontWeight: "700" },
   acctEmail: { color: CC.dim, fontSize: 12, marginTop: 3 },
-  signOutBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "rgba(224,30,43,0.4)", borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: "rgba(224,30,43,0.08)" },
+  signOutBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "rgba(224,30,43,0.4)", borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: "rgba(224,30,43,0.08)", minHeight: 44, justifyContent: "center" },
   signOutText: { color: "#E01E2B", fontSize: 13, fontWeight: "700" },
 
   statsRow: { flexDirection: "row", gap: 12, marginTop: 18, borderTopWidth: 1, borderTopColor: CC.borderSoft, paddingTop: 16 },

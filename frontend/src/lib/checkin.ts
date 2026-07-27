@@ -40,6 +40,7 @@ export type TodayReadiness = {
 export async function submitCheckin(payload: {
   checkin: CheckinInput;
   symptoms?: Record<string, boolean>;
+  flags?: Record<string, boolean>;
   date?: string;
 }): Promise<ReadinessResult> {
   const res = await fetch(`${base()}/api/rider/checkin`, {
