@@ -33,14 +33,14 @@ function NavRow({ item, active, onPress, badge }: { item: NavItem; active: boole
             style={styles.activeIndicator}
           />
           <Ionicons name={item.icon} size={22} color="#fff" />
-          <Text style={[styles.label, { color: "#fff", fontWeight: "700" }]} numberOfLines={1}>
+          <Text style={[styles.label, { color: "#fff", fontWeight: "700" }]} numberOfLines={2}>
             {item.label}
           </Text>
         </LinearGradient>
       ) : (
         <View style={styles.row}>
           <Ionicons name={item.icon} size={22} color={colors.textDim} />
-          <Text style={styles.label} numberOfLines={1}>
+          <Text style={styles.label} numberOfLines={2}>
             {item.label}
           </Text>
           {badge ? <View style={styles.badge} /> : null}

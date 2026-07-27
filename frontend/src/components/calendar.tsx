@@ -6,7 +6,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Rect, Circle } from "react-native-svg";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from "react-native-reanimated";
-import { CoachPersona } from "../lib/coach-persona";
+import { CoachPersona, useCoach } from "../lib/coach-persona";
 import { CalendarDay, CalendarSession, ZoneBar, STATUS_LABEL, Readiness, ScheduledWorkout } from "../lib/calendar";
 /* palette (extends the plan palette with recovery hues) */
 export const CC = {
@@ -377,14 +377,15 @@ export function QuickActionsCard({ onAction }: { onAction: (id: string, title: s
   );
 }
 
-/* ── Alberto tip footer ─────────────────────────────────────────────────── */
+/* ── coach tip footer ───────────────────────────────────────────────────── */
 export function CalendarTipFooter({ tip }: { tip: string }) {
+  const coach = useCoach();
   return (
     <View style={cs.tip} testID="calendar-tip">
       <Ionicons name="star" size={16} color={CC.yellow} />
-      <Text style={cs.tipLabel}>Alberto&apos;s Tip</Text>
+      <Text style={cs.tipLabel}>{coach.name}&apos;s Tip</Text>
       <Text style={cs.tipText} numberOfLines={2}>{tip}</Text>
-      <Text style={cs.signature}>Alberto</Text>
+      <Text style={cs.signature}>{coach.name}</Text>
     </View>
   );
 }

@@ -167,6 +167,6 @@ export const STATUS_LABEL: Record<SessionStatus, string> = {
 };
 
 export const FILTERS = [
-  "All", "Cycling", "FB50", "Recovery", "My Peaceful Companion",
-  "Completed", "Planned", "Alberto-generated",
+  "All", "Cycling", "FB50", "Recovery",
+  "Completed", "Planned", "Coach-generated",
 ] as const;

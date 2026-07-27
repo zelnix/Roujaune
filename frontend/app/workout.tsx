@@ -70,10 +70,9 @@ const CONTROLS = [
   { key: "increase", label: "Increase Intensity", icon: "add-circle" as const },
   { key: "erg", label: "Toggle ERG Mode", icon: "sync" as const },
   { key: "camera", label: "Camera Selection", icon: "camera" as const },
-  { key: "mute", label: "Mute Alberto", icon: "volume-mute" as const },
+  { key: "mute", label: "Mute Coach", icon: "volume-mute" as const },
   { key: "reconnect", label: "Trainer Reconnect", icon: "bluetooth" as const },
   { key: "lock", label: "Touch Lock", icon: "lock-closed" as const },
-  { key: "peaceful", label: "Peaceful Pause", icon: "leaf" as const },
 ];
 
 function fmt(sec: number) {
@@ -390,11 +389,6 @@ export default function LiveWorkout() {
       case "lock":
         setLocked(true);
         showToast("Screen locked — hold the button to unlock.");
-        break;
-      case "peaceful":
-        if (!paused) { pause(); setPaused(true); }
-        showToast("Peaceful pause — breathe deep and reset.");
-        logControl("Peaceful pause");
         break;
       default:
         break;
