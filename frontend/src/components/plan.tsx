@@ -58,6 +58,7 @@ export const PLAN = {
   autoAdjustment: undefined as string | undefined,
   hero: undefined as { week: number; phase_number: number; phase_name: string; week_in_phase: number; is_phase_start: boolean } | undefined,
   tip: "Consistency compounds. Focus on the process this phase and the results will come.",
+  no_plan: false,
 };
 
 export const PLAN_TABS = ["Overview", "Phases", "Key Workouts", "Load & Progress", "Adaptations"];

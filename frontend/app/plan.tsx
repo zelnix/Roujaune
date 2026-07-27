@@ -162,6 +162,28 @@ export default function TrainingPlanScreen() {
     body = (<>{benchmarkGate}{hero}{progress}{roadmapRow}{workoutsRow}{tip}</>);
   }
 
+  if ((displayPlan as any).no_plan) {
+    body = (
+      <View testID="no-plan-prompt" style={styles.noPlanWrap}>
+        <Ionicons name="bicycle" size={30} color={C.yellow} />
+        <Text style={styles.noPlanTitle}>Ride your way</Text>
+        <Text style={styles.noPlanSub}>You don't need a plan to ride. Browse the workout library and pick whatever you feel like — or add some structure whenever you're ready.</Text>
+        <Pressable testID="np-browse" onPress={() => router.push("/workouts")} style={[styles.npBtn, styles.npBtnPrimary]}>
+          <Ionicons name="bicycle" size={16} color="#fff" />
+          <Text style={styles.npBtnText}>Browse workouts</Text>
+        </Pressable>
+        <Pressable testID="np-choose" onPress={() => router.push("/onboarding")} style={[styles.npBtn, styles.npBtnGhost]}>
+          <Ionicons name="list" size={16} color="#fff" />
+          <Text style={styles.npBtnText}>Choose a plan</Text>
+        </Pressable>
+        <Pressable testID="np-coach" onPress={() => { setChatSeed("Can you build me a training plan around my goals?"); setShowChat(true); }} style={[styles.npBtn, styles.npBtnGhost]}>
+          <Ionicons name="chatbubble-ellipses" size={16} color={C.yellow} />
+          <Text style={styles.npBtnText}>Ask {persona.name} to build one</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   const Grid = (
     <View style={styles.gridInner}>
       <View style={styles.headerRow}>
@@ -261,6 +283,13 @@ const styles = StyleSheet.create({
   canvas: { flex: 1, flexDirection: "row", backgroundColor: C.bg },
   content: { paddingHorizontal: 22, paddingVertical: 18 },
   gridInner: { gap: 14 },
+  noPlanWrap: { alignItems: "center", gap: 10, paddingVertical: 40, paddingHorizontal: 24, backgroundColor: "rgba(255,255,255,0.03)", borderRadius: 18, borderWidth: 1, borderColor: "rgba(255,255,255,0.08)" },
+  noPlanTitle: { color: C.white, fontSize: 22, fontWeight: "900", marginTop: 4 },
+  noPlanSub: { color: C.dim, fontSize: 14, textAlign: "center", maxWidth: 460, lineHeight: 20, marginBottom: 8 },
+  npBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, minHeight: 48, borderRadius: 12, paddingHorizontal: 22, minWidth: 260 },
+  npBtnPrimary: { backgroundColor: C.rouge },
+  npBtnGhost: { backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.12)" },
+  npBtnText: { color: C.white, fontSize: 15, fontWeight: "700" },
   headerRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 20 },
   headerRight: { alignItems: "flex-end", gap: 12 },
   messageBtn: { flexDirection: "row", alignItems: "center", gap: 9, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12, minHeight: 44 },

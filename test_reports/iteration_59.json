@@ -1,0 +1,45 @@
+{
+  "summary": "Full backend+frontend verification of the plan-scoping refactor (NO_PLAN casual rider, Green Lantern couch-to-road, demo Build & Climb, DuplicateKeyError fix). 12/12 pytest backend cases PASS (test_iter58_plan_scoping.py). Frontend on mobile viewport (390x844): (1) GREEN LANTERN — Home renders exactly 1 [data-testid=training-plan-card] showing 'From Couch to Road' with NO 'Build & Climb' leakage; /plan renders 1 [data-testid=plan-hero] with 'From Couch to Road'; /calendar and /progress render clean, no Build & Climb, no red-screen; Profile [data-testid=sign-out] correctly clears session (URL -> /login). (2) NO-PLAN RIDER — Home 1 training-plan-card with 'Ride your way' copy + [data-testid=browse-workouts-button] + [data-testid=choose-plan-button]; NO 'Build & Climb', NO 'Threshold Climb' anywhere on Home; /plan shows [data-testid=no-plan-prompt] with np-browse / np-choose / np-coach (all 3 present); GET /api/plan returns {id:'none', no_plan:true, title:'No training plan yet', workouts/goals empty}; /api/calendar/week returns free:true, 7 days, no fabricated Threshold Climb; POST /api/coach/adaptation -> 400 'No active training plan'; /api/plan/adaptations empty; /api/plan/progress zeros/no Build & Climb. (3) DEMO ACCOUNT — Home correctly shows 'Build & Climb' (expected/desired demo data); no 'From Couch to Road' leakage. (4) CONCURRENCY — 8 parallel GET /api/plan for Green Lantern ALL returned id=couch-to-road + 'From Couch to Road' title — no DuplicateKeyError -> Build & Climb fallback. (5) Refactored plan endpoints for Green Lantern: /api/plan/adaptations, /api/plan/progress, /api/plan/targets, /api/coach/adaptation, /api/coach/adaptation/detail all 200 (or 503 when LLM key absent) — none 500, none Build & Climb grounded.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/plan (Green Lantern)", "issues": ["Minor: 3 SVG console warnings 'attribute x1/x2/x: Expected length, Infinity' from a chart component when a series has 0-length input. Cosmetic; does not affect user-facing rendering."]}
+    ],
+    "react_native_issues": [
+      {"component": "props.pointerEvents", "issue": "React Native Web deprecation warning: 'props.pointerEvents is deprecated. Use style.pointerEvents' logged on /login. Reference: any component still passing pointerEvents as a prop rather than a style key."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter58_plan_scoping.py",
+    "/app/test_reports/pytest/iter58.xml",
+    "/app/test_reports/screens/i58_gl_home.jpeg",
+    "/app/test_reports/screens/i58_gl_plan.jpeg",
+    "/app/test_reports/screens/i58_np_home.jpeg",
+    "/app/test_reports/screens/i58_np_plan.jpeg",
+    "/app/test_reports/screens/i58_demo_home.jpeg"
+  ],
+  "action_items": [
+    "OPTIONAL (cosmetic): Guard the /plan progress chart against empty/zero-length series to eliminate SVG 'Infinity' console warnings on cold-load.",
+    "OPTIONAL (deprecation): Migrate any remaining pointerEvents prop usages to style={{ pointerEvents: ... }} to silence RN-Web deprecation warning."
+  ],
+  "critical_code_review_comments": [
+    "server.py get_plan (L3512) now correctly returns NO_PLAN on missing/empty assignment and never uses BUILD_AND_CLIMB as except-fallback — the except path (L3550-3552) returns dict(NO_PLAN).",
+    "_active_plan_id (L3104) resolves rider.assigned_plan_id -> user.assigned_plan_id -> plan_state; returns '' when nothing found (no demo fallback).",
+    "_plan_id_or_active (L3135) treats legacy 'build-and-climb'/'none'/'' as 'use rider real active plan' so old clients never fabricate the demo plan.",
+    "_free_calendar_week (L3953) returns free:true 7-day open week with no fabricated sessions — correctly used in get_calendar_week (L4009) for the else branch.",
+    "training_plans index migration (L4703-4712) drops legacy single-field unique id_1 and creates compound unique (user_id, id) — this is the root fix for the DuplicateKeyError that had caused Green Lantern to receive BUILD_AND_CLIMB via except-fallback. Verified: 8 concurrent /api/plan requests remain grounded in couch-to-road.",
+    "coach_adaptation (L3626) short-circuits with HTTP 400 'No active training plan to adapt' when _plan_id_or_active returns empty — verified live for the no-plan rider.",
+    "TrainingPlanCard.tsx branches cleanly on plan.no_plan to render the casual-rider CTA card (browse-workouts-button + choose-plan-button) using the same testID='training-plan-card' wrapper, keeping Home layout stable."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter58_plan_scoping.py (new)"
+  ],
+  "success_rate": {"backend": "12/12 (100%)", "frontend": "100% on tested criteria (GL, no-plan, demo)"},
+  "seed_data_creation": "None. Used the three pre-seeded credentials from /app/memory/test_credentials.md (greenlantern, demo, noplan).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Three-account plan-scoping test setup is stable. Credentials: greenlantern@roujaune.app/rideon9900 (couch-to-road), demo@roujaune.app/demo9900 (build-and-climb, intended), noplan@roujaune.app/noplan9900 (id=none, no_plan:true). Reuse /app/backend/tests/test_iter58_plan_scoping.py for regression. Frontend testIDs verified: training-plan-card, plan-hero, browse-workouts-button, choose-plan-button, no-plan-prompt, np-browse, np-choose, np-coach, sign-out, email-input, password-input, submit-btn. When automating login use these testIDs — RN-Web renders buttons such that get_by_role('button', name=...) is unreliable.",
+  "rca_of_issue": "N/A — no bugs found. The previously-reported Green Lantern 'Build & Climb' leak was rooted in a global unique index (training_plans.id_1) causing DuplicateKeyError under concurrent /api/plan hits, which the old except-block masked by returning BUILD_AND_CLIMB. The migration to compound unique (user_id, id) plus removal of every BUILD_AND_CLIMB fallback (now dict(NO_PLAN)) is verified by the 8-way concurrent /api/plan test — every response is couch-to-road."
+}

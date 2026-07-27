@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 import { colors, radius, spacing } from "../theme";
 import { trainingPlan } from "../data";
 import { usePlan } from "../lib/plan";
@@ -9,6 +10,18 @@ import { CircularProgress, ClimbBars, SecondaryButton, SectionLabel } from "./ui
 
 export function TrainingPlanCard({ onPress }: { onPress: () => void }) {
   const { plan } = usePlan();
+  const router = useRouter();
+  if ((plan as any).no_plan) {
+    return (
+      <LinearGradient testID="training-plan-card" colors={["#101211", "#0A0B0A"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.card}>
+        <SectionLabel color={colors.red}>TRAINING PLAN</SectionLabel>
+        <Text style={styles.title}>Ride your way</Text>
+        <Text style={[styles.week, { marginTop: 6 }]}>No plan needed — browse workouts and pick whatever you feel like. Want structure? Choose a plan anytime.</Text>
+        <SecondaryButton testID="browse-workouts-button" label="Browse workouts" tone="red" onPress={() => router.push("/workouts")} style={{ marginTop: spacing.md }} />
+        <SecondaryButton testID="choose-plan-button" label="Choose a plan" tone="outline" onPress={onPress} style={{ marginTop: spacing.sm }} />
+      </LinearGradient>
+    );
+  }
   // Upcoming = any planned day (ride, recovery, rest, strength…) not yet done —
   // the card shows the rider's full next schedule, not only the rides.
   const upcoming = plan.workouts.filter((w) => !w.completed);

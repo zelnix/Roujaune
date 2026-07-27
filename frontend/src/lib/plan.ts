@@ -16,13 +16,34 @@ const planCacheKey = (_id?: string) => `roujaune:plan:active:v2`;
 // Neutral placeholder shown only until the rider's real (cached or live) plan
 // arrives. Avoids flashing the bundled "Build & Climb" demo plan name to riders
 // who are on a different plan (e.g. Green Lantern → "From Couch to Road").
-const PLAN_PLACEHOLDER: TrainingPlan = { ...PLAN, title: "Training Plan", label: "TRAINING PLAN", description: "" };
+// Neutral placeholder shown only until the rider's real plan arrives. It carries
+// NO demo ("Build & Climb") content so nothing misleading can flash.
+const PLAN_PLACEHOLDER: TrainingPlan = {
+  ...PLAN, id: "", title: "Training Plan", label: "TRAINING PLAN", description: "",
+  goals: [], phases: [], workouts: [], weeklyLoad: [], progressPct: 0,
+  progress: {} as any, no_plan: false,
+};
 
 /** Map the FastAPI /api/plan document (snake_case) into the UI plan shape. */
 function normalize(d: any): TrainingPlan {
+  // A rider with no plan yet — return an empty shape (no demo fallback content).
+  if (d?.no_plan || d?.id === "none") {
+    return {
+      ...PLAN,
+      id: d.id ?? "none",
+      title: d.title ?? "No training plan yet",
+      label: "TRAINING PLAN",
+      description: d.description ?? "",
+      no_plan: !!d.no_plan,
+      goals: [], phases: [], workouts: [], weeklyLoad: [], progressPct: 0,
+      progress: {} as any, phase: undefined as any, hero: undefined,
+      adaptation: "", adaptationStatus: "",
+    } as TrainingPlan;
+  }
   return {
     ...PLAN,
     id: d.id ?? PLAN.id,
+    no_plan: false,
     plan_complete: d.plan_complete ?? false,
     title: d.title ?? PLAN.title,
     label: d.label ?? PLAN.label,

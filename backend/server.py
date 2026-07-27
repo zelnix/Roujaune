@@ -2355,7 +2355,7 @@ async def rider_readiness_today():
 
 
 
-async def _build_rider_context(plan_id: str = "build-and-climb") -> str:
+async def _build_rider_context(plan_id: str = "") -> str:
     """Assemble a compact, factual snapshot of the rider (latest ride, current
     plan phase/progress, readiness) so the coach can reference real numbers in
     chat. Best-effort — returns whatever is available, never raises."""
@@ -2364,9 +2364,10 @@ async def _build_rider_context(plan_id: str = "build-and-climb") -> str:
     if rl:
         lines.append(rl)
     try:
-        plan = await udb.training_plans.find_one({"id": plan_id})
+        plan_id = await _plan_id_or_active(plan_id)
+        plan = (await udb.training_plans.find_one({"id": plan_id})) if plan_id else None
         if not plan:
-            plan = dict(BUILD_AND_CLIMB)
+            plan = {}
         phase = plan.get("phase", {})
         prog = plan.get("progress", {})
         goals = [g.get("title") for g in plan.get("goals", []) if g.get("status") != "complete"]
@@ -2525,13 +2526,14 @@ async def coach_chat(req: CoachChatRequest):
             "plan_updated": plan_updated, "plan_change": applied_note}
 
 
-async def _refresh_adaptation_after_ride(req: "CoachDebriefRequest", plan_id: str = "build-and-climb"):
+async def _refresh_adaptation_after_ride(req: "CoachDebriefRequest", plan_id: str = ""):
     """Regenerate and cache the coach's plan-adaptation note after a completed
     ride, so the Training Plan reflects the latest session. Best-effort."""
     try:
-        plan = await udb.training_plans.find_one({"id": plan_id})
-        if not plan:
-            plan = dict(BUILD_AND_CLIMB)
+        plan_id = await _plan_id_or_active(plan_id)
+        if not plan_id:
+            return
+        plan = await udb.training_plans.find_one({"id": plan_id}) or {}
         # Feed interval execution into the adaptive-targets engine first so the
         # coach's note can reference any target nudges it just made.
         _bias, nudges = await _update_adaptive_targets(plan_id, req.intervals)
@@ -2709,11 +2711,13 @@ async def _update_adaptive_targets(plan_id: str, intervals: List[Dict[str, Any]]
 
 
 @api_router.get("/plan/targets")
-async def get_plan_targets(plan_id: str = "build-and-climb"):
+async def get_plan_targets(plan_id: str = ""):
     """Current adaptive per-zone target bias (fraction, e.g. Z4: 0.04 → +4%) plus
     the recent execution ratios that produced it. The live HUD applies the bias
     on top of FTP × zone%; the Plan screen visualises both."""
-    plan = await udb.training_plans.find_one({"id": plan_id}) or {}
+    plan_id = await _plan_id_or_active(plan_id)
+    plan = (await udb.training_plans.find_one({"id": plan_id})) if plan_id else None
+    plan = plan or {}
     return {
         "zone_bias": plan.get("zone_bias") or {},
         "zone_exec": plan.get("zone_exec") or {},
@@ -3099,15 +3103,14 @@ async def _on_plan_change(plan_id: str):
 
 async def _active_plan_id() -> str:
     """The plan the current rider is on. An explicit `assigned_plan_id` (on the
-    rider profile, or failing that the user account) wins. Otherwise we infer the
-    plan from the rider's real training state, then fall back to the beginner
-    plan — we NEVER default a logged-in rider onto the 'Build & Climb' demo."""
+    rider profile, or failing that the user account) wins, then we infer from the
+    rider's real training state. If none of those exist the rider simply has NO
+    plan yet — we return "" and NEVER fall back to a demo plan."""
     try:
         rider = await _rider_doc()
         pid = (rider.get("assigned_plan_id") or "").strip()
         if pid:
             return pid
-        # Fallback: an explicit assignment stored on the user account.
         try:
             u = await auth._db.users.find_one({"user_id": auth.current_user_id()}) or {}
             upid = (u.get("assigned_plan_id") or "").strip()
@@ -3115,7 +3118,6 @@ async def _active_plan_id() -> str:
                 return upid
         except Exception:
             pass
-        # Infer from the rider's actual training progress (structured plans only).
         try:
             st = await udb.plan_state.find_one(
                 {"id": {"$in": list(STRUCTURED_PLAN_IDS)}},
@@ -3125,11 +3127,18 @@ async def _active_plan_id() -> str:
                 return st["id"]
         except Exception:
             pass
-        if (rider.get("name") or "").strip().lower() == "green lantern":
-            return "couch-to-road"
     except Exception:
-        pass
-    return "couch-to-road"
+        logging.exception("_active_plan_id failed")
+    return ""
+
+
+async def _plan_id_or_active(plan_id: Optional[str]) -> str:
+    """Resolve the plan id to operate on. The client historically passes the
+    legacy "build-and-climb" default; treat that (and empty) as 'use the rider's
+    real active plan' so we never fabricate the demo plan."""
+    if plan_id and plan_id not in ("build-and-climb", "none", ""):
+        return plan_id
+    return await _active_plan_id()
 
 
 async def _apply_companion_ops(plan_id: str, ops: list, source: str, reason: str) -> list:
@@ -3483,29 +3492,48 @@ async def _with_adaptation_meta(resp, plan_id):
     return resp
 
 
+# Returned when the rider has no plan assigned. The client renders a blank
+# plan with a prompt (choose a plan, ask the coach to build one, or create
+# your own). We NEVER fabricate a demo plan.
+NO_PLAN = {
+    "id": "none",
+    "title": "No training plan yet",
+    "label": "TRAINING PLAN",
+    "no_plan": True,
+    "free": False,
+    "description": "",
+    "workouts": [],
+    "goals": [],
+    "phases": [],
+    "progress_pct": 0,
+}
+
+
 @api_router.get("/plan")
-async def get_plan(id: str = "build-and-climb"):
-    """Return the rider's current training plan (seeded into Mongo on first read).
-    Green Lantern is on the beginner 'From Couch to Road' plan; every other rider
-    stays on 'Build & Climb'."""
+async def get_plan(id: str = ""):
+    """Return the rider's current training plan, resolved from their real
+    assignment/training state. If the rider has no plan we return NO_PLAN so the
+    app can prompt them — we never fall back to a demo ('Build & Climb') plan."""
     try:
-        rider = await _rider_doc()
         active = await _active_plan_id()
         if active == "none":
             return {"id": "none", "title": "Free Riding", "label": "FREE RIDING", "free": True,
                     "description": "You're riding without a structured plan. Jump into any ride whenever you like.",
                     "workouts": [], "goals": [], "progress_pct": 0}
-        if active in STRUCTURED_PLAN_IDS or id in STRUCTURED_PLAN_IDS:
-            spid = active if active in STRUCTURED_PLAN_IDS else id
+        if not active:
+            return dict(NO_PLAN)
+        if active in STRUCTURED_PLAN_IDS:
+            spid = active
             pdoc, weeks_map, planned, prefix = await _struct_ctx_for_rider(spid)
             cur, ride_map, supp = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id=spid, ride_prefix=prefix)
             prog = await _ctr_progress(ride_map, ride_prefix=prefix, planned_tss=planned)
             done = _plan_done(weeks_map, cur, int(pdoc.get("duration_weeks") or 16), ride_map, supp)
             return await _with_adaptation_meta(_ctr_plan_response(cur, ride_map, prog, weeks=weeks_map, plan_doc=pdoc, plan_id=spid, plan_complete=done, supp_dates=supp), spid)
-        doc = await udb.training_plans.find_one({"id": id})
-        base = await _rider_plan_def(id)
+        # Non-structured (custom/admin-authored) plan the rider is explicitly on.
+        doc = await udb.training_plans.find_one({"id": active})
+        base = await _rider_plan_def(active)
         if not base:
-            base = dict(BUILD_AND_CLIMB)
+            return dict(NO_PLAN)
         base.pop("_id", None)
         # Overlay mutable runtime state the app edits (goals, coach adaptations,
         # adaptive zone bias) onto the admin-managed plan definition.
@@ -3521,7 +3549,7 @@ async def get_plan(id: str = "build-and-climb"):
         return merged
     except Exception:
         logging.exception("get_plan failed")
-        return BUILD_AND_CLIMB
+        return dict(NO_PLAN)
 
 
 class AdaptationRequest(BaseModel):
@@ -3602,11 +3630,11 @@ async def coach_adaptation(req: AdaptationRequest):
     if not os.environ.get("EMERGENT_LLM_KEY"):
         raise HTTPException(status_code=503, detail="Coaching model not configured")
 
-    # Load the plan (seed if needed) so the insight is grounded in real data.
-    plan = await udb.training_plans.find_one({"id": req.plan_id})
-    if not plan:
-        await udb.training_plans.update_one({"id": req.plan_id}, {"$set": BUILD_AND_CLIMB}, upsert=True)
-        plan = dict(BUILD_AND_CLIMB)
+    # Resolve the rider's real active plan (never the legacy build-and-climb default).
+    req.plan_id = await _plan_id_or_active(req.plan_id)
+    if not req.plan_id:
+        raise HTTPException(status_code=400, detail="No active training plan to adapt")
+    plan = await udb.training_plans.find_one({"id": req.plan_id}) or {}
 
     cache_key = f"adaptation_ai_{req.coach_name.lower()}"
     if not req.refresh and plan.get(cache_key):
@@ -3708,10 +3736,10 @@ async def coach_adaptation_detail(req: AdaptationRequest):
     adaptation (reasoning factors + concrete adjustments). Cached per plan+coach."""
     if not os.environ.get("EMERGENT_LLM_KEY"):
         raise HTTPException(status_code=503, detail="Coaching model not configured")
-    plan = await udb.training_plans.find_one({"id": req.plan_id})
-    if not plan:
-        await udb.training_plans.update_one({"id": req.plan_id}, {"$set": BUILD_AND_CLIMB}, upsert=True)
-        plan = dict(BUILD_AND_CLIMB)
+    req.plan_id = await _plan_id_or_active(req.plan_id)
+    if not req.plan_id:
+        raise HTTPException(status_code=400, detail="No active training plan to adapt")
+    plan = await udb.training_plans.find_one({"id": req.plan_id}) or {}
     # Ground structured plans in their COMPUTED phase/progress (the training_plans
     # doc alone is sparse for couch-to-road / ride-stronger / ride-beyond).
     if req.plan_id in ("couch-to-road", "ride-stronger", "ride-beyond"):
@@ -3739,13 +3767,13 @@ async def coach_adaptation_detail(req: AdaptationRequest):
 
 
 @api_router.get("/plan/adaptations")
-async def get_plan_adaptations(plan_id: str = "build-and-climb", coach_name: Optional[str] = None):
+async def get_plan_adaptations(plan_id: str = "", coach_name: Optional[str] = None):
     """Return the coach's adaptation history (newest first). Seeds a first entry
     from the plan's current cached/static adaptation if the history is empty."""
-    plan = await udb.training_plans.find_one({"id": plan_id})
-    if not plan:
-        await udb.training_plans.update_one({"id": plan_id}, {"$set": BUILD_AND_CLIMB}, upsert=True)
-        plan = dict(BUILD_AND_CLIMB)
+    plan_id = await _plan_id_or_active(plan_id)
+    if not plan_id:
+        return {"adaptations": [], "status": ""}
+    plan = await udb.training_plans.find_one({"id": plan_id}) or {}
 
     history = plan.get("adaptation_history") or []
     if not history:
@@ -3780,10 +3808,9 @@ class GoalsUpdateRequest(BaseModel):
 @api_router.put("/plan/goals")
 async def update_plan_goals(req: GoalsUpdateRequest):
     """Persist the rider's edited plan goals and return the updated plan."""
-    plan = await udb.training_plans.find_one({"id": req.plan_id})
-    if not plan:
-        await udb.training_plans.update_one({"id": req.plan_id}, {"$set": BUILD_AND_CLIMB}, upsert=True)
-
+    req.plan_id = await _plan_id_or_active(req.plan_id)
+    if not req.plan_id:
+        raise HTTPException(status_code=400, detail="No active training plan")
     goals = [g.dict() for g in req.goals]
     await udb.training_plans.update_one(
         {"id": req.plan_id},
@@ -3795,14 +3822,22 @@ async def update_plan_goals(req: GoalsUpdateRequest):
 
 
 @api_router.get("/plan/progress")
-async def get_plan_progress(plan_id: str = "build-and-climb"):
+async def get_plan_progress(plan_id: str = ""):
     """Detailed plan progress for the "View Progress" modal: headline metrics,
     fitness trend series and a per-week completion breakdown."""
-    plan = await udb.training_plans.find_one({"id": plan_id})
-    if not plan:
-        await udb.training_plans.update_one({"id": plan_id}, {"$set": BUILD_AND_CLIMB}, upsert=True)
-        plan = dict(BUILD_AND_CLIMB)
+    plan_id = await _plan_id_or_active(plan_id)
+    if not plan_id:
+        return {"progress_pct": 0, "summary": {}, "fitness": [], "trend": [], "metrics": [], "weeks": []}
+    plan = await udb.training_plans.find_one({"id": plan_id}) or {}
     plan.pop("_id", None)
+    # Structured plans compute their progress live rather than storing weekly_load.
+    if plan_id in STRUCTURED_PLAN_IDS:
+        try:
+            computed = await get_plan(id=plan_id)
+            if isinstance(computed, dict):
+                plan = {**plan, **computed}
+        except Exception:
+            pass
 
     weekly = plan.get("weekly_load", [])
     here = plan.get("you_are_here", 1)
@@ -3915,6 +3950,36 @@ CALENDAR_WEEK = {
 }
 
 
+def _free_calendar_week(start: str) -> dict:
+    """An open (planless) week for casual riders: real dates, no fabricated plan
+    sessions. Rider-scheduled workouts get attached to their day by the caller."""
+    from datetime import datetime, timedelta
+    try:
+        base = datetime.strptime(start, "%Y-%m-%d").date()
+    except Exception:
+        base = datetime.utcnow().date()
+    mon = base - timedelta(days=base.weekday())
+    end = mon + timedelta(days=6)
+    today = datetime.utcnow().date()
+    names = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
+    days = [{
+        "date": (mon + timedelta(days=i)).isoformat(),
+        "day_name": names[i],
+        "day_num": (mon + timedelta(days=i)).strftime("%d %b").upper(),
+        "focus": "Open",
+    } for i in range(7)]
+    sel = today.isoformat() if mon <= today <= end else mon.isoformat()
+    return {
+        "id": mon.isoformat(),
+        "start_date": mon.isoformat(),
+        "end_date": end.isoformat(),
+        "range_label": f"{mon.strftime('%d')} \u2013 {end.strftime('%d %b %Y')}",
+        "selected_date": sel,
+        "free": True,
+        "days": days,
+    }
+
+
 @api_router.get("/calendar/week")
 async def get_calendar_week(start: str = "2025-05-12"):
     """Return a scheduling week (seeded into Mongo on first read)."""
@@ -3932,11 +3997,16 @@ async def get_calendar_week(start: str = "2025-05-12"):
             pdoc, weeks_map, planned, prefix = _struct_ctx("ride-beyond")
             cur, ride_map, supp_dates = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id="ride-beyond", ride_prefix=prefix)
             doc = _ctr_calendar_week(weeks_map[cur], ride_map, supp_dates, _ctr_today())
-        else:
+        elif active == "build-and-climb":
+            # The dedicated demo account keeps the illustrative demo week.
             doc = await udb.calendar_weeks.find_one({"start_date": start})
             if not doc or doc.get("seed_version") != CALENDAR_WEEK["seed_version"]:
                 await udb.calendar_weeks.update_one({"start_date": start}, {"$set": CALENDAR_WEEK}, upsert=True)
                 doc = dict(CALENDAR_WEEK)
+        else:
+            # Casual rider (no structured plan): an OPEN week they can fill with
+            # any workouts they pick — never the fabricated demo week.
+            doc = _free_calendar_week(start)
         doc.pop("_id", None)
         # Attach rider-scheduled catalog workouts to their matching day.
         try:
@@ -3980,7 +4050,7 @@ async def get_calendar_week(start: str = "2025-05-12"):
         return doc
     except Exception:
         logging.exception("get_calendar_week failed")
-        return CALENDAR_WEEK
+        return _free_calendar_week(start)
 
 
 # ----------------------- Workout favorites & scheduling -----------------------
@@ -4629,6 +4699,17 @@ async def _seed_plans_on_startup():
         logger.info("Workout catalog seeded/loaded from MongoDB")
     except Exception:
         logging.exception("workout catalog seeding failed")
+    try:
+        # training_plans is a PER-USER collection; a single-field unique index on
+        # `id` breaks multi-rider use (two riders can't each have "couch-to-road")
+        # and caused DuplicateKeyErrors that fell back to the demo plan. Enforce a
+        # compound unique index on (user_id, id) instead.
+        info = await db.training_plans.index_information()
+        if "id_1" in info:
+            await db.training_plans.drop_index("id_1")
+        await db.training_plans.create_index([("user_id", 1), ("id", 1)], unique=True, name="user_id_1_id_1")
+    except Exception:
+        logging.exception("training_plans index migration failed")
     try:
         await auth.ensure_indexes()
         seeded = await auth.seed_admins()
