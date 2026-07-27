@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useCallback, useEffect, useState } from "react";
 import { Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
 import { getToken, setToken, loadToken, installFetchAuth } from "./session";
@@ -161,6 +162,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await fetch(`${API}/api/auth/logout`, { method: "POST" });
     } catch {
       /* noop */
+    }
+    // Clear rider-scoped cached app data so nothing leaks into the next account
+    // that logs in on this device (e.g. a stale training plan or profile).
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      const stale = keys.filter(
+        (k) => k.startsWith("roujaune:plan") || k === "roujaune:riderProfile" || k === "roujaune:riderAvatar",
+      );
+      if (stale.length) await AsyncStorage.multiRemove(stale);
+    } catch {
+      /* ignore cache clear errors */
     }
     await setToken(null);
     setUser(null);
