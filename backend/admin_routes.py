@@ -408,10 +408,24 @@ async def delete_plan(plan_id: str):
 
 
 # --------------------------------------------------------------------------- #
-#  Integrations health                                                        #
+#  Integrations health + estimated monthly spend (HWG cost rollup)            #
 # --------------------------------------------------------------------------- #
+# Flat monthly cost estimates (USD) + soft budgets per integration. When real
+# token/request usage tracking lands, replace the flat estimate with
+# monthly_units × unit_price. The one field the HWG rollup reads is
+# totals.est_cost_month_usd.
+_INTEGRATION_COST = {
+    "llm":         {"est": 40.0, "budget": 150.0},
+    "push":        {"est": 5.0,  "budget": 25.0},
+    "email":       {"est": 10.0, "budget": 40.0},
+    "weather":     {"est": 0.0,  "budget": 5.0},
+    "google_auth": {"est": 0.0,  "budget": 5.0},
+    "database":    {"est": 15.0, "budget": 60.0},
+}
+
+
 @admin_router.get("/integrations")
-async def integrations(health: int = 0):
+async def integrations(health: int = 1):
     import os
     def _st(configured: bool) -> str:
         return "healthy" if configured else "not_configured"
@@ -433,7 +447,28 @@ async def integrations(health: int = 0):
             db_ok = False
         items.append({"id": "database", "name": "MongoDB", "type": "database", "configured": True,
                       "status": "healthy" if db_ok else "down"})
-    return {"items": items}
+    # Attach per-integration estimated monthly cost + budget/over-budget flag.
+    for it in items:
+        cfg = _INTEGRATION_COST.get(it["id"], {"est": 0.0, "budget": 0.0})
+        est = round(float(cfg["est"]), 2)
+        budget = float(cfg["budget"])
+        it["est_cost_month_usd"] = est
+        it["budget_month_usd"] = budget
+        it["over_budget"] = bool(budget) and est > budget
+    month_total = round(sum(float(i.get("est_cost_month_usd", 0) or 0) for i in items), 2)
+    over = sum(1 for i in items if i.get("over_budget"))
+    return {
+        "integrations": items,   # console reads either key
+        "items": items,
+        "totals": {"est_cost_month_usd": month_total, "over_budget_count": over},
+        "summary": {
+            "day": round(month_total / 30, 2),
+            "week": round(month_total / 4.3, 2),
+            "month": month_total,
+            "year": round(month_total * 12, 2),
+        },
+        "generated_at": _now(),
+    }
 
 
 # --------------------------------------------------------------------------- #
