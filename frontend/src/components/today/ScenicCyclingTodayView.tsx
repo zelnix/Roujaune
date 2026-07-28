@@ -5,15 +5,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { colors, radius, spacing } from "../../theme";
 import { useScenicRoutes, useScenicLast, ScenicRoute, ytThumb } from "../../lib/scenic-routes";
+import { BrandHeader } from "../BrandHeader";
 
-const WORDMARK = require("../../../assets/images/auth_wordmark.png");
-
-/** Wordmark title + subtitle header, matching the other Today screens. */
+/** Standard Today header (3D wordmark + tagline) with a scenic-specific line,
+ *  matching the training experience screen. */
 function ScenicHeader() {
   return (
-    <View style={styles.header} testID="scenic-header">
-      <Image source={WORDMARK} style={styles.wordmark} contentFit="contain" />
-      <Text style={styles.subtitle}>WHERE SHALL WE EXPLORE TODAY?</Text>
+    <View testID="scenic-header">
+      <BrandHeader compact descriptor="Where shall we explore today?" />
     </View>
   );
 }

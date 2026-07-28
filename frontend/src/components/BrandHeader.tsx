@@ -52,13 +52,14 @@ function Wordmark3D({ scale = 1 }: { scale?: number }) {
   );
 }
 
-export function BrandHeader({ compact = false, showDescriptor = true }: { compact?: boolean; showDescriptor?: boolean }) {
+export function BrandHeader({ compact = false, showDescriptor = true, descriptor }: { compact?: boolean; showDescriptor?: boolean; descriptor?: string }) {
   const persona = useCoach();
+  const line = descriptor ?? `Personalised cycling training with ${persona.name}.`;
   return (
     <View testID="brand-header">
       <Wordmark3D scale={compact ? 0.72 : 1} />
       <Text style={[styles.tagline, compact && { fontSize: 24, marginTop: 6 }]}>{brand.tagline}</Text>
-      {showDescriptor && <Text style={[styles.descriptor, compact && { fontSize: 13 }]}>{`Personalised cycling training with ${persona.name}.`}</Text>}
+      {showDescriptor && <Text style={[styles.descriptor, compact && { fontSize: 13 }]}>{line}</Text>}
     </View>
   );
 }
