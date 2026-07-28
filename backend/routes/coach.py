@@ -4,6 +4,7 @@ plan-adaptation summary/detail generators. LLM personas come from
 services.coach_llm; all plan math from services.plan_engine (one-way dependency).
 """
 import os  # noqa: F401
+import json
 import asyncio
 import logging
 import uuid
@@ -13,6 +14,7 @@ from typing import Any, Dict, List, Optional  # noqa: F401
 from fastapi import APIRouter, HTTPException  # noqa: F401
 
 import auth  # noqa: F401
+import plans_admin
 import companion_plan
 from auth import udb
 from core import now_iso
@@ -30,6 +32,11 @@ from services.plan_engine import (
 )  # noqa: F401
 
 router = APIRouter()
+
+# Shared with the plan routes (one-way coach -> plan dependency; plan.py never
+# imports coach, so no cycle). get_plan gives structured-plan grounding for the
+# adaptation detail; WELLNESS_DATA feeds the readiness snippet in coach context.
+from routes.plan import get_plan, WELLNESS_DATA  # noqa: E402
 
 
 @router.post("/coach/cue")

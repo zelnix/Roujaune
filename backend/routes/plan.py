@@ -3,6 +3,7 @@ state and math lives in services.plan_engine; these handlers just orchestrate it
 per rider. Scoped per user; never fabricates a demo plan (returns NO_PLAN).
 """
 import logging
+import os
 import re  # noqa: F401
 import uuid  # noqa: F401
 from datetime import date, datetime, timedelta, timezone  # noqa: F401
@@ -15,6 +16,7 @@ import plans_admin
 import companion_plan  # noqa: F401
 from auth import udb
 from core import now_iso  # noqa: F401
+from services.coach_llm import coach_system
 from models import (
     AssignPlanRequest, OnboardingReq, GoalsUpdateRequest, FavToggleRequest,
     ScheduleRequest, MoveSessionRequest, ReviewRequest,

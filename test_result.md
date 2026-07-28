@@ -123,7 +123,8 @@ backend_refactor_coach_plan_engine:
     file: "backend/server.py, backend/services/plan_engine.py, backend/routes/plan.py, backend/routes/coach.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
+    verified: "iter65 fix — 29/29 pytest pass. Fixed 6 missing imports (plan.py: os, coach_system; coach.py: json, plans_admin, get_plan, WELLNESS_DATA from routes.plan). No 500s; calendar/review + coach/adaptation/detail confirmed working."
     status_history:
         -working: "NA"
         -agent: "main"
