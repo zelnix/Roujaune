@@ -130,6 +130,7 @@ export default function ScenicRideScreen() {
   const [heard, setHeard] = React.useState<Set<number>>(new Set());
   const [hiddenPoi, setHiddenPoi] = React.useState<Set<number>>(new Set());
   const [saved, setSaved] = React.useState<Set<number>>(new Set());
+  const [sessionSaved, setSessionSaved] = React.useState<Set<number>>(new Set()); // saved during THIS ride
   const [narrating, setNarrating] = React.useState(false);
   // Effortless capture: a subtle "save discovery" prompt + confirmation toast.
   const [discoveryPrompt, setDiscoveryPrompt] = React.useState<ScenicPoi | null>(null);
@@ -235,6 +236,7 @@ export default function ScenicRideScreen() {
     if (has) {
       const id = savedIds.current[poi.order];
       if (id) { deleteDiscovery(id); delete savedIds.current[poi.order]; }
+      setSessionSaved((s) => { const n = new Set(s); n.delete(poi.order); return n; });
       return true;
     }
     const d = await saveDiscovery({
@@ -243,7 +245,11 @@ export default function ScenicRideScreen() {
       description: poi.description, narration: poi.narration,
       photo: poi.image || route.thumbnail || ytThumb(route.youtube_id),
     });
-    if (d?.id) { savedIds.current[poi.order] = d.id; return true; }
+    if (d?.id) {
+      savedIds.current[poi.order] = d.id;
+      setSessionSaved((s) => new Set(s).add(poi.order));
+      return true;
+    }
     // Roll back the optimistic add if the save failed.
     setSaved((sv) => { const n = new Set(sv); n.delete(poi.order); return n; });
     return false;
@@ -421,6 +427,12 @@ export default function ScenicRideScreen() {
                 <Text style={s.metaSub}>remaining</Text>
               </View>
             </View>
+            {sessionSaved.size > 0 && (
+              <View style={s.savedChip}>
+                <Ionicons name="bookmark" size={14} color={colors.yellow} />
+                <Text style={s.savedChipText}>{sessionSaved.size} discover{sessionSaved.size === 1 ? "y" : "ies"} saved this ride</Text>
+              </View>
+            )}
           </Pressable>
         )}
 
@@ -717,6 +729,8 @@ const s = StyleSheet.create({
 
   utility: { position: "absolute", top: 24, right: 24, flexDirection: "row", gap: 10, zIndex: 20 },
   promptWrap: { position: "absolute", top: 78, left: 0, right: 0, alignItems: "center", paddingHorizontal: 16, zIndex: 25 },
+  savedChip: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(255,194,10,0.12)", borderRadius: 999, borderWidth: 1, borderColor: "rgba(255,194,10,0.35)", paddingVertical: 7, paddingHorizontal: 12, alignSelf: "flex-start" },
+  savedChipText: { color: colors.yellow, fontSize: 12, fontWeight: "800" },
   prompt: { flexDirection: "row", alignItems: "center", gap: 10, maxWidth: 440, width: "100%", backgroundColor: "rgba(8,10,10,0.94)", borderRadius: 16, borderWidth: 1, borderColor: "rgba(255,194,10,0.5)", paddingVertical: 8, paddingLeft: 8, paddingRight: 8 },
   promptImg: { width: 42, height: 42, borderRadius: 10, backgroundColor: "#0E1512" },
   promptImgFallback: { alignItems: "center", justifyContent: "center" },

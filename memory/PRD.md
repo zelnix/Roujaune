@@ -702,3 +702,6 @@ STILL PENDING (awaiting approval): Phase 3 (Home banners consolidation, dup CTAs
 
 ## Discovery prompt chime + haptic (2026-07-28 fork)
 - When the "Save discovery" prompt appears during a ride, a gentle bell chime plays and a success haptic fires (eyes-forward alert). Added a synthesized `assets/audio/discovery_chime.wav` (soft E6→B6 bell, ~1.1s), played via `expo-audio` at 0.55 volume; haptic via `expo-haptics` `notificationAsync(Success)` (guarded to non-web). Triggered from the same reached-POI effect validated in iter73. Audio/haptics are native — fully testable only on a device build. Verified: ride screen bundles + renders with the new asset.
+
+## "Discoveries saved this ride" HUD counter (2026-07-28 fork)
+- Tracks discoveries saved during the CURRENT ride via a `sessionSaved` set (distinct from previously-saved POIs primed from the backend on entry). Incremented on a successful new save (prompt or panel bookmark), decremented on un-save. A subtle yellow chip ("N discover(y/ies) saved this ride") appears in the left progress panel when count > 0. Verified via screenshot (counter text renders after saving on lake-achensee).
