@@ -11,6 +11,7 @@ import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 import YouTubePlayer from "@/src/components/YouTubePlayer";
 import { colors, radius } from "@/src/theme";
 import * as Speech from "expo-speech";
+import * as Haptics from "expo-haptics";
 import { useScenicRoute, useScenicPois, ScenicPoi, logScenicRide, ytThumb, saveDiscovery, deleteDiscovery, fetchDiscoveries } from "@/src/lib/scenic-routes";
 import { getResume, saveResume, clearResume } from "@/src/lib/scenic-resume";
 import { useCoach, useVoiceGuidance, setVoiceGuidance, VoiceGuidance } from "@/src/lib/coach-persona";
@@ -148,6 +149,13 @@ export default function ScenicRideScreen() {
 
   // Soft, looping ambient soundtrack that replaces the (muted) video audio.
   const ambient = useAudioPlayer(require("../assets/audio/scenic_ambient.mp3"));
+  // Gentle chime that plays when a new discovery prompt appears (eyes-forward).
+  const chime = useAudioPlayer(require("../assets/audio/discovery_chime.wav"));
+  React.useEffect(() => { try { chime.volume = 0.55; } catch {} }, [chime]);
+  const alertDiscovery = React.useCallback(() => {
+    try { chime.seekTo(0); chime.play(); } catch {}
+    if (Platform.OS !== "web") { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {}); }
+  }, [chime]);
   React.useEffect(() => {
     setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
     try { ambient.loop = true; } catch {}
@@ -316,9 +324,10 @@ export default function ScenicRideScreen() {
     if (!reached) return;
     promptedRef.current.add(reached.order);
     setDiscoveryPrompt(reached);
+    alertDiscovery();
     if (promptTimer.current) clearTimeout(promptTimer.current);
     promptTimer.current = setTimeout(() => setDiscoveryPrompt(null), 7000);
-  }, [pct, pois, hiddenPoi, saved]);
+  }, [pct, pois, hiddenPoi, saved, alertDiscovery]);
 
   // Clear pending timers on unmount.
   React.useEffect(() => () => {
