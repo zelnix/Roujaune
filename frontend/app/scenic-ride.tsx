@@ -153,9 +153,10 @@ export default function ScenicRideScreen() {
   const chime = useAudioPlayer(require("../assets/audio/discovery_chime.wav"));
   React.useEffect(() => { try { chime.volume = 0.55; } catch {} }, [chime]);
   const alertDiscovery = React.useCallback(() => {
-    try { chime.seekTo(0); chime.play(); } catch {}
+    // Quiet mode keeps the ride fully silent — only the haptic tap fires.
+    if (audioMode !== "quiet") { try { chime.seekTo(0); chime.play(); } catch {} }
     if (Platform.OS !== "web") { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {}); }
-  }, [chime]);
+  }, [chime, audioMode]);
   React.useEffect(() => {
     setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
     try { ambient.loop = true; } catch {}
