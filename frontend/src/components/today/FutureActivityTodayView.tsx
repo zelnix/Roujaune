@@ -52,7 +52,7 @@ export function FutureActivityTodayView({ mode }: { mode: RiderExperience }) {
     <View style={{ gap: spacing.md }} testID={`future-activity-${mode}`}>
       <View style={styles.topRow}>
         <View style={{ flex: 1 }}>
-          <BrandHeader compact={compact} />
+          <BrandHeader compact={compact} descriptor={`${meta.description}.`} />
         </View>
         <HeaderStatus />
       </View>

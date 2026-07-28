@@ -11,30 +11,44 @@ import { HeaderStatus } from "../HeaderStatus";
 
 const heroBg = require("../../../assets/images/scenic_hero_bg.png");
 
+/** Higher-res YouTube still for full-bleed backgrounds (falls back gracefully). */
+function ytThumbMax(id: string): string {
+  return `https://img.youtube.com/vi/${id}/maxresdefault.jpg`;
+}
+
 /** Standard Today hero — the same treatment as the Training Today screen: a
  *  full-bleed background photo with the 3D wordmark + tagline + descriptor
- *  overlaid, and the standard status cluster top-right. */
-function ScenicHeader({ compact }: { compact: boolean }) {
+ *  overlaid, and the standard status cluster top-right. The photo swaps to
+ *  match the selected region for a more immersive feel. */
+function ScenicHeader({ compact, source, children }: { compact: boolean; source: any; children?: React.ReactNode }) {
   return (
     <ImageBackground
-      source={heroBg}
-      style={[styles.headerHero, compact && { minHeight: 190, padding: 18 }]}
+      source={source}
+      style={[styles.headerHero, compact && { padding: 16 }]}
       imageStyle={styles.headerHeroImg}
+      resizeMode="cover"
       testID="scenic-header"
-      accessibilityLabel="Cyclist on a lakeside road at sunset"
+      accessibilityLabel="Scenic cycling destination"
     >
       <LinearGradient
-        colors={["rgba(5,7,6,0.82)", "rgba(5,7,6,0.35)", "rgba(5,7,6,0.15)", "rgba(5,7,6,0.55)"]}
+        colors={["rgba(5,7,6,0.86)", "rgba(5,7,6,0.4)", "rgba(5,7,6,0.05)", "rgba(5,7,6,0.15)"]}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0.2 }}
+        end={{ x: 1, y: 0.15 }}
+        style={StyleSheet.absoluteFill as any}
+      />
+      <LinearGradient
+        colors={["transparent", "rgba(5,7,6,0.15)", "rgba(5,7,6,0.72)"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
         style={StyleSheet.absoluteFill as any}
       />
       <View style={styles.headerRow}>
         <View style={{ flex: 1 }}>
-          <BrandHeader compact={compact} />
+          <BrandHeader compact={compact} descriptor="Where shall we explore today?" />
         </View>
         <HeaderStatus />
       </View>
+      {children ? <View style={styles.heroOverlay}>{children}</View> : null}
     </ImageBackground>
   );
 }
@@ -90,7 +104,7 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
   if (!routes || routes.length === 0) {
     return (
       <View style={{ gap: spacing.md }} testID="scenic-cycling-today">
-        <ScenicHeader compact={compact} />
+        <ScenicHeader compact={compact} source={heroBg} />
         <View style={styles.empty} testID="scenic-empty">
           <View style={styles.emptyIcon}><Ionicons name="earth-outline" size={30} color={colors.yellow} /></View>
           <Text style={styles.emptyTitle}>New scenic destinations are on the way</Text>
@@ -118,80 +132,84 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
   const recent = filtered.slice(-2);
   const lastRoute = last?.available && last.routeId ? routes.find((r) => r.id === last.routeId) : null;
 
+  // Header photo swaps to a matching destination when a region is selected.
+  const regionHeroRoute = activeRegion === "All" ? null : routes.find((r) => r.region === activeRegion);
+  const heroSource = regionHeroRoute ? { uri: ytThumbMax(regionHeroRoute.youtube_id) } : heroBg;
+
   return (
     <View style={{ gap: spacing.md }} testID="scenic-cycling-today">
-      <ScenicHeader compact={compact} />
+      <ScenicHeader compact={compact} source={heroSource}>
+        {/* Overlaid POV showcase + prefs, sitting on the background photo */}
+        <ImageBackground source={{ uri: thumbUri(hero) }} style={styles.hero} imageStyle={styles.heroImg} testID="scenic-hero">
+          <View style={styles.heroScrim} />
+          <View style={styles.heroTopRow}>
+            <View style={styles.povBadge}>
+              <Ionicons name="videocam" size={12} color="#fff" />
+              <Text style={styles.povText}>POV VIDEO</Text>
+            </View>
+            <View style={styles.guidedBadge}>
+              <Ionicons name="leaf" size={11} color={colors.yellow} />
+              <Text style={styles.guidedText}>Relaxed ride</Text>
+            </View>
+          </View>
+          <View style={{ flex: 1 }} />
+          <Text style={styles.heroTitle}>{hero.name.toUpperCase()}</Text>
+          <Text style={styles.heroCountry}>{hero.place}</Text>
+          <Text style={styles.heroDesc} numberOfLines={2}>
+            {hero.description || `A relaxed ${hero.tag.toLowerCase()} journey — ride at your own pace and soak in the scenery.`}
+          </Text>
+          <View style={styles.heroStats}>
+            {mins(hero) ? <Stat icon="time-outline" label={`${mins(hero)} minutes`} /> : null}
+            <Stat icon="leaf-outline" label="Relaxed" />
+            {hero.elevation_m ? <Stat icon="trending-up-outline" label={`${hero.elevation_m} m`} /> : null}
+            {hero.distance_km ? <Stat icon="navigate-outline" label={`${hero.distance_km} km`} /> : null}
+          </View>
+          <View style={styles.heroCtas}>
+            <Pressable testID="begin-scenic-journey" onPress={() => open(hero.id)} accessibilityRole="button" accessibilityLabel={`Begin scenic journey: ${hero.name}`}
+              style={({ hovered }: any) => [styles.primaryCta, hovered && styles.primaryCtaHover]}>
+              <Ionicons name="play" size={16} color="#fff" />
+              <Text style={styles.primaryCtaText}>BEGIN SCENIC JOURNEY</Text>
+            </Pressable>
+            <Pressable testID="surprise-me" onPress={surprise} accessibilityRole="button" accessibilityLabel="Surprise me with a random scenic ride"
+              style={({ hovered }: any) => [styles.surpriseCta, hovered && styles.surpriseCtaHover]}>
+              <Ionicons name="shuffle" size={16} color={colors.yellow} />
+              <Text style={styles.surpriseCtaText}>SURPRISE ME</Text>
+            </Pressable>
+          </View>
+        </ImageBackground>
 
-      {/* Hero destination — half-size showcase card */}
-      <ImageBackground source={{ uri: thumbUri(hero) }} style={styles.hero} imageStyle={styles.heroImg} testID="scenic-hero">
-        <View style={styles.heroScrim} />
-        <View style={styles.heroTopRow}>
-          <View style={styles.povBadge}>
-            <Ionicons name="videocam" size={12} color="#fff" />
-            <Text style={styles.povText}>POV VIDEO</Text>
-          </View>
-          <View style={styles.guidedBadge}>
-            <Ionicons name="leaf" size={11} color={colors.yellow} />
-            <Text style={styles.guidedText}>Relaxed ride</Text>
-          </View>
-        </View>
-        <View style={{ flex: 1 }} />
-        <Text style={styles.heroTitle}>{hero.name.toUpperCase()}</Text>
-        <Text style={styles.heroCountry}>{hero.place}</Text>
-        <Text style={styles.heroDesc} numberOfLines={2}>
-          {hero.description || `A relaxed ${hero.tag.toLowerCase()} journey — ride at your own pace and soak in the scenery.`}
-        </Text>
-        <View style={styles.heroStats}>
-          {mins(hero) ? <Stat icon="time-outline" label={`${mins(hero)} minutes`} /> : null}
-          <Stat icon="leaf-outline" label="Relaxed" />
-          {hero.elevation_m ? <Stat icon="trending-up-outline" label={`${hero.elevation_m} m`} /> : null}
-          {hero.distance_km ? <Stat icon="navigate-outline" label={`${hero.distance_km} km`} /> : null}
-        </View>
-        <View style={styles.heroCtas}>
-          <Pressable testID="begin-scenic-journey" onPress={() => open(hero.id)} accessibilityRole="button" accessibilityLabel={`Begin scenic journey: ${hero.name}`}
-            style={({ hovered }: any) => [styles.primaryCta, hovered && styles.primaryCtaHover]}>
-            <Ionicons name="play" size={16} color="#fff" />
-            <Text style={styles.primaryCtaText}>BEGIN SCENIC JOURNEY</Text>
-          </Pressable>
-          <Pressable testID="surprise-me" onPress={surprise} accessibilityRole="button" accessibilityLabel="Surprise me with a random scenic ride"
-            style={({ hovered }: any) => [styles.surpriseCta, hovered && styles.surpriseCtaHover]}>
-            <Ionicons name="shuffle" size={16} color={colors.yellow} />
-            <Text style={styles.surpriseCtaText}>SURPRISE ME</Text>
+        {/* Preferences summary + region filters (same line as Ride feel) */}
+        <View style={styles.prefs} testID="scenic-prefs">
+          <Pref label="Companion" value="Alberto" icon="person-circle-outline" />
+          <Pref label="Journey style" value="Discover" icon="compass-outline" />
+          <Pref label="Ride feel" value="Relaxed Journey" icon="leaf-outline" />
+          {regions.length > 1 && (
+            <View style={styles.prefFilters} testID="scenic-region-filter">
+              {["All", ...regions].map((r) => {
+                const sel = activeRegion === r;
+                return (
+                  <Pressable
+                    key={r}
+                    testID={`scenic-region-${r}`}
+                    onPress={() => setRegion(r)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: sel }}
+                    accessibilityLabel={`Show ${r} rides`}
+                    style={[styles.filterChip, sel && styles.filterChipSel]}
+                  >
+                    <Ionicons name={regionIcon(r)} size={13} color={sel ? colors.bg : colors.yellow} />
+                    <Text style={[styles.filterChipText, sel && styles.filterChipTextSel]}>{r}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+          <Pressable testID="adjust-journey" onPress={() => router.push("/settings")} style={styles.adjust} accessibilityRole="button">
+            <Ionicons name="options-outline" size={15} color={colors.yellow} />
+            <Text style={styles.adjustText}>Adjust journey</Text>
           </Pressable>
         </View>
-      </ImageBackground>
-
-      {/* Preferences summary + region filters (same line as Ride feel) */}
-      <View style={styles.prefs} testID="scenic-prefs">
-        <Pref label="Companion" value="Alberto" icon="person-circle-outline" />
-        <Pref label="Journey style" value="Discover" icon="compass-outline" />
-        <Pref label="Ride feel" value="Relaxed Journey" icon="leaf-outline" />
-        {regions.length > 1 && (
-          <View style={styles.prefFilters} testID="scenic-region-filter">
-            {["All", ...regions].map((r) => {
-              const sel = activeRegion === r;
-              return (
-                <Pressable
-                  key={r}
-                  testID={`scenic-region-${r}`}
-                  onPress={() => setRegion(r)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: sel }}
-                  accessibilityLabel={`Show ${r} rides`}
-                  style={[styles.filterChip, sel && styles.filterChipSel]}
-                >
-                  <Ionicons name={regionIcon(r)} size={13} color={sel ? colors.bg : colors.yellow} />
-                  <Text style={[styles.filterChipText, sel && styles.filterChipTextSel]}>{r}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
-        <Pressable testID="adjust-journey" onPress={() => router.push("/settings")} style={styles.adjust} accessibilityRole="button">
-          <Ionicons name="options-outline" size={15} color={colors.yellow} />
-          <Text style={styles.adjustText}>Adjust journey</Text>
-        </Pressable>
-      </View>
+      </ScenicHeader>
 
       {/* Continue your journey — only when the rider actually has a last scenic ride */}
       {lastRoute && (
@@ -266,9 +284,10 @@ function DestRow({ title, data, open, tag }: { title: string; data: ScenicRoute[
 
 const styles = StyleSheet.create({
   h1: { color: colors.white, fontSize: 22, fontWeight: "800", letterSpacing: 0.4 },
-  headerHero: { minHeight: 260, borderRadius: radius.xl, overflow: "hidden", padding: 24, justifyContent: "center", backgroundColor: "#0E1512" },
-  headerHeroImg: { borderRadius: radius.xl },
+  headerHero: { minHeight: 600, borderRadius: radius.xl, overflow: "hidden", padding: 22, paddingTop: 20, justifyContent: "flex-start", backgroundColor: "#0E1512" },
+  headerHeroImg: { borderRadius: radius.xl, transform: [{ scale: 1.55 }, { translateY: -95 }] },
   headerRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 16 },
+  heroOverlay: { marginTop: "auto", gap: spacing.md, paddingTop: spacing.lg },
   header: { gap: 6, marginBottom: 2 },
   wordmark: { width: 200, height: 30, alignSelf: "flex-start" },
   subtitle: { color: colors.textDim, fontSize: 13.5, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
@@ -287,29 +306,29 @@ const styles = StyleSheet.create({
   emptyTitle: { color: colors.white, fontSize: 18, fontWeight: "800", textAlign: "center" },
   emptyBody: { color: colors.textDim, fontSize: 14.5, lineHeight: 22, textAlign: "center", maxWidth: 460 },
 
-  hero: { alignSelf: "flex-start", width: "100%", maxWidth: 560, minHeight: 210, borderRadius: radius.xl, overflow: "hidden", padding: 18, justifyContent: "flex-end", backgroundColor: "#0E1512" },
+  hero: { alignSelf: "flex-start", width: "100%", maxWidth: 672, minHeight: 252, borderRadius: radius.xl, overflow: "hidden", padding: 20, justifyContent: "flex-end", backgroundColor: "#0E1512" },
   heroImg: { borderRadius: radius.xl },
   heroScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(6,8,7,0.5)" },
-  heroTopRow: { position: "absolute", top: 14, left: 18, right: 18, flexDirection: "row", justifyContent: "space-between" },
+  heroTopRow: { position: "absolute", top: 14, left: 20, right: 20, flexDirection: "row", justifyContent: "space-between" },
   povBadge: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(224,30,43,0.92)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
   povText: { color: "#fff", fontSize: 9.5, fontWeight: "800", letterSpacing: 0.5 },
   guidedBadge: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(0,0,0,0.5)", borderWidth: 1, borderColor: "rgba(245,179,1,0.35)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
   guidedText: { color: colors.yellow, fontSize: 9.5, fontWeight: "700" },
-  heroTitle: { color: "#fff", fontSize: 21, fontWeight: "900", letterSpacing: 0.3 },
-  heroCountry: { color: colors.yellow, fontSize: 13, fontWeight: "700", marginTop: 2 },
-  heroDesc: { color: "rgba(255,255,255,0.85)", fontSize: 12.5, lineHeight: 18, marginTop: 6, maxWidth: 520 },
-  heroStats: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 10 },
+  heroTitle: { color: "#fff", fontSize: 24, fontWeight: "900", letterSpacing: 0.3 },
+  heroCountry: { color: colors.yellow, fontSize: 14, fontWeight: "700", marginTop: 2 },
+  heroDesc: { color: "rgba(255,255,255,0.85)", fontSize: 13.5, lineHeight: 19, marginTop: 7, maxWidth: 560 },
+  heroStats: { flexDirection: "row", flexWrap: "wrap", gap: 14, marginTop: 12 },
   stat: { flexDirection: "row", alignItems: "center", gap: 6 },
-  statText: { color: "#fff", fontSize: 12, fontWeight: "600" },
-  heroCtas: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 14 },
-  primaryCta: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.red, borderRadius: radius.pill, paddingVertical: 12, paddingHorizontal: 18, minHeight: 46 },
+  statText: { color: "#fff", fontSize: 12.5, fontWeight: "600" },
+  heroCtas: { flexDirection: "row", flexWrap: "wrap", gap: 11, marginTop: 16 },
+  primaryCta: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.red, borderRadius: radius.pill, paddingVertical: 13, paddingHorizontal: 20, minHeight: 48 },
   primaryCtaHover: { backgroundColor: colors.redBright },
-  primaryCtaText: { color: "#fff", fontSize: 12.5, fontWeight: "800", letterSpacing: 0.5 },
-  surpriseCta: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(0,0,0,0.45)", borderWidth: 1, borderColor: "rgba(245,179,1,0.5)", borderRadius: radius.pill, paddingVertical: 12, paddingHorizontal: 16, minHeight: 46 },
+  primaryCtaText: { color: "#fff", fontSize: 13, fontWeight: "800", letterSpacing: 0.5 },
+  surpriseCta: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(0,0,0,0.45)", borderWidth: 1, borderColor: "rgba(245,179,1,0.5)", borderRadius: radius.pill, paddingVertical: 13, paddingHorizontal: 18, minHeight: 48 },
   surpriseCtaHover: { backgroundColor: "rgba(245,179,1,0.14)" },
-  surpriseCtaText: { color: colors.yellow, fontSize: 12.5, fontWeight: "800", letterSpacing: 0.5 },
+  surpriseCtaText: { color: colors.yellow, fontSize: 13, fontWeight: "800", letterSpacing: 0.5 },
 
-  prefs: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 16, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 16 },
+  prefs: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 16, backgroundColor: "rgba(10,14,12,0.66)", borderRadius: radius.lg, borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", padding: 16 },
   prefFilters: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
   prefItem: { flexDirection: "row", alignItems: "center", gap: 10 },
   prefLabel: { color: colors.textFaint, fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
