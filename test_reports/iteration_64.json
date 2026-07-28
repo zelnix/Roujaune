@@ -1,0 +1,39 @@
+{
+  "summary": "ITER64 Rider + Benchmark domain refactor fully verified — pure structural extraction, ZERO behavioural regression. 40/40 pytest tests pass in /app/backend/tests/test_iter64_rider_benchmark_refactor.py against the external base URL. Coverage: (1) Rider domain in routes/rider.py — GET/PUT /rider/profile, /rider/appearance, /rider/prefs, /rider/settings, /rider/kv (incl. dot-key rejection 400), GET /rider/prs + /rider/prs/{route_id} + POST /rider/prs (records/previous/pr shape), GET /rider/season + /rider/season?days=7, GET /api/progress/summary (workouts/ftp/tests/totals), GET /rider/achievements, POST /rider/supplementary/complete (toggle), POST /rider/readiness, POST /rider/level, POST /rider/checkin + GET /rider/readiness/today; (2) DELETE /rider/account exercised against a throwaway registered user (NOT greenlantern) — token invalidated afterward as expected; (3) Benchmark domain in routes/benchmark.py — /benchmark/profile (seeded ftp=305 preserved), /benchmark/results (list + create + decision accept/exclude/invalid/404), /benchmark/sessions (create/get/patch/404/400), /benchmark/zones (7 zones, Z4=277-320W for ftp=305), /benchmark/plan-gate?plan_id=couch-to-road (all 11 keys present), /benchmark/nudge, /benchmark/plan-review, /benchmark/trends?range=3m, /benchmark/week (snapshotted → cancelled → started → patched day 0 → invalid status 400 → out-of-range 404 → cancelled → restored to original startDate=2026-07-27), /benchmark/recommendation; (4) Engine endpoints that consume the moved shared helpers — GET /plan, GET /calendar/week?start=2026-07-27 (uses services/rider_common._cal_status), GET /coach/chat/history (uses services/rider_common._rider_line), POST /coach/cue (LLM upstream currently flaky — endpoint reaches _rider_line successfully before the emergentintegrations chat call, so the refactor helper import path is proven; the 502/503 that appears intermittently is an EXTERNAL Anthropic/LiteLLM outage — logs show 'openai.InternalServerError: upstream connect error' — not a refactor bug), GET /plan/progress; (5) Admin benchmark-config cross-module sync — POST /admin/login → GET /admin/benchmark/config baseline (56) → PUT ftp_retest_days=60 → GET reflects 60 (proves mutation of benchmark_routes.FTP_RETEST_DAYS module constant from server.py works) → restored to 56 and verified. Final demo state check: benchmark week active, startDate=2026-07-27, days=7, ftp=305, ftpWkg=3.96, ftp_retest_days=56 — all restored.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/coach/cue", "issue": "Intermittent 502/503 from upstream LLM (litellm.ServiceUnavailableError: OpenAIException — upstream connect error/connection termination). NOT introduced by this refactor — same behaviour would occur pre-refactor. The refactored code path via services.rider_common._rider_line is confirmed working (rider line built before the LLM call)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter64_rider_benchmark_refactor.py",
+    "/app/test_reports/pytest/iter64.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/rider.py (494 lines) is self-contained — depends only on auth.udb, core.now_iso, models, services.readiness, services.rider_level, services.rider_common. No server.py imports. Clean extraction.",
+    "routes/benchmark.py (649 lines) depends only on auth, plans_admin, push, services.benchmark_decision, services.coach_llm.coach_line, services.plan_common._active_plan_id. Clean extraction.",
+    "services/rider_common.py holds _rider_doc / _rider_line / _cal_status / RIDER_DEFAULT — imported by both routes/rider.py, routes/benchmark.py (indirectly via services/coach_llm) and server.py (calendar/coach engines). No circular imports.",
+    "services/plan_common.py holds _active_plan_id / _plan_id_or_active / STRUCTURED_PLAN_IDS / _RIDE_PREFIX — imported by routes/benchmark.py (nudge) and server.py (plan engine). No circular imports.",
+    "Admin cross-module sync uses `benchmark_routes.FTP_RETEST_DAYS = int(...)` from server.py (lines 2438, 2534). Because Python re-binds the module attribute (not just the local reference), routes/benchmark.py functions that read FTP_RETEST_DAYS at call time see the new value. Verified end-to-end.",
+    "GET /api/rider/settings returns {} when no doc exists (line 109) — subtly different from other endpoints that upsert defaults. This is the pre-refactor behaviour preserved verbatim; noting only for completeness.",
+    "GET /api/benchmark/profile always returns the 9 headline keys with None for missing values (line 30-32) — deliberate stable shape for the client; preserved.",
+    "server.py is still 2610 lines — the P1 monolith reduction continues to progress. Remaining domains that could be extracted next: coach chat/streaming (largest cluster), plan-engine, calendar, workouts/summary endpoints already extracted. Consider extracting the coach domain next."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter64_rider_benchmark_refactor.py (new — 40 tests)"
+  ],
+  "success_rate": {"backend": "100% (40/40)", "frontend": "not tested (backend-only iteration)"},
+  "seed_data_creation": "All test data is ephemeral or restored: (a) benchmark result created in test_create_and_decision_roundtrip is flagged isDevData=true and never touches the real profile; (b) benchmark session created in test_session_lifecycle is user-scoped and left as 'completed' — no impact; (c) rider_prs test creates one TEST_iter64_pr_* prefixed record — cannot be deleted via API but is prefix-tagged and harmless; (d) benchmark week was snapshotted (active=true, startDate=2026-07-27), cancelled, exercised, then restored to same startDate — verified end-state matches original (active/7 days/same start); (e) admin ftp_retest_days flipped 56→60→56, verified restored; (f) rider settings/prefs/appearance/profile all round-tripped with try/finally restore; (g) supplementary log toggled twice (net-zero); (h) daily check-in stored 'latest' snapshot — same as before; (i) throwaway account TEST_iter64_del_<hex>@roujaune.app was registered then deleted (DELETE /rider/account) — no residual data. Greenlantern demo state fully preserved.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Base URL: https://roujaune-train.preview.emergentagent.com. Rider login: greenlantern@roujaune.app / rideon9900 (couch-to-road, ftp=305 seeded, benchmark week active starting 2026-07-27). Admin login: POST /api/admin/login {email: roger.parenzee@gmail.com, password: letmein9900} — separate token from rider auth. Rider level endpoint (POST /rider/level) returns riderLevel/previousLevel/levelChanged/progressTowardNextLevel — NOT `level` or `capability`. /coach/cue depends on EMERGENT_LLM_KEY + Anthropic/LiteLLM upstream; when the upstream is degraded expect 502/503 (transient, not a code bug). To exercise DELETE /rider/account safely: register a throwaway with @roujaune.app domain (NOT @*.test — pydantic email-validator rejects reserved TLDs with 422). server.py still 2610 lines — next refactor target likely the coach chat domain.",
+  "rca_of_issue": "N/A — no refactor regressions. Only anomaly is external LLM upstream flakiness affecting /coach/cue (pre-existing)."
+}

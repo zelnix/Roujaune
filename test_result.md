@@ -103,6 +103,20 @@
 #====================================================================================================
 
 
+backend_refactor_rider_benchmark:
+  - task: "server.py restructure — extract Rider + Benchmark domains into routes/ + shared services/"
+    implemented: true
+    working: "NA"
+    file: "backend/server.py, backend/routes/rider.py, backend/routes/benchmark.py, backend/services/rider_common.py, backend/services/coach_llm.py, backend/services/plan_common.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Continued the P1 backend modularization (server.py 3850 -> 2610 lines). Extracted: (1) ALL rider-domain endpoints into routes/rider.py — /rider/profile,appearance,prefs,settings,kv,prs,account,season,achievements,supplementary/complete,readiness,level,checkin,readiness/today + /progress/summary; (2) ALL benchmark endpoints into routes/benchmark.py — /benchmark/profile,results,sessions,results/{id}/decision,zones,plan-gate,nudge,plan-review(+apply/dismiss),trends,week(+start/day/cancel),recommendation. Shared helpers moved to services/: rider_common.py (_rider_doc,_rider_line,_cal_status,RIDER_DEFAULT), coach_llm.py (coach_system,coach_chat_system,STYLE_TONE,coach_line), plan_common.py (STRUCTURED_PLAN_IDS,_RIDE_PREFIX,_active_plan_id,_plan_id_or_active). Admin benchmark-config router now mutates benchmark_routes.BM_RETEST_DAYS/FTP_RETEST_DAYS (module attribute) so cross-module admin edits stay in sync with the benchmark route. Self-verified via curl (demo greenlantern): all rider GET/PUT/POST 200, all benchmark endpoints 200 incl. plan-gate LLM coachMessage, admin /admin/benchmark/config GET+PUT+restore 200, and engine endpoints that consume the moved helpers still 200 (/plan, /calendar/week uses _cal_status, /coach/chat/history uses _rider_line). NEEDS: full backend regression to confirm no behavioural change across rider/benchmark/plan/calendar/coach/progress and admin config. NOTE: coach + plan engines intentionally left in server.py (deeply intertwined via module-global mutation — CTR/RS/RB reload); deferred to a future pass."
+
+
 benchmark_wp_c_d_e_g_and_ui:
   - task: "WP-C personalised recommendation, WP-G plan-start benchmark gate (rule + LLM), WP-D Benchmark Week (calendar overlay), WP-E plan-change review + Progress trends"
     implemented: true
