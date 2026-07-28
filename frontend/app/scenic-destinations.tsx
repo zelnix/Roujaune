@@ -91,19 +91,21 @@ export default function ScenicDestinationsScreen() {
 
         {/* Region filter */}
         {regions.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow} testID="destinations-region-filter">
-            {["All", ...regions].map((r) => {
-              const sel = region === r;
-              return (
-                <Pressable key={r} testID={`destinations-region-${r}`} onPress={() => setRegion(r)}
-                  accessibilityRole="button" accessibilityState={{ selected: sel }}
-                  style={[styles.chip, sel && styles.chipSel]}>
-                  <Ionicons name={regionIcon(r)} size={14} color={sel ? colors.bg : colors.yellow} />
-                  <Text style={[styles.chipText, sel && styles.chipTextSel]}>{r}</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+          <View style={styles.filterBand}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.filterRow} testID="destinations-region-filter">
+              {["All", ...regions].map((r) => {
+                const sel = region === r;
+                return (
+                  <Pressable key={r} testID={`destinations-region-${r}`} onPress={() => setRegion(r)}
+                    accessibilityRole="button" accessibilityState={{ selected: sel }}
+                    style={[styles.chip, sel && styles.chipSel]}>
+                    <Ionicons name={regionIcon(r)} size={14} color={sel ? colors.bg : colors.yellow} />
+                    <Text style={[styles.chipText, sel && styles.chipTextSel]}>{r}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
         )}
 
         {loading ? (
@@ -117,7 +119,7 @@ export default function ScenicDestinationsScreen() {
             </Pressable>
           </View>
         ) : (
-          <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.results} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <Text style={styles.count}>{results.length} {results.length === 1 ? "ride" : "rides"}</Text>
             <View style={[styles.grid, { gap }]}>
               {results.map((r) => (
@@ -180,12 +182,14 @@ const styles = StyleSheet.create({
   searchWrap: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: spacing.lg, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 16, minHeight: 48 },
   searchInput: { flex: 1, color: colors.white, fontSize: 15, paddingVertical: 12 },
 
+  filterBand: { flexGrow: 0, flexShrink: 0 },
   filterRow: { flexDirection: "row", gap: 8, paddingHorizontal: spacing.lg, paddingVertical: 12 },
   chip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(245,179,1,0.10)", borderWidth: 1, borderColor: "rgba(245,179,1,0.30)", borderRadius: radius.pill, paddingHorizontal: 14, paddingVertical: 9, minHeight: 40 },
   chipSel: { backgroundColor: colors.yellow, borderColor: colors.yellow },
   chipText: { color: colors.white, fontSize: 13, fontWeight: "700" },
   chipTextSel: { color: colors.bg, fontWeight: "800" },
 
+  results: { flex: 1 },
   scroll: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   count: { color: colors.textDim, fontSize: 13, fontWeight: "700", marginBottom: 12 },
   grid: { flexDirection: "row", flexWrap: "wrap" },
