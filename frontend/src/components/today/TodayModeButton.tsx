@@ -16,7 +16,7 @@ export function TodayModeButton({ compact = false }: { compact?: boolean }) {
 
   return (
     <View style={styles.wrap}>
-      {!compact && <Text style={styles.eyebrow} numberOfLines={1}>EXPERIENCE</Text>}
+      {!compact && <Text style={styles.eyebrow} numberOfLines={1}>RIDE XP</Text>}
       <Pressable
         testID="today-mode-button"
         onPress={() => setOpen(true)}
@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
     })),
   },
   selectedPressed: { transform: [{ translateY: 2 }], borderBottomWidth: 1, opacity: 0.96 },
-  iconBubble: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.16)" },
+  iconBubble: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg },
   selLabel: { color: colors.bg, fontSize: 9.5, fontWeight: "900", textAlign: "center" },
   chevCompact: { marginTop: 1 },
 

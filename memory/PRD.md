@@ -651,3 +651,11 @@ STILL PENDING (awaiting approval): Phase 3 (Home banners consolidation, dup CTAs
 - COMING-SOON TEASERS: backend /api/rider/interest (GET/POST/DELETE {mode}, 422 invalid; valid gravel/mountain-bike/walking/running/rowing/climbing); mode-interest.ts reactive store; new /coming-soon?mode=<id> teaser screen (hero + bullets from FutureActivityTodayView.PREVIEW + "Notify me when this launches" → notified/undo). TodayModeButton now routes coming-soon taps to the teaser (no experience switch). Verified iter69.
 - SELECTOR RESTYLE (user): "TODAY I WANT TO" → "RIDING EXPERIENCE"; the selector is now a highlighted yellow button (wordmark yellow border/fill/icon/label/chevron); menu items ALL look active (removed coming-soon dimming + COMING SOON badge — teaser conveys it on tap). Training nav "Home" renamed → "Today". Verified via screenshot; lint clean.
 - Known minor (non-blocking, web-only): DestinationCard heart Pressable nested in card Pressable → React web "button cannot descend button" hydration warning; functionality fine (stopPropagation).
+
+## Selector polish + isolation fix + admin interest (2026-07-28 fork)
+- DATA FIX: added scenic_favourites + mode_interest to auth.USER_SCOPED (were global; now per-rider). Verified isolation iter70 (rider A vs fresh rider B).
+- HWG ADMIN API: GET /api/admin/interest → per-mode "Notify me" counts {items[6],total}, require_admin. Verified (401/403/200).
+- DestinationCard: heart moved to be a SIBLING of the card Pressable (no nested <button> web warning). Verified.
+- Coach avatar: added subtle white wash (rgba(255,255,255,0.14)) to lighten portrait.
+- Riding-experience selector: solid yellow 3D button (borderBottom depth + shadow), no chevron; icon bubble now SOLID DARK (colors.bg) so the icon is visible; training mode icon changed "fitness"(heart-pulse) → "barbell"; label "EXPERIENCE" → "RIDE XP".
+- Persistence re-confirmed per-rider across sessions (iter70 reload test).
