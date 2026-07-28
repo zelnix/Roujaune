@@ -641,3 +641,7 @@ STILL PENDING (awaiting approval): Phase 3 (Home banners consolidation, dup CTAs
 - EXPLORE DESTINATIONS (new): app/scenic-destinations.tsx — full 22-route scenic catalogue with live search (name/place/country/tag; testID scenic-search) + region filter chips + responsive grid; opens /scenic-ride. Scenic side-nav "Explore Destinations" now routes here (was /routes). 
 - BUG FIXED (iter68 critical): region chips weren't filtering — RN-web horizontal ScrollView stretched vertically and overlaid the grid, swallowing taps. Fixed by wrapping filter row in flexGrow:0 band, results ScrollView flex:1, keyboardShouldPersistTaps. Verified: Alps=6, Lakes=6, Safari=1, Countryside=9, All=22, Alps+'fedaia'=2.
 - Remaining future/backlog: Rive rider variants (Phase 2/3, awaiting roujaune-riders.riv); activate more "coming soon" Today modes on request; favourite/save destinations (nav placeholder exists).
+
+## Restore original training nav + rename mode (2026-07-28 fork)
+- Per user: the Training experience's side navigation now matches the ORIGINAL app nav (from src/data.ts pre-Today-Mode): Home, Workouts, Virtual Routes, Benchmark Workouts, Training Plan, Progress, Community, Connections; footer Settings + Help. Each other experience (scenic/gravel/mtb/walking/etc.) keeps its own dedicated nav (unchanged).
+- Renamed Today Mode label + shortLabel "Train today" → "Training" (selector button now shows "Training"). Verified via screenshot. Lint clean.

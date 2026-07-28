@@ -46,7 +46,7 @@ export interface TodayModeMeta {
 
 /** The eight activity modes shown in the selector. */
 export const TODAY_MODES: TodayModeMeta[] = [
-  { id: "training", label: "Train today", shortLabel: "Train today", description: "Follow my training plan", icon: "fitness", availability: "available", route: "/", primaryActionLabel: "START TODAY'S TRAINING" },
+  { id: "training", label: "Training", shortLabel: "Training", description: "Follow my training plan", icon: "fitness", availability: "available", route: "/", primaryActionLabel: "START TODAY'S TRAINING" },
   { id: "scenic-cycling", label: "Take a scenic ride", shortLabel: "Scenic ride", description: "Explore a destination", icon: "bicycle", availability: "available", route: "/", primaryActionLabel: "BEGIN SCENIC JOURNEY" },
   { id: "gravel", label: "Ride gravel", shortLabel: "Gravel", description: "Mixed-surface adventure", icon: "trail-sign", availability: "coming-soon", route: "/", primaryActionLabel: "START GRAVEL ADVENTURE" },
   { id: "mountain-bike", label: "Go mountain biking", shortLabel: "Mountain bike", description: "Trails and technical riding", icon: "triangle", availability: "coming-soon", route: "/", primaryActionLabel: "START TRAIL RIDE" },
@@ -80,15 +80,19 @@ export const experienceNavigation: Record<RiderExperience, ExperienceNavigation>
   training: {
     experience: "training", defaultRoute: "/",
     items: [
-      { key: "home", label: "Today", icon: "home", route: "/", availability: "available" },
-      { key: "training", label: "My Training Plan", icon: "clipboard-outline", route: "/plan", availability: "available" },
-      { key: "calendar", label: "Calendar", icon: "calendar-outline", route: "/calendar", availability: "available" },
+      { key: "home", label: "Home", icon: "home", route: "/", availability: "available" },
       { key: "workouts", label: "Workouts", icon: "fitness-outline", route: "/workouts", availability: "available" },
-      { key: "benchmark", label: "Benchmark Tests", icon: "speedometer-outline", route: "/benchmark", availability: "available" },
+      { key: "routes", label: "Virtual Routes", icon: "git-network-outline", route: "/routes", availability: "available" },
+      { key: "benchmark", label: "Benchmark Workouts", icon: "speedometer-outline", route: "/benchmark", availability: "available" },
+      { key: "training", label: "Training Plan", icon: "clipboard-outline", route: "/plan", availability: "available" },
       { key: "progress", label: "Progress", icon: "stats-chart-outline", route: "/progress", availability: "available" },
-      { key: "history", label: "Ride History", icon: "time-outline", route: "/progress", availability: "coming-soon" },
+      { key: "community", label: "Community", icon: "people-outline", route: "/community", availability: "available" },
+      { key: "connections", label: "Connections", icon: "link-outline", route: "/connections", availability: "available" },
     ],
-    footer: UTILITY,
+    footer: [
+      { key: "settings", label: "Settings", icon: "settings-outline", route: "/settings", availability: "available" },
+      { key: "help", label: "Help", icon: "help-circle-outline", route: "/help", availability: "available" },
+    ],
   },
   "scenic-cycling": {
     experience: "scenic-cycling", defaultRoute: "/",
