@@ -7,6 +7,7 @@ export type YouTubePlayerProps = {
   playing: boolean;
   startSeconds?: number;
   onStateChange?: (playing: boolean) => void;
+  onProgress?: (currentSec: number, durationSec: number) => void;
 };
 
 /** Web (React Native Web) YouTube player. Renders a real DOM <iframe> via
@@ -17,7 +18,7 @@ export type YouTubePlayerProps = {
  *  size. On high-DPI displays a CSS-sized player under-samples and looks soft,
  *  so we render the iframe at a large internal resolution (up to 4K) and scale
  *  it down to fit — YouTube then streams the highest-quality source available. */
-export default function YouTubePlayer({ videoId, height, width, playing, startSeconds, onStateChange }: YouTubePlayerProps) {
+export default function YouTubePlayer({ videoId, height, width, playing, startSeconds, onStateChange, onProgress }: YouTubePlayerProps) {
   const ref = React.useRef<HTMLIFrameElement | null>(null);
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const dpr = typeof window !== "undefined" ? Math.max(window.devicePixelRatio || 1, 1) : 1;
