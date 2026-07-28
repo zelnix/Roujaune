@@ -7,10 +7,13 @@ import Svg, { Circle, Polygon } from "react-native-svg";
 import { C } from "./plan";
 import { CoachPersona } from "../lib/coach-persona";
 import type { CelebrationData } from "../lib/phase-complete";
+import { useReducedMotionSafe } from "../lib/use-reduced-motion";
 
 function Sparkle({ style, delay }: { style?: any; delay: number }) {
   const a = React.useRef(new Animated.Value(0)).current;
+  const reduceMotion = useReducedMotionSafe();
   React.useEffect(() => {
+    if (reduceMotion) { a.setValue(0.9); return; }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.delay(delay),
@@ -20,7 +23,7 @@ function Sparkle({ style, delay }: { style?: any; delay: number }) {
     );
     loop.start();
     return () => loop.stop();
-  }, [a, delay]);
+  }, [a, delay, reduceMotion]);
   return (
     <Animated.View style={[{ position: "absolute", opacity: a, transform: [{ scale: a }] }, style]}>
       <Ionicons name="sparkles" size={16} color={C.yellow} />

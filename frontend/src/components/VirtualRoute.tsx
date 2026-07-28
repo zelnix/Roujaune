@@ -4,6 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
 import Svg, { Polygon, Ellipse, Path } from "react-native-svg";
 import { colors } from "../theme";
+import { useReducedMotionSafe } from "../lib/use-reduced-motion";
 
 // Rear-view rider cutouts. A female asset drops in here when available.
 const RIDER_MALE = require("../../assets/images/rider_male_rear_cut.png");
@@ -28,6 +29,7 @@ export function VirtualRoute({ width, height, speed = 26, cadence = 88, gender =
   const bob = React.useRef(new Animated.Value(0)).current;
   const loopRef = React.useRef<Animated.CompositeAnimation | null>(null);
   const bobRef = React.useRef<Animated.CompositeAnimation | null>(null);
+  const reduceMotion = useReducedMotionSafe();
 
   const cx = width / 2;
   const horizonY = height * 0.42;
@@ -37,7 +39,7 @@ export function VirtualRoute({ width, height, speed = 26, cadence = 88, gender =
   // Road scroll speed scales with the rider's speed (paused → frozen).
   React.useEffect(() => {
     loopRef.current?.stop();
-    if (paused) return;
+    if (paused || reduceMotion) { scroll.setValue(0); return; }
     const kmh = Math.max(6, Math.min(60, speed));
     const dur = 2600 - (kmh / 60) * 1700; // faster speed → shorter loop
     scroll.setValue(0);
@@ -46,12 +48,12 @@ export function VirtualRoute({ width, height, speed = 26, cadence = 88, gender =
     );
     loopRef.current.start();
     return () => loopRef.current?.stop();
-  }, [speed, paused, scroll]);
+  }, [speed, paused, scroll, reduceMotion]);
 
   // Pedalling bob scales with cadence.
   React.useEffect(() => {
     bobRef.current?.stop();
-    if (paused) return;
+    if (paused || reduceMotion) { bob.setValue(0); return; }
     const rpm = Math.max(50, Math.min(120, cadence));
     const half = (60000 / rpm) / 2; // one bob per pedal stroke
     bobRef.current = Animated.loop(
@@ -62,7 +64,7 @@ export function VirtualRoute({ width, height, speed = 26, cadence = 88, gender =
     );
     bobRef.current.start();
     return () => bobRef.current?.stop();
-  }, [cadence, paused, bob]);
+  }, [cadence, paused, bob, reduceMotion]);
 
   // Perspective mapping p(0=horizon,1=foreground) → screen y, scale, spread.
   const yFor = (p: number) => horizonY + (height - horizonY) * (p * p);

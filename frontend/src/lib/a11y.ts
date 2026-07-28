@@ -14,10 +14,10 @@ export { LARGE_TEXT_SCALE };
  * module-store pattern as coach-persona / notifications so every screen (and the
  * root Text patch) stays in sync live.
  */
-export type A11yState = { largeText: boolean; highContrast: boolean };
+export type A11yState = { largeText: boolean; highContrast: boolean; reduceMotion: boolean };
 
 const KEY = "roujaune:a11y";
-const DEFAULT: A11yState = { largeText: false, highContrast: false };
+const DEFAULT: A11yState = { largeText: false, highContrast: false, reduceMotion: false };
 
 let state: A11yState = { ...DEFAULT };
 let hydrated = false;
@@ -30,7 +30,7 @@ function apiBase(): string {
 
 function setState(next: Partial<A11yState>) {
   const merged = { ...state, ...next };
-  if (merged.largeText === state.largeText && merged.highContrast === state.highContrast) return;
+  if (merged.largeText === state.largeText && merged.highContrast === state.highContrast && merged.reduceMotion === state.reduceMotion) return;
   state = merged;
   setA11yRuntime(state.largeText, state.highContrast);
   emit();
@@ -60,6 +60,7 @@ export async function refreshA11yFromServer() {
     const next: Partial<A11yState> = {};
     if (typeof d.largeText === "boolean") next.largeText = d.largeText;
     if (typeof d.highContrast === "boolean") next.highContrast = d.highContrast;
+    if (typeof d.reduceMotion === "boolean") next.reduceMotion = d.reduceMotion;
     if (Object.keys(next).length) {
       setState(next);
       AsyncStorage.setItem(KEY, JSON.stringify(state)).catch(() => {});
@@ -75,7 +76,7 @@ async function persist() {
     await fetch(`${apiBase()}/api/rider/settings`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ largeText: state.largeText, highContrast: state.highContrast }),
+      body: JSON.stringify({ largeText: state.largeText, highContrast: state.highContrast, reduceMotion: state.reduceMotion }),
     });
   } catch {
     /* keep local; re-syncs on next change */
@@ -93,6 +94,11 @@ export function setLargeText(on: boolean) {
 
 export function setHighContrast(on: boolean) {
   setState({ highContrast: on });
+  persist();
+}
+
+export function setReduceMotion(on: boolean) {
+  setState({ reduceMotion: on });
   persist();
 }
 

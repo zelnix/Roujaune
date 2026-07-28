@@ -1,0 +1,41 @@
+{
+  "summary": "ITER68 full-stack verification of (1) Reduce-motion accessibility toggle + backend rider-settings whitelist and (2) new /scenic-destinations Explore Destinations screen. BACKEND: 12/12 pytest tests PASS (/app/backend/tests/test_iter68_reduce_motion_and_scenic_destinations.py, junit /app/test_reports/pytest/iter68.xml) — PUT /api/rider/settings round-trips reduceMotion (true & false), the a11y triple {largeText,highContrast,reduceMotion} round-trips together and does NOT clobber sibling fields (homeCity, hudEnabled), MongoDB _id is stripped, both GET+PUT are auth-gated (401 without token), /api/scenic/routes returns 22 published routes with region metadata, 'garda' → ≥1, 'kenya' → Hell's Gate, and /api/scenic/routes/lake-garda is playable. FRONTEND (as greenlantern@roujaune.app @ 1280x800): /scenic-destinations renders with testID scenic-destinations, 22 destination-card-* tiles, all 5 chips destinations-region-{All,Alps,Lakes,Safari,Countryside}, scenic-search input, scenic-search-clear button and destinations-empty state. Search works perfectly: 'garda' filters to 4 (lake-garda, adige-valley-to-garda, ledro-to-garda-ponale, garda-sunrise-promenade), 'kenya' filters to 1 (hells-gate-safari), 'nonexistentplace123' shows the empty state with 'No rides match \"…\"' + Clear filters CTA, clear restores 22. Card tap correctly navigates to /scenic-ride?route=lake-garda. Settings → Accessibility card renders all three toggles tg-largeText, tg-highContrast, tg-reduceMotion; toggling tg-reduceMotion PUTs to /api/rider/settings and the value survives full page reload. REGRESSION: scenic-ride player at /scenic-ride?route=lake-garda still loads with the YouTube iframe. HOWEVER one CRITICAL FRONTEND BUG was found: the region filter chips do NOT filter the grid when clicked alone — clicking destinations-region-Alps / Lakes / Safari / Countryside leaves all 22 cards visible and the 'All' chip stays selected (state does not switch). Combining region + search returned the same result as search alone (Alps+'lake' = 7 = number of 'lake' matches with no region filter applied), confirming the region state never updates from a chip tap. This blocks the region-filter acceptance criterion.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "scenic-destinations region filter", "issue": "Tapping destinations-region-{Alps|Lakes|Safari|Countryside} does NOT filter the grid — result count stays at 22 and the 'All' chip remains highlighted after the click. Only combined with search does the grid narrow (because the search predicate runs), which proves the `region` React state never updates from a chip tap. Reference: /app/frontend/app/scenic-destinations.tsx:94-107 (ScrollView chips with Pressable onPress={() => setRegion(r)}).", "testID": "destinations-region-Alps", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/scenic-destinations", "issues": ["'22 rides' count text visually overlaps the region-chip ScrollView row on desktop (1280x800) — the count sits on top of the chip labels, which is likely also the cause of the region filter click not registering. Reference: styles.count (marginBottom: 12) is inside the inner ScrollView, but the outer horizontal filter ScrollView appears to render behind it. Refer /app/frontend/app/scenic-destinations.tsx:120-127 vs 94-107."]}
+    ],
+    "react_native_issues": [
+      {"component": "react-native-web props.pointerEvents", "issue": "Pre-existing (noted in iter66/iter67) — console warning 'props.pointerEvents is deprecated. Use style.pointerEvents' still fires. Non-blocking, not introduced by iter68."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter68_reduce_motion_and_scenic_destinations.py",
+    "/app/test_reports/pytest/iter68.xml",
+    "/app/test_reports/screens/i68_destinations.jpeg",
+    "/app/test_reports/screens/i68_search_garda.jpeg",
+    "/app/test_reports/screens/i68_empty.jpeg",
+    "/app/test_reports/screens/i68_alps.jpeg",
+    "/app/test_reports/screens/i68_a11y_rm_on.jpeg"
+  ],
+  "action_items": [
+    "FIX region filter click handling on /scenic-destinations: clicking destinations-region-Alps/Lakes/Safari/Countryside must update the `region` state so the grid re-filters. Likely root cause: the horizontal filter ScrollView is being visually + hit-test overlapped by the 'count' text of the sibling ScrollView (they render in the same vertical band). Two possible fixes: (a) move the '{n} rides' count inside the horizontal filter ScrollView's parent as a preceding sibling (before the filter row) or after with a proper marginTop, so the chips row has its own layout band; (b) wrap the chip ScrollView with an explicit height container so its Pressables receive touches. Verify by asserting `destinations-region-Alps` selection toggles chip highlight AND grid count drops below 22.",
+    "OPTIONAL: consider adding a small `flex-shrink: 0` container around the horizontal ScrollView and/or increasing paddingTop on styles.scroll so the count/grid doesn't sit on top of the filter row on wider layouts (>=1000px)."
+  ],
+  "critical_code_review_comments": [
+    "/app/backend/routes/rider.py PUT /api/rider/settings correctly whitelists arbitrary body keys except id/user_id/_id — reduceMotion flows through with zero backend changes required. GET returns {} on first read (no doc) which the frontend a11y hydrator handles gracefully.",
+    "/app/frontend/src/lib/a11y.ts: setReduceMotion → setState → persist() correctly writes to AsyncStorage AND PUTs {largeText, highContrast, reduceMotion} to /api/rider/settings — clean and consistent with existing setLargeText / setHighContrast. resetA11y() on logout prevents leakage across accounts. refreshA11yFromServer is called after hydrate and coerces booleans safely. Good.",
+    "/app/frontend/src/lib/use-reduced-motion.ts correctly ORs the app toggle with the OS AccessibilityInfo.isReduceMotionEnabled, matching platform conventions.",
+    "/app/frontend/app/scenic-destinations.tsx: search predicate correctly ORs name/place/country/tag and combines with region. Cards have testID destination-card-<id>, chips have testID destinations-region-<r>, empty state has testID destinations-empty and a Clear-filters CTA that resets both filters. Region ordering (Alps/Lakes/Safari/Countryside first, alphabetical after) is thoughtful. NOTE: the two sibling ScrollViews (filterRow horizontal + scroll vertical) can visually collide on desktop — recommend restructuring, see action_items."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (12/12 pytest)", "frontend": "80% — scenic-destinations screen renders, search+empty+clear+card-tap all work, reduce-motion toggle + persistence works; region filter chips are broken (see ui_bugs)"},
+  "seed_data_creation": "None — tests use the existing published scenic catalog and the rider greenlantern@roujaune.app. Test PUT reduce-motion writes are cleaned up (toggled back off) at the end of the a11y bundle test.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend regression: /app/backend/tests/test_iter68_reduce_motion_and_scenic_destinations.py (12 tests, ~2s). Base URL: EXPO_PUBLIC_BACKEND_URL (or default https://roujaune-train.preview.emergentagent.com). Rider creds: greenlantern@roujaune.app / rideon9900. To reproduce the region-filter bug: log in via UI (Sign in with email → email/password → Sign in), navigate to /scenic-destinations, tap the Alps chip (data-testid='destinations-region-Alps') and observe the count stays '22 rides' and only the 'All' chip stays yellow-highlighted. Reduce-motion smoke test: /settings → scroll to ACCESSIBILITY card → tap tg-reduceMotion; verify GET /api/rider/settings returns reduceMotion:true. The api base is https://roujaune-train.preview.emergentagent.com and EXPO_PUBLIC_BACKEND_URL is the only var (there is no EXPO_BACKEND_URL)."
+}

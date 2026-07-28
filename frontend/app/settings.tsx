@@ -10,7 +10,7 @@ import { useCoach, setCoach, COACHES, CoachId, COACH_STYLES, VOICE_GUIDANCE_OPTS
 import { resolveBothCoachVoices, ResolvedVoice, COACH_PITCH, loadSpanishVoices, CoachVoiceOption } from "@/src/lib/coach-voice";
 import { getVoiceId, setVoiceId } from "@/src/lib/prefs";
 import { useSettings, WHEEL_PRESETS } from "@/src/lib/settings";
-import { useA11y, setLargeText, setHighContrast } from "@/src/lib/a11y";
+import { useA11y, setLargeText, setHighContrast, setReduceMotion } from "@/src/lib/a11y";
 
 const PREVIEW_LINE = "Alright, let's ride. Hold steady and breathe — you've got this.";
 
@@ -242,6 +242,7 @@ export default function SettingsScreen() {
         <SectionTitle label="ACCESSIBILITY" color={CC.rouge} />
         <PrefToggle label="Large text" sub="Increase text size across the whole app" on={a11y.largeText} onToggle={() => setLargeText(!a11y.largeText)} testID="tg-largeText" divider />
         <PrefToggle label="High contrast" sub="Brighter, bolder text for easier reading" on={a11y.highContrast} onToggle={() => setHighContrast(!a11y.highContrast)} testID="tg-highContrast" divider />
+        <PrefToggle label="Reduce motion" sub="Calm the app by minimising animations" on={a11y.reduceMotion} onToggle={() => setReduceMotion(!a11y.reduceMotion)} testID="tg-reduceMotion" divider />
         <View style={s.a11yPreview} testID="a11y-preview">
           <Text style={s.a11yPreviewLabel}>Preview</Text>
           <Text style={s.a11yPreviewHeading}>Today's ride — Endurance Base</Text>
