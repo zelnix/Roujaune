@@ -216,7 +216,8 @@ _WIKI_UA = "ROUJAUNE/1.0 (https://roujaune.app; support@roujaune.app) python-htt
 
 _BAD_IMG = re.compile(
     r"(flag_|flag-|coat_of_arms|coat-of-arms|wappen|blason|escudo|bandera|"
-    r"location_|locator|_map[._]|map_of|karte|logo|seal_|emblem|\.svg)",
+    r"location_|locator|_map[._]|map_of|mappa|mapa_|karte|ferrovia|railway_map|"
+    r"logo|seal_|emblem|\.svg)",
     re.IGNORECASE,
 )
 
