@@ -116,7 +116,20 @@ accessibility_toggles:
         -agent: "main"
         -comment: "Added ACCESSIBILITY card in Settings with Large text + High contrast toggles (for the 50+ audience). Global Text/TextInput render patch (text-scale.ts) injects an override into the INPUT style before RN/RN-Web processes it: Large Text multiplies fontSize/lineHeight by 1.22 app-wide; High Contrast promotes dim/neutral body text to #FFFFFF and bumps light font-weights to 600 (accent colours left vivid). Reactive module-store (a11y.ts) persists both flags per rider via /api/rider/settings (backend already merges arbitrary keys) + AsyncStorage cache; refreshes on login, resets on logout/delete (no cross-account leak). AuthGate re-keys the expo-router <Stack> on toggle so the whole app re-renders instantly. Verified end-to-end on web preview (tablet landscape): both toggles flip, persist, and apply app-wide (sidebar + cards + preview) with text visibly larger and dim copy turned bright/bold; expo-router preserved the current route through the re-key (non-disruptive). Demo account reset to OFF baseline."
 
-backend_refactor_rider_benchmark:
+backend_refactor_coach_plan_engine:
+  - task: "server.py restructure Phase 2 — extract Coach + Plan engine and routes"
+    implemented: true
+    working: "NA"
+    file: "backend/server.py, backend/services/plan_engine.py, backend/routes/plan.py, backend/routes/coach.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Completed the deferred P1 refactor. server.py 3850 -> 496 lines. NEW services/plan_engine.py holds the entire deterministic plan engine (BUILD_AND_CLIMB, CTR/RS/RB structured-plan state + hot-reload from DB, _struct_ctx*, _ctr_state/progress/readiness/calendar_week/plan_response, _plan_done, _with_adaptation_meta, LEVEL_PLAN/_plan_for_level, NUDGE_* + _aggregate_ride_zones + _update_adaptive_targets, _free_calendar_week, NO_PLAN). External callers read mutable plan globals via live module-attribute access (plan_engine.CTR_PLAN etc.); functions inside mutate via `global`. NEW routes/plan.py (get_plan, rider/plan assign, onboarding/recommend, plan/targets, plan/adaptations, plan/goals, plan/progress, calendar/week+scheduled+schedule+move+review, workout-favorites, progress, progress/timeline, rider/missed). NEW routes/coach.py (coach/cue, extend-advice, debrief, chat+history, adaptation+detail, plus helpers _build_rider_context, _refresh_adaptation_after_ride, _record_adaptation, _generate_adaptation(+detail), _extend_decision, _chat_id). Dependency is strictly one-way coach->plan->plan_common->rider_common (no cycles). server.py now only keeps: app/middleware setup, TrainerSim + /ws/telemetry, /openapi.json, admin-config router (benchmark thresholds + coaches, still mutating benchmark_routes constants), startup seed (uses plan_engine.CTR/RS/RB + _reload_* + _on_plan_change) and shutdown. Self-verified via curl (greenlantern demo): plan/calendar/progress/coach/onboarding/targets/adaptations + coach chat/cue/extend/adaptation(+detail) all 200; backend boots + seeds cleanly. NEEDS: full backend regression across plan/calendar/coach/progress + admin config + benchmark + rider to confirm zero behavioural change."
+
+
   - task: "server.py restructure — extract Rider + Benchmark domains into routes/ + shared services/"
     implemented: true
     working: "NA"

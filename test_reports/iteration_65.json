@@ -1,0 +1,64 @@
+{
+  "summary": "ITER65 PLAN + COACH domain extraction verified. 28/29 tests PASS in /app/backend/tests/test_iter65_plan_coach_refactor.py against the external base URL. ONE critical refactor regression found: POST /api/calendar/review returns 500 (Internal Server Error) because `os` and `coach_system` were not imported when `review_calendar_change` was moved into routes/plan.py — `key = os.environ.get('EMERGENT_LLM_KEY')` raises NameError immediately (backend log confirms: 'NameError: name os is not defined at /app/backend/routes/plan.py, line 510'). Additionally, static analysis found 4 SILENT-degradation NameErrors in routes/coach.py — all wrapped in try/except so they don't 500 but they DISABLE the features they gate: (a) `plans_admin` at coach.py:402 (companion plan-edit intent inside /coach/chat), (b) `plans_admin` at coach.py:491 (adaptive plan easing after /coach/debrief), (c) `WELLNESS_DATA` at coach.py:343-344 (readiness snippet in coach chat rider_ctx), (d) `get_plan` + `json` at coach.py:528 & 764 & 739 (structured-plan grounding + JSON parse in /coach/adaptation/detail). These do not fail the current test assertions (endpoints still return 200/2xx or acceptable 502/503) because they are wrapped in `try/except: logging.warning(...)` or the JSON path is only hit inside an already-broad `try/except` that returns 502. Coverage otherwise: PLAN routes (GET /plan → couch-to-road resolves with weeks/phase/progress_pct, /rider/plan, non-destructive assign→restore of greenlantern's plan, /onboarding/recommend, /plan/targets, /plan/adaptations, PUT /plan/goals, /plan/progress); CALENDAR + PROGRESS (calendar/week?start=2026-07-27 seven-day payload, calendar/scheduled CRUD create→list→delete cleanup, calendar/move smoke 200/400, workout-favorites toggle+restore, /progress, /progress/timeline?range=3m, /rider/missed); COACH (chat/history GET, extend-advice, coach/cue 200, coach/chat roundtrip persisting user+coach messages, coach/adaptation, coach/adaptation/detail); REGRESSION on previously-extracted domains (/rider/profile 200, /benchmark/profile ftp=305 preserved, /benchmark/plan-gate?plan_id=couch-to-road 200, /benchmark/recommendation 200); ADMIN cross-module sync (POST /admin/login → GET /admin/benchmark/config → PUT ftp_retest_days 56→60→56 restore verified end-to-end, GET /admin/coaches 200); PLAN hot-reload (GET /plan still resolves same id after PUT /plan/goals). All mutated state restored (assigned plan restored to couch-to-road; scheduled workout created was deleted; workout-favorite toggled twice back to original; goals overwritten with placeholder — see action items; ftp_retest_days restored to original). WebSocket /api/ws/telemetry not exercised (optional).",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/calendar/review",
+        "issue": "500 Internal Server Error — routes/plan.py line 510 references `os.environ.get(...)` and line 530 references `coach_system(...)` but neither `os` nor `coach_system` is imported in routes/plan.py. Traceback in backend log: `NameError: name 'os' is not defined`. The refactor extracted review_calendar_change out of server.py but did not carry the imports. Fix: add `import os` and `from services.coach_llm import coach_system` to routes/plan.py.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "POST /api/coach/chat (plan-edit-intent branch)",
+        "issue": "SILENT DEGRADATION — routes/coach.py line 402 calls `plans_admin.get_plan_def(plan_id)` but `plans_admin` is not imported in coach.py. Wrapped in try/except so /coach/chat still returns 200, but the entire companion plan-edit path is disabled: any 'move my ride to Thursday' style message no longer updates the plan (silently logs `chat plan-edit failed`). Fix: add `import plans_admin`."
+      },
+      {
+        "endpoint": "POST /api/coach/debrief (adaptive easing branch)",
+        "issue": "SILENT DEGRADATION — routes/coach.py line 491 (`_refresh_adaptation_after_ride`) calls `plans_admin.get_plan_def(plan_id)` without importing `plans_admin`. Adaptive plan easing on low-compliance rides is silently disabled (logs `adaptive plan easing failed`). Fix: add `import plans_admin`."
+      },
+      {
+        "endpoint": "POST /api/coach/chat (rider context)",
+        "issue": "SILENT DEGRADATION — routes/coach.py lines 343-344 (`_build_rider_context`) references `WELLNESS_DATA.get('readiness', ...)` but `WELLNESS_DATA` was left behind in routes/plan.py (line 572) and never imported into coach.py. Coach chat rider context loses the readiness/sleep/HRV snippet (silently logs `readiness lookup failed`). Fix: either import `from routes.plan import WELLNESS_DATA` or (better) move WELLNESS_DATA into a shared services module."
+      },
+      {
+        "endpoint": "POST /api/coach/adaptation/detail",
+        "issue": "TWO SILENT DEGRADATIONS in one path: (a) routes/coach.py line 764 calls `get_plan(id=req.plan_id)` — but `get_plan` is defined in routes/plan.py and not imported here → structured plan grounding is silently skipped for couch-to-road/ride-stronger/ride-beyond adaptation-detail requests. (b) routes/coach.py line 739 calls `json.loads(raw)` without `import json` → when cache miss AND LLM succeeds, this endpoint raises NameError inside its outer try/except and returns 502. `_refresh_adaptation_after_ride` at line 528 also calls `get_plan(...)` similarly (best-effort so silent). Fix: `import json` and `from routes.plan import get_plan` (or extract get_plan into services)."
+      },
+      {
+        "endpoint": "POST /api/coach/cue",
+        "issue": "Intermittent 502/503 from upstream LLM (litellm/Anthropic) — same PRE-EXISTING flakiness noted in iter64. Not introduced by this refactor. Endpoint code path is correct."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": [], "react_native_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter65_plan_coach_refactor.py",
+    "/app/test_reports/pytest/iter65.xml"
+  ],
+  "action_items": [
+    "routes/plan.py: add `import os` (used at line 510) AND `from services.coach_llm import coach_system` (used at line 530). Without these POST /api/calendar/review 500s.",
+    "routes/coach.py: add `import json` (used at line 739 in _generate_adaptation_detail).",
+    "routes/coach.py: add `import plans_admin` (used at lines 402 and 491).",
+    "routes/coach.py: resolve `WELLNESS_DATA` (used at lines 343-344) — either `from routes.plan import WELLNESS_DATA` or lift WELLNESS_DATA into services/rider_common.py (cleaner, avoids routes→routes coupling).",
+    "routes/coach.py: resolve `get_plan` (used at lines 528 and 764) — either `from routes.plan import get_plan` or refactor structured-plan resolution into services/plan_engine.py so both routers can call it without cross-router imports. The latter is aligned with the current architecture (routes call services).",
+    "Optional (test hygiene): GoalsUpdateRequest requires `id` field in each goal (Pydantic 422 otherwise). Not a refactor bug — was already required — but worth documenting.",
+    "Consider re-enabling ESLint / a pyflakes-style CI check to catch these missing-import regressions automatically during future extractions."
+  ],
+  "critical_code_review_comments": [
+    "Extraction depth is correct (coach → plan_engine → plan_common one-way) but 6 missing imports slipped in during the move. Static analysis with `ruff` / `pyflakes` on routes/*.py would have caught all of them in seconds: `os` in plan.py; `json`, `plans_admin`, `WELLNESS_DATA`, `get_plan` in coach.py. Two of them (coach_system, os in plan.py) cause hard 500s; four cause silent degradation because they sit inside try/except blocks.",
+    "The `# noqa: F401` markers on almost every import in the new files suggest a linter WAS run but was silenced everywhere. This masked real bugs. Recommend removing blanket noqa and treating F821 (undefined name) as a build failure.",
+    "routes/coach.py imports `companion_plan` but not `plans_admin` — a common pairing. The two go together in this codebase and both should have been carried.",
+    "WELLNESS_DATA lives in routes/plan.py at module scope but is read by coach chat context (routes/coach.py). This creates a latent routes→routes dependency. Move it to services/rider_common.py or services/wellness.py before the next iteration.",
+    "server.py went 3850→~496 as advertised. Good progress on P1 monolith reduction. Only the 6 missing imports need to be added to complete this iteration cleanly."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter65_plan_coach_refactor.py (new — 29 tests, 28 pass)"
+  ],
+  "success_rate": {"backend": "96.5% (28/29)", "frontend": "not tested (backend-only iteration)"},
+  "seed_data_creation": "All test mutations restored inside their own test: (a) rider plan assign → 'none' then restored to 'couch-to-road' (verified via /rider/plan); (b) one scheduled workout created and DELETEd (cleanup verified); (c) workout-favorite toggled twice (net-zero, verified original set == final set); (d) admin ftp_retest_days flipped 56→60→56 (verified); (e) coach chat wrote 2 messages to Alberto thread (acceptable per instructions — chat is demo state and DELETE /coach/chat/history exists to clear if needed, not called to preserve rider context); (f) PUT /plan/goals overwrote the plan's `goals` with a single placeholder (`id`=test_iter65_goal / `id`=hot) — original goals array was empty for couch-to-road so no data was lost, but noted here for transparency.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Base URL: EXPO_PUBLIC_BACKEND_URL from /app/frontend/.env = https://roujaune-train.preview.emergentagent.com. Rider: greenlantern@roujaune.app / rideon9900 (couch-to-road, ftp=305, benchmark week active from 2026-07-27). Admin: POST /api/admin/login {email: roger.parenzee@gmail.com, password: letmein9900}. After main agent adds the 6 missing imports, re-run: `EXPO_PUBLIC_BACKEND_URL=https://roujaune-train.preview.emergentagent.com python -m pytest /app/backend/tests/test_iter65_plan_coach_refactor.py -v` — expected 29/29. Note: greenlantern's plan.goals is currently a placeholder from test_put_plan_goals — main agent may want to remove or reseed if the UI expects real goals; couch-to-road plan itself was empty of goals pre-test so no real data was lost. The 6 missing imports are the ONLY refactor regression — everything else in the plan+coach extraction is behavior-identical to pre-refactor.",
+  "rca_of_issue": "RCA: When server.py was chopped into routes/plan.py and routes/coach.py, the code blocks were moved but the top-of-file `import` statements in server.py were only PARTIALLY carried into the new modules. server.py imports `os`, `json`, `plans_admin`, `coach_system`, defines `WELLNESS_DATA` and `get_plan` — all of which are still referenced by functions now in coach.py/plan.py. Because `coach_system` and `os` are used at the TOP of `review_calendar_change` (before any try/except), that endpoint immediately 500s. The four missing symbols in coach.py sit inside `try: ... except: logging.warning(...)` blocks that were designed to swallow LLM/DB errors but end up swallowing the NameError too — the endpoints still respond 200 but with degraded functionality. REPRODUCTION for the 500: POST {BASE}/api/calendar/review with any valid ReviewRequest body → 500 Internal Server Error, backend log shows NameError('os'). MITIGATION: add the 6 missing imports listed in action_items. VERIFICATION: re-run the pytest file — test_calendar_review should flip to PASS, all others should remain PASS."
+}
