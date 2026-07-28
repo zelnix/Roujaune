@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, Modal, Pressable, ScrollView, Platform } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { colors, radius, spacing } from "../../theme";
 import { TODAY_MODES, TodayModeMeta, useTodayMode } from "../../lib/today-mode";
@@ -16,19 +16,18 @@ export function TodayModeButton({ compact = false }: { compact?: boolean }) {
 
   return (
     <View style={styles.wrap}>
-      {!compact && <Text style={styles.eyebrow} numberOfLines={1}>RIDE XP</Text>}
       <Pressable
         testID="today-mode-button"
         onPress={() => setOpen(true)}
         accessibilityRole="button"
-        accessibilityLabel={`Riding experience: ${meta.label}. Change activity`}
+        accessibilityLabel={`Ride experience: ${meta.label}. Change activity`}
         style={({ pressed }: any) => [styles.selected, pressed && styles.selectedPressed]}
       >
         <View style={styles.iconBubble}>
-          <Ionicons name={meta.icon} size={compact ? 18 : 16} color={colors.yellow} />
+          <FontAwesome5 name="biking" size={compact ? 17 : 15} color={colors.yellow} />
         </View>
         {!compact && (
-          <Text style={styles.selLabel} numberOfLines={1}>{meta.shortLabel}</Text>
+          <Text style={styles.selLabel} numberOfLines={2}>Ride experience</Text>
         )}
       </Pressable>
 
@@ -120,7 +119,7 @@ const styles = StyleSheet.create({
   },
   selectedPressed: { transform: [{ translateY: 2 }], borderBottomWidth: 1, opacity: 0.96 },
   iconBubble: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg },
-  selLabel: { color: colors.bg, fontSize: 9.5, fontWeight: "900", textAlign: "center" },
+  selLabel: { color: colors.bg, fontSize: 10, fontWeight: "900", textAlign: "center", lineHeight: 13 },
   chevCompact: { marginTop: 1 },
 
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "center", alignItems: "flex-start", paddingLeft: 110, paddingVertical: 40 },

@@ -5,7 +5,18 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { colors, radius, spacing } from "../../theme";
 import { useScenicRoutes, useScenicLast, ScenicRoute, ytThumb } from "../../lib/scenic-routes";
-import { ScheduledWorkoutReminder } from "./ScheduledWorkoutReminder";
+
+const WORDMARK = require("../../../assets/images/auth_wordmark.png");
+
+/** Wordmark title + subtitle header, matching the other Today screens. */
+function ScenicHeader() {
+  return (
+    <View style={styles.header} testID="scenic-header">
+      <Image source={WORDMARK} style={styles.wordmark} contentFit="contain" />
+      <Text style={styles.subtitle}>WHERE SHALL WE EXPLORE TODAY?</Text>
+    </View>
+  );
+}
 
 function mins(r: ScenicRoute): number | null {
   return r.duration_min ?? null;
@@ -39,7 +50,6 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
   if (loading) {
     return (
       <View style={styles.loadingWrap} testID="scenic-cycling-today">
-        <ScheduledWorkoutReminder />
         <ActivityIndicator color={colors.yellow} />
         <Text style={styles.loadingText}>Finding beautiful roads for you…</Text>
       </View>
@@ -50,8 +60,7 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
   if (!routes || routes.length === 0) {
     return (
       <View style={{ gap: spacing.md }} testID="scenic-cycling-today">
-        <ScheduledWorkoutReminder />
-        <Text style={styles.h1}>WHERE SHALL WE EXPLORE TODAY?</Text>
+        <ScenicHeader />
         <View style={styles.empty} testID="scenic-empty">
           <View style={styles.emptyIcon}><Ionicons name="earth-outline" size={30} color={colors.yellow} /></View>
           <Text style={styles.emptyTitle}>New scenic destinations are on the way</Text>
@@ -81,9 +90,7 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
 
   return (
     <View style={{ gap: spacing.md }} testID="scenic-cycling-today">
-      <ScheduledWorkoutReminder />
-
-      <Text style={styles.h1}>WHERE SHALL WE EXPLORE TODAY?</Text>
+      <ScenicHeader />
 
       {regions.length > 1 && (
         <ScrollView
@@ -230,6 +237,9 @@ function DestRow({ title, data, open, tag }: { title: string; data: ScenicRoute[
 
 const styles = StyleSheet.create({
   h1: { color: colors.white, fontSize: 22, fontWeight: "800", letterSpacing: 0.4 },
+  header: { gap: 6, marginBottom: 2 },
+  wordmark: { width: 200, height: 30, alignSelf: "flex-start" },
+  subtitle: { color: colors.textDim, fontSize: 13.5, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
 
   filterRow: { flexDirection: "row", gap: 8, paddingVertical: 2, paddingRight: 8 },
   filterChip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(245,179,1,0.10)", borderWidth: 1, borderColor: "rgba(245,179,1,0.30)", borderRadius: radius.pill, paddingHorizontal: 14, paddingVertical: 9, minHeight: 40 },

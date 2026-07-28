@@ -111,7 +111,7 @@ export default function Dashboard() {
             showsVerticalScrollIndicator={false}
             testID="dashboard-scroll"
           >
-            <HomeNotificationArea />
+            {experience === "training" && <HomeNotificationArea />}
 
             <WelcomeBackRibbon />
 
