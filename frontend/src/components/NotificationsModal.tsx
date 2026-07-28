@@ -1,9 +1,11 @@
 import React from "react";
 import { View, Text, StyleSheet, Modal, Pressable, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { CC } from "./calendar";
+import type { BenchmarkNudge } from "../lib/benchmark/api";
 
-type Notif = { id: string; icon: any; color: string; title: string; body: string; detail: string; time: string };
+type Notif = { id: string; icon: any; color: string; title: string; body: string; detail: string; time: string; action?: "benchmark" };
 
 const NOTIFS: Notif[] = [
   { id: "1", icon: "trophy", color: CC.yellow, title: "New personal best", body: "You set a new 20-min power record on your last ride.", detail: "Outstanding work! On your last ride you held 298 W for 20 minutes — a new personal best and a strong sign your threshold is climbing. Your coach has already factored this into your upcoming interval targets. Keep fuelling well and recovering between hard sessions.", time: "2h ago" },
@@ -14,9 +16,31 @@ const NOTIFS: Notif[] = [
 
 /** Notifications sheet — tap a notification to read the detail (marks it read),
  * with per-row read/unread toggles and an unread count. */
-export function NotificationsModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+export function NotificationsModal({ visible, onClose, nudge }: { visible: boolean; onClose: () => void; nudge?: BenchmarkNudge }) {
+  const router = useRouter();
   const [readIds, setReadIds] = React.useState<Set<string>>(new Set());
   const [selected, setSelected] = React.useState<Notif | null>(null);
+
+  // Real, live notifications (from server signals) shown above the demo feed.
+  const liveNotifs = React.useMemo<Notif[]>(() => {
+    const out: Notif[] = [];
+    if (nudge?.required) {
+      const reason = (nudge.reason || "").trim();
+      const nice = reason ? `${reason.charAt(0).toUpperCase()}${reason.slice(1)}.` : "";
+      out.push({
+        id: "rebenchmark",
+        icon: "fitness",
+        color: CC.yellow,
+        title: "Time to re-benchmark",
+        body: nice || "A fresh benchmark keeps your training targets accurate.",
+        detail: `${nice} A fresh benchmark${nudge.recommendedTestName ? ` (${nudge.recommendedTestName})` : ""} recalibrates your training zones so every workout targets the right intensity. It only takes one session — tap below to get started.`,
+        time: "now",
+        action: "benchmark",
+      });
+    }
+    return out;
+  }, [nudge]);
+  const allNotifs = React.useMemo(() => [...liveNotifs, ...NOTIFS], [liveNotifs]);
 
   const markRead = (id: string) => setReadIds((prev) => new Set(prev).add(id));
   const toggleRead = (id: string) =>
@@ -28,7 +52,8 @@ export function NotificationsModal({ visible, onClose }: { visible: boolean; onC
 
   const openDetail = (n: Notif) => { markRead(n.id); setSelected(n); };
   const close = () => { setSelected(null); onClose(); };
-  const unread = NOTIFS.filter((n) => !readIds.has(n.id)).length;
+  const goBenchmark = () => { close(); router.push("/benchmark"); };
+  const unread = allNotifs.filter((n) => !readIds.has(n.id)).length;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={close}>
@@ -51,14 +76,21 @@ export function NotificationsModal({ visible, onClose }: { visible: boolean; onC
               <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
                 <Text style={s.detailBody}>{selected.detail}</Text>
               </ScrollView>
-              <Pressable
-                testID="mark-unread"
-                onPress={() => { toggleRead(selected.id); setSelected(null); }}
-                style={s.unreadBtn}
-              >
-                <Ionicons name="mail-unread-outline" size={16} color={CC.white} />
-                <Text style={s.unreadBtnText}>Mark as unread</Text>
-              </Pressable>
+              {selected.action === "benchmark" ? (
+                <Pressable testID="notif-start-benchmark" onPress={goBenchmark} style={s.actionBtn}>
+                  <Ionicons name="fitness" size={16} color={CC.bg ?? "#241B00"} />
+                  <Text style={s.actionBtnText}>Start benchmark</Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  testID="mark-unread"
+                  onPress={() => { toggleRead(selected.id); setSelected(null); }}
+                  style={s.unreadBtn}
+                >
+                  <Ionicons name="mail-unread-outline" size={16} color={CC.white} />
+                  <Text style={s.unreadBtnText}>Mark as unread</Text>
+                </Pressable>
+              )}
             </View>
           ) : (
             <>
@@ -70,7 +102,7 @@ export function NotificationsModal({ visible, onClose }: { visible: boolean; onC
                 <Pressable onPress={close} testID="notifications-close" hitSlop={10}><Ionicons name="close" size={22} color={CC.white} /></Pressable>
               </View>
               <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
-                {NOTIFS.map((n) => {
+                {allNotifs.map((n) => {
                   const isRead = readIds.has(n.id);
                   return (
                     <Pressable key={n.id} testID={`notification-${n.id}`} onPress={() => openDetail(n)} style={s.row}>
@@ -127,4 +159,6 @@ const s = StyleSheet.create({
   detailBody: { color: CC.white, fontSize: 14, lineHeight: 21 },
   unreadBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 16, borderWidth: 1, borderColor: CC.border, borderRadius: 12, paddingVertical: 12, backgroundColor: "rgba(255,255,255,0.03)" },
   unreadBtnText: { color: CC.white, fontSize: 13, fontWeight: "700" },
+  actionBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 16, borderRadius: 12, paddingVertical: 13, backgroundColor: CC.yellow },
+  actionBtnText: { color: CC.bg ?? "#241B00", fontSize: 14, fontWeight: "900" },
 });

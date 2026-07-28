@@ -17,6 +17,7 @@ import { ReadinessGate } from "@/src/components/ReadinessGate";
 import { ProgressCard, CommunityCard, WellnessCard, AchievementCard } from "@/src/components/BottomCards";
 import { navItems, navFooter } from "@/src/data";
 import { useCoach } from "@/src/lib/coach-persona";
+import { useBenchmarkNudge } from "@/src/lib/benchmark/api";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
 import { ProgressPanel } from "@/src/components/ProgressPanel";
 import { NotificationsModal } from "@/src/components/NotificationsModal";
@@ -61,6 +62,7 @@ export default function Dashboard() {
 
   const router = useRouter();
   const persona = useCoach();
+  const { nudge: benchmarkNudge } = useBenchmarkNudge();
   const [active, setActive] = React.useState("home");
   const [showChat, setShowChat] = React.useState(false);
   const [showProgress, setShowProgress] = React.useState(false);
@@ -151,7 +153,7 @@ export default function Dashboard() {
 
       <Toast message={toast} />
       <CoachChatModal visible={showChat} onClose={() => setShowChat(false)} persona={persona} />
-      <NotificationsModal visible={showNotifs} onClose={() => setShowNotifs(false)} />
+      <NotificationsModal visible={showNotifs} onClose={() => setShowNotifs(false)} nudge={benchmarkNudge} />
       <Modal visible={showProgress} transparent animationType="fade" onRequestClose={() => setShowProgress(false)}>
         <Pressable style={styles.progressBackdrop} onPress={() => setShowProgress(false)} testID="progress-modal">
           <Pressable style={styles.progressCard} onPress={() => { /* swallow */ }}>

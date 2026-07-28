@@ -92,6 +92,35 @@ export function useBenchmarkPlanReview() {
   return { review, setReview, loading, reload };
 }
 
+export interface BenchmarkNudge {
+  required: boolean;
+  status: string;
+  planId: string;
+  planLevel?: string;
+  reason?: string;
+  recommendedTestId?: string;
+  recommendedTestName?: string;
+}
+const EMPTY_NUDGE: BenchmarkNudge = { required: false, status: "none", planId: "" };
+export async function fetchBenchmarkNudge(): Promise<BenchmarkNudge> {
+  try {
+    const res = await fetch(`${apiBase()}/api/benchmark/nudge`);
+    return res.ok ? { ...EMPTY_NUDGE, ...(await res.json()) } : EMPTY_NUDGE;
+  } catch { return EMPTY_NUDGE; }
+}
+/** Does the rider's CURRENT plan need a fresh benchmark right now? Drives the
+ *  Today "time to re-benchmark" nudge + the notifications bell. */
+export function useBenchmarkNudge() {
+  const [nudge, setNudge] = useState<BenchmarkNudge>(EMPTY_NUDGE);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let alive = true;
+    (async () => { const n = await fetchBenchmarkNudge(); if (alive) { setNudge(n); setLoading(false); } })();
+    return () => { alive = false; };
+  }, []);
+  return { nudge, loading };
+}
+
 export interface BenchmarkTrends {
   range: string;
   series: Record<string, { date: string; value: number }[]>;

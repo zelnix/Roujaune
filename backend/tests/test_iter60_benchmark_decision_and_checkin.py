@@ -17,7 +17,7 @@ import requests
 
 # Ensure backend module importable for the pure-logic test.
 sys.path.insert(0, "/app/backend")
-from benchmark_decision import (  # noqa: E402
+from services.benchmark_decision import (  # noqa: E402
     BenchmarkDecisionInput,
     decide_benchmark,
 )

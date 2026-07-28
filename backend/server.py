@@ -15,9 +15,11 @@ from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime, timezone
 
-from readiness import compute_readiness
-from benchmark_decision import decide_benchmark, BenchmarkDecisionInput
-from rider_level import compute_rider_level
+from core import now_iso
+from models import *  # noqa: F401,F403  (Pydantic models)
+from services.readiness import compute_readiness
+from services.benchmark_decision import decide_benchmark, BenchmarkDecisionInput
+from services.rider_level import compute_rider_level
 import plans_admin
 import companion_plan
 import auth
@@ -29,10 +31,8 @@ from auth import udb
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+# MongoDB connection (shared handle lives in db.py to avoid import cycles)
+from db import client, db, mongo_url  # noqa: E402
 auth.init(db)
 
 # Outdoor ride syncing (imported AFTER load_dotenv so provider/env config resolves)
@@ -47,88 +47,18 @@ app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
 
-# ----------------------- Report downloads (preview convenience) -----------------------
-from fastapi.responses import FileResponse
-
-# Allow-list of downloadable review PDFs (prevents path traversal). Served public
-# in preview so they can be opened directly from the browser.
-_REPORTS = {
-    "ux-audit": "/app/Roujaune_UX_Audit_Report.pdf",
-    "architecture-security": "/app/Roujaune_Architecture_Security_Review.pdf",
-}
-
-
-@api_router.get("/reports")
-async def list_reports():
-    return {"reports": [{"id": k, "download": f"/api/reports/{k}"} for k in _REPORTS]}
-
-
-@api_router.get("/reports/{name}")
-async def download_report(name: str):
-    path = _REPORTS.get(name)
-    if not path or not os.path.exists(path):
-        raise HTTPException(status_code=404, detail="Report not found")
-    return FileResponse(path, media_type="application/pdf", filename=os.path.basename(path))
-
-
 # ----------------------------- Models -----------------------------
-def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
-class StatusCheck(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: str = Field(default_factory=now_iso)
 
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
 
 
-class WorkoutStart(BaseModel):
-    workout: str = "Threshold Climb"
-    route: str = "Alpe d'Huez"
 
 
-class WorkoutSummary(BaseModel):
-    elapsed: int = 0
-    avg_power: float = 0
-    avg_hr: float = 0
-    distance: float = 0
-    tss: float = 0
-    calories: float = 0
-
-
-class WorkoutSession(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    workout: str
-    route: str
-    status: str = "active"  # active | ended
-    started_at: str = Field(default_factory=now_iso)
-    ended_at: Optional[str] = None
-    summary: WorkoutSummary = Field(default_factory=WorkoutSummary)
 
 
 # ----------------------------- REST -----------------------------
-@api_router.get("/")
-async def root():
-    return {"message": "ROUJAUNE telemetry API"}
-
-
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    obj = StatusCheck(**input.dict())
-    await db.status_checks.insert_one(obj.dict())
-    return obj
-
-
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    rows = await db.status_checks.find().to_list(1000)
-    return [StatusCheck(**r) for r in rows]
-
-
 @api_router.post("/workouts/start", response_model=WorkoutSession)
 async def start_workout(body: WorkoutStart):
     session = WorkoutSession(workout=body.workout, route=body.route)
@@ -168,23 +98,8 @@ async def end_workout(session_id: str, summary: WorkoutSummary):
 
 
 # ----------------------- Post-ride summary aggregation -----------------------
-class TelemetrySample(BaseModel):
-    power: float = 0
-    hr: float = 0
-    cadence: float = 0
-    speed: float = 0
 
 
-class SummarizeRequest(BaseModel):
-    workout: str = "Threshold Climb"
-    workout_id: Optional[str] = None
-    route: Optional[Dict[str, Any]] = None   # {id,name,place,distance,elevation,tag}
-    elapsed: int = 0          # seconds of the ride
-    ftp: int = 287            # rider FTP (watts)
-    weight: float = 78        # kg
-    manual: Optional[Dict[str, Any]] = None  # user-entered metrics when no telemetry
-    samples: List[TelemetrySample] = Field(default_factory=list)
-    est_calories: int = 0     # live in-ride kcal estimate (used when no telemetry)
 
 
 # Polished reference dataset — matches the design mock. Returned when a ride
@@ -749,26 +664,6 @@ def coach_chat_system(name: str = "Alberto", gender: str = "male", style: str = 
     )
 
 
-class CoachCueRequest(BaseModel):
-    power: int = 0
-    hr: int = 0
-    cadence: int = 0
-    speed: float = 0
-    elapsed: int = 0
-    power_target: int = 251
-    cadence_low: int = 90
-    cadence_high: int = 100
-    workout: str = "Threshold Climb"
-    segment: Optional[str] = None
-    zone: Optional[str] = None
-    route: Optional[str] = None
-    seated: bool = False
-    coach_name: str = "Alberto"
-    coach_gender: str = "male"
-    cue_kind: str = "live"  # live | intro | next_preview | extend_advice
-    next_segment: Optional[str] = None
-    next_zone: Optional[str] = None
-    next_target: Optional[int] = None
 
 
 @api_router.post("/coach/cue")
@@ -833,17 +728,6 @@ async def coach_cue(req: CoachCueRequest):
         raise HTTPException(status_code=502, detail=f"Coaching generation failed: {e}")
 
 
-class ExtendAdviceRequest(BaseModel):
-    power: int = 0
-    hr: int = 0
-    cadence: int = 0
-    elapsed: int = 0            # seconds ridden
-    workout: str = "Threshold Climb"
-    type_id: str = "endurance"  # workout type: endurance/tempo/threshold/vo2max/sprints/climbing/recovery/restday/fb50
-    route: Optional[str] = None
-    wearable_on: bool = False
-    coach_name: str = "Alberto"
-    coach_gender: str = "male"
 
 
 HARD_TYPES = {"threshold", "vo2max", "sprints", "climbing"}
@@ -936,30 +820,6 @@ async def coach_extend_advice(req: ExtendAdviceRequest):
     return {"advice": advice, "recommend": recommend, "suggested": suggested}
 
 
-class CoachDebriefRequest(BaseModel):
-    ride_id: Optional[str] = None
-    workout: str = "Threshold Climb"
-    route: Optional[str] = None
-    duration_sec: int = 0
-    distance_km: float = 0
-    elevation_m: int = 0
-    avg_power: int = 0
-    norm_power: int = 0
-    power_target: int = 0
-    avg_cadence: int = 0
-    avg_hr: int = 0
-    max_hr: int = 0
-    calories: int = 0
-    tss: int = 0
-    intensity: float = 0
-    compliance: int = 0
-    interval_compliance: int = 0
-    intervals: List[Dict[str, Any]] = Field(default_factory=list)
-    zones: List[Dict[str, Any]] = Field(default_factory=list)
-    extended_min: int = 0
-    adjustments: List[str] = Field(default_factory=list)
-    coach_name: str = "Alberto"
-    coach_gender: str = "male"
 
 
 @api_router.post("/coach/debrief")
@@ -1054,16 +914,6 @@ def _chat_id(coach_name: str) -> str:
 RIDER_DEFAULT = {"id": "me", "name": "Rider One", "weight_kg": 78.0, "age": 42, "gender": "male", "city": "", "region": "", "country": "", "capability": "intermediate"}
 
 
-class RiderProfileUpdate(BaseModel):
-    name: Optional[str] = None
-    weight_kg: Optional[float] = None
-    age: Optional[int] = None
-    gender: Optional[str] = None
-    city: Optional[str] = None
-    region: Optional[str] = None
-    country: Optional[str] = None
-    capability: Optional[str] = None
-    avatar: Optional[str] = None
 
 
 async def _rider_doc() -> dict:
@@ -1099,10 +949,6 @@ async def get_rider_profile():
 APPEARANCE_DEFAULT = {"id": "me", "riderType": "younger_male", "bikeType": "road", "clothingStyle": "get_fit"}
 
 
-class AppearanceUpdate(BaseModel):
-    riderType: Optional[str] = None
-    bikeType: Optional[str] = None
-    clothingStyle: Optional[str] = None
 
 
 @api_router.get("/rider/appearance")
@@ -1133,11 +979,6 @@ async def update_rider_appearance(req: AppearanceUpdate):
 PREFS_DEFAULT = {"id": "me", "coach_id": "alberto", "coach_style": "balanced", "voice_guidance": "full", "speech_rate": 0.95}
 
 
-class PrefsUpdate(BaseModel):
-    coach_id: Optional[str] = None
-    coach_style: Optional[str] = None
-    voice_guidance: Optional[str] = None
-    speech_rate: Optional[float] = None
 
 
 @api_router.get("/rider/prefs")
@@ -1513,6 +1354,43 @@ async def benchmark_plan_gate(plan_id: str, coach_name: str = "Alberto", coach_g
     }
 
 
+@api_router.get("/benchmark/nudge")
+async def benchmark_nudge():
+    """Lightweight Today-screen signal: does the rider's CURRENT plan need a
+    fresh benchmark right now? Uses the deterministic decision engine only (no
+    LLM), and fires just for the strongest 'required' state so the Today nudge
+    stays high-signal."""
+    uid = auth.current_user_id()
+    plan_id = await _active_plan_id()
+    if not plan_id:
+        return {"required": False, "status": "none", "planId": ""}
+    level = await _plan_level(plan_id)
+    profile = await udb.benchmark_profile.find_one({"user_id": uid}) or {}
+    checkin = await udb.daily_checkins.find_one({"user_id": uid, "id": "latest"}) or {}
+    results = await udb.benchmark_results.find(
+        {"user_id": uid, "decision": "accepted"}).sort("createdAt", -1).to_list(length=50)
+    last_ftp = next((r for r in results if (r.get("primaryMetric") or {}).get("key") == "ftp"), None)
+    ftp = profile.get("ftp")
+    last_days = _days_since(profile.get("lastBenchmarkDate"))
+    low_conf = bool(last_ftp and (last_ftp.get("confidence") or 0) < 50)
+    decision = decide_benchmark(BenchmarkDecisionInput(
+        plan_level=level, has_ftp=bool(ftp), days_since_last=last_days,
+        illness=bool(checkin.get("illness")), injury=bool(checkin.get("injury")),
+        returning=bool(checkin.get("returning")), equipment_changed=bool(checkin.get("equipmentChanged")),
+        low_confidence=low_conf, ftp_retest_days=FTP_RETEST_DAYS,
+    ))
+    rec = await _benchmark_recommendation()
+    return {
+        "required": decision.status == "required",
+        "status": decision.status,
+        "planId": plan_id,
+        "planLevel": level,
+        "reason": decision.reasons[0] if decision.reasons else "",
+        "recommendedTestId": rec["primary"]["testId"],
+        "recommendedTestName": BM_TEST_NAME.get(rec["primary"]["testId"]),
+    }
+
+
 # ---- WP-E: Training Plan review (proposed changes require explicit approval) ----
 def _next_monday_iso() -> str:
     from datetime import timedelta
@@ -1833,19 +1711,8 @@ async def get_benchmark_recommendation():
 
 
 # ---- Personal Records (Best Time / avg power per scenic route + segments) ----
-class SegmentSplit(BaseModel):
-    label: str
-    km: float = 0
-    time_sec: int = 0
 
 
-class PRSubmit(BaseModel):
-    route_id: str
-    route_name: Optional[str] = None
-    time_sec: int = 0            # total route completion time (seconds)
-    avg_power: int = 0           # average power over the ride (W)
-    completed: bool = True       # only score the route time PR when the route finished
-    splits: List[SegmentSplit] = Field(default_factory=list)
 
 
 def _clean_pr(doc: dict) -> dict:
@@ -1943,9 +1810,6 @@ async def submit_rider_pr(body: PRSubmit):
     }
 
 
-class AssignPlanRequest(BaseModel):
-    plan_id: str
-    reset_progress: bool = False
 
 @api_router.get("/rider/plan")
 async def get_rider_plan():
@@ -2013,13 +1877,6 @@ async def _plan_for_level(level: str):
     return None
 
 
-class OnboardingReq(BaseModel):
-    experience_years: float = 0
-    weekly_rides: int = 0
-    longest_ride_min: int = 0
-    confident_60min: bool = False
-    self_rating: str = "new"        # new | some | confident
-    goal: str | None = None
 
 
 def _classify_level(r: "OnboardingReq") -> str:
@@ -2062,45 +1919,6 @@ async def delete_rider_account():
     uid = actor.get("user_id")
     result = await auth.erase_user_data(uid)
     return {"ok": True, **result}
-
-
-def _http_get_json(url: str):
-    import urllib.request
-    with urllib.request.urlopen(url, timeout=6) as r:
-        return json.loads(r.read().decode())
-
-
-@api_router.get("/weather")
-async def get_weather(city: str = "", region: str = "", country: str = ""):
-    """Current temperature for the rider's location via Open-Meteo (keyless)."""
-    query = ", ".join([p for p in [city, region, country] if p]).strip()
-    if not query:
-        return {"available": False}
-    try:
-        import urllib.parse
-        geo = await asyncio.to_thread(
-            _http_get_json,
-            f"https://geocoding-api.open-meteo.com/v1/search?name={urllib.parse.quote(city or query)}&count=1&language=en&format=json",
-        )
-        res = (geo.get("results") or [None])[0]
-        if not res:
-            return {"available": False}
-        lat, lon = res["latitude"], res["longitude"]
-        place = res.get("name", city)
-        wx = await asyncio.to_thread(
-            _http_get_json,
-            f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,apparent_temperature",
-        )
-        cur = wx.get("current", {})
-        return {
-            "available": True,
-            "temp_c": round(cur.get("temperature_2m", 0)),
-            "feels_c": round(cur.get("apparent_temperature", cur.get("temperature_2m", 0))),
-            "place": place,
-        }
-    except Exception:
-        logging.warning("weather lookup failed")
-        return {"available": False}
 
 
 @api_router.get("/rider/season")
@@ -2197,10 +2015,6 @@ async def progress_summary():
 
 
 
-class SupplementaryLog(BaseModel):
-    kind: str = "strength"   # strength | mobility | recovery | balance
-    title: str = "Supplementary session"
-    date: Optional[str] = None
 
 
 @api_router.post("/rider/supplementary/complete")
@@ -2435,11 +2249,6 @@ async def _build_rider_context(plan_id: str = "") -> str:
     )
 
 
-class CoachChatRequest(BaseModel):
-    coach_name: str = "Alberto"
-    coach_gender: str = "male"
-    coaching_style: str = "balanced"
-    message: str
 
 
 @api_router.get("/coach/chat/history")
@@ -3570,11 +3379,6 @@ async def get_plan(id: str = ""):
         return dict(NO_PLAN)
 
 
-class AdaptationRequest(BaseModel):
-    plan_id: str = "build-and-climb"
-    coach_name: str = "Alberto"
-    coach_gender: str = "male"
-    refresh: bool = False
 
 
 async def _generate_adaptation(plan: dict, coach_name: str, coach_gender: str, recent_ride: Optional[dict] = None) -> str:
@@ -3811,16 +3615,8 @@ async def get_plan_adaptations(plan_id: str = "", coach_name: Optional[str] = No
     return {"adaptations": history, "status": plan.get("adaptation_status", "Plan is adapting as you improve")}
 
 
-class PlanGoal(BaseModel):
-    id: str
-    title: str
-    description: str = ""
-    status: str = "incomplete"
 
 
-class GoalsUpdateRequest(BaseModel):
-    plan_id: str = "build-and-climb"
-    goals: List[PlanGoal]
 
 
 @api_router.put("/plan/goals")
@@ -4072,8 +3868,6 @@ async def get_calendar_week(start: str = "2025-05-12"):
 
 
 # ----------------------- Workout favorites & scheduling -----------------------
-class FavToggleRequest(BaseModel):
-    workout_id: str
 
 
 @api_router.get("/workout-favorites")
@@ -4096,14 +3890,6 @@ async def toggle_workout_favorite(req: FavToggleRequest):
     return {"favorites": ids, "favorited": favorited}
 
 
-class ScheduleRequest(BaseModel):
-    workout_id: str
-    workout_name: str
-    duration: str = ""
-    tss: str = ""
-    zone: str = ""
-    color: str = "rouge"
-    date: str = "2025-05-13"
 
 
 @api_router.get("/calendar/scheduled")
@@ -4133,11 +3919,6 @@ async def delete_scheduled_workout(entry_id: str):
     return {"ok": True}
 
 
-class MoveSessionRequest(BaseModel):
-    week_start: str = "2025-05-12"
-    session_type: str  # cycling | fb50 | wellness
-    from_date: str
-    to_date: str
 
 
 @api_router.post("/calendar/move")
@@ -4164,15 +3945,6 @@ async def move_calendar_session(req: MoveSessionRequest):
     return doc
 
 
-class ReviewRequest(BaseModel):
-    session_title: str
-    session_type: str = "cycling"
-    from_day: str
-    to_day: str
-    to_focus: str = ""
-    to_existing: str = ""
-    coach_name: str = "Alberto"
-    coach_gender: str = "male"
 
 
 @api_router.post("/calendar/review")
@@ -4494,8 +4266,6 @@ async def assign_catalog_workout(workout_id: str):
     return {"assigned": workout_id, "workout": doc}
 
 
-class WorkoutEdit(BaseModel):
-    patch: Dict[str, Any] = Field(default_factory=dict)
 
 
 @api_router.put("/catalog/{workout_id}")
@@ -4578,9 +4348,6 @@ async def get_benchmark_config():
     return {"retest_days": dict(BM_RETEST_DAYS), "ftp_retest_days": FTP_RETEST_DAYS, "tests": BM_ALL_TESTS}
 
 
-class BenchmarkConfigPatch(BaseModel):
-    retest_days: Optional[Dict[str, int]] = None
-    ftp_retest_days: Optional[int] = None
 
 
 @admin_cfg_router.put("/benchmark/config")
@@ -4619,8 +4386,6 @@ async def get_coaches_config():
     return {"coaches": coaches, "safety_policy": COACH_SAFETY_POLICY}
 
 
-class CoachesConfig(BaseModel):
-    coaches: List[Dict[str, Any]]
 
 
 @admin_cfg_router.put("/coaches")
@@ -4635,6 +4400,11 @@ async def put_coaches_config(body: CoachesConfig):
 api_router.include_router(plans_admin.plans_router, dependencies=[Depends(auth.require_admin)])
 api_router.include_router(auth.auth_router)
 api_router.include_router(auth.admin_auth_router)
+# Extracted route modules (restructure into /routes).
+from routes import system as system_routes  # noqa: E402
+from routes import weather as weather_routes  # noqa: E402
+api_router.include_router(system_routes.router)
+api_router.include_router(weather_routes.router)
 app.include_router(api_router)
 app.include_router(push.router)
 app.include_router(admin_routes.admin_router)
