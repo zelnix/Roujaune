@@ -21,7 +21,7 @@ function initials(name?: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function StatusBar({ onFlame, onNotifications, onProfile, avatar, initialsText }: { onFlame: () => void; onNotifications: () => void; onProfile?: () => void; avatar?: string | null; initialsText: string }) {
+function StatusBar({ onFlame, onNotifications, onProfile, avatar, initialsText, notifCount }: { onFlame: () => void; onNotifications: () => void; onProfile?: () => void; avatar?: string | null; initialsText: string; notifCount?: number }) {
   return (
     <View style={styles.statusRow}>
       <GlassPill testID="flame-pill" onPress={onFlame}>
@@ -31,9 +31,11 @@ function StatusBar({ onFlame, onNotifications, onProfile, avatar, initialsText }
 
       <GlassPill testID="bell-pill" onPress={onNotifications}>
         <Ionicons name="notifications" size={16} color="#fff" />
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{brand.notifications}</Text>
-        </View>
+        {(notifCount ?? 0) > 0 && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{notifCount}</Text>
+          </View>
+        )}
       </GlassPill>
 
       <GlassPill testID="profile-pill" style={styles.avatar} onPress={onProfile}>
@@ -61,6 +63,7 @@ export function HeroRoute({
   onNotifications,
   compact = false,
   sideSlot,
+  notifCount,
 }: {
   width: number;
   height: number;
@@ -71,6 +74,7 @@ export function HeroRoute({
   onNotifications: () => void;
   compact?: boolean;
   sideSlot?: React.ReactNode;
+  notifCount?: number;
 }) {
   const { avatar, profile, loaded: profileLoaded } = useRiderProfile();
   const { settings, loaded: settingsLoaded } = useSettings();
@@ -104,7 +108,7 @@ export function HeroRoute({
       </View>
 
       {/* top-right status */}
-      <StatusBar onFlame={onFlame} onNotifications={onNotifications} onProfile={onProfile} avatar={avatar} initialsText={profileLoaded ? initials(profile?.name) : ""} />
+      <StatusBar onFlame={onFlame} onNotifications={onNotifications} onProfile={onProfile} avatar={avatar} initialsText={profileLoaded ? initials(profile?.name) : ""} notifCount={notifCount} />
 
       {/* right: local weather → tap for the 7-day forecast */}
       <Pressable

@@ -4,43 +4,16 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { CC } from "./calendar";
 import type { BenchmarkNudge } from "../lib/benchmark/api";
+import { useLiveNotifications, LiveNotif } from "../lib/notifications";
 
-type Notif = { id: string; icon: any; color: string; title: string; body: string; detail: string; time: string; action?: "benchmark" };
-
-const NOTIFS: Notif[] = [
-  { id: "1", icon: "trophy", color: CC.yellow, title: "New personal best", body: "You set a new 20-min power record on your last ride.", detail: "Outstanding work! On your last ride you held 298 W for 20 minutes — a new personal best and a strong sign your threshold is climbing. Your coach has already factored this into your upcoming interval targets. Keep fuelling well and recovering between hard sessions.", time: "2h ago" },
-  { id: "2", icon: "calendar", color: CC.rouge, title: "Tomorrow: Threshold intervals", body: "4 × 8 min at threshold — get an early night.", detail: "Tomorrow's session is 4 × 8 minutes at threshold with 4 minutes easy between efforts. Aim to hold steady power rather than starting too hard. Have a good dinner tonight, hydrate, and get an early night so you arrive fresh.", time: "5h ago" },
-  { id: "3", icon: "flame", color: "#E8631C", title: "Streak going strong", body: "Keep the momentum — ride today to extend your streak.", detail: "You're on a roll! Consistency is the single biggest driver of fitness gains. A short spin today is enough to keep your streak alive — even 30 easy minutes counts.", time: "1d ago" },
-  { id: "4", icon: "chatbubble-ellipses", color: CC.green, title: "Message from your coach", body: "\"Great work holding your zones this week.\"", detail: "\"Great work holding your zones this week — your pacing on the climbs was much more even than last block. Next we'll sharpen your top end with a couple of VO2 sessions. Proud of the discipline you're showing.\"", time: "2d ago" },
-];
-
-/** Notifications sheet — tap a notification to read the detail (marks it read),
- * with per-row read/unread toggles and an unread count. */
+/** Notifications sheet — driven entirely by real backend signals (re-benchmark,
+ * FTP review, upcoming test, missed workouts, coach messages). Tap a row to read
+ * the detail (marks it read); benchmark-related rows offer a "Start benchmark" CTA. */
 export function NotificationsModal({ visible, onClose, nudge }: { visible: boolean; onClose: () => void; nudge?: BenchmarkNudge }) {
   const router = useRouter();
+  const notifs = useLiveNotifications(nudge);
   const [readIds, setReadIds] = React.useState<Set<string>>(new Set());
-  const [selected, setSelected] = React.useState<Notif | null>(null);
-
-  // Real, live notifications (from server signals) shown above the demo feed.
-  const liveNotifs = React.useMemo<Notif[]>(() => {
-    const out: Notif[] = [];
-    if (nudge?.required) {
-      const reason = (nudge.reason || "").trim();
-      const nice = reason ? `${reason.charAt(0).toUpperCase()}${reason.slice(1)}.` : "";
-      out.push({
-        id: "rebenchmark",
-        icon: "fitness",
-        color: CC.yellow,
-        title: "Time to re-benchmark",
-        body: nice || "A fresh benchmark keeps your training targets accurate.",
-        detail: `${nice} A fresh benchmark${nudge.recommendedTestName ? ` (${nudge.recommendedTestName})` : ""} recalibrates your training zones so every workout targets the right intensity. It only takes one session — tap below to get started.`,
-        time: "now",
-        action: "benchmark",
-      });
-    }
-    return out;
-  }, [nudge]);
-  const allNotifs = React.useMemo(() => [...liveNotifs, ...NOTIFS], [liveNotifs]);
+  const [selected, setSelected] = React.useState<LiveNotif | null>(null);
 
   const markRead = (id: string) => setReadIds((prev) => new Set(prev).add(id));
   const toggleRead = (id: string) =>
@@ -50,10 +23,10 @@ export function NotificationsModal({ visible, onClose, nudge }: { visible: boole
       return next;
     });
 
-  const openDetail = (n: Notif) => { markRead(n.id); setSelected(n); };
+  const openDetail = (n: LiveNotif) => { markRead(n.id); setSelected(n); };
   const close = () => { setSelected(null); onClose(); };
   const goBenchmark = () => { close(); router.push("/benchmark"); };
-  const unread = allNotifs.filter((n) => !readIds.has(n.id)).length;
+  const unread = notifs.filter((n) => !readIds.has(n.id)).length;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={close}>
@@ -97,39 +70,48 @@ export function NotificationsModal({ visible, onClose, nudge }: { visible: boole
               <View style={s.head}>
                 <View style={{ flex: 1 }}>
                   <Text style={s.title}>Notifications</Text>
-                  <Text style={s.sub}>{unread > 0 ? `${unread} unread` : "You're all caught up"}</Text>
+                  <Text style={s.sub}>
+                    {notifs.length === 0 ? "You're all caught up" : unread > 0 ? `${unread} unread` : "You're all caught up"}
+                  </Text>
                 </View>
                 <Pressable onPress={close} testID="notifications-close" hitSlop={10}><Ionicons name="close" size={22} color={CC.white} /></Pressable>
               </View>
-              <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
-                {allNotifs.map((n) => {
-                  const isRead = readIds.has(n.id);
-                  return (
-                    <Pressable key={n.id} testID={`notification-${n.id}`} onPress={() => openDetail(n)} style={s.row}>
-                      {!isRead ? <View style={s.unreadDot} /> : <View style={s.dotSpacer} />}
-                      <View style={[s.icon, { backgroundColor: n.color + "22", borderColor: n.color }]}>
-                        <Ionicons name={n.icon} size={17} color={n.color} />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[s.rowTitle, isRead && s.readText]}>{n.title}</Text>
-                        <Text style={s.rowBody} numberOfLines={2}>{n.body}</Text>
-                      </View>
-                      <View style={s.rowRight}>
-                        <Text style={s.time}>{n.time}</Text>
-                        <Pressable
-                          testID={`toggle-read-${n.id}`}
-                          onPress={(e) => { e.stopPropagation(); toggleRead(n.id); }}
-                          hitSlop={8}
-                          style={s.toggleBtn}
-                          accessibilityLabel={isRead ? "Mark as unread" : "Mark as read"}
-                        >
-                          <Ionicons name={isRead ? "mail-unread-outline" : "checkmark-done"} size={15} color={CC.dim} />
-                        </Pressable>
-                      </View>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
+              {notifs.length === 0 ? (
+                <View testID="notifications-empty" style={s.empty}>
+                  <Ionicons name="notifications-off-outline" size={28} color={CC.dim} />
+                  <Text style={s.emptyText}>No new notifications right now.</Text>
+                </View>
+              ) : (
+                <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                  {notifs.map((n) => {
+                    const isRead = readIds.has(n.id);
+                    return (
+                      <Pressable key={n.id} testID={`notification-${n.id}`} onPress={() => openDetail(n)} style={s.row}>
+                        {!isRead ? <View style={s.unreadDot} /> : <View style={s.dotSpacer} />}
+                        <View style={[s.icon, { backgroundColor: n.color + "22", borderColor: n.color }]}>
+                          <Ionicons name={n.icon} size={17} color={n.color} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[s.rowTitle, isRead && s.readText]}>{n.title}</Text>
+                          <Text style={s.rowBody} numberOfLines={2}>{n.body}</Text>
+                        </View>
+                        <View style={s.rowRight}>
+                          <Text style={s.time}>{n.time}</Text>
+                          <Pressable
+                            testID={`toggle-read-${n.id}`}
+                            onPress={(e) => { e.stopPropagation(); toggleRead(n.id); }}
+                            hitSlop={8}
+                            style={s.toggleBtn}
+                            accessibilityLabel={isRead ? "Mark as unread" : "Mark as read"}
+                          >
+                            <Ionicons name={isRead ? "mail-unread-outline" : "checkmark-done"} size={15} color={CC.dim} />
+                          </Pressable>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              )}
             </>
           )}
         </Pressable>
@@ -145,6 +127,8 @@ const s = StyleSheet.create({
   backBtn: { padding: 2 },
   title: { color: CC.white, fontSize: 19, fontWeight: "900" },
   sub: { color: CC.dim, fontSize: 12.5, marginTop: 2 },
+  empty: { alignItems: "center", justifyContent: "center", paddingVertical: 34, gap: 10 },
+  emptyText: { color: CC.dim, fontSize: 13, fontWeight: "600" },
   row: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 11, borderTopWidth: 1, borderTopColor: CC.borderSoft },
   unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: CC.rouge, marginTop: 6 },
   dotSpacer: { width: 8 },
