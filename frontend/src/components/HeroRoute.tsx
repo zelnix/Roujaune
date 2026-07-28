@@ -4,7 +4,6 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing } from "../theme";
-import { brand } from "../data";
 import { useRiderProfile } from "../lib/rider-profile";
 import { useSettings } from "../lib/settings";
 import { useWeather } from "../lib/weather";
@@ -21,14 +20,9 @@ function initials(name?: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function StatusBar({ onFlame, onNotifications, onProfile, avatar, initialsText, notifCount }: { onFlame: () => void; onNotifications: () => void; onProfile?: () => void; avatar?: string | null; initialsText: string; notifCount?: number }) {
+function StatusBar({ onNotifications, onProfile, avatar, initialsText, notifCount }: { onNotifications: () => void; onProfile?: () => void; avatar?: string | null; initialsText: string; notifCount?: number }) {
   return (
     <View style={styles.statusRow}>
-      <GlassPill testID="flame-pill" onPress={onFlame}>
-        <Ionicons name="flame" size={16} color={colors.yellow} />
-        <Text style={styles.pillText}>{brand.flame}</Text>
-      </GlassPill>
-
       <GlassPill testID="bell-pill" onPress={onNotifications}>
         <Ionicons name="notifications" size={16} color="#fff" />
         {(notifCount ?? 0) > 0 && (
@@ -59,7 +53,6 @@ export function HeroRoute({
   onStart,
   onMessage,
   onProfile,
-  onFlame,
   onNotifications,
   compact = false,
   sideSlot,
@@ -70,7 +63,6 @@ export function HeroRoute({
   onStart: () => void;
   onMessage?: () => void;
   onProfile?: () => void;
-  onFlame: () => void;
   onNotifications: () => void;
   compact?: boolean;
   sideSlot?: React.ReactNode;
@@ -108,7 +100,7 @@ export function HeroRoute({
       </View>
 
       {/* top-right status */}
-      <StatusBar onFlame={onFlame} onNotifications={onNotifications} onProfile={onProfile} avatar={avatar} initialsText={profileLoaded ? initials(profile?.name) : ""} notifCount={notifCount} />
+      <StatusBar onNotifications={onNotifications} onProfile={onProfile} avatar={avatar} initialsText={profileLoaded ? initials(profile?.name) : ""} notifCount={notifCount} />
 
       {/* right: local weather → tap for the 7-day forecast */}
       <Pressable

@@ -8,6 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { colors, radius, spacing, shadow } from "@/src/theme";
 import { SideNavigation } from "@/src/components/SideNavigation";
+import { HeaderStatus } from "@/src/components/HeaderStatus";
 import { BrandHeader } from "@/src/components/BrandHeader";
 import { navItems, navFooter } from "@/src/data";
 import { useCoach } from "@/src/lib/coach-persona";
@@ -135,7 +136,10 @@ export default function TodaysTraining() {
                   </View>
                 </View>
 
-                <AlbertoTrainingCard width={400} onPress={() => showToast(`Message from ${persona.name}`)} />
+                <View style={styles.headerRightCol}>
+                  <HeaderStatus />
+                  <AlbertoTrainingCard width={400} onPress={() => showToast(`Message from ${persona.name}`)} />
+                </View>
               </View>
             )}
 
@@ -195,6 +199,7 @@ const styles = StyleSheet.create({
   compactTopRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   fullCol: { width: "100%", flex: 0 },
   headerLeft: { flex: 1 },
+  headerRightCol: { alignItems: "flex-end", gap: spacing.sm },
   pageTitle: { color: colors.white, fontSize: 44, fontWeight: "800", letterSpacing: -0.5, marginTop: 8 },
   dateRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8 },
   dateText: { color: colors.textDim, fontSize: 14 },

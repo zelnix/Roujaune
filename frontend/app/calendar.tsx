@@ -17,6 +17,7 @@ import {
   CalendarTipFooter, DraggableSession, ReadinessDetail, ScheduledSessionCard,
 } from "@/src/components/calendar";
 import { unscheduleWorkout } from "@/src/lib/workout-prefs";
+import { HeaderStatus } from "@/src/components/HeaderStatus";
 
 const LABEL_W = 66;
 
@@ -165,6 +166,7 @@ export default function CalendarScreen() {
                 <Text style={styles.title}>Calendar</Text>
                 <Text style={styles.subtitle}>Plan your week. Execute your day.</Text>
               </View>
+              <HeaderStatus />
             </View>
 
             <DateControls

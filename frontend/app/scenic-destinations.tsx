@@ -57,6 +57,21 @@ export default function ScenicDestinationsScreen() {
             <Ionicons name="chevron-back" size={22} color={colors.white} />
           </Pressable>
           <Text style={styles.title}>Explore Destinations</Text>
+          <Pressable
+            testID="surprise-me"
+            onPress={() => {
+              if (!routes || routes.length === 0) return;
+              const pick = routes[Math.floor(Math.random() * routes.length)];
+              open(pick.id);
+            }}
+            style={styles.surpriseBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Surprise me with a random scenic ride"
+            hitSlop={8}
+          >
+            <Ionicons name="shuffle" size={16} color={colors.yellow} />
+            <Text style={styles.surpriseText}>Surprise me</Text>
+          </Pressable>
         </View>
 
         {/* Search */}
@@ -129,6 +144,8 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: spacing.md, paddingVertical: 12 },
   backBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 22, backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: colors.border },
   title: { color: colors.white, fontSize: 22, fontWeight: "900", letterSpacing: 0.3 },
+  surpriseBtn: { flexDirection: "row", alignItems: "center", gap: 6, marginLeft: "auto" as any, borderWidth: 1, borderColor: "rgba(245,179,1,0.4)", borderRadius: radius.pill, paddingVertical: 9, paddingHorizontal: 14, minHeight: 44, backgroundColor: "rgba(245,179,1,0.1)" },
+  surpriseText: { color: colors.yellow, fontSize: 12.5, fontWeight: "800" },
 
   searchWrap: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: spacing.lg, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 16, minHeight: 48 },
   searchInput: { flex: 1, color: colors.white, fontSize: 15, paddingVertical: 12 },

@@ -659,3 +659,10 @@ STILL PENDING (awaiting approval): Phase 3 (Home banners consolidation, dup CTAs
 - Coach avatar: added subtle white wash (rgba(255,255,255,0.14)) to lighten portrait.
 - Riding-experience selector: solid yellow 3D button (borderBottom depth + shadow), no chevron; icon bubble now SOLID DARK (colors.bg) so the icon is visible; training mode icon changed "fitness"(heart-pulse) → "barbell"; label "EXPERIENCE" → "RIDE XP".
 - Persistence re-confirmed per-rider across sessions (iter70 reload test).
+
+## Standardised top-right header + sidebar cleanup + Surprise Me (2026-07-28 fork)
+- **Reusable `HeaderStatus`** (`src/components/HeaderStatus.tsx`): standard top-right cluster = notification button (unread badge → NotificationsModal) + rider avatar (→ /profile). Self-manages its modal + benchmark nudge.
+- Wired across every screen: home (HeroRoute training view + ScenicCyclingTodayView + FutureActivityTodayView), all AppScaffold screens (default `headerRight` = HeaderStatus: progress, community, connections, help, profile, routes, settings, benchmark), and custom-header screens (plan, training, workouts, workout-list, calendar).
+- **Removed** the flame/streak "achievements" pill from the home top-right (HeroRoute StatusBar) + its now-dead "Your Progress" modal/state/imports in index.tsx.
+- **Removed "Profile"** from the sidebar utility nav (`today-mode.ts` UTILITY) — profile is now reached via the avatar everywhere.
+- **"Surprise me"** shuffle: scenic Today hero CTA (`testID surprise-me`) + Explore Destinations header — picks a random published scenic route and opens the player. Verified via screenshots (home training/scenic/future, progress, plan, workouts).

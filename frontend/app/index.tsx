@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, Animated, useWindowDimensions, Platform, Modal, Pressable } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Animated, useWindowDimensions, Platform } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -24,9 +24,7 @@ import { useReducedMotionSafe } from "@/src/lib/use-reduced-motion";
 import { useBenchmarkNudge } from "@/src/lib/benchmark/api";
 import { useLiveNotifications, useNotificationReadState } from "@/src/lib/notifications";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
-import { ProgressPanel } from "@/src/components/ProgressPanel";
 import { NotificationsModal } from "@/src/components/NotificationsModal";
-import { CC } from "@/src/components/calendar";
 
 function Toast({ message }: { message: { id: number; text: string } | null }) {
   const anim = React.useRef(new Animated.Value(0)).current;
@@ -81,7 +79,6 @@ export default function Dashboard() {
   const unreadCount = liveNotifs.filter((n) => !readKeys.has(n.key)).length;
   const [active, setActive] = React.useState("home");
   const [showChat, setShowChat] = React.useState(false);
-  const [showProgress, setShowProgress] = React.useState(false);
   const [showNotifs, setShowNotifs] = React.useState(false);
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
 
@@ -125,7 +122,6 @@ export default function Dashboard() {
                 onStart={() => router.push("/training")}
                 onMessage={() => setShowChat(true)}
                 onProfile={() => router.push("/profile")}
-                onFlame={() => setShowProgress(true)}
                 onNotifications={() => setShowNotifs(true)}
                 notifCount={unreadCount}
                 compact={compact}
@@ -171,20 +167,6 @@ export default function Dashboard() {
       <Toast message={toast} />
       <CoachChatModal visible={showChat} onClose={() => setShowChat(false)} persona={persona} />
       <NotificationsModal visible={showNotifs} onClose={() => setShowNotifs(false)} nudge={benchmarkNudge} />
-      <Modal visible={showProgress} transparent animationType="fade" onRequestClose={() => setShowProgress(false)}>
-        <Pressable style={styles.progressBackdrop} onPress={() => setShowProgress(false)} testID="progress-modal">
-          <Pressable style={styles.progressCard} onPress={() => { /* swallow */ }}>
-            <View style={styles.progressHead}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.progressTitle}>Your Progress</Text>
-                <Text style={styles.progressSub}>Your riding at a glance</Text>
-              </View>
-              <Pressable onPress={() => setShowProgress(false)} testID="progress-close" hitSlop={10}><Ionicons name="close" size={22} color={colors.white} /></Pressable>
-            </View>
-            <ProgressPanel />
-          </Pressable>
-        </Pressable>
-      </Modal>
     </GestureHandlerRootView>
   );
 }
@@ -218,9 +200,4 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   toastText: { color: colors.white, fontWeight: "700", fontSize: 14 },
-  progressBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.72)", alignItems: "center", justifyContent: "center", padding: 24 },
-  progressCard: { width: "100%", maxWidth: 440, backgroundColor: CC.card, borderWidth: 1, borderColor: CC.border, borderRadius: 20, padding: 20 },
-  progressHead: { flexDirection: "row", alignItems: "flex-start", marginBottom: 12 },
-  progressTitle: { color: colors.white, fontSize: 19, fontWeight: "900" },
-  progressSub: { color: CC.dim, fontSize: 12.5, marginTop: 2 },
 });

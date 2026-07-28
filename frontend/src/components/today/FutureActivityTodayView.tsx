@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing } from "../../theme";
 import { RiderExperience, modeMeta, setExperience } from "../../lib/today-mode";
 import { ScheduledWorkoutReminder } from "./ScheduledWorkoutReminder";
+import { HeaderStatus } from "../HeaderStatus";
 
 /** Activity-specific preview copy for the roadmap experiences. */
 export const PREVIEW: Record<string, { heading: string; blurb: string; bullets: string[] }> = {
@@ -46,6 +47,10 @@ export function FutureActivityTodayView({ mode }: { mode: RiderExperience }) {
   const p = PREVIEW[mode] ?? { heading: "COMING SOON", blurb: "This experience is on the Roujaune roadmap.", bullets: [] };
   return (
     <View style={{ gap: spacing.md }} testID={`future-activity-${mode}`}>
+      <View style={styles.topRow}>
+        <View style={{ flex: 1 }} />
+        <HeaderStatus />
+      </View>
       <ScheduledWorkoutReminder />
       <View style={styles.card}>
         <View style={styles.iconWrap}>
@@ -84,6 +89,7 @@ export function FutureActivityTodayView({ mode }: { mode: RiderExperience }) {
 }
 
 const styles = StyleSheet.create({
+  topRow: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end" },
   card: { backgroundColor: colors.card, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: 26, alignItems: "center", gap: 12 },
   iconWrap: { width: 68, height: 68, borderRadius: 34, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(245,179,1,0.1)", borderWidth: 1, borderColor: "rgba(245,179,1,0.3)" },
   soonPill: { borderWidth: 1, borderColor: "rgba(245,179,1,0.45)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },

@@ -6,13 +6,17 @@ import { useRouter } from "expo-router";
 import { colors, radius, spacing } from "../../theme";
 import { useScenicRoutes, useScenicLast, ScenicRoute, ytThumb } from "../../lib/scenic-routes";
 import { BrandHeader } from "../BrandHeader";
+import { HeaderStatus } from "../HeaderStatus";
 
 /** Standard Today header (3D wordmark + tagline) with a scenic-specific line,
  *  matching the training experience screen. */
 function ScenicHeader() {
   return (
-    <View testID="scenic-header">
-      <BrandHeader compact descriptor="Where shall we explore today?" />
+    <View style={styles.headerRow} testID="scenic-header">
+      <View style={{ flex: 1 }}>
+        <BrandHeader compact descriptor="Where shall we explore today?" />
+      </View>
+      <HeaderStatus />
     </View>
   );
 }
@@ -45,6 +49,13 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
   const [region, setRegion] = React.useState<string>("All");
 
   const open = (id: string) => router.push(`/scenic-ride?route=${id}` as any);
+
+  const surprise = React.useCallback(() => {
+    if (!routes || routes.length === 0) return;
+    const pick = routes[Math.floor(Math.random() * routes.length)];
+    onToast?.(`Surprise! ${pick.name}`);
+    open(pick.id);
+  }, [routes, onToast]);
 
   if (loading) {
     return (
@@ -149,6 +160,11 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
             <Ionicons name="play" size={16} color="#fff" />
             <Text style={styles.primaryCtaText}>BEGIN SCENIC JOURNEY</Text>
           </Pressable>
+          <Pressable testID="surprise-me" onPress={surprise} accessibilityRole="button" accessibilityLabel="Surprise me with a random scenic ride"
+            style={({ hovered }: any) => [styles.surpriseCta, hovered && styles.surpriseCtaHover]}>
+            <Ionicons name="shuffle" size={16} color={colors.yellow} />
+            <Text style={styles.surpriseCtaText}>SURPRISE ME</Text>
+          </Pressable>
         </View>
       </ImageBackground>
 
@@ -236,6 +252,7 @@ function DestRow({ title, data, open, tag }: { title: string; data: ScenicRoute[
 
 const styles = StyleSheet.create({
   h1: { color: colors.white, fontSize: 22, fontWeight: "800", letterSpacing: 0.4 },
+  headerRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 16 },
   header: { gap: 6, marginBottom: 2 },
   wordmark: { width: 200, height: 30, alignSelf: "flex-start" },
   subtitle: { color: colors.textDim, fontSize: 13.5, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
@@ -272,6 +289,9 @@ const styles = StyleSheet.create({
   primaryCta: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.red, borderRadius: radius.pill, paddingVertical: 14, paddingHorizontal: 24, minHeight: 48 },
   primaryCtaHover: { backgroundColor: colors.redBright },
   primaryCtaText: { color: "#fff", fontSize: 13.5, fontWeight: "800", letterSpacing: 0.6 },
+  surpriseCta: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(0,0,0,0.45)", borderWidth: 1, borderColor: "rgba(245,179,1,0.5)", borderRadius: radius.pill, paddingVertical: 14, paddingHorizontal: 22, minHeight: 48 },
+  surpriseCtaHover: { backgroundColor: "rgba(245,179,1,0.14)" },
+  surpriseCtaText: { color: colors.yellow, fontSize: 13.5, fontWeight: "800", letterSpacing: 0.6 },
 
   prefs: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 20, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 16 },
   prefItem: { flexDirection: "row", alignItems: "center", gap: 10 },

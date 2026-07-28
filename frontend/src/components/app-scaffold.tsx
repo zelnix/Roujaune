@@ -8,6 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { markPlanSeen } from "../lib/plan-badge";
 import { SideNavigation } from "./SideNavigation";
+import { HeaderStatus } from "./HeaderStatus";
 import { resolveNav, rememberRoute, getExperience } from "../lib/today-mode";
 import { CC } from "./calendar";
 
@@ -92,7 +93,7 @@ export function AppScaffold({
                 <Text style={styles.subtitle}>{subtitle}</Text>
               </View>
               <View style={styles.headerRight}>
-                {headerRight}
+                {headerRight ?? <HeaderStatus />}
               </View>
             </View>
             {children}

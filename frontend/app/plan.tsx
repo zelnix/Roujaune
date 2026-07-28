@@ -17,6 +17,7 @@ import {
   KeyWorkoutsCard, AlbertoAdaptationsCard, AdaptiveTargetsCard, PlanProgressStrip, AlbertoTipFooter,
 } from "@/src/components/plan";
 import { SideNavigation } from "@/src/components/SideNavigation";
+import { HeaderStatus } from "@/src/components/HeaderStatus";
 import { CalendarCard } from "@/src/components/CalendarCard";
 import { ReadinessGate } from "@/src/components/ReadinessGate";
 import { EditGoalsModal, ProgressModal, AdaptationsModal, PhaseDetailModal, KeyWorkoutDetailModal } from "@/src/components/plan-modals";
@@ -203,6 +204,7 @@ export default function TrainingPlanScreen() {
             <Text style={styles.messageBtnText}>Message {persona.name}</Text>
             <Ionicons name="chatbubble-ellipses" size={15} color={C.yellow} />
           </Pressable>
+          <HeaderStatus />
         </View>
       </View>
       <ReadinessGate />
@@ -291,7 +293,7 @@ const styles = StyleSheet.create({
   npBtnGhost: { backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.12)" },
   npBtnText: { color: C.white, fontSize: 15, fontWeight: "700" },
   headerRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 20 },
-  headerRight: { alignItems: "flex-end", gap: 12 },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 14 },
   messageBtn: { flexDirection: "row", alignItems: "center", gap: 9, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12, minHeight: 44 },
   messageBtnHover: { borderColor: "rgba(255,194,10,0.4)", backgroundColor: "rgba(255,255,255,0.05)" },
   messageAvatar: { width: 26, height: 26, borderRadius: 13, backgroundColor: "rgba(255,255,255,0.08)" },

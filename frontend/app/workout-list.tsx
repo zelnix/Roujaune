@@ -8,6 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { CC } from "@/src/components/calendar";
 import { SideNavigation } from "@/src/components/SideNavigation";
+import { HeaderStatus } from "@/src/components/HeaderStatus";
 import { WorkoutCustomizeModal } from "@/src/components/WorkoutCustomizeModal";
 import { useCoach } from "@/src/lib/coach-persona";
 import { useRiderProfile } from "@/src/lib/rider-profile";
@@ -189,6 +190,7 @@ export default function WorkoutListScreen() {
                 <Text style={s.title}>{title}</Text>
                 <Text style={s.subtitle}>{filtered.length} session{filtered.length === 1 ? "" : "s"} · pick one and launch it straight away.</Text>
               </View>
+              <HeaderStatus />
             </View>
 
             {/* filter bar */}

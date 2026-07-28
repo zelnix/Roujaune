@@ -63,7 +63,6 @@ export function modeMeta(id: RiderExperience): TodayModeMeta {
 // Shared utility section — identical across every experience.
 const UTILITY: NavItem[] = [
   { key: "connections", label: "Connections", icon: "link-outline", route: "/connections", availability: "available" },
-  { key: "profile", label: "Profile", icon: "person-circle-outline", route: "/profile", availability: "available" },
   { key: "settings", label: "Settings", icon: "settings-outline", route: "/settings", availability: "available" },
 ];
 

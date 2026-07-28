@@ -10,6 +10,7 @@ import Svg, { Rect } from "react-native-svg";
 
 import { CC } from "@/src/components/calendar";
 import { SideNavigation } from "@/src/components/SideNavigation";
+import { HeaderStatus } from "@/src/components/HeaderStatus";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
 import { useCoach } from "@/src/lib/coach-persona";
 import { markPlanSeen } from "@/src/lib/plan-badge";
@@ -194,6 +195,7 @@ export default function WorkoutsScreen() {
                 <Text style={s.title}>Workouts</Text>
                 <Text style={s.subtitle}>Choose your workout. Train with purpose. Ride stronger.</Text>
               </View>
+              <HeaderStatus />
             </View>
 
             {/* tabs */}
