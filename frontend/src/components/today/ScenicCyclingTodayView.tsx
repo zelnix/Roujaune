@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, ImageBackground, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView, ImageBackground, ActivityIndicator, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -8,13 +8,13 @@ import { useScenicRoutes, useScenicLast, ScenicRoute, ytThumb } from "../../lib/
 import { BrandHeader } from "../BrandHeader";
 import { HeaderStatus } from "../HeaderStatus";
 
-/** Standard Today header (3D wordmark + tagline) with a scenic-specific line,
- *  matching the training experience screen. */
-function ScenicHeader() {
+/** Standard Today header — identical to the Training Today screen (same 3D
+ *  wordmark, tagline and descriptor) so every ride-experience screen matches. */
+function ScenicHeader({ compact }: { compact: boolean }) {
   return (
     <View style={styles.headerRow} testID="scenic-header">
       <View style={{ flex: 1 }}>
-        <BrandHeader compact descriptor="Where shall we explore today?" />
+        <BrandHeader compact={compact} />
       </View>
       <HeaderStatus />
     </View>
@@ -44,6 +44,8 @@ function regionIcon(region: string): any {
  *  scenic ride (hidden until they have one). */
 export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => void }) {
   const router = useRouter();
+  const { height } = useWindowDimensions();
+  const compact = height < 560;
   const { routes, loading } = useScenicRoutes();
   const last = useScenicLast();
   const [region, setRegion] = React.useState<string>("All");
@@ -70,7 +72,7 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
   if (!routes || routes.length === 0) {
     return (
       <View style={{ gap: spacing.md }} testID="scenic-cycling-today">
-        <ScenicHeader />
+        <ScenicHeader compact={compact} />
         <View style={styles.empty} testID="scenic-empty">
           <View style={styles.emptyIcon}><Ionicons name="earth-outline" size={30} color={colors.yellow} /></View>
           <Text style={styles.emptyTitle}>New scenic destinations are on the way</Text>
@@ -100,7 +102,7 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
 
   return (
     <View style={{ gap: spacing.md }} testID="scenic-cycling-today">
-      <ScenicHeader />
+      <ScenicHeader compact={compact} />
 
       {regions.length > 1 && (
         <ScrollView

@@ -1,10 +1,11 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { View, Text, StyleSheet, Pressable, useWindowDimensions } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing } from "../../theme";
 import { RiderExperience, modeMeta, setExperience } from "../../lib/today-mode";
 import { ScheduledWorkoutReminder } from "./ScheduledWorkoutReminder";
 import { HeaderStatus } from "../HeaderStatus";
+import { BrandHeader } from "../BrandHeader";
 
 /** Activity-specific preview copy for the roadmap experiences. */
 export const PREVIEW: Record<string, { heading: string; blurb: string; bullets: string[] }> = {
@@ -44,11 +45,15 @@ export const PREVIEW: Record<string, { heading: string; blurb: string; bullets: 
  *  "Coming soon" state that never dead-ends and points back to Train today. */
 export function FutureActivityTodayView({ mode }: { mode: RiderExperience }) {
   const meta = modeMeta(mode);
+  const { height } = useWindowDimensions();
+  const compact = height < 560;
   const p = PREVIEW[mode] ?? { heading: "COMING SOON", blurb: "This experience is on the Roujaune roadmap.", bullets: [] };
   return (
     <View style={{ gap: spacing.md }} testID={`future-activity-${mode}`}>
       <View style={styles.topRow}>
-        <View style={{ flex: 1 }} />
+        <View style={{ flex: 1 }}>
+          <BrandHeader compact={compact} />
+        </View>
         <HeaderStatus />
       </View>
       <ScheduledWorkoutReminder />
@@ -89,7 +94,7 @@ export function FutureActivityTodayView({ mode }: { mode: RiderExperience }) {
 }
 
 const styles = StyleSheet.create({
-  topRow: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end" },
+  topRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 16 },
   card: { backgroundColor: colors.card, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: 26, alignItems: "center", gap: 12 },
   iconWrap: { width: 68, height: 68, borderRadius: 34, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(245,179,1,0.1)", borderWidth: 1, borderColor: "rgba(245,179,1,0.3)" },
   soonPill: { borderWidth: 1, borderColor: "rgba(245,179,1,0.45)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
