@@ -13,6 +13,15 @@ function mins(r: ScenicRoute): number | null {
 function thumbUri(r: ScenicRoute): string {
   return r.thumbnail || ytThumb(r.youtube_id);
 }
+function regionIcon(region: string): any {
+  switch (region) {
+    case "Alps": return "triangle-outline";
+    case "Lakes": return "water-outline";
+    case "Safari": return "paw-outline";
+    case "Countryside": return "leaf-outline";
+    default: return "sparkles-outline"; // "All"
+  }
+}
 
 /** Calm, destination-led Today content for the Scenic Cycling experience —
  *  driven by the admin-managed scenic-route catalog (POV YouTube rides), fully
@@ -23,6 +32,7 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
   const router = useRouter();
   const { routes, loading } = useScenicRoutes();
   const last = useScenicLast();
+  const [region, setRegion] = React.useState<string>("All");
 
   const open = (id: string) => router.push(`/scenic-ride?route=${id}` as any);
 
@@ -54,10 +64,19 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
     );
   }
 
-  const hero = routes[0];
-  const others = routes.filter((r) => r.id !== hero.id);
-  const shortRides = routes.filter((r) => (mins(r) ?? 999) < 35);
-  const recent = routes.slice(-2);
+  const REGION_ORDER = ["Alps", "Lakes", "Safari", "Countryside"];
+  const present = Array.from(new Set(routes.map((r) => r.region).filter(Boolean))) as string[];
+  const regions = [
+    ...REGION_ORDER.filter((r) => present.includes(r)),
+    ...present.filter((r) => !REGION_ORDER.includes(r)).sort(),
+  ];
+  const activeRegion = region !== "All" && present.includes(region) ? region : "All";
+  const filtered = activeRegion === "All" ? routes : routes.filter((r) => r.region === activeRegion);
+
+  const hero = filtered[0];
+  const others = filtered.filter((r) => r.id !== hero.id);
+  const shortRides = filtered.filter((r) => (mins(r) ?? 999) < 35);
+  const recent = filtered.slice(-2);
   const lastRoute = last?.available && last.routeId ? routes.find((r) => r.id === last.routeId) : null;
 
   return (
@@ -65,6 +84,33 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
       <ScheduledWorkoutReminder />
 
       <Text style={styles.h1}>WHERE SHALL WE EXPLORE TODAY?</Text>
+
+      {regions.length > 1 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+          testID="scenic-region-filter"
+        >
+          {["All", ...regions].map((r) => {
+            const sel = activeRegion === r;
+            return (
+              <Pressable
+                key={r}
+                testID={`scenic-region-${r}`}
+                onPress={() => setRegion(r)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: sel }}
+                accessibilityLabel={`Show ${r} rides`}
+                style={[styles.filterChip, sel && styles.filterChipSel]}
+              >
+                <Ionicons name={regionIcon(r)} size={14} color={sel ? colors.bg : colors.yellow} />
+                <Text style={[styles.filterChipText, sel && styles.filterChipTextSel]}>{r}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      )}
 
       {/* Hero destination */}
       <ImageBackground source={{ uri: thumbUri(hero) }} style={styles.hero} imageStyle={styles.heroImg} testID="scenic-hero">
@@ -184,6 +230,12 @@ function DestRow({ title, data, open, tag }: { title: string; data: ScenicRoute[
 
 const styles = StyleSheet.create({
   h1: { color: colors.white, fontSize: 22, fontWeight: "800", letterSpacing: 0.4 },
+
+  filterRow: { flexDirection: "row", gap: 8, paddingVertical: 2, paddingRight: 8 },
+  filterChip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(245,179,1,0.10)", borderWidth: 1, borderColor: "rgba(245,179,1,0.30)", borderRadius: radius.pill, paddingHorizontal: 14, paddingVertical: 9, minHeight: 40 },
+  filterChipSel: { backgroundColor: colors.yellow, borderColor: colors.yellow },
+  filterChipText: { color: colors.white, fontSize: 13, fontWeight: "700" },
+  filterChipTextSel: { color: colors.bg, fontWeight: "800" },
 
   loadingWrap: { gap: spacing.md, paddingVertical: 40, alignItems: "center" },
   loadingText: { color: colors.textDim, fontSize: 14, fontWeight: "600" },

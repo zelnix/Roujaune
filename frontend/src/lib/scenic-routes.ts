@@ -12,6 +12,7 @@ export type ScenicRoute = {
   name: string;
   place: string;
   country?: string;
+  region?: string;
   youtube_id: string;
   duration_min?: number | null;
   distance_km?: number | null;

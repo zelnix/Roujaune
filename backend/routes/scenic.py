@@ -99,6 +99,7 @@ def _public(doc: dict) -> dict:
         "name": doc.get("name"),
         "place": doc.get("place") or "",
         "country": doc.get("country") or "",
+        "region": doc.get("region") or "",
         "youtube_id": doc.get("youtube_id"),
         "duration_min": doc.get("duration_min"),
         "distance_km": doc.get("distance_km"),
@@ -168,6 +169,7 @@ class ScenicRouteIn(BaseModel):
     name: str
     place: Optional[str] = ""
     country: Optional[str] = ""
+    region: Optional[str] = ""
     youtube_id: str            # raw id OR any YouTube URL (normalised on save)
     duration_min: Optional[int] = None
     distance_km: Optional[float] = None
@@ -187,6 +189,7 @@ class ScenicRoutePatch(BaseModel):
     name: Optional[str] = None
     place: Optional[str] = None
     country: Optional[str] = None
+    region: Optional[str] = None
     youtube_id: Optional[str] = None
     duration_min: Optional[int] = None
     distance_km: Optional[float] = None
@@ -242,6 +245,7 @@ async def admin_create_scenic(body: ScenicRouteIn):
         "name": body.name.strip(),
         "place": (body.place or "").strip(),
         "country": (body.country or "").strip(),
+        "region": (body.region or "").strip(),
         "youtube_id": yid,
         "duration_min": body.duration_min,
         "distance_km": body.distance_km,
@@ -277,7 +281,7 @@ async def admin_update_scenic(route_id: str, body: ScenicRoutePatch):
         updates["youtube_id"] = yid
     if "status" in data:
         updates["status"] = _validate_status(data["status"])
-    for k in ("name", "place", "country", "duration_min", "distance_km", "elevation_m",
+    for k in ("name", "place", "country", "region", "duration_min", "distance_km", "elevation_m",
               "tag", "terrain", "difficulty", "surface", "highlights",
               "thumbnail_url", "description", "sort"):
         if k in data:
@@ -326,18 +330,22 @@ async def admin_archive_scenic(route_id: str):
 # --------------------------------------------------------------------------- #
 _SEED = [
     {"id": "dutch-countryside", "name": "Dutch Countryside Cruise", "place": "Netherlands",
+     "region": "Countryside",
      "youtube_id": "q0jLGrwk1MQ", "duration_min": 60, "distance_km": 24, "elevation_m": 60,
      "tag": "Flat & Peaceful", "sort": 0,
      "description": "Glide past open polders, canals and windmills on quiet Dutch lanes."},
     {"id": "german-country-roads", "name": "German Country Roads", "place": "Bavaria, Germany",
+     "region": "Countryside",
      "youtube_id": "d6ib9yH3cTE", "duration_min": 30, "distance_km": 12, "elevation_m": 140,
      "tag": "Rolling Hills", "sort": 1,
      "description": "A gentle roll through peaceful German farmland — natural sounds, no music."},
     {"id": "lake-achensee", "name": "Lake Achensee", "place": "Tyrol, Austria",
+     "region": "Lakes",
      "youtube_id": "Pzx9hk1UT1Y", "duration_min": 80, "distance_km": 32, "elevation_m": 320,
      "tag": "Alpine Lakeside", "sort": 2,
      "description": "Turquoise alpine water and mountain air on a relaxed lakeside loop."},
     {"id": "carolina-greenway", "name": "Carolina Greenway", "place": "Greenville, USA",
+     "region": "Countryside",
      "youtube_id": "ppP-wVHVhyk", "duration_min": 45, "distance_km": 18, "elevation_m": 110,
      "tag": "Riverside Trail", "sort": 3,
      "description": "A tranquil riverside greenway with dappled shade and easy miles."},
