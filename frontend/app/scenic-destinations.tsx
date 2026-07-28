@@ -6,19 +6,10 @@ import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { colors, radius, spacing } from "@/src/theme";
-import { useScenicRoutes, ScenicRoute, ytThumb } from "@/src/lib/scenic-routes";
+import { useScenicRoutes, ScenicRoute } from "@/src/lib/scenic-routes";
+import { DestinationCard, regionIcon } from "@/src/components/today/DestinationCard";
 
 const REGION_ORDER = ["Alps", "Lakes", "Safari", "Countryside"];
-
-function regionIcon(region: string): any {
-  switch (region) {
-    case "Alps": return "triangle-outline";
-    case "Lakes": return "water-outline";
-    case "Safari": return "paw-outline";
-    case "Countryside": return "leaf-outline";
-    default: return "sparkles-outline";
-  }
-}
 
 /** Explore Destinations — the full scenic catalogue with a lightweight search
  *  (name / place / country) and a region filter, so riders can quickly find a
@@ -133,46 +124,6 @@ export default function ScenicDestinationsScreen() {
   );
 }
 
-function DestinationCard({ route, width, onPress }: { route: ScenicRoute; width?: number; onPress: () => void }) {
-  return (
-    <Pressable
-      testID={`destination-card-${route.id}`}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`${route.name}, ${route.place}${route.duration_min ? `, ${route.duration_min} minutes` : ""}`}
-      style={({ hovered }: any) => [styles.card, width ? { width } : { alignSelf: "stretch" }, hovered && styles.cardHover]}
-    >
-      <View style={styles.thumb}>
-        <Image source={{ uri: route.thumbnail || ytThumb(route.youtube_id) }} style={StyleSheet.absoluteFill as any} contentFit="cover" />
-        {!!route.region && (
-          <View style={styles.regionBadge}>
-            <Ionicons name={regionIcon(route.region)} size={11} color={colors.bg} />
-            <Text style={styles.regionBadgeText}>{route.region}</Text>
-          </View>
-        )}
-      </View>
-      <View style={styles.cardBody}>
-        <Text style={styles.cardTitle} numberOfLines={1}>{route.name}</Text>
-        <Text style={styles.cardPlace} numberOfLines={1}>{route.place}{route.country ? ` · ${route.country}` : ""}</Text>
-        <View style={styles.cardMeta}>
-          {route.duration_min ? <Meta icon="time-outline" label={`${route.duration_min}m`} /> : null}
-          {route.distance_km ? <Meta icon="navigate-outline" label={`${route.distance_km}km`} /> : null}
-          <View style={styles.tagPill}><Text style={styles.tagPillText}>{route.tag}</Text></View>
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
-function Meta({ icon, label }: { icon: any; label: string }) {
-  return (
-    <View style={styles.meta}>
-      <Ionicons name={icon} size={12} color={colors.textFaint} />
-      <Text style={styles.metaText}>{label}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   header: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: spacing.md, paddingVertical: 12 },
@@ -193,20 +144,6 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   count: { color: colors.textDim, fontSize: 13, fontWeight: "700", marginBottom: 12 },
   grid: { flexDirection: "row", flexWrap: "wrap" },
-
-  card: { backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, overflow: "hidden" },
-  cardHover: { borderColor: "rgba(255,255,255,0.24)" },
-  thumb: { height: 150, backgroundColor: "rgba(255,255,255,0.05)" },
-  regionBadge: { position: "absolute", top: 10, left: 10, flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.yellow, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 },
-  regionBadgeText: { color: colors.bg, fontSize: 10.5, fontWeight: "800" },
-  cardBody: { padding: 12, gap: 3 },
-  cardTitle: { color: colors.white, fontSize: 15.5, fontWeight: "800" },
-  cardPlace: { color: colors.yellow, fontSize: 12.5, fontWeight: "600" },
-  cardMeta: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 6, flexWrap: "wrap" },
-  meta: { flexDirection: "row", alignItems: "center", gap: 4 },
-  metaText: { color: colors.textDim, fontSize: 12 },
-  tagPill: { backgroundColor: "rgba(245,179,1,0.14)", borderRadius: 999, paddingHorizontal: 9, paddingVertical: 2 },
-  tagPillText: { color: colors.yellow, fontSize: 10.5, fontWeight: "700" },
 
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 14, padding: 30 },
   centerText: { color: colors.textDim, fontSize: 15, fontWeight: "600", textAlign: "center" },

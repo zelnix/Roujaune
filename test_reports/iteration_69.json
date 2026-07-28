@@ -1,0 +1,36 @@
+{
+  "summary": "Iter69 — Saved Destinations (favourites) + Coming-soon teaser interest. Backend: 6/6 pytest passing (favourites round-trip lake-garda + hells-gate-safari, 404 for unknown route, invalid mode 422, all 6 valid modes register/list/remove). Frontend: full mobile flow verified end-to-end — heart on Explore Destinations toggles saved state, /saved-destinations shows exactly the saved routes newest-first with count, removing filled heart drops the route, empty state shows Explore button; /scenic-ride heart (scenic-fav-<id>) also syncs into Saved Destinations; Today-mode gravel option NAVIGATES to /coming-soon?mode=gravel (does NOT switch rider experience) and Notify me → notified + Undo works and persists across revisits; Scenic Cycling side-nav 'Saved Destinations' correctly routes to /saved-destinations (was coming-soon before). No red-screen errors. All test data cleaned up (favs + gravel interest). One minor HTML hydration warning on web: nested <Pressable> (heart inside card) renders as <button> inside <button>.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "DestinationCard", "issue": "The favourite heart <Pressable> is nested inside the card <Pressable>. On web RN renders both as <button>, producing a hydration warning: 'In HTML, <button> cannot be a descendant of <button>'. Functionally works (stopPropagation on heart), but invalid HTML on web. Consider rendering the heart as a Pressable placed as a sibling absolutely-positioned overlay rather than a child. Reference: /app/frontend/src/components/today/DestinationCard.tsx:39-49"}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter69_favourites_and_interest.py",
+    "/app/test_reports/pytest/iter69.xml",
+    "/app/test_reports/screens/i69_home.jpeg",
+    "/app/test_reports/screens/i69_teaser.jpeg",
+    "/app/test_reports/screens/i69_saved.jpeg",
+    "/app/test_reports/screens/i69_scenic_home.jpeg"
+  ],
+  "action_items": [
+    "(Optional / cosmetic) Refactor DestinationCard so the heart Pressable is not a descendant of the card Pressable, to silence the 'button inside button' hydration warning on web (functionality is unaffected)."
+  ],
+  "critical_code_review_comments": [
+    "scenic.py favourites are per-rider (via udb) and unpublished/deleted route ids are silently skipped in list — good defensive behaviour.",
+    "rider.py mode-interest correctly returns 422 for unknown modes via HTTPException (not a Pydantic path) — matches spec.",
+    "Both scenic-routes.ts and mode-interest.ts implement reactive optimistic in-memory stores with revert-on-failure — clean UX."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter69_favourites_and_interest.py (created)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None persistent. Test-created favourites (lake-garda, hells-gate-safari) and gravel interest were all removed at end of tests to keep the greenlantern demo tidy.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Rider greenlantern@roujaune.app / rideon9900 works. Fetch auto-attaches Bearer token after login. Nested <button> HTML warning on DestinationCard is pre-existing and not a blocker. Test file /app/backend/tests/test_iter69_favourites_and_interest.py cleans up its own state and can be re-run safely."
+}

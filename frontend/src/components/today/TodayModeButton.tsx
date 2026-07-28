@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, Modal, Pressable, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { colors, radius, spacing } from "../../theme";
 import { TODAY_MODES, TodayModeMeta, useTodayMode } from "../../lib/today-mode";
 import { useReducedMotionSafe } from "../../lib/use-reduced-motion";
@@ -10,6 +11,7 @@ import { useReducedMotionSafe } from "../../lib/use-reduced-motion";
  *  label + chevron) and opens a floating dark-glass menu of all modes. */
 export function TodayModeButton({ compact = false }: { compact?: boolean }) {
   const { meta, experience, setExperience } = useTodayMode();
+  const router = useRouter();
   const [open, setOpen] = React.useState(false);
 
   return (
@@ -36,18 +38,20 @@ export function TodayModeButton({ compact = false }: { compact?: boolean }) {
         current={experience}
         onClose={() => setOpen(false)}
         onSelect={(id) => { setExperience(id); setOpen(false); }}
+        onComingSoon={(id) => { setOpen(false); router.push(`/coming-soon?mode=${id}` as any); }}
       />
     </View>
   );
 }
 
 export function TodayModeMenu({
-  visible, current, onClose, onSelect,
+  visible, current, onClose, onSelect, onComingSoon,
 }: {
   visible: boolean;
   current: string;
   onClose: () => void;
   onSelect: (id: TodayModeMeta["id"]) => void;
+  onComingSoon?: (id: TodayModeMeta["id"]) => void;
 }) {
   const noMotion = useReducedMotionSafe();
   return (
@@ -61,7 +65,10 @@ export function TodayModeMenu({
                 key={m.id}
                 meta={m}
                 selected={m.id === current}
-                onPress={() => { if (m.availability !== "coming-soon") onSelect(m.id); }}
+                onPress={() => {
+                  if (m.availability === "coming-soon") onComingSoon?.(m.id);
+                  else onSelect(m.id);
+                }}
               />
             ))}
           </ScrollView>
@@ -77,14 +84,13 @@ function TodayModeOption({ meta, selected, onPress }: { meta: TodayModeMeta; sel
     <Pressable
       testID={`today-mode-option-${meta.id}`}
       onPress={onPress}
-      disabled={soon}
       accessibilityRole="button"
-      accessibilityState={{ selected, disabled: soon }}
-      accessibilityLabel={`${meta.label}. ${meta.description}${soon ? ". Coming soon" : ""}${selected ? ". Selected" : ""}`}
+      accessibilityState={{ selected }}
+      accessibilityLabel={`${meta.label}. ${meta.description}${soon ? ". Coming soon — tap to preview" : ""}${selected ? ". Selected" : ""}`}
       style={({ hovered }: any) => [
         styles.option,
         selected && styles.optionSel,
-        hovered && !selected && !soon && styles.optionHover,
+        hovered && !selected && styles.optionHover,
         soon && styles.optionSoon,
       ]}
     >

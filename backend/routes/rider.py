@@ -122,6 +122,37 @@ async def update_rider_settings(payload: Dict[str, Any] = Body(...)):
     return doc
 
 
+# ---- Activity interest ("Notify me when this launches" for roadmap modes) ----
+VALID_MODES = {"gravel", "mountain-bike", "walking", "running", "rowing", "climbing"}
+
+
+@router.get("/rider/interest")
+async def get_mode_interest():
+    """Modes the rider has asked to be notified about — powers the teaser
+    button's 'we'll let you know' state and gives us a demand signal."""
+    rows = await udb.mode_interest.find({}, {"_id": 0, "mode": 1}).to_list(50)
+    return {"modes": [r["mode"] for r in rows]}
+
+
+@router.post("/rider/interest/{mode}")
+async def register_mode_interest(mode: str):
+    if mode not in VALID_MODES:
+        raise HTTPException(status_code=422, detail="Unknown activity mode")
+    await udb.mode_interest.update_one(
+        {"mode": mode},
+        {"$set": {"mode": mode, "at": now_iso()}},
+        upsert=True,
+    )
+    return {"registered": mode}
+
+
+@router.delete("/rider/interest/{mode}")
+async def remove_mode_interest(mode: str):
+    await udb.mode_interest.delete_one({"mode": mode})
+    return {"removed": mode}
+
+
+
 # ---- Generic per-user key/value preference store ----
 @router.get("/rider/kv")
 async def get_rider_kv():

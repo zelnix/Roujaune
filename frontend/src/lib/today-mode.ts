@@ -101,7 +101,7 @@ export const experienceNavigation: Record<RiderExperience, ExperienceNavigation>
       { key: "explore", label: "Explore Destinations", icon: "compass-outline", route: "/scenic-destinations", availability: "available" },
       { key: "continue", label: "Continue Journey", icon: "play-circle-outline", route: "/routes", availability: "coming-soon" },
       { key: "journeys", label: "My Scenic Journeys", icon: "map-outline", route: "/routes", availability: "coming-soon" },
-      { key: "saved", label: "Saved Destinations", icon: "bookmark-outline", route: "/routes", availability: "coming-soon" },
+      { key: "saved", label: "Saved Destinations", icon: "bookmark-outline", route: "/saved-destinations", availability: "available" },
       { key: "discoveries", label: "Discoveries", icon: "sparkles-outline", route: "/routes", availability: "coming-soon" },
       { key: "companions", label: "Companions", icon: "people-outline", route: "/settings", availability: "coming-soon" },
     ],

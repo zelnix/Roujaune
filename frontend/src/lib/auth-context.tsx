@@ -9,6 +9,8 @@ import { resetRiderProfile } from "./rider-profile";
 import { resetNotificationReadState } from "./notifications";
 import { refreshA11yFromServer, resetA11y } from "./a11y";
 import { resetTodayMode, hydrateTodayModeForUser, clearTodayModeForUser } from "./today-mode";
+import { refreshScenicFavourites, resetScenicFavourites } from "./scenic-routes";
+import { resetModeInterest } from "./mode-interest";
 
 const API = (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
 const AUTH_BASE = "https://auth.emergentagent.com";
@@ -135,6 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Restore this rider's remembered riding experience (persists across
       // sessions until they explicitly choose another mode).
       hydrateTodayModeForUser(user.user_id);
+      refreshScenicFavourites();
     }
   }, [user]);
 
@@ -198,6 +201,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     resetNotificationReadState();
     resetA11y();
     resetTodayMode();
+    resetScenicFavourites();
+    resetModeInterest();
     await setToken(null);
     setUser(null);
   }, []);
@@ -223,6 +228,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     resetNotificationReadState();
     resetA11y();
     clearTodayModeForUser(user?.user_id);
+    resetScenicFavourites();
+    resetModeInterest();
     await setToken(null);
     setUser(null);
   }, [user]);

@@ -6,7 +6,7 @@ import { RiderExperience, modeMeta, setExperience } from "../../lib/today-mode";
 import { ScheduledWorkoutReminder } from "./ScheduledWorkoutReminder";
 
 /** Activity-specific preview copy for the roadmap experiences. */
-const PREVIEW: Record<string, { heading: string; blurb: string; bullets: string[] }> = {
+export const PREVIEW: Record<string, { heading: string; blurb: string; bullets: string[] }> = {
   gravel: {
     heading: "GRAVEL ADVENTURES ARE ON THE WAY",
     blurb: "Mixed-surface routes with surface breakdowns, elevation, remoteness and resupply points.",

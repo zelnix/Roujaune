@@ -162,6 +162,38 @@ async def scenic_last_ride():
 
 
 # --------------------------------------------------------------------------- #
+#  Favourites (rider-scoped Saved Destinations)                               #
+# --------------------------------------------------------------------------- #
+@router.get("/scenic/favourites")
+async def list_favourites():
+    """The rider's saved scenic destinations (full published routes, newest
+    saved first). Ids of unpublished/deleted routes are silently skipped."""
+    favs = await udb.scenic_favourites.find({}, {"_id": 0}).sort("at", -1).to_list(500)
+    ids = [f["route_id"] for f in favs]
+    order = {rid: i for i, rid in enumerate(ids)}
+    docs = await db.scenic_routes.find(
+        {"id": {"$in": ids}, "status": "published"}, {"_id": 0}).to_list(500)
+    docs.sort(key=lambda d: order.get(d.get("id"), 9999))
+    return {"ids": ids, "routes": [_public(d) for d in docs]}
+
+
+@router.post("/scenic/favourites/{route_id}")
+async def add_favourite(route_id: str):
+    route = await db.scenic_routes.find_one({"id": route_id}, {"_id": 0, "id": 1})
+    if not route:
+        raise HTTPException(status_code=404, detail="Scenic route not found")
+    await udb.scenic_favourites.update_one(
+        {"route_id": route_id}, {"$set": {"route_id": route_id, "at": _now()}}, upsert=True)
+    return {"saved": route_id}
+
+
+@router.delete("/scenic/favourites/{route_id}")
+async def remove_favourite(route_id: str):
+    await udb.scenic_favourites.delete_one({"route_id": route_id})
+    return {"removed": route_id}
+
+
+# --------------------------------------------------------------------------- #
 #  Admin (HWG console)                                                        #
 # --------------------------------------------------------------------------- #
 class ScenicRouteIn(BaseModel):

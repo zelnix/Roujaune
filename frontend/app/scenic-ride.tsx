@@ -6,7 +6,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import YouTubePlayer from "@/src/components/YouTubePlayer";
 import { colors, radius, spacing } from "@/src/theme";
-import { useScenicRoute, logScenicRide, ScenicRoute } from "@/src/lib/scenic-routes";
+import { useScenicRoute, logScenicRide, ScenicRoute, useScenicFavourites } from "@/src/lib/scenic-routes";
 
 const hms = (s: number) => {
   const h = Math.floor(s / 3600);
@@ -24,6 +24,7 @@ export default function ScenicRideScreen() {
   const { route: routeId } = useLocalSearchParams<{ route?: string }>();
   const { width } = useWindowDimensions();
   const { route, loading, error } = useScenicRoute(routeId);
+  const fav = useScenicFavourites();
 
   const [playing, setPlaying] = React.useState(false);
   const [elapsed, setElapsed] = React.useState(0);
@@ -109,6 +110,18 @@ export default function ScenicRideScreen() {
                 <Text style={s.povText}>POV VIDEO</Text>
               </View>
               <View style={s.tagBadge}><Text style={s.tagText}>{route.tag}</Text></View>
+              <Pressable
+                testID={`scenic-fav-${route.id}`}
+                onPress={() => fav.toggle(route.id)}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityState={{ selected: fav.has(route.id) }}
+                accessibilityLabel={fav.has(route.id) ? "Remove from saved" : "Save destination"}
+                style={[s.favBtn, fav.has(route.id) && s.favBtnOn]}
+              >
+                <Ionicons name={fav.has(route.id) ? "heart" : "heart-outline"} size={16} color={fav.has(route.id) ? "#fff" : colors.white} />
+                <Text style={s.favText}>{fav.has(route.id) ? "Saved" : "Save"}</Text>
+              </Pressable>
             </View>
             <Text style={s.title}>{route.name}</Text>
             <Text style={s.place}>{route.place}</Text>
@@ -214,6 +227,9 @@ const s = StyleSheet.create({
   povText: { color: "#fff", fontSize: 9.5, fontWeight: "800", letterSpacing: 0.5 },
   tagBadge: { backgroundColor: "rgba(245,179,1,0.16)", borderWidth: 1, borderColor: colors.yellow + "55", borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4 },
   tagText: { color: colors.yellow, fontSize: 11, fontWeight: "800" },
+  favBtn: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5, backgroundColor: "rgba(255,255,255,0.05)" },
+  favBtnOn: { backgroundColor: colors.red, borderColor: colors.red },
+  favText: { color: colors.white, fontSize: 11.5, fontWeight: "800" },
   title: { color: colors.white, fontSize: 26, fontWeight: "900", letterSpacing: 0.3 },
   place: { color: colors.yellow, fontSize: 15, fontWeight: "700" },
   desc: { color: "rgba(255,255,255,0.82)", fontSize: 15, lineHeight: 22, marginTop: 8, maxWidth: 640 },

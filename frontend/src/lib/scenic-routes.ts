@@ -122,3 +122,83 @@ export async function logScenicRide(route: ScenicRoute, elapsedSec: number): Pro
     /* history save is best-effort — never blocks the rider */
   }
 }
+
+// ── Saved Destinations (favourites) — reactive per-rider store ───────────────
+let favIds = new Set<string>();
+let favHydrated = false;
+const favListeners = new Set<() => void>();
+const favEmit = () => favListeners.forEach((l) => l());
+
+async function hydrateFavourites() {
+  try {
+    const r = await fetch(`${base()}/api/scenic/favourites`);
+    if (!r.ok) return;
+    const d = await r.json();
+    favIds = new Set<string>(Array.isArray(d?.ids) ? d.ids : []);
+    favEmit();
+  } catch { /* keep current */ }
+}
+
+/** Called on login/session-restore to load the rider's saved destinations. */
+export function refreshScenicFavourites() {
+  favHydrated = true;
+  hydrateFavourites();
+}
+
+/** Called on logout so one rider's saves never leak to the next. */
+export function resetScenicFavourites() {
+  favHydrated = false;
+  favIds = new Set<string>();
+  favEmit();
+}
+
+/** Toggle a destination in/out of the rider's saved list (optimistic). */
+export async function toggleFavourite(routeId: string): Promise<void> {
+  const wasFav = favIds.has(routeId);
+  const next = new Set(favIds);
+  if (wasFav) next.delete(routeId); else next.add(routeId);
+  favIds = next;
+  favEmit();
+  try {
+    await fetch(`${base()}/api/scenic/favourites/${encodeURIComponent(routeId)}`, {
+      method: wasFav ? "DELETE" : "POST",
+    });
+  } catch {
+    // revert on failure
+    const revert = new Set(favIds);
+    if (wasFav) revert.add(routeId); else revert.delete(routeId);
+    favIds = revert;
+    favEmit();
+  }
+}
+
+/** Reactive favourites hook — { has(id), toggle(id), count, ids }. */
+export function useScenicFavourites() {
+  const [, force] = React.useReducer((n) => n + 1, 0);
+  React.useEffect(() => {
+    if (!favHydrated) refreshScenicFavourites();
+    const l = () => force();
+    favListeners.add(l);
+    return () => { favListeners.delete(l); };
+  }, []);
+  return {
+    ids: favIds,
+    count: favIds.size,
+    has: (id: string) => favIds.has(id),
+    toggle: toggleFavourite,
+  };
+}
+
+/** The rider's full saved destinations (published routes), newest saved first. */
+export function useSavedDestinations() {
+  const [routes, setRoutes] = React.useState<ScenicRoute[] | null>(null);
+  const fav = useScenicFavourites();
+  const load = React.useCallback(() => {
+    fetch(`${base()}/api/scenic/favourites`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("failed"))))
+      .then((d) => setRoutes(Array.isArray(d?.routes) ? d.routes : []))
+      .catch(() => setRoutes([]));
+  }, []);
+  React.useEffect(() => { load(); }, [load, fav.count]);
+  return { routes, loading: routes === null };
+}
