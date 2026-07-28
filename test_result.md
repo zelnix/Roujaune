@@ -116,7 +116,20 @@ accessibility_toggles:
         -agent: "main"
         -comment: "Added ACCESSIBILITY card in Settings with Large text + High contrast toggles (for the 50+ audience). Global Text/TextInput render patch (text-scale.ts) injects an override into the INPUT style before RN/RN-Web processes it: Large Text multiplies fontSize/lineHeight by 1.22 app-wide; High Contrast promotes dim/neutral body text to #FFFFFF and bumps light font-weights to 600 (accent colours left vivid). Reactive module-store (a11y.ts) persists both flags per rider via /api/rider/settings (backend already merges arbitrary keys) + AsyncStorage cache; refreshes on login, resets on logout/delete (no cross-account leak). AuthGate re-keys the expo-router <Stack> on toggle so the whole app re-renders instantly. Verified end-to-end on web preview (tablet landscape): both toggles flip, persist, and apply app-wide (sidebar + cards + preview) with text visibly larger and dim copy turned bright/bold; expo-router preserved the current route through the re-key (non-disruptive). Demo account reset to OFF baseline."
 
-backend_refactor_coach_plan_engine:
+today_mode_experience_selector:
+  - task: "Today Mode selector + experience-aware side navigation (Phase 1)"
+    implemented: true
+    working: "NA"
+    file: "frontend/src/lib/today-mode.ts, frontend/src/components/today/*, frontend/src/components/SideNavigation.tsx, frontend/src/components/app-scaffold.tsx, frontend/app/index.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        -working: "NA"
+        -agent: "main"
+        -comment: "Added a data-driven Today Mode selector below the ROUJAUNE wordmark in the rail (TodayModeButton + floating dark-glass TodayModeMenu with all 8 activities; Train today + Take a scenic ride available, others 'Coming soon' with badges + disabled). New reactive session store (today-mode.ts) holds experience + per-experience last-route memory (AsyncStorage, reset on logout). SideNavigation + AppScaffold now render the CURRENT experience's nav config (experienceNavigation record) instead of static navItems; coming-soon items show a toast and never navigate. Today screen (index.tsx) swaps content by mode with a 240ms fade (respects reduce-motion): training = existing dashboard untouched; scenic-cycling = new ScenicCyclingTodayView (Lake Garda hero, POV/guided badges, 42m/Relaxed/8 discoveries, BEGIN SCENIC JOURNEY -> /virtual-route, EXPLORE DESTINATIONS -> /routes, prefs summary, 5 destination rows); other modes = FutureActivityTodayView (activity-specific Coming-soon + disabled CTA + Back to Train today). Non-destructive ScheduledWorkoutReminder shown for non-training modes. Verified via screenshots (tablet landscape): selector, menu, scenic switch (nav + content swap, shell mounted), and AppScaffold /plan still renders with new rail + active highlight. Switching modes never touches the training plan/scheduled workout. NEEDS: frontend regression across nav from all rail items + mode switching + coming-soon toasts."
+
+
   - task: "server.py restructure Phase 2 — extract Coach + Plan engine and routes"
     implemented: true
     working: "NA"

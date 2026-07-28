@@ -8,6 +8,7 @@ import { refreshCoachFromServer, resetCoach } from "./coach-persona";
 import { resetRiderProfile } from "./rider-profile";
 import { resetNotificationReadState } from "./notifications";
 import { refreshA11yFromServer, resetA11y } from "./a11y";
+import { resetTodayMode } from "./today-mode";
 
 const API = (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
 const AUTH_BASE = "https://auth.emergentagent.com";
@@ -193,6 +194,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     resetRiderProfile();
     resetNotificationReadState();
     resetA11y();
+    resetTodayMode();
     await setToken(null);
     setUser(null);
   }, []);
@@ -217,6 +219,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     resetRiderProfile();
     resetNotificationReadState();
     resetA11y();
+    resetTodayMode();
     await setToken(null);
     setUser(null);
   }, []);

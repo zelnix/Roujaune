@@ -15,8 +15,11 @@ import { TodayTrainingCard } from "@/src/components/TodayTrainingCard";
 import { HomeNotificationArea } from "@/src/components/HomeNotificationArea";
 import { ReadinessGate } from "@/src/components/ReadinessGate";
 import { ProgressCard, CommunityCard, WellnessCard, AchievementCard } from "@/src/components/BottomCards";
-import { navItems, navFooter } from "@/src/data";
 import { useCoach } from "@/src/lib/coach-persona";
+import { useTodayMode, resolveNav, rememberRoute, getExperience } from "@/src/lib/today-mode";
+import { ScenicCyclingTodayView } from "@/src/components/today/ScenicCyclingTodayView";
+import { FutureActivityTodayView } from "@/src/components/today/FutureActivityTodayView";
+import { useReducedMotionSafe } from "@/src/lib/use-reduced-motion";
 import { useBenchmarkNudge } from "@/src/lib/benchmark/api";
 import { useLiveNotifications, useNotificationReadState } from "@/src/lib/notifications";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
@@ -63,6 +66,14 @@ export default function Dashboard() {
 
   const router = useRouter();
   const persona = useCoach();
+  const { experience } = useTodayMode();
+  const noMotion = useReducedMotionSafe();
+  const fade = React.useRef(new Animated.Value(1)).current;
+  React.useEffect(() => {
+    if (noMotion) { fade.setValue(1); return; }
+    fade.setValue(0.35);
+    Animated.timing(fade, { toValue: 1, duration: 240, useNativeDriver: true }).start();
+  }, [experience, noMotion, fade]);
   const { nudge: benchmarkNudge } = useBenchmarkNudge();
   const liveNotifs = useLiveNotifications(benchmarkNudge);
   const { readKeys } = useNotificationReadState();
@@ -78,24 +89,12 @@ export default function Dashboard() {
   }, []);
 
   const onSelectNav = (key: string) => {
-    if (key === "training") {
-      router.push("/plan");
-      return;
-    }
-    if (key === "workouts") {
-      router.push("/workouts");
-      return;
-    }
-    const routes: Record<string, string> = { calendar: "/calendar", routes: "/virtual-route", progress: "/progress", benchmark: "/benchmark", community: "/community", connections: "/connections", settings: "/settings", help: "/help" };
-    if (routes[key]) {
-      router.push(routes[key] as any);
-      return;
-    }
-    setActive(key);
-    if (key !== "home") {
-      const item = [...navItems, ...navFooter].find((n) => n.key === key);
-      showToast(`${item?.label ?? key}`);
-    }
+    const item = resolveNav(key);
+    if (!item) { setActive(key); return; }
+    if (item.availability === "coming-soon") { showToast(`${item.label} — coming soon`); return; }
+    if (key === "home") { setActive("home"); return; }
+    rememberRoute(getExperience(), item.route);
+    router.push(item.route as any);
   };
 
   return (
@@ -113,6 +112,9 @@ export default function Dashboard() {
           >
             <HomeNotificationArea />
 
+            <Animated.View style={{ opacity: fade, gap: spacing.md }}>
+            {experience === "training" ? (
+            <>
             <View style={[styles.heroRow, { height: heroHeight }]}>
               <HeroRoute
                 width={mainWidth}
@@ -152,6 +154,13 @@ export default function Dashboard() {
                 <CommunityCard onPress={() => showToast("Joining a group ride")} />
               </View>
             </View>
+            </>
+            ) : experience === "scenic-cycling" ? (
+              <ScenicCyclingTodayView onToast={showToast} />
+            ) : (
+              <FutureActivityTodayView mode={experience} />
+            )}
+            </Animated.View>
           </ScrollView>
         </View>
       </SafeAreaView>

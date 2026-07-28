@@ -4,13 +4,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors, radius, spacing, shadow } from "../theme";
-import { navItems, navFooter, NavItem } from "../data";
+import { NavItem } from "../data";
 import { Touchable } from "./ui";
 import { usePlanBadge } from "../lib/plan-badge";
+import { useTodayMode } from "../lib/today-mode";
+import { TodayModeButton } from "./today/TodayModeButton";
 
 const logoIcon = require("../../assets/images/logo_glyph_t.png");
 
-function NavRow({ item, active, onPress, badge }: { item: NavItem; active: boolean; onPress: () => void; badge?: boolean }) {
+function NavRow({ item, active, onPress, badge, soon }: { item: NavItem; active: boolean; onPress: () => void; badge?: boolean; soon?: boolean }) {
   return (
     <Touchable
       testID={`railnav-${item.key}`}
@@ -18,6 +20,8 @@ function NavRow({ item, active, onPress, badge }: { item: NavItem; active: boole
       scaleTo={0.94}
       lift={false}
       style={styles.rowWrap}
+      accessibilityLabel={`${item.label}${soon ? ", coming soon" : ""}`}
+      accessibilityState={{ selected: active }}
     >
       {active ? (
         <LinearGradient
@@ -38,12 +42,12 @@ function NavRow({ item, active, onPress, badge }: { item: NavItem; active: boole
           </Text>
         </LinearGradient>
       ) : (
-        <View style={styles.row}>
-          <Ionicons name={item.icon} size={22} color={colors.textDim} />
-          <Text style={styles.label} numberOfLines={2}>
+        <View style={[styles.row, soon && styles.rowSoon]}>
+          <Ionicons name={item.icon} size={22} color={soon ? colors.textFaint : colors.textDim} />
+          <Text style={[styles.label, soon && { color: colors.textFaint }]} numberOfLines={2}>
             {item.label}
           </Text>
-          {badge ? <View style={styles.badge} /> : null}
+          {soon ? <View style={styles.soonDot} /> : badge ? <View style={styles.badge} /> : null}
         </View>
       )}
     </Touchable>
@@ -62,11 +66,14 @@ export function SideNavigation({
   compact?: boolean;
 }) {
   const planBadge = usePlanBadge();
+  const { nav } = useTodayMode();
   return (
     <View style={[styles.nav, { width }]} testID="side-navigation">
       <View style={[styles.logoWrap, compact && { width: 42, height: 42, marginBottom: spacing.sm }]}>
         <Image source={logoIcon} style={compact ? { width: 38, height: 38 } : styles.logo} contentFit="contain" />
       </View>
+
+      <TodayModeButton compact={compact} />
 
       <ScrollView
         style={{ width: "100%" }}
@@ -74,13 +81,13 @@ export function SideNavigation({
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.items}>
-          {navItems.map((item) => (
-            <NavRow key={item.key} item={item} active={active === item.key} onPress={() => onSelect(item.key)} badge={item.key === "training" && planBadge && active !== "training"} />
+          {nav.items.map((item) => (
+            <NavRow key={item.key} item={item} active={active === item.key} onPress={() => onSelect(item.key)} soon={item.availability === "coming-soon"} badge={item.key === "training" && planBadge && active !== "training"} />
           ))}
         </View>
 
         <View style={styles.footer}>
-          {navFooter.map((item) => (
+          {nav.footer.map((item) => (
             <NavRow key={item.key} item={item} active={active === item.key} onPress={() => onSelect(item.key)} />
           ))}
         </View>
@@ -130,5 +137,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 4,
   },
   badge: { position: "absolute", top: 8, right: 14, width: 9, height: 9, borderRadius: 5, backgroundColor: colors.red, borderWidth: 1.5, borderColor: colors.nav },
+  soonDot: { position: "absolute", top: 8, right: 14, width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.yellow },
+  rowSoon: { opacity: 0.8 },
   label: { color: colors.textDim, fontSize: 10.5, fontWeight: "600", textAlign: "center" },
 });

@@ -8,14 +8,8 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { markPlanSeen } from "../lib/plan-badge";
 import { SideNavigation } from "./SideNavigation";
+import { resolveNav, rememberRoute, getExperience } from "../lib/today-mode";
 import { CC } from "./calendar";
-
-const ROUTE: Record<string, string> = {
-  home: "/", training: "/plan", calendar: "/calendar", workouts: "/workouts",
-  routes: "/virtual-route", progress: "/progress",
-  community: "/community", connections: "/connections", settings: "/settings", help: "/help",
-  benchmark: "/benchmark",
-};
 
 function useApiData<T>(path: string) {
   const [data, setData] = React.useState<T | null>(null);
@@ -68,11 +62,13 @@ export function AppScaffold({
   const showToast = React.useCallback((t: string) => setToast({ id: Date.now(), text: t }), []);
 
   const onSelect = (key: string) => {
+    const item = resolveNav(key);
+    if (!item) return;
+    if (item.availability === "coming-soon") { showToast(`${item.label} — coming soon`); return; }
     if (key === active) return;
     if (key === "training") markPlanSeen();
-    const to = ROUTE[key];
-    if (to) router.replace(to as any);
-    else showToast(`${key} — coming soon`);
+    rememberRoute(getExperience(), item.route);
+    router.replace(item.route as any);
   };
 
   return (
