@@ -219,22 +219,25 @@ export default function ScenicRideScreen() {
     return () => { alive = false; };
   }, [route]);
 
-  const toggleSave = React.useCallback(async (poi: ScenicPoi) => {
-    if (!route) return;
+  const toggleSave = React.useCallback(async (poi: ScenicPoi): Promise<boolean> => {
+    if (!route) return false;
     const has = saved.has(poi.order);
     setSaved((sv) => { const n = new Set(sv); has ? n.delete(poi.order) : n.add(poi.order); return n; });
     if (has) {
       const id = savedIds.current[poi.order];
       if (id) { deleteDiscovery(id); delete savedIds.current[poi.order]; }
-    } else {
-      const d = await saveDiscovery({
-        route_id: route.id, route_name: route.name, place: route.place,
-        poi_order: poi.order, at_pct: poi.at_pct, title: poi.title,
-        description: poi.description, narration: poi.narration,
-        photo: poi.image || route.thumbnail || ytThumb(route.youtube_id),
-      });
-      if (d?.id) savedIds.current[poi.order] = d.id;
+      return true;
     }
+    const d = await saveDiscovery({
+      route_id: route.id, route_name: route.name, place: route.place,
+      poi_order: poi.order, at_pct: poi.at_pct, title: poi.title,
+      description: poi.description, narration: poi.narration,
+      photo: poi.image || route.thumbnail || ytThumb(route.youtube_id),
+    });
+    if (d?.id) { savedIds.current[poi.order] = d.id; return true; }
+    // Roll back the optimistic add if the save failed.
+    setSaved((sv) => { const n = new Set(sv); n.delete(poi.order); return n; });
+    return false;
   }, [route, saved]);
 
   const showToast = React.useCallback((msg: string) => {
@@ -248,8 +251,8 @@ export default function ScenicRideScreen() {
     if (!p) return;
     setDiscoveryPrompt(null);
     if (promptTimer.current) clearTimeout(promptTimer.current);
-    if (!saved.has(p.order)) await toggleSave(p);
-    showToast(`Saved “${p.title}” to your scrapbook`);
+    const ok = saved.has(p.order) ? true : await toggleSave(p);
+    showToast(ok ? `Saved “${p.title}” to your scrapbook` : "Couldn't save just now — tap the bookmark to retry");
   }, [discoveryPrompt, saved, toggleSave, showToast]);
 
   const dismissPrompt = React.useCallback(() => {
