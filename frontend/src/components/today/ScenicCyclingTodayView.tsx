@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, ImageBackground, ActivityIndicator, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { colors, radius, spacing } from "../../theme";
@@ -8,16 +9,33 @@ import { useScenicRoutes, useScenicLast, ScenicRoute, ytThumb } from "../../lib/
 import { BrandHeader } from "../BrandHeader";
 import { HeaderStatus } from "../HeaderStatus";
 
-/** Standard Today header — identical to the Training Today screen (same 3D
- *  wordmark, tagline and descriptor) so every ride-experience screen matches. */
+const heroBg = require("../../../assets/images/scenic_hero_bg.png");
+
+/** Standard Today hero — the same treatment as the Training Today screen: a
+ *  full-bleed background photo with the 3D wordmark + tagline + descriptor
+ *  overlaid, and the standard status cluster top-right. */
 function ScenicHeader({ compact }: { compact: boolean }) {
   return (
-    <View style={styles.headerRow} testID="scenic-header">
-      <View style={{ flex: 1 }}>
-        <BrandHeader compact={compact} />
+    <ImageBackground
+      source={heroBg}
+      style={[styles.headerHero, compact && { minHeight: 190, padding: 18 }]}
+      imageStyle={styles.headerHeroImg}
+      testID="scenic-header"
+      accessibilityLabel="Cyclist on a lakeside road at sunset"
+    >
+      <LinearGradient
+        colors={["rgba(5,7,6,0.82)", "rgba(5,7,6,0.35)", "rgba(5,7,6,0.15)", "rgba(5,7,6,0.55)"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0.2 }}
+        style={StyleSheet.absoluteFill as any}
+      />
+      <View style={styles.headerRow}>
+        <View style={{ flex: 1 }}>
+          <BrandHeader compact={compact} />
+        </View>
+        <HeaderStatus />
       </View>
-      <HeaderStatus />
-    </View>
+    </ImageBackground>
   );
 }
 
@@ -104,34 +122,7 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
     <View style={{ gap: spacing.md }} testID="scenic-cycling-today">
       <ScenicHeader compact={compact} />
 
-      {regions.length > 1 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterRow}
-          testID="scenic-region-filter"
-        >
-          {["All", ...regions].map((r) => {
-            const sel = activeRegion === r;
-            return (
-              <Pressable
-                key={r}
-                testID={`scenic-region-${r}`}
-                onPress={() => setRegion(r)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: sel }}
-                accessibilityLabel={`Show ${r} rides`}
-                style={[styles.filterChip, sel && styles.filterChipSel]}
-              >
-                <Ionicons name={regionIcon(r)} size={14} color={sel ? colors.bg : colors.yellow} />
-                <Text style={[styles.filterChipText, sel && styles.filterChipTextSel]}>{r}</Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      )}
-
-      {/* Hero destination */}
+      {/* Hero destination — half-size showcase card */}
       <ImageBackground source={{ uri: thumbUri(hero) }} style={styles.hero} imageStyle={styles.heroImg} testID="scenic-hero">
         <View style={styles.heroScrim} />
         <View style={styles.heroTopRow}>
@@ -170,11 +161,32 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
         </View>
       </ImageBackground>
 
-      {/* Preferences summary */}
+      {/* Preferences summary + region filters (same line as Ride feel) */}
       <View style={styles.prefs} testID="scenic-prefs">
         <Pref label="Companion" value="Alberto" icon="person-circle-outline" />
         <Pref label="Journey style" value="Discover" icon="compass-outline" />
         <Pref label="Ride feel" value="Relaxed Journey" icon="leaf-outline" />
+        {regions.length > 1 && (
+          <View style={styles.prefFilters} testID="scenic-region-filter">
+            {["All", ...regions].map((r) => {
+              const sel = activeRegion === r;
+              return (
+                <Pressable
+                  key={r}
+                  testID={`scenic-region-${r}`}
+                  onPress={() => setRegion(r)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: sel }}
+                  accessibilityLabel={`Show ${r} rides`}
+                  style={[styles.filterChip, sel && styles.filterChipSel]}
+                >
+                  <Ionicons name={regionIcon(r)} size={13} color={sel ? colors.bg : colors.yellow} />
+                  <Text style={[styles.filterChipText, sel && styles.filterChipTextSel]}>{r}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
         <Pressable testID="adjust-journey" onPress={() => router.push("/settings")} style={styles.adjust} accessibilityRole="button">
           <Ionicons name="options-outline" size={15} color={colors.yellow} />
           <Text style={styles.adjustText}>Adjust journey</Text>
@@ -254,6 +266,8 @@ function DestRow({ title, data, open, tag }: { title: string; data: ScenicRoute[
 
 const styles = StyleSheet.create({
   h1: { color: colors.white, fontSize: 22, fontWeight: "800", letterSpacing: 0.4 },
+  headerHero: { minHeight: 260, borderRadius: radius.xl, overflow: "hidden", padding: 24, justifyContent: "center", backgroundColor: "#0E1512" },
+  headerHeroImg: { borderRadius: radius.xl },
   headerRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 16 },
   header: { gap: 6, marginBottom: 2 },
   wordmark: { width: 200, height: 30, alignSelf: "flex-start" },
@@ -273,29 +287,30 @@ const styles = StyleSheet.create({
   emptyTitle: { color: colors.white, fontSize: 18, fontWeight: "800", textAlign: "center" },
   emptyBody: { color: colors.textDim, fontSize: 14.5, lineHeight: 22, textAlign: "center", maxWidth: 460 },
 
-  hero: { minHeight: 300, borderRadius: radius.xl, overflow: "hidden", padding: 22, justifyContent: "flex-end", backgroundColor: "#0E1512" },
+  hero: { alignSelf: "flex-start", width: "100%", maxWidth: 560, minHeight: 210, borderRadius: radius.xl, overflow: "hidden", padding: 18, justifyContent: "flex-end", backgroundColor: "#0E1512" },
   heroImg: { borderRadius: radius.xl },
   heroScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(6,8,7,0.5)" },
-  heroTopRow: { position: "absolute", top: 18, left: 22, right: 22, flexDirection: "row", justifyContent: "space-between" },
+  heroTopRow: { position: "absolute", top: 14, left: 18, right: 18, flexDirection: "row", justifyContent: "space-between" },
   povBadge: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(224,30,43,0.92)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
   povText: { color: "#fff", fontSize: 9.5, fontWeight: "800", letterSpacing: 0.5 },
   guidedBadge: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(0,0,0,0.5)", borderWidth: 1, borderColor: "rgba(245,179,1,0.35)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
   guidedText: { color: colors.yellow, fontSize: 9.5, fontWeight: "700" },
-  heroTitle: { color: "#fff", fontSize: 26, fontWeight: "900", letterSpacing: 0.4 },
-  heroCountry: { color: colors.yellow, fontSize: 14, fontWeight: "700", marginTop: 2 },
-  heroDesc: { color: "rgba(255,255,255,0.85)", fontSize: 14, lineHeight: 20, marginTop: 8, maxWidth: 560 },
-  heroStats: { flexDirection: "row", flexWrap: "wrap", gap: 16, marginTop: 14 },
+  heroTitle: { color: "#fff", fontSize: 21, fontWeight: "900", letterSpacing: 0.3 },
+  heroCountry: { color: colors.yellow, fontSize: 13, fontWeight: "700", marginTop: 2 },
+  heroDesc: { color: "rgba(255,255,255,0.85)", fontSize: 12.5, lineHeight: 18, marginTop: 6, maxWidth: 520 },
+  heroStats: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 10 },
   stat: { flexDirection: "row", alignItems: "center", gap: 6 },
-  statText: { color: "#fff", fontSize: 13, fontWeight: "600" },
-  heroCtas: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 18 },
-  primaryCta: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.red, borderRadius: radius.pill, paddingVertical: 14, paddingHorizontal: 24, minHeight: 48 },
+  statText: { color: "#fff", fontSize: 12, fontWeight: "600" },
+  heroCtas: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 14 },
+  primaryCta: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.red, borderRadius: radius.pill, paddingVertical: 12, paddingHorizontal: 18, minHeight: 46 },
   primaryCtaHover: { backgroundColor: colors.redBright },
-  primaryCtaText: { color: "#fff", fontSize: 13.5, fontWeight: "800", letterSpacing: 0.6 },
-  surpriseCta: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(0,0,0,0.45)", borderWidth: 1, borderColor: "rgba(245,179,1,0.5)", borderRadius: radius.pill, paddingVertical: 14, paddingHorizontal: 22, minHeight: 48 },
+  primaryCtaText: { color: "#fff", fontSize: 12.5, fontWeight: "800", letterSpacing: 0.5 },
+  surpriseCta: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(0,0,0,0.45)", borderWidth: 1, borderColor: "rgba(245,179,1,0.5)", borderRadius: radius.pill, paddingVertical: 12, paddingHorizontal: 16, minHeight: 46 },
   surpriseCtaHover: { backgroundColor: "rgba(245,179,1,0.14)" },
-  surpriseCtaText: { color: colors.yellow, fontSize: 13.5, fontWeight: "800", letterSpacing: 0.6 },
+  surpriseCtaText: { color: colors.yellow, fontSize: 12.5, fontWeight: "800", letterSpacing: 0.5 },
 
-  prefs: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 20, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 16 },
+  prefs: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 16, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 16 },
+  prefFilters: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
   prefItem: { flexDirection: "row", alignItems: "center", gap: 10 },
   prefLabel: { color: colors.textFaint, fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
   prefValue: { color: colors.white, fontSize: 14, fontWeight: "700", marginTop: 1 },
