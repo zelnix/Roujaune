@@ -1,0 +1,34 @@
+{
+  "summary": "Iteration 72 — Scenic POI Wikipedia image enrichment + Journeys elevation_m/country tested. 15/15 pytest tests passed. Verified: (1) /api/scenic/routes/{id}/pois returns landmark photos for lake-garda (7/7), lake-achensee (6/6), dutch-countryside (6/6); all image URLs are https://upload.wikimedia.org/wikipedia/commons/... and none match the flag/coat-of-arms/locator/svg deny-list. (2) Cached 2nd call is fast (<15s, actually sub-second) and retains the `image` field. (3) ?refresh=true regenerates POIs and still enriches images. (4) POI endpoint returns 200 across all target routes and 404 for unknown route (never 500). (5) /api/scenic/journeys objects include the new `elevation_m` (int|null) and `country` (str) fields alongside id/routeId/name/place/tag/distance_km/duration_sec/at/thumbnail/discoveries. (6) Regressions all pass: /api/scenic/routes lists 22 published routes including all three targets, /routes/lake-garda returns detail, favourites POST/GET/DELETE roundtrip, discoveries POST/GET/PATCH/DELETE full CRUD.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/scenic/routes/{id}/pois", "issue": "Image relevance quality — a few POIs get an image whose subject is off-topic even though the URL passes the deny-list. Examples observed: lake-garda POI 'Albarè' returns 'MappaFerroviaVeronaCaprino.jpg' (an Italian railway map — 'Mappa'/'Mappa Ferrovia' is not caught by the _BAD_IMG regex which only matches 'map_of' / '_map[._]' / 'karte'); dutch-countryside 'Pasture and dike edge' returns 'Sacramento_River_Levee.jpg' (Sacramento, USA — not the Netherlands); 'Farmstead on quiet lane' returns 'Skyline_Amsterdam_Zuidas.jpg'. Consider (a) extending _BAD_IMG to include 'mappa', 'mapa', 'plan_', 'diagram', and (b) verifying the article's country/coordinates before accepting the image."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter72_scenic_poi_images_and_journeys.py",
+    "/app/test_reports/pytest/iter72.xml"
+  ],
+  "action_items": [
+    "OPTIONAL (relevance polish, not a regression): tighten _BAD_IMG in /app/backend/routes/scenic.py to also reject Italian/Spanish/Dutch map words (e.g. 'mappa', 'mapa', 'plattegrond') and, ideally, gate `_wiki_thumb` on the article's country matching the route's country before accepting the image. Current deny-list catches flags/coats/locators/logos/svg but not thematic maps or wrong-country photos."
+  ],
+  "critical_code_review_comments": [
+    "scenic.py:337 — source is computed from os_has_key() *after* the LLM call, meaning a route whose LLM parse failed and fell back to highlights will still be recorded as source='llm' in the cache. Cosmetic (used by clients as a hint only).",
+    "scenic.py:301 — httpx.AsyncClient(timeout=8) is created inside _enrich_poi_images per call; for 5–7 POIs the 8s timeout applies to each request independently, so worst-case total time for a full LLM+wiki pass can approach ~30–60s. Acceptable, and cache mitigates it, but consider a shared client at module scope if this endpoint gets hotter.",
+    "scenic.py:328 — the cached path backfills images when 'image' key is missing, but never re-tries when image is None. That's intentional (avoids repeated failed lookups) but worth documenting."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter72_scenic_poi_images_and_journeys.py"],
+  "success_rate": {"backend": "100% (15/15)", "frontend": "not tested (backend-only per request)"},
+  "seed_data_creation": "No persistent test data — favourites/discoveries tests POST then DELETE their own rows.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend base URL comes from /app/frontend/.env EXPO_PUBLIC_BACKEND_URL (loaded via python-dotenv). Rider greenlantern@roujaune.app has real scenic-* ride_history entries so /api/scenic/journeys returns non-empty for that account; demo@roujaune.app can be empty. POI cache lives in Mongo `scenic_poi`; to force full regeneration use ?refresh=true. First uncached POI call for a fresh route may take up to ~60s (LLM + parallel wiki lookups); cached is <1s.",
+  "rca_of_issue": "N/A — feature works as specified. Only a minor image-relevance polish suggested; not a regression from iteration 71."
+}

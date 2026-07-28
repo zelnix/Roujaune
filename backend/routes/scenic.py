@@ -27,6 +27,8 @@ from __future__ import annotations
 import datetime
 import re
 import uuid
+import asyncio
+import httpx
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -174,7 +176,10 @@ async def _generate_pois(doc: dict) -> list[dict]:
             '{"at_pct": <0..1 float of where it appears in the ride>, '
             '"title": <short landmark name>, '
             '"description": <=140 chars factual description>, '
-            '"narration": <=220 chars warm first-person line a companion would say>}. '
+            '"narration": <=220 chars warm first-person line a companion would say>, '
+            '"wiki": <exact title of the most relevant REAL English Wikipedia '
+            'article for this place (e.g. "Lake Garda", "Bardolino"), or "" if '
+            'you are not confident a real article exists>}. '
             "Give 5-7 items spread across the ride."
         )
         prompt = (
@@ -199,25 +204,137 @@ async def _generate_pois(doc: dict) -> list[dict]:
                 "title": str(it.get("title") or "Point of interest")[:80],
                 "description": str(it.get("description") or "")[:180],
                 "narration": str(it.get("narration") or "")[:260],
+                "wiki": str(it.get("wiki") or "")[:120],
             })
         return pois or _fallback_pois(doc)
     except Exception:
         return _fallback_pois(doc)
 
 
+_WIKI_UA = "ROUJAUNE/1.0 (https://roujaune.app; support@roujaune.app) python-httpx"
+
+
+_BAD_IMG = re.compile(
+    r"(flag_|flag-|coat_of_arms|coat-of-arms|wappen|blason|escudo|bandera|"
+    r"location_|locator|_map[._]|map_of|karte|logo|seal_|emblem|\.svg)",
+    re.IGNORECASE,
+)
+
+
+async def _wiki_thumb(client: httpx.AsyncClient, query: str) -> Optional[str]:
+    if not query.strip():
+        return None
+    try:
+        r = await client.get(
+            "https://en.wikipedia.org/w/api.php",
+            params={
+                "action": "query", "generator": "search", "gsrsearch": query,
+                "gsrlimit": "4", "prop": "pageimages", "piprop": "thumbnail",
+                "pithumbsize": "640", "format": "json", "redirects": "1",
+            },
+            headers={"User-Agent": _WIKI_UA, "Accept": "application/json"},
+        )
+        if r.status_code != 200:
+            return None
+        pages = (r.json().get("query") or {}).get("pages") or {}
+        for _, p in sorted(pages.items(), key=lambda kv: kv[1].get("index", 99)):
+            thumb = (p.get("thumbnail") or {}).get("source")
+            # Skip flags / coats of arms / locator maps / logos — not scenery.
+            if thumb and not _BAD_IMG.search(thumb):
+                return thumb
+    except Exception:
+        return None
+    return None
+
+
+async def _wiki_summary_thumb(client: httpx.AsyncClient, title: str) -> Optional[str]:
+    """Lead image of a specific Wikipedia article (most relevant when the title
+    is a real page). Filters out flags / maps / logos."""
+    title = (title or "").strip()
+    if not title:
+        return None
+    try:
+        from urllib.parse import quote
+        r = await client.get(
+            f"https://en.wikipedia.org/api/rest_v1/page/summary/{quote(title.replace(' ', '_'))}",
+            headers={"User-Agent": _WIKI_UA, "Accept": "application/json"},
+        )
+        if r.status_code != 200:
+            return None
+        j = r.json()
+        for src in ((j.get("thumbnail") or {}).get("source"),
+                    (j.get("originalimage") or {}).get("source")):
+            if src and not _BAD_IMG.search(src):
+                return src
+    except Exception:
+        return None
+    return None
+
+
+async def _poi_image(client: httpx.AsyncClient, poi: dict, place: str) -> Optional[str]:
+    """Find a representative photo for a point of interest. Prefers the exact
+    Wikipedia article the LLM named (best relevance), then a keyword search of
+    the landmark within its region, then the landmark alone. Returns None when
+    nothing suitable is found (the client falls back to the route thumbnail)."""
+    title = str(poi.get("title") or "").strip()
+    wiki = str(poi.get("wiki") or "").strip()
+    if wiki:
+        img = await _wiki_summary_thumb(client, wiki)
+        if img:
+            return img
+        img = await _wiki_thumb(client, wiki)
+        if img:
+            return img
+    if not title:
+        return None
+    img = await _wiki_thumb(client, f"{title} {place}".strip())
+    if not img:
+        img = await _wiki_thumb(client, title)
+    return img
+
+
+async def _enrich_poi_images(pois: list[dict], doc: dict) -> list[dict]:
+    """Attach a landmark photo to each POI (best-effort, in parallel). Falls
+    back to no image (the client then uses the route thumbnail)."""
+    place = doc.get("place") or doc.get("region") or doc.get("country") or ""
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            results = await asyncio.gather(
+                *[_poi_image(client, p, place) for p in pois],
+                return_exceptions=True,
+            )
+        for p, img in zip(pois, results):
+            p["image"] = img if isinstance(img, str) else None
+    except Exception:
+        for p in pois:
+            p.setdefault("image", None)
+    return pois
+
+
 @router.get("/scenic/routes/{route_id}/pois")
 async def scenic_points_of_interest(route_id: str, refresh: bool = False):
     """Points of interest along a scenic route, generated by the LLM from the
-    route metadata and cached in `scenic_poi`. The HUD surfaces the next
-    uncompleted POI as the ride progresses."""
+    route metadata and cached in `scenic_poi`. Each POI is enriched with a
+    landmark photo (Wikipedia). The HUD surfaces the next uncompleted POI as the
+    ride progresses."""
     doc = await db.scenic_routes.find_one({"id": route_id, "status": "published"}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Scenic route not found")
     if not refresh:
         cached = await db.scenic_poi.find_one({"route_id": route_id}, {"_id": 0})
         if cached and cached.get("pois"):
-            return {"route_id": route_id, "pois": cached["pois"], "source": cached.get("source", "cache")}
+            pois = cached["pois"]
+            # Backfill images for older cached POIs without re-running the LLM.
+            if any("image" not in p for p in pois):
+                pois = await _enrich_poi_images(pois, doc)
+                try:
+                    await db.scenic_poi.update_one(
+                        {"route_id": route_id}, {"$set": {"pois": pois, "at": _now()}})
+                except Exception:
+                    pass
+            return {"route_id": route_id, "pois": pois, "source": cached.get("source", "cache")}
     pois = await _generate_pois(doc)
+    pois = await _enrich_poi_images(pois, doc)
     source = "llm" if os_has_key() else "fallback"
     try:
         await db.scenic_poi.update_one(
@@ -392,12 +509,23 @@ async def scenic_journeys():
     for r in rides:
         route = r.get("route") or {}
         rid = (r.get("workout_id") or "").replace("scenic-", "", 1) or route.get("id")
+        # Elevation may be stored numerically or as a "320 m" string.
+        elev = route.get("elevation_m")
+        if elev is None:
+            e = route.get("elevation")
+            if isinstance(e, str):
+                mm = re.search(r"\d+", e)
+                elev = int(mm.group()) if mm else None
+            elif isinstance(e, (int, float)):
+                elev = int(e)
         out.append({
             "id": r.get("id"),
             "routeId": rid,
             "name": route.get("name") or (r.get("workout") or "").replace("Scenic Ride · ", ""),
             "place": route.get("place") or "",
+            "country": route.get("country") or "",
             "tag": route.get("tag") or "Scenic",
+            "elevation_m": elev,
             "distance_km": r.get("distance_km") or route.get("distance") or None,
             "duration_sec": r.get("duration_sec"),
             "at": r.get("created_at"),

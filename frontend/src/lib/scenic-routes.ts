@@ -83,6 +83,7 @@ export type ScenicPoi = {
   title: string;
   description: string;
   narration: string;
+  image?: string | null;
 };
 
 /** LLM-generated points of interest for a route (cached backend-side). The HUD
@@ -130,9 +131,11 @@ export async function logScenicRide(route: ScenicRoute, elapsedSec: number): Pro
           id: route.id,
           name: route.name,
           place: route.place,
+          country: route.country || "",
           youtube_id: route.youtube_id,
           distance: route.distance_km ? `${route.distance_km} km` : "",
           elevation: route.elevation_m ? `${route.elevation_m} m` : "",
+          elevation_m: route.elevation_m ?? null,
           tag: route.tag,
         },
         elapsed: Math.max(0, Math.round(elapsedSec)),
@@ -212,7 +215,9 @@ export type ScenicJourney = {
   routeId: string;
   name: string;
   place?: string;
+  country?: string;
   tag?: string;
+  elevation_m?: number | null;
   distance_km?: number | string | null;
   duration_sec?: number | null;
   at?: string;

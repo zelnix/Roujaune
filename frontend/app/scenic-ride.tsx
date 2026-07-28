@@ -225,7 +225,7 @@ export default function ScenicRideScreen() {
         route_id: route.id, route_name: route.name, place: route.place,
         poi_order: poi.order, at_pct: poi.at_pct, title: poi.title,
         description: poi.description, narration: poi.narration,
-        photo: route.thumbnail || ytThumb(route.youtube_id),
+        photo: poi.image || route.thumbnail || ytThumb(route.youtube_id),
       });
       if (d?.id) savedIds.current[poi.order] = d.id;
     }
@@ -384,7 +384,7 @@ export default function ScenicRideScreen() {
               <Ionicons name="eye-off-outline" size={15} color={colors.textFaint} />
             </Pressable>
             <Text style={s.poiName}>{upcomingPoi.title}</Text>
-            <Image source={{ uri: route.thumbnail || ytThumb(route.youtube_id) }} style={s.poiImg} contentFit="cover" />
+            <Image source={{ uri: upcomingPoi.image || route.thumbnail || ytThumb(route.youtube_id) }} style={s.poiImg} contentFit="cover" />
             <Text style={s.poiDesc}>{upcomingPoi.description || `A scenic highlight along the ${subtitle.toLowerCase()}.`}</Text>
             <View style={s.poiActions}>
               <Pressable style={[s.hearBtn, { flex: 1 }]} testID="hear-the-story" onPress={() => narrate(upcomingPoi.narration, upcomingPoi.order)} accessibilityRole="button" accessibilityLabel={`${narrating ? "Stop" : "Hear"} the story of ${upcomingPoi.title}`}>
