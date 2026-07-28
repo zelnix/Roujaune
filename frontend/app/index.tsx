@@ -72,7 +72,7 @@ export default function Dashboard() {
   React.useEffect(() => {
     if (noMotion) { fade.setValue(1); return; }
     fade.setValue(0.35);
-    Animated.timing(fade, { toValue: 1, duration: 240, useNativeDriver: true }).start();
+    Animated.timing(fade, { toValue: 1, duration: 240, useNativeDriver: Platform.OS !== "web" }).start();
   }, [experience, noMotion, fade]);
   const { nudge: benchmarkNudge } = useBenchmarkNudge();
   const liveNotifs = useLiveNotifications(benchmarkNudge);

@@ -95,9 +95,11 @@ function TodayModeOption({ meta, selected, onPress }: { meta: TodayModeMeta; sel
         <View style={styles.optLabelRow}>
           <Text style={[styles.optLabel, soon && { color: colors.textDim }]} numberOfLines={1}>{meta.label}</Text>
           {selected && <Ionicons name="checkmark-circle" size={16} color="#fff" />}
+        </View>
+        <View style={styles.optLabelRow}>
+          <Text style={styles.optDesc} numberOfLines={1}>{meta.description}</Text>
           {soon && <Text style={styles.soonBadge}>COMING SOON</Text>}
         </View>
-        <Text style={styles.optDesc} numberOfLines={1}>{meta.description}</Text>
       </View>
     </Pressable>
   );
@@ -131,8 +133,8 @@ const styles = StyleSheet.create({
   optionSoon: { opacity: 0.7 },
   optIcon: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.05)" },
   optIconSel: { backgroundColor: colors.red },
-  optLabelRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  optLabel: { color: colors.white, fontSize: 14.5, fontWeight: "700" },
-  optDesc: { color: colors.textDim, fontSize: 11.5, marginTop: 1 },
+  optLabelRow: { flexDirection: "row", alignItems: "center", gap: 8, justifyContent: "space-between" },
+  optLabel: { color: colors.white, fontSize: 14.5, fontWeight: "700", flexShrink: 1 },
+  optDesc: { color: colors.textDim, fontSize: 11.5, marginTop: 1, flexShrink: 1 },
   soonBadge: { color: colors.yellow, fontSize: 8.5, fontWeight: "800", letterSpacing: 0.5, borderWidth: 1, borderColor: "rgba(245,179,1,0.4)", borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1 },
 });

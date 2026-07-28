@@ -123,7 +123,8 @@ today_mode_experience_selector:
     file: "frontend/src/lib/today-mode.ts, frontend/src/components/today/*, frontend/src/components/SideNavigation.tsx, frontend/src/components/app-scaffold.tsx, frontend/app/index.tsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
+    verified: "iter66 frontend 100% (7/7 acceptance + 8/8 rail regression); polish applied (mtb label truncation, web useNativeDriver guard)."
     status_history:
         -working: "NA"
         -agent: "main"
