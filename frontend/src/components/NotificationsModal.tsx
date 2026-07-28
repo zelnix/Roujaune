@@ -4,29 +4,22 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { CC } from "./calendar";
 import type { BenchmarkNudge } from "../lib/benchmark/api";
-import { useLiveNotifications, LiveNotif } from "../lib/notifications";
+import { useLiveNotifications, useNotificationReadState, LiveNotif } from "../lib/notifications";
 
 /** Notifications sheet — driven entirely by real backend signals (re-benchmark,
- * FTP review, upcoming test, missed workouts, coach messages). Tap a row to read
- * the detail (marks it read); benchmark-related rows offer a "Start benchmark" CTA. */
+ * FTP review, upcoming test, missed workouts, coach messages). Read-state is
+ * persisted per rider so the bell badge stays accurate across launches. */
 export function NotificationsModal({ visible, onClose, nudge }: { visible: boolean; onClose: () => void; nudge?: BenchmarkNudge }) {
   const router = useRouter();
   const notifs = useLiveNotifications(nudge);
-  const [readIds, setReadIds] = React.useState<Set<string>>(new Set());
+  const { readKeys, markRead, markUnread, markAllRead } = useNotificationReadState();
   const [selected, setSelected] = React.useState<LiveNotif | null>(null);
 
-  const markRead = (id: string) => setReadIds((prev) => new Set(prev).add(id));
-  const toggleRead = (id: string) =>
-    setReadIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-
-  const openDetail = (n: LiveNotif) => { markRead(n.id); setSelected(n); };
+  const openDetail = (n: LiveNotif) => { markRead(n.key); setSelected(n); };
   const close = () => { setSelected(null); onClose(); };
   const goBenchmark = () => { close(); router.push("/benchmark"); };
-  const unread = notifs.filter((n) => !readIds.has(n.id)).length;
+  const unread = notifs.filter((n) => !readKeys.has(n.key)).length;
+  const allRead = () => markAllRead(notifs.map((n) => n.key));
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={close}>
@@ -57,7 +50,7 @@ export function NotificationsModal({ visible, onClose, nudge }: { visible: boole
               ) : (
                 <Pressable
                   testID="mark-unread"
-                  onPress={() => { toggleRead(selected.id); setSelected(null); }}
+                  onPress={() => { markUnread(selected.key); setSelected(null); }}
                   style={s.unreadBtn}
                 >
                   <Ionicons name="mail-unread-outline" size={16} color={CC.white} />
@@ -76,6 +69,12 @@ export function NotificationsModal({ visible, onClose, nudge }: { visible: boole
                 </View>
                 <Pressable onPress={close} testID="notifications-close" hitSlop={10}><Ionicons name="close" size={22} color={CC.white} /></Pressable>
               </View>
+              {unread > 0 && (
+                <Pressable testID="mark-all-read" onPress={allRead} style={s.markAllBtn}>
+                  <Ionicons name="checkmark-done-outline" size={15} color={CC.yellow} />
+                  <Text style={s.markAllText}>Mark all read</Text>
+                </Pressable>
+              )}
               {notifs.length === 0 ? (
                 <View testID="notifications-empty" style={s.empty}>
                   <Ionicons name="notifications-off-outline" size={28} color={CC.dim} />
@@ -84,7 +83,7 @@ export function NotificationsModal({ visible, onClose, nudge }: { visible: boole
               ) : (
                 <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
                   {notifs.map((n) => {
-                    const isRead = readIds.has(n.id);
+                    const isRead = readKeys.has(n.key);
                     return (
                       <Pressable key={n.id} testID={`notification-${n.id}`} onPress={() => openDetail(n)} style={s.row}>
                         {!isRead ? <View style={s.unreadDot} /> : <View style={s.dotSpacer} />}
@@ -99,7 +98,7 @@ export function NotificationsModal({ visible, onClose, nudge }: { visible: boole
                           <Text style={s.time}>{n.time}</Text>
                           <Pressable
                             testID={`toggle-read-${n.id}`}
-                            onPress={(e) => { e.stopPropagation(); toggleRead(n.id); }}
+                            onPress={(e) => { e.stopPropagation(); isRead ? markUnread(n.key) : markRead(n.key); }}
                             hitSlop={8}
                             style={s.toggleBtn}
                             accessibilityLabel={isRead ? "Mark as unread" : "Mark as read"}
@@ -145,4 +144,6 @@ const s = StyleSheet.create({
   unreadBtnText: { color: CC.white, fontSize: 13, fontWeight: "700" },
   actionBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 16, borderRadius: 12, paddingVertical: 13, backgroundColor: CC.yellow },
   actionBtnText: { color: CC.bg ?? "#241B00", fontSize: 14, fontWeight: "900" },
+  markAllBtn: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 6, paddingBottom: 6 },
+  markAllText: { color: CC.yellow, fontSize: 12.5, fontWeight: "800" },
 });

@@ -6,6 +6,7 @@ import * as Linking from "expo-linking";
 import { getToken, setToken, loadToken, installFetchAuth } from "./session";
 import { refreshCoachFromServer, resetCoach } from "./coach-persona";
 import { resetRiderProfile } from "./rider-profile";
+import { resetNotificationReadState } from "./notifications";
 
 const API = (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
 const AUTH_BASE = "https://auth.emergentagent.com";
@@ -186,6 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     resetCoach();
     resetRiderProfile();
+    resetNotificationReadState();
     await setToken(null);
     setUser(null);
   }, []);
@@ -208,6 +210,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     resetCoach();
     resetRiderProfile();
+    resetNotificationReadState();
     await setToken(null);
     setUser(null);
   }, []);

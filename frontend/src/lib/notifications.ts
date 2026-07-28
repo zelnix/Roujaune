@@ -8,6 +8,7 @@ import { useBenchmarkWeek, useBenchmarkPlanReview, useBenchmarkNudge, BenchmarkN
 
 export type LiveNotif = {
   id: string;
+  key: string;
   icon: any;
   color: string;
   title: string;
@@ -16,6 +17,17 @@ export type LiveNotif = {
   time: string;
   action?: "benchmark";
 };
+
+// Stable, content-aware key so read-state resets when a notification's content
+// changes (e.g. a new coach message reuses id "coach-msg" but new text).
+function djb2(str: string): string {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
+function keyFor(id: string, title: string, body: string): string {
+  return `${id}|${djb2(title + "\u0001" + body)}`;
+}
 
 const C = { yellow: "#FFC20A", rouge: "#E01E2B", green: "#2ECC71", orange: "#E8631C", blue: "#40A9C6" };
 
@@ -86,7 +98,7 @@ export function useLiveNotifications(nudgeOverride?: BenchmarkNudge): LiveNotif[
   const coach = useLatestCoachMessage();
   const nudge = nudgeOverride ?? nudgeHook;
 
-  const out: LiveNotif[] = [];
+  const out: Omit<LiveNotif, "key">[] = [];
 
   // 1) Re-benchmark required (strongest signal).
   if (nudge?.required) {
@@ -163,5 +175,66 @@ export function useLiveNotifications(nudgeOverride?: BenchmarkNudge): LiveNotif[
     });
   }
 
-  return out;
+  return out.map((n) => ({ ...n, key: keyFor(n.id, n.title, n.body) }));
 }
+
+// ── Per-rider read-state (persisted server-side, shared across consumers) ───
+let _readSnap: Set<string> = new Set();
+let _readLoaded = false;
+const _readListeners = new Set<() => void>();
+function _emitRead() { _readListeners.forEach((l) => l()); }
+
+function _postRead(path: string, body: object) {
+  return fetch(`${apiBase()}/api/notifications/${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).catch(() => {});
+}
+
+/** Reset the in-memory read snapshot (call on logout). */
+export function resetNotificationReadState() {
+  _readSnap = new Set();
+  _readLoaded = false;
+  _emitRead();
+}
+
+export function useNotificationReadState() {
+  const [readKeys, setReadKeys] = useState<Set<string>>(_readSnap);
+  const [loading, setLoading] = useState(!_readLoaded);
+
+  useEffect(() => {
+    const l = () => setReadKeys(new Set(_readSnap));
+    _readListeners.add(l);
+    l();
+    return () => { _readListeners.delete(l); };
+  }, []);
+
+  useEffect(() => {
+    if (_readLoaded) { setLoading(false); return; }
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`${apiBase()}/api/notifications/read-state`);
+        if (res.ok) {
+          const j = await res.json();
+          _readSnap = new Set<string>(j.readKeys || []);
+          _readLoaded = true;
+          _emitRead();
+        }
+      } catch {
+        /* offline: start empty */
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const markRead = (key: string) => { _readSnap = new Set(_readSnap).add(key); _emitRead(); _postRead("read", { key }); };
+  const markUnread = (key: string) => { const n = new Set(_readSnap); n.delete(key); _readSnap = n; _emitRead(); _postRead("unread", { key }); };
+  const markAllRead = (keys: string[]) => { const n = new Set(_readSnap); keys.forEach((k) => n.add(k)); _readSnap = n; _emitRead(); _postRead("read-all", { keys }); };
+
+  return { readKeys, loading, markRead, markUnread, markAllRead };
+}
+

@@ -18,7 +18,7 @@ import { ProgressCard, CommunityCard, WellnessCard, AchievementCard } from "@/sr
 import { navItems, navFooter } from "@/src/data";
 import { useCoach } from "@/src/lib/coach-persona";
 import { useBenchmarkNudge } from "@/src/lib/benchmark/api";
-import { useLiveNotifications } from "@/src/lib/notifications";
+import { useLiveNotifications, useNotificationReadState } from "@/src/lib/notifications";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
 import { ProgressPanel } from "@/src/components/ProgressPanel";
 import { NotificationsModal } from "@/src/components/NotificationsModal";
@@ -65,6 +65,8 @@ export default function Dashboard() {
   const persona = useCoach();
   const { nudge: benchmarkNudge } = useBenchmarkNudge();
   const liveNotifs = useLiveNotifications(benchmarkNudge);
+  const { readKeys } = useNotificationReadState();
+  const unreadCount = liveNotifs.filter((n) => !readKeys.has(n.key)).length;
   const [active, setActive] = React.useState("home");
   const [showChat, setShowChat] = React.useState(false);
   const [showProgress, setShowProgress] = React.useState(false);
@@ -120,7 +122,7 @@ export default function Dashboard() {
                 onProfile={() => router.push("/profile")}
                 onFlame={() => setShowProgress(true)}
                 onNotifications={() => setShowNotifs(true)}
-                notifCount={liveNotifs.length}
+                notifCount={unreadCount}
                 compact={compact}
                 sideSlot={<TodayTrainingCard overlay onToast={showToast} onCalendar={() => router.push("/calendar")} />}
               />

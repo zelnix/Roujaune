@@ -20,6 +20,7 @@ from models import *  # noqa: F401,F403  (Pydantic models)
 from services.readiness import compute_readiness
 from services.benchmark_decision import decide_benchmark, BenchmarkDecisionInput
 from services.rider_level import compute_rider_level
+from services.catalog import seed_workout_catalog  # noqa: E402
 import plans_admin
 import companion_plan
 import auth
@@ -2249,55 +2250,15 @@ async def _reload_rb_from_db():
 
 
 # ── Workout catalog (server-managed; seeded from bundled JSON) ───────────────
-with open(ROOT_DIR / "workout_catalog.json", encoding="utf-8") as _f:
-    CATALOG_SEED = json.load(_f)
-
-_CATALOG_EDITABLE = {
-    "name", "typeId", "typeName", "color", "icon", "duration", "tss", "if",
-    "difficulty", "description", "focus", "zones", "level", "environment", "segmentSpec",
-}
 
 
-async def seed_workout_catalog():
-    """Non-destructive seed of the global `workout_catalog` collection so live
-    edits made via the console are never overwritten on restart."""
-    for w in CATALOG_SEED:
-        payload = {k: v for k, v in w.items() if k != "id"}
-        await db.workout_catalog.update_one(
-            {"id": w["id"]},
-            {"$setOnInsert": {**payload, "seeded_at": datetime.now(timezone.utc).isoformat()}},
-            upsert=True,
-        )
 
 
-async def _global_catalog() -> list:
-    docs = await db.workout_catalog.find({}, {"_id": 0}).to_list(2000)
-    return docs or [dict(w) for w in CATALOG_SEED]
 
 
-async def _resolve_catalog(uid: Optional[str]) -> list:
-    """The rider's effective catalog: global overlaid by their personal copies."""
-    base = {w["id"]: w for w in await _global_catalog()}
-    if uid:
-        copies = await db.rider_workouts.find({"user_id": uid}, {"_id": 0, "user_id": 0}).to_list(2000)
-        for c in copies:
-            base[c["id"]] = c
-    return list(base.values())
 
 
-async def _resolve_workout(uid: Optional[str], wid: str) -> Optional[dict]:
-    """A single workout, preferring the rider's copy, then global, then bundled."""
-    if uid:
-        c = await db.rider_workouts.find_one({"user_id": uid, "id": wid}, {"_id": 0, "user_id": 0})
-        if c:
-            return c
-    g = await db.workout_catalog.find_one({"id": wid}, {"_id": 0})
-    if g:
-        return g
-    for w in CATALOG_SEED:
-        if w["id"] == wid:
-            return dict(w)
-    return None
+
 
 
 
@@ -3459,18 +3420,6 @@ PROGRESS_DATA = {
     ],
 }
 
-ROUTES_DATA = {
-    "featured": {"id": "XlwjMjyU410", "name": "Alpe d'Huez", "place": "France", "distance": "13.8 km", "elevation": "1,120 m", "grade": "8.1%", "tag": "Legendary Climb", "difficulty": "Hard"},
-    "categories": ["All", "Climbs", "Flat", "Rolling", "Gravel"],
-    "routes": [
-        {"id": "r1", "name": "Alpe d'Huez", "place": "France", "distance": "13.8 km", "elevation": "1,120 m", "tag": "Climb", "difficulty": "Hard", "color": "rouge"},
-        {"id": "r2", "name": "Stelvio Pass", "place": "Italy", "distance": "24.3 km", "elevation": "1,808 m", "tag": "Climb", "difficulty": "Extreme", "color": "rouge"},
-        {"id": "r3", "name": "Mont Ventoux", "place": "France", "distance": "21.5 km", "elevation": "1,610 m", "tag": "Climb", "difficulty": "Hard", "color": "orange"},
-        {"id": "r4", "name": "Tuscan Rollers", "place": "Italy", "distance": "48.0 km", "elevation": "620 m", "tag": "Rolling", "difficulty": "Moderate", "color": "amber"},
-        {"id": "r5", "name": "Loire Valley", "place": "France", "distance": "62.0 km", "elevation": "240 m", "tag": "Flat", "difficulty": "Easy", "color": "green"},
-        {"id": "r6", "name": "Girona Gravel", "place": "Spain", "distance": "38.5 km", "elevation": "540 m", "tag": "Gravel", "difficulty": "Moderate", "color": "amber"},
-    ],
-}
 
 WELLNESS_DATA = {
     "headline": "Well recovered.",
@@ -3492,25 +3441,6 @@ WELLNESS_DATA = {
     "fb50": {"completed": 12, "planned": 15, "streak": 4, "next": "Mobility Flow", "next_duration": "15 min"},
 }
 
-COMMUNITY_DATA = {
-    "challenges": [
-        {"id": "c1", "title": "May Climbing Challenge", "sub": "Climb 5,000 m this month", "progress": 68, "reward": "Climber Badge", "color": "rouge"},
-        {"id": "c2", "title": "Consistency Streak", "sub": "Ride 5 days a week", "progress": 80, "reward": "Iron Legs", "color": "yellow"},
-        {"id": "c3", "title": "Gran Fondo Prep", "sub": "Complete the 4-week block", "progress": 45, "reward": "Fondo Ready", "color": "green"},
-    ],
-    "leaderboard": [
-        {"rank": 1, "name": "Marco B.", "points": 1840, "you": False},
-        {"rank": 2, "name": "Sofia R.", "points": 1720, "you": False},
-        {"rank": 3, "name": "You", "points": 1685, "you": True},
-        {"rank": 4, "name": "Liam O.", "points": 1590, "you": False},
-        {"rank": 5, "name": "Emma T.", "points": 1510, "you": False},
-    ],
-    "feed": [
-        {"id": "p1", "name": "Sofia R.", "action": "completed", "title": "Stelvio Pass", "when": "12m ago", "kudos": 24, "color": "rouge"},
-        {"id": "p2", "name": "Marco B.", "action": "set a PR on", "title": "20-min Power", "when": "1h ago", "kudos": 41, "color": "yellow"},
-        {"id": "p3", "name": "Liam O.", "action": "finished", "title": "Long Ride Endurance", "when": "3h ago", "kudos": 18, "color": "green"},
-    ],
-}
 
 CONNECTIONS_DATA = {
     "devices": [
@@ -3642,9 +3572,6 @@ async def get_progress_timeline(rng: str = Query("3m", alias="range"), offset: i
     }
 
 
-@api_router.get("/routes")
-async def get_routes():
-    return ROUTES_DATA
 
 
 @api_router.get("/rider/missed")
@@ -3675,74 +3602,18 @@ async def rider_missed():
     }
 
 
-@api_router.get("/community")
-async def get_community():
-    return COMMUNITY_DATA
-
-
-# --------------------------------------------------------------------------- #
-#  Rider workout catalog — read + copy-on-assign + personal edits             #
-# --------------------------------------------------------------------------- #
-@api_router.get("/catalog")
-async def get_catalog():
-    """The current rider's effective catalog (global overlaid by their copies)."""
-    return {"items": await _resolve_catalog(auth.current_user_id())}
-
-
-@api_router.get("/catalog/{workout_id}")
-async def get_catalog_item(workout_id: str):
-    w = await _resolve_workout(auth.current_user_id(), workout_id)
-    if not w:
-        raise HTTPException(status_code=404, detail="Workout not found")
-    return w
-
-
-@api_router.post("/catalog/{workout_id}/assign")
-async def assign_catalog_workout(workout_id: str):
-    """Copy-on-assign: give the current rider their own editable copy of a workout."""
-    uid = auth.current_user_id()
-    src = await _resolve_workout(uid, workout_id)
-    if not src:
-        raise HTTPException(status_code=404, detail="Workout not found")
-    doc = {k: v for k, v in src.items() if k not in ("seeded_at",)}
-    doc["id"] = workout_id
-    doc.setdefault("origin_id", workout_id)
-    doc["assigned_at"] = datetime.now(timezone.utc).isoformat()
-    await db.rider_workouts.update_one(
-        {"user_id": uid, "id": workout_id}, {"$set": {**doc, "user_id": uid}}, upsert=True)
-    doc.pop("user_id", None)
-    return {"assigned": workout_id, "workout": doc}
 
 
 
 
-@api_router.put("/catalog/{workout_id}")
-async def edit_my_workout(workout_id: str, body: WorkoutEdit):
-    """Edit the rider's own copy (auto-forks from global on first edit)."""
-    uid = auth.current_user_id()
-    existing = await db.rider_workouts.find_one({"user_id": uid, "id": workout_id}, {"_id": 0, "user_id": 0})
-    if not existing:
-        src = await _resolve_workout(uid, workout_id)
-        if not src:
-            raise HTTPException(status_code=404, detail="Workout not found")
-        existing = {**{k: v for k, v in src.items() if k != "seeded_at"}, "origin_id": workout_id}
-    for k, v in (body.patch or {}).items():
-        if k in _CATALOG_EDITABLE:
-            existing[k] = v
-    existing["id"] = workout_id
-    existing["edited_at"] = datetime.now(timezone.utc).isoformat()
-    await db.rider_workouts.update_one(
-        {"user_id": uid, "id": workout_id}, {"$set": {**existing, "user_id": uid}}, upsert=True)
-    existing.pop("user_id", None)
-    return {"workout": existing}
 
 
-@api_router.delete("/catalog/{workout_id}/reset")
-async def reset_my_workout(workout_id: str):
-    """Discard the rider's copy and revert to the global workout."""
-    uid = auth.current_user_id()
-    res = await db.rider_workouts.delete_one({"user_id": uid, "id": workout_id})
-    return {"reset": workout_id, "reverted": res.deleted_count > 0}
+
+
+
+
+
+
 
 
 @api_router.get("/openapi.json")
@@ -3856,6 +3727,10 @@ from routes import connections as connections_routes  # noqa: E402
 api_router.include_router(connections_routes.router)
 from routes import workouts as workouts_routes  # noqa: E402
 api_router.include_router(workouts_routes.router)
+from routes import catalog as catalog_routes  # noqa: E402
+api_router.include_router(catalog_routes.router)
+from routes import notifications as notifications_routes  # noqa: E402
+api_router.include_router(notifications_routes.router)
 api_router.include_router(weather_routes.router)
 app.include_router(api_router)
 app.include_router(push.router)

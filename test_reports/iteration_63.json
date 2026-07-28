@@ -1,0 +1,32 @@
+{
+  "summary": "ITER63 refactor (catalog + system) + per-rider notification read-state fully verified. Backend: 57/57 pytest tests pass — new /app/backend/tests/test_iter63_catalog_system_notifs.py (14 tests) covers the extracted catalog domain (GET /catalog returns 171 items, GET /catalog/{id} 200/404, POST /catalog/{id}/assign creates a rider copy with origin_id + assigned_at, PUT /catalog/{id} patches editable fields and stamps edited_at, DELETE /catalog/{id}/reset reverts to the global), the static endpoints moved to routes/system.py (GET /routes returns {featured=Alpe d'Huez, categories inc 'All', routes[6] with full schema}, GET /community returns {challenges[3], leaderboard[5] inc you=true, feed[3]}, both auth-gated), and routes/notifications.py read-state (GET returns {readKeys, allReadAt}; POST /read is idempotent via $addToSet — posting the same key twice keeps a single entry; POST /read-all adds every key and stamps allReadAt; POST /unread removes; all auth-gated). Regression suites test_iter59/60/62 still pass (43 tests). Frontend UI verified end-to-end on the external mobile web preview: bell-pill on Today shows badge '3' matching the three live signals (FTP review 287W→305W, benchmark test tomorrow 'Cadence Control Assessment', coach message from Alberto). Modal opens, mark-all-read button is visible while unread>0, tapping it persists all 3 keys server-side (allReadAt set) and header switches to 'You're all caught up'; bell badge disappears. Reloaded the page — badge remains hidden (server-backed persistence confirmed). Per-row toggle-read-ftp-review persisted the key on the server. notifications-empty testID exists and is code-wired for the empty branch. Cleanup performed: all read-state keys removed for greenlantern so the demo bell shows 3 unread again; catalog test workout reset to global. NO issues to report.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter63_catalog_system_notifs.py",
+    "/app/test_reports/pytest/iter63.xml",
+    "/app/test_reports/screens/iter63_final.jpeg"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "services/catalog.py cleanly separates seed vs resolve logic and is imported by both server.py startup and routes/catalog.py — no server.py dependency. _CATALOG_EDITABLE whitelist prevents patching identity fields.",
+    "routes/notifications.py uses $addToSet for /read (idempotent) and $pull for /unread (safe when key absent) — confirmed via test_read_idempotent_via_addToSet.",
+    "routes/system.py bundles static /routes and /community with the pre-existing /status + /reports endpoints — appropriate grouping.",
+    "notifications.ts._postRead swallows fetch errors — good for offline UX but silently hides server 5xx; logging or a Sentry breadcrumb would be nice-to-have (non-blocking).",
+    "NotificationsModal correctly branches on notifs.length===0 -> notifications-empty; on unread>0 -> mark-all-read button; header sub-text handles all three cases (empty / N unread / all caught up)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter63_catalog_system_notifs.py (new)"
+  ],
+  "success_rate": {"backend": "100% (57/57)", "frontend": "100% (bell badge=3, modal, mark-all-read, per-row toggle, persistence across reload, empty-state wired)"},
+  "seed_data_creation": "Ephemeral only. Catalog test PUT/assign was followed by DELETE /catalog/{id}/reset in the same test to revert the rider copy. Notification test keys (TEST_iter63_*) were unread at the end of each test. Final teardown test_zzz_reset_read_state_for_demo unreads every remaining key for greenlantern so the demo bell shows unread again. Verified /api/notifications/read-state returns readKeys=[] for greenlantern after teardown.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "External base URL: https://roujaune-train.preview.emergentagent.com. Rider: greenlantern@roujaune.app / rideon9900. Login form uses testIDs email-input / password-input / submit-btn (NOT login-email/login-password/login-submit). React-native-web Pressable + Playwright .click() is flaky on the bell-pill — use `await page.evaluate(\"document.querySelector('[data-testid=...]').click()\")` as a reliable fallback. Live notification testIDs on the modal: notification-ftp-review, notification-bm-test-<YYYY-MM-DD>, notification-coach-msg (+ notification-missed / notification-rebenchmark when applicable). Row-level toggle: toggle-read-<id>. Detail view has notif-start-benchmark or mark-unread. Mark all read: testID mark-all-read (only visible when unread>0). Empty state: notifications-empty (visible when notifs=[]). Server read-state keys are content-aware (e.g. 'ftp-review|138f52n') so they persist across identical FTP updates but change if the underlying content changes. resetNotificationReadState() is called on signOut so the in-memory snapshot resets between accounts (verified in auth-context.tsx line 190).",
+  "rca_of_issue": "N/A — no functional issues found."
+}
