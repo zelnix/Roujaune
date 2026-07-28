@@ -77,6 +77,31 @@ export function useScenicRoute(id?: string | null) {
   return { route, loading, error };
 }
 
+export type ScenicPoi = {
+  order: number;
+  at_pct: number;
+  title: string;
+  description: string;
+  narration: string;
+};
+
+/** LLM-generated points of interest for a route (cached backend-side). The HUD
+ *  surfaces the next uncompleted POI as the ride progresses. */
+export function useScenicPois(id?: string | null) {
+  const [pois, setPois] = React.useState<ScenicPoi[] | null>(null);
+  React.useEffect(() => {
+    if (!id) { setPois([]); return; }
+    let alive = true;
+    setPois(null);
+    fetch(`${base()}/api/scenic/routes/${encodeURIComponent(id)}/pois`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("failed"))))
+      .then((d) => { if (alive) setPois(Array.isArray(d?.pois) ? d.pois : []); })
+      .catch(() => { if (alive) setPois([]); });
+    return () => { alive = false; };
+  }, [id]);
+  return { pois: pois ?? [], loading: pois === null };
+}
+
 /** The rider's most recent scenic ride, for the "Continue your journey" rail. */
 export function useScenicLast() {
   const [last, setLast] = React.useState<ScenicLast | null>(null);

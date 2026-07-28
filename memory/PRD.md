@@ -666,3 +666,12 @@ STILL PENDING (awaiting approval): Phase 3 (Home banners consolidation, dup CTAs
 - **Removed** the flame/streak "achievements" pill from the home top-right (HeroRoute StatusBar) + its now-dead "Your Progress" modal/state/imports in index.tsx.
 - **Removed "Profile"** from the sidebar utility nav (`today-mode.ts` UTILITY) — profile is now reached via the avatar everywhere.
 - **"Surprise me"** shuffle: scenic Today hero CTA (`testID surprise-me`) + Explore Destinations header — picks a random published scenic route and opens the player. Verified via screenshots (home training/scenic/future, progress, plan, workouts).
+
+## Scenic Ride HUD wired to real data (2026-07-28 fork)
+- **Points of Interest (LLM):** new `GET /api/scenic/routes/{id}/pois` generates route-specific POIs via emergentintegrations (openai gpt-5.4), cached in `scenic_poi`, with a highlights-derived fallback. HUD panel renamed COMING UP → **POINTS OF INTEREST**, auto-advances with ride progress; "Hear the story" narrates via companion TTS (expo-speech); save/skip/heard states; waveform animates only while narrating.
+- **Progress/header/companion:** destination header + current-area + %/remaining derived from route metadata + ride position (elapsed≈video time; exact YouTube currentTime API still TODO). Companion (Alberto/Adriana) messages are contextual and respect Quiet/Discover/Guided (Guided auto-narrates); hiding a panel does not mute audio.
+- **Ride info bar:** Time real; cadence/HR show "—" until BLE sensor (native build); distance estimated from progress; keeps recording when hidden.
+- **Leave flow:** Close/Home/Journeys open a Save & leave / End without saving / Continue dialog; Explore saves then navigates.
+- **Resume:** in-progress ride persisted to AsyncStorage (`scenic-resume.ts`: video position, elapsed, progress), cleared on logout/completion. Scenic Today hero becomes a **RESUME RIDE** card (progress bar + %) when a resumable ride exists, else the featured ride. Web player seeks via `&start=`.
+- Video muted (web+native) + looping ambient CC0 track with in-HUD music on/off + 4-level volume.
+- Deferred: exact video-currentTime sync, real BLE sensors, backend `discoveries` model + per-POI photos, cross-session persistence of heard/saved/hidden states, dedicated Scenic Audio/Settings/Companion sheets.

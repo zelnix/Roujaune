@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { colors, radius, spacing } from "../../theme";
 import { useScenicRoutes, useScenicLast, ScenicRoute, ytThumb } from "../../lib/scenic-routes";
+import { useScenicResume } from "../../lib/scenic-resume";
 import { ExperienceHero, experienceHeroBg } from "./ExperienceHero";
 
 /** Higher-res YouTube still for full-bleed backgrounds (falls back gracefully). */
@@ -39,6 +40,7 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
   const compact = height < 560;
   const { routes, loading } = useScenicRoutes();
   const last = useScenicLast();
+  const resume = useScenicResume();
   const [region, setRegion] = React.useState<string>("All");
 
   const open = (id: string) => router.push(`/scenic-ride?route=${id}` as any);
@@ -85,7 +87,9 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
   const activeRegion = region !== "All" && present.includes(region) ? region : "All";
   const filtered = activeRegion === "All" ? routes : routes.filter((r) => r.region === activeRegion);
 
-  const hero = filtered[0];
+  const resumeRoute = resume ? routes.find((r) => r.id === resume.routeId) : null;
+  const resuming = !!resumeRoute;
+  const hero = resumeRoute ?? filtered[0];
   const others = filtered.filter((r) => r.id !== hero.id);
   const shortRides = filtered.filter((r) => (mins(r) ?? 999) < 35);
   const recent = filtered.slice(-2);
@@ -102,16 +106,19 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
         <ImageBackground source={{ uri: thumbUri(hero) }} style={styles.hero} imageStyle={styles.heroImg} testID="scenic-hero">
           <View style={styles.heroScrim} />
           <View style={styles.heroTopRow}>
-            <View style={styles.povBadge}>
-              <Ionicons name="videocam" size={12} color="#fff" />
-              <Text style={styles.povText}>POV VIDEO</Text>
-            </View>
-            <View style={styles.guidedBadge}>
-              <Ionicons name="leaf" size={11} color={colors.yellow} />
-              <Text style={styles.guidedText}>Relaxed ride</Text>
+            {!resuming && (
+              <View style={styles.povBadge}>
+                <Ionicons name="videocam" size={12} color="#fff" />
+                <Text style={styles.povText}>POV VIDEO</Text>
+              </View>
+            )}
+            <View style={[styles.guidedBadge, resuming && { marginLeft: "auto" as any }]}>
+              <Ionicons name={resuming ? "play-circle" : "leaf"} size={11} color={colors.yellow} />
+              <Text style={styles.guidedText}>{resuming ? `RESUME · ${Math.round((resume?.pct ?? 0) * 100)}%` : "Relaxed ride"}</Text>
             </View>
           </View>
           <View style={{ flex: 1 }} />
+          {resuming && <Text style={styles.resumeKicker}>CONTINUE YOUR RIDE</Text>}
           <Text style={styles.heroTitle}>{hero.name.toUpperCase()}</Text>
           <Text style={styles.heroCountry}>{hero.place}</Text>
           <Text style={styles.heroDesc} numberOfLines={2}>
@@ -123,11 +130,16 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
             {hero.elevation_m ? <Stat icon="trending-up-outline" label={`${hero.elevation_m} m`} /> : null}
             {hero.distance_km ? <Stat icon="navigate-outline" label={`${hero.distance_km} km`} /> : null}
           </View>
+          {resuming && (
+            <View style={styles.resumeBar} testID="scenic-resume-progress">
+              <View style={[styles.resumeFill, { width: `${Math.round((resume?.pct ?? 0) * 100)}%` }]} />
+            </View>
+          )}
           <View style={styles.heroCtas}>
-            <Pressable testID="begin-scenic-journey" onPress={() => open(hero.id)} accessibilityRole="button" accessibilityLabel={`Begin scenic journey: ${hero.name}`}
+            <Pressable testID="begin-scenic-journey" onPress={() => open(hero.id)} accessibilityRole="button" accessibilityLabel={resuming ? `Resume ride: ${hero.name}` : `Begin scenic journey: ${hero.name}`}
               style={({ hovered }: any) => [styles.primaryCta, hovered && styles.primaryCtaHover]}>
               <Ionicons name="play" size={16} color="#fff" />
-              <Text style={styles.primaryCtaText}>BEGIN SCENIC JOURNEY</Text>
+              <Text style={styles.primaryCtaText}>{resuming ? "RESUME RIDE" : "BEGIN SCENIC JOURNEY"}</Text>
             </Pressable>
             <Pressable testID="surprise-me" onPress={surprise} accessibilityRole="button" accessibilityLabel="Surprise me with a random scenic ride"
               style={({ hovered }: any) => [styles.surpriseCta, hovered && styles.surpriseCtaHover]}>
@@ -270,6 +282,9 @@ const styles = StyleSheet.create({
   guidedBadge: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(0,0,0,0.5)", borderWidth: 1, borderColor: "rgba(245,179,1,0.35)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
   guidedText: { color: colors.yellow, fontSize: 9.5, fontWeight: "700" },
   heroTitle: { color: "#fff", fontSize: 24, fontWeight: "900", letterSpacing: 0.3 },
+  resumeKicker: { color: colors.yellow, fontSize: 11, fontWeight: "900", letterSpacing: 2, marginBottom: 3 },
+  resumeBar: { height: 5, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.22)", overflow: "hidden", marginTop: 12, maxWidth: 520 },
+  resumeFill: { height: "100%", borderRadius: 3, backgroundColor: colors.yellow },
   heroCountry: { color: colors.yellow, fontSize: 14, fontWeight: "700", marginTop: 2 },
   heroDesc: { color: "rgba(255,255,255,0.85)", fontSize: 13.5, lineHeight: 19, marginTop: 7, maxWidth: 560 },
   heroStats: { flexDirection: "row", flexWrap: "wrap", gap: 14, marginTop: 12 },

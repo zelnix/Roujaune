@@ -10,6 +10,7 @@ import { resetNotificationReadState } from "./notifications";
 import { refreshA11yFromServer, resetA11y } from "./a11y";
 import { resetTodayMode, hydrateTodayModeForUser, clearTodayModeForUser } from "./today-mode";
 import { refreshScenicFavourites, resetScenicFavourites } from "./scenic-routes";
+import { refreshScenicResume, resetScenicResume } from "./scenic-resume";
 import { resetModeInterest } from "./mode-interest";
 
 const API = (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
@@ -138,6 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // sessions until they explicitly choose another mode).
       hydrateTodayModeForUser(user.user_id);
       refreshScenicFavourites();
+      refreshScenicResume();
     }
   }, [user]);
 

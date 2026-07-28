@@ -5,6 +5,7 @@ export type YouTubePlayerProps = {
   height: number;
   width: number;
   playing: boolean;
+  startSeconds?: number;
   onStateChange?: (playing: boolean) => void;
 };
 
@@ -16,7 +17,7 @@ export type YouTubePlayerProps = {
  *  size. On high-DPI displays a CSS-sized player under-samples and looks soft,
  *  so we render the iframe at a large internal resolution (up to 4K) and scale
  *  it down to fit — YouTube then streams the highest-quality source available. */
-export default function YouTubePlayer({ videoId, height, width, playing, onStateChange }: YouTubePlayerProps) {
+export default function YouTubePlayer({ videoId, height, width, playing, startSeconds, onStateChange }: YouTubePlayerProps) {
   const ref = React.useRef<HTMLIFrameElement | null>(null);
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const dpr = typeof window !== "undefined" ? Math.max(window.devicePixelRatio || 1, 1) : 1;
@@ -30,6 +31,7 @@ export default function YouTubePlayer({ videoId, height, width, playing, onState
     `https://www.youtube.com/embed/${videoId}` +
     `?rel=0&modestbranding=1&playsinline=1&iv_load_policy=3&fs=1&controls=0&disablekb=1` +
     `&enablejsapi=1&vq=hd2160&hd=1&mute=1` +
+    (startSeconds && startSeconds > 2 ? `&start=${Math.floor(startSeconds)}` : "") +
     (origin ? `&origin=${encodeURIComponent(origin)}` : "") +
     (playing ? "&autoplay=1" : "");
 

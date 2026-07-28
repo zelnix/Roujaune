@@ -10,7 +10,9 @@ import Svg, { Circle } from "react-native-svg";
 import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 import YouTubePlayer from "@/src/components/YouTubePlayer";
 import { colors, radius } from "@/src/theme";
-import { useScenicRoute, logScenicRide, ytThumb } from "@/src/lib/scenic-routes";
+import * as Speech from "expo-speech";
+import { useScenicRoute, useScenicPois, ScenicPoi, logScenicRide, ytThumb } from "@/src/lib/scenic-routes";
+import { getResume, saveResume, clearResume } from "@/src/lib/scenic-resume";
 import { useCoach, useVoiceGuidance, setVoiceGuidance, VoiceGuidance } from "@/src/lib/coach-persona";
 
 const SERIF = Platform.select({ ios: "Georgia", android: "serif", default: "Georgia, 'Times New Roman', serif" }) as string;
@@ -62,12 +64,28 @@ function Ring({ pct }: { pct: number }) {
   );
 }
 
-/** Static audio waveform decoration. */
-function Waveform() {
+/** Audio waveform — animates only while companion narration is playing. */
+function Waveform({ active }: { active?: boolean }) {
   const bars = [6, 12, 20, 10, 16, 24, 14, 8, 18, 12, 22, 9, 15, 20, 7, 13];
+  const anim = React.useRef(new Animated.Value(0)).current;
+  React.useEffect(() => {
+    if (!active) { anim.stopAnimation(); anim.setValue(0); return; }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, { toValue: 1, duration: 420, useNativeDriver: false }),
+        Animated.timing(anim, { toValue: 0, duration: 420, useNativeDriver: false }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [active, anim]);
   return (
     <View style={s.wave}>
-      {bars.map((h, i) => <View key={i} style={[s.waveBar, { height: h }]} />)}
+      {bars.map((h, i) => {
+        const min = active ? Math.max(3, h * 0.4) : h;
+        const scaled = anim.interpolate({ inputRange: [0, 1], outputRange: [min, active ? h * (0.7 + (i % 5) * 0.12) : h] });
+        return <Animated.View key={i} style={[s.waveBar, { height: scaled as any, opacity: active ? 1 : 0.7 }]} />;
+      })}
     </View>
   );
 }
@@ -79,16 +97,25 @@ export default function ScenicRideScreen() {
   const { route: routeId } = useLocalSearchParams<{ route?: string }>();
   const { width, height } = useWindowDimensions();
   const { route, loading, error } = useScenicRoute(routeId);
+  const { pois } = useScenicPois(routeId);
   const persona = useCoach();
 
+  // Resume support: continue from where the rider left off (if any).
+  const resumeRef = React.useRef(getResume());
+  const r0 = resumeRef.current && routeId && resumeRef.current.routeId === routeId ? resumeRef.current : null;
+
   const [playing, setPlaying] = React.useState(true);
-  const [elapsed, setElapsed] = React.useState(0);
-  const [saving, setSaving] = React.useState(false);
+  const [elapsed, setElapsed] = React.useState(r0 ? r0.elapsedSec : 0);
   const [hud, setHud] = React.useState(true);
   const [show, setShow] = React.useState({ location: true, comingUp: true, companion: true, metrics: true });
   const hideOne = (k: keyof typeof show) => setShow((s) => ({ ...s, [k]: false }));
   const [musicOn, setMusicOn] = React.useState(true);
   const [musicLevel, setMusicLevel] = React.useState(2); // 1..4
+  const [heard, setHeard] = React.useState<Set<number>>(new Set());
+  const [hiddenPoi, setHiddenPoi] = React.useState<Set<number>>(new Set());
+  const [saved, setSaved] = React.useState<Set<number>>(new Set());
+  const [narrating, setNarrating] = React.useState(false);
+  const [pendingNav, setPendingNav] = React.useState<null | (() => void)>(null);
   const guidance = useVoiceGuidance();
   const audioMode: "quiet" | "discover" | "guided" =
     guidance === "muted" ? "quiet" : guidance === "full" ? "guided" : "discover";
@@ -128,13 +155,72 @@ export default function ScenicRideScreen() {
   }, [hud, fade]);
 
   const leave = () => { if (router.canGoBack()) router.back(); else router.replace("/"); };
-  const finish = async () => {
-    if (!route) return leave();
-    setSaving(true);
-    await logScenicRide(route, elapsed);
-    setSaving(false);
-    leave();
+
+  const durationSec = (route?.duration_min ?? 45) * 60;
+  const startPos = r0 ? r0.positionSec : 0;
+  const positionSec = Math.max(0, startPos + (elapsed - (r0 ? r0.elapsedSec : 0)));
+  const pct = Math.min(1, positionSec / durationSec);
+  const completed = pct >= 0.98;
+
+  // Narrate a point-of-interest with the companion's voice; drives the waveform.
+  const narrate = React.useCallback((text: string, order: number) => {
+    if (narrating) { Speech.stop(); setNarrating(false); return; }
+    if (!text) return;
+    setNarrating(true);
+    setHeard((s) => new Set(s).add(order));
+    Speech.stop();
+    Speech.speak(text, {
+      pitch: persona.id === "adriana" ? 1.08 : 0.96,
+      rate: 0.95,
+      onDone: () => setNarrating(false),
+      onStopped: () => setNarrating(false),
+      onError: () => setNarrating(false),
+    });
+  }, [narrating, persona.id]);
+
+  // Persist an in-progress ride so it can be resumed from the Scenic hero.
+  const persistResume = React.useCallback(() => {
+    if (!route || completed) return;
+    saveResume({ routeId: route.id, name: route.name, place: route.place, positionSec, elapsedSec: elapsed, pct });
+  }, [route, completed, positionSec, elapsed, pct]);
+
+  const endRide = async (saveState: boolean, navFn?: () => void) => {
+    Speech.stop();
+    if (saveState && !completed && route) {
+      await persistResume();
+    } else if (route) {
+      await clearResume();
+      await logScenicRide(route, elapsed);
+    }
+    (navFn ?? leave)();
   };
+
+  // Auto-save the resume point every few seconds while riding.
+  React.useEffect(() => {
+    if (!playing) return;
+    const t = setInterval(() => { persistResume(); }, 6000);
+    return () => clearInterval(t);
+  }, [playing, persistResume]);
+  // Clear resume once the ride is essentially complete.
+  React.useEffect(() => { if (completed) clearResume(); }, [completed]);
+  // Stop narration on unmount.
+  React.useEffect(() => () => { Speech.stop(); }, []);
+
+  // Next uncompleted point of interest along the ride.
+  const upcomingPoi: ScenicPoi | null = React.useMemo(() => {
+    const list = pois.filter((p) => !hiddenPoi.has(p.order));
+    if (list.length === 0) return null;
+    return list.find((p) => p.at_pct >= pct - 0.01) ?? list[list.length - 1];
+  }, [pois, pct, hiddenPoi]);
+
+  // Guided mode: auto-narrate a POI as the rider reaches it.
+  React.useEffect(() => {
+    if (audioMode !== "guided" || !upcomingPoi || narrating) return;
+    if (pct >= upcomingPoi.at_pct - 0.005 && !heard.has(upcomingPoi.order)) {
+      narrate(upcomingPoi.narration, upcomingPoi.order);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pct, upcomingPoi, audioMode]);
 
   if (loading) {
     return (
@@ -164,11 +250,10 @@ export default function ScenicRideScreen() {
     ? { w: width, h: width * 9 / 16 }
     : { w: height * 16 / 9, h: height };
 
-  const durationSec = (route.duration_min ?? 45) * 60;
-  const pct = Math.min(1, elapsed / durationSec);
-  const remainingMin = Math.max(0, Math.ceil((durationSec - elapsed) / 60));
+  const remainingMin = Math.max(0, Math.ceil((durationSec - positionSec) / 60));
   const km = ((route.distance_km ?? 0) * pct).toFixed(1);
-  const upcoming = route.highlights?.[0] ?? "the next highlight";
+  const currentArea = [...pois].filter((p) => p.at_pct <= pct + 0.001).slice(-1)[0]?.title ?? (route.place || route.name);
+  const upcoming = upcomingPoi?.title ?? (route.highlights?.[0] ?? "the next highlight");
   const subtitle = route.tag || "Scenic Route";
 
   return (
@@ -178,7 +263,7 @@ export default function ScenicRideScreen() {
       {/* POV video — full-bleed cover */}
       <View style={s.videoWrap} pointerEvents="none">
         <View style={{ width: cover.w, height: cover.h, marginLeft: (width - cover.w) / 2, marginTop: (height - cover.h) / 2 }}>
-          <YouTubePlayer height={cover.h} width={cover.w} playing={playing} videoId={route.youtube_id} onStateChange={setPlaying} />
+          <YouTubePlayer height={cover.h} width={cover.w} playing={playing} videoId={route.youtube_id} startSeconds={Math.floor(startPos)} onStateChange={setPlaying} />
         </View>
       </View>
 
@@ -204,7 +289,7 @@ export default function ScenicRideScreen() {
             <Ionicons name="eye-off-outline" size={16} color={colors.textFaint} style={s.hideHint} />
             <View style={s.rowCenter}>
               <Ionicons name="location" size={16} color={colors.yellow} />
-              <Text style={s.placeText} numberOfLines={1}>{route.place || route.name}</Text>
+              <Text style={s.placeText} numberOfLines={1}>{currentArea}</Text>
             </View>
             <View style={s.divider} />
             <View style={s.rowCenter}>
@@ -238,19 +323,29 @@ export default function ScenicRideScreen() {
           </View>
         </View>
 
-        {/* Right — coming up (tap to hide) */}
-        {show.comingUp && (
-          <Pressable style={s.rightPanel} onPress={() => hideOne("comingUp")} testID="hide-comingup" accessibilityRole="button" accessibilityLabel="Hide coming up panel">
-            <Ionicons name="close" size={15} color={colors.textFaint} style={s.hideHint} />
-            <Text style={s.comingUp}>COMING UP</Text>
-            <Text style={s.poiName}>{upcoming}</Text>
-            <Image source={{ uri: route.thumbnail || ytThumb(route.youtube_id) }} style={s.poiImg} contentFit="cover" />
-            <Text style={s.poiDesc}>A scenic highlight along the {subtitle.toLowerCase()} — settle in as you approach.</Text>
-            <Pressable style={s.hearBtn} testID="hear-the-story" onPress={() => setAudio("guided")} accessibilityRole="button" accessibilityLabel={`Hear the story of ${upcoming}`}>
-              <Ionicons name="headset" size={16} color="#fff" />
-              <Text style={s.hearText}>Hear the story</Text>
+        {/* Right — points of interest (tap header area to hide) */}
+        {show.comingUp && upcomingPoi && (
+          <View style={s.rightPanel} pointerEvents="box-none">
+            <Pressable onPress={() => hideOne("comingUp")} testID="hide-comingup" accessibilityRole="button" accessibilityLabel="Hide points of interest" style={s.poiHead}>
+              <Text style={s.comingUp}>POINTS OF INTEREST</Text>
+              <Ionicons name="eye-off-outline" size={15} color={colors.textFaint} />
             </Pressable>
-          </Pressable>
+            <Text style={s.poiName}>{upcomingPoi.title}</Text>
+            <Image source={{ uri: route.thumbnail || ytThumb(route.youtube_id) }} style={s.poiImg} contentFit="cover" />
+            <Text style={s.poiDesc}>{upcomingPoi.description || `A scenic highlight along the ${subtitle.toLowerCase()}.`}</Text>
+            <View style={s.poiActions}>
+              <Pressable style={[s.hearBtn, { flex: 1 }]} testID="hear-the-story" onPress={() => narrate(upcomingPoi.narration, upcomingPoi.order)} accessibilityRole="button" accessibilityLabel={`${narrating ? "Stop" : "Hear"} the story of ${upcomingPoi.title}`}>
+                <Ionicons name={narrating ? "pause" : "headset"} size={16} color="#fff" />
+                <Text style={s.hearText}>{narrating ? "Stop story" : "Hear the story"}</Text>
+              </Pressable>
+              <Pressable style={s.poiIconBtn} testID="poi-save" onPress={() => setSaved((sv) => { const n = new Set(sv); n.has(upcomingPoi.order) ? n.delete(upcomingPoi.order) : n.add(upcomingPoi.order); return n; })} accessibilityRole="button" accessibilityLabel="Save this discovery">
+                <Ionicons name={saved.has(upcomingPoi.order) ? "bookmark" : "bookmark-outline"} size={18} color={colors.yellow} />
+              </Pressable>
+              <Pressable style={s.poiIconBtn} testID="poi-skip" onPress={() => setHiddenPoi((h) => new Set(h).add(upcomingPoi.order))} accessibilityRole="button" accessibilityLabel="Skip this discovery">
+                <Ionicons name="play-skip-forward-outline" size={18} color={colors.textDim} />
+              </Pressable>
+            </View>
+          </View>
         )}
 
         {/* Companion card (tap to hide) */}
@@ -260,9 +355,13 @@ export default function ScenicRideScreen() {
             <View style={{ flex: 1 }}>
               <Text style={s.companionName}>{persona.name}</Text>
               <Text style={s.companionText}>
-                You&apos;re approaching one of {route.place || route.name}&apos;s most iconic views. Settle in, enjoy the {subtitle.toLowerCase()}, and I&apos;ll share a story as we reach {upcoming}.
+                {audioMode === "quiet"
+                  ? `Riding quietly through ${currentArea}. I'll stay out of the way — tap Discover or Guided any time.`
+                  : narrating
+                    ? (upcomingPoi?.narration ?? `Enjoy the ${subtitle.toLowerCase()}.`)
+                    : `We're passing ${currentArea}. ${audioMode === "guided" ? `I'll share a story as we reach ${upcoming}.` : `Tap "Hear the story" for ${upcoming}.`}`}
               </Text>
-              <Waveform />
+              <Waveform active={narrating} />
             </View>
           </Pressable>
         )}
@@ -272,8 +371,8 @@ export default function ScenicRideScreen() {
           <View style={s.metricsBar} pointerEvents="box-none">
             <Pressable style={s.rowCenter} onPress={() => hideOne("metrics")} testID="hide-metrics" accessibilityRole="button" accessibilityLabel="Hide metrics bar">
               <Metric icon="time-outline" value={clock(elapsed)} label="Time" />
-              <Metric icon="sync-outline" value="78" label="rpm" />
-              <Metric icon="heart-outline" value="118" label="bpm" />
+              <Metric icon="sync-outline" value="—" label="rpm" />
+              <Metric icon="heart-outline" value="—" label="bpm" />
               <Metric icon="navigate-outline" value={km} label="km" />
             </Pressable>
             <View style={s.segment}>
@@ -291,11 +390,11 @@ export default function ScenicRideScreen() {
             <Image source={require("../assets/images/wordmark_t.png")} style={s.navWordmarkImg} contentFit="contain" />
           </View>
           <View style={s.navItems}>
-            <NavItem icon="home-outline" label="Home" onPress={() => router.replace("/")} />
-            <NavItem icon="compass-outline" label="Explore" onPress={() => router.replace("/scenic-destinations")} />
+            <NavItem icon="home-outline" label="Home" onPress={() => setPendingNav(() => () => router.replace("/"))} />
+            <NavItem icon="compass-outline" label="Explore" onPress={async () => { await persistResume(); router.replace("/scenic-destinations"); }} />
             <NavItem icon="bicycle" label="Ride" active />
-            <NavItem icon="map-outline" label="Journeys" onPress={() => router.replace("/saved-destinations")} />
-            <NavItem icon="headset-outline" label="Audio" onPress={() => setAudio(audioMode === "guided" ? "quiet" : "guided")} />
+            <NavItem icon="map-outline" label="Journeys" onPress={() => setPendingNav(() => () => router.replace("/saved-destinations"))} />
+            <NavItem icon="headset-outline" label="Audio" onPress={() => setMusicOn((v) => !v)} />
             <NavItem icon="settings-outline" label="Settings" onPress={() => router.push("/settings")} />
             <NavItem icon="people-outline" label="Companion" onPress={() => router.push("/profile")} />
           </View>
@@ -314,10 +413,31 @@ export default function ScenicRideScreen() {
         <Pressable style={s.utilBtn} onPress={() => setPlaying((p) => !p)} testID="scenic-playpause" accessibilityRole="button" accessibilityLabel={playing ? "Pause" : "Play"}>
           <Ionicons name={playing ? "pause" : "play"} size={20} color="#fff" />
         </Pressable>
-        <Pressable style={[s.utilBtn, s.utilExit]} onPress={finish} disabled={saving} testID="scenic-finish" accessibilityRole="button" accessibilityLabel="Finish ride">
+        <Pressable style={[s.utilBtn, s.utilExit]} onPress={() => setPendingNav(() => leave)} testID="scenic-finish" accessibilityRole="button" accessibilityLabel="End ride">
           <Ionicons name="close" size={20} color="#fff" />
         </Pressable>
       </View>
+
+      {/* Save & leave / End without saving / Continue dialog */}
+      {pendingNav && (
+        <View style={s.dialogWrap} testID="leave-dialog">
+          <View style={s.dialogCard}>
+            <Text style={s.dialogTitle}>Leave this ride?</Text>
+            <Text style={s.dialogSub}>You&apos;re {Math.round(pct * 100)}% through {route.name}.</Text>
+            <Pressable style={[s.dialogBtn, s.dialogPrimary]} testID="dlg-save" onPress={() => { const n = pendingNav; setPendingNav(null); endRide(true, n); }}>
+              <Ionicons name="bookmark" size={16} color="#fff" />
+              <Text style={s.dialogBtnText}>Save &amp; leave</Text>
+            </Pressable>
+            <Pressable style={[s.dialogBtn, s.dialogDanger]} testID="dlg-end" onPress={() => { const n = pendingNav; setPendingNav(null); endRide(false, n); }}>
+              <Ionicons name="stop-circle-outline" size={16} color="#fff" />
+              <Text style={s.dialogBtnText}>End without saving</Text>
+            </Pressable>
+            <Pressable style={[s.dialogBtn, s.dialogGhost]} testID="dlg-continue" onPress={() => setPendingNav(null)}>
+              <Text style={[s.dialogBtnText, { color: colors.white }]}>Continue riding</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -411,8 +531,11 @@ const s = StyleSheet.create({
   poiName: { color: colors.white, fontFamily: SERIF, fontSize: 26, fontWeight: "700", marginTop: 4, marginBottom: 12 },
   poiImg: { width: "100%", height: 150, borderRadius: radius.md, backgroundColor: "#0E1512" },
   poiDesc: { color: colors.textDim, fontSize: 13.5, lineHeight: 20, marginTop: 12 },
-  hearBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.red, borderRadius: radius.md, paddingVertical: 13, marginTop: 14, minHeight: 46 },
+  hearBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.red, borderRadius: radius.md, paddingVertical: 13, minHeight: 46 },
   hearText: { color: "#fff", fontSize: 14.5, fontWeight: "700" },
+  poiHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  poiActions: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 14 },
+  poiIconBtn: { width: 46, height: 46, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: BORDER },
 
   companion: { position: "absolute", left: 24, bottom: 168, width: 420, flexDirection: "row", gap: 14, backgroundColor: PANEL, borderRadius: radius.xl, borderWidth: 1, borderColor: BORDER, padding: 16 },
   avatar: { width: 52, height: 52, borderRadius: 26, borderWidth: 1.5, borderColor: colors.yellow, backgroundColor: "#0E1512" },
@@ -443,4 +566,14 @@ const s = StyleSheet.create({
   utility: { position: "absolute", top: 24, right: 24, flexDirection: "row", gap: 10, zIndex: 20 },
   utilBtn: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.5)", borderWidth: 1, borderColor: BORDER },
   utilExit: { backgroundColor: "rgba(224,30,43,0.85)", borderColor: colors.red },
+
+  dialogWrap: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.62)", alignItems: "center", justifyContent: "center", zIndex: 30, padding: 24 },
+  dialogCard: { width: "100%", maxWidth: 400, backgroundColor: "#0E1512", borderRadius: radius.xl, borderWidth: 1, borderColor: BORDER, padding: 22, gap: 10 },
+  dialogTitle: { color: colors.white, fontSize: 20, fontWeight: "900" },
+  dialogSub: { color: colors.textDim, fontSize: 13.5, marginBottom: 6 },
+  dialogBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: radius.md, paddingVertical: 14, minHeight: 50 },
+  dialogPrimary: { backgroundColor: colors.red },
+  dialogDanger: { backgroundColor: "#3a1216", borderWidth: 1, borderColor: "rgba(224,30,43,0.5)" },
+  dialogGhost: { backgroundColor: "transparent", borderWidth: 1, borderColor: BORDER },
+  dialogBtnText: { color: "#fff", fontSize: 15, fontWeight: "800" },
 });
