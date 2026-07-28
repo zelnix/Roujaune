@@ -178,32 +178,54 @@ export const experienceNavigation: Record<RiderExperience, ExperienceNavigation>
   },
 };
 
-// ── reactive store ──────────────────────────────────────────────────────────
-const KEY = "roujaune:today-mode";
+// ── reactive store (per-rider, persistent across sessions) ───────────────────
+// The rider's chosen experience is remembered PER user id and survives logout /
+// app restart — it only changes when the rider explicitly picks another mode.
+const KEY_BASE = "roujaune:today-mode";
+let activeKey = KEY_BASE;            // anonymous until a rider is known
 let experience: RiderExperience = "training";
 const lastRoute: Partial<Record<RiderExperience, string>> = {};
 let hydrated = false;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 
+function keyFor(userId: string | null | undefined): string {
+  return userId ? `${KEY_BASE}:${userId}` : KEY_BASE;
+}
+
+async function loadFrom(key: string): Promise<void> {
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    if (raw) {
+      const d = JSON.parse(raw);
+      if (d.experience && experienceNavigation[d.experience as RiderExperience]) experience = d.experience;
+      if (d.lastRoute) Object.assign(lastRoute, d.lastRoute);
+    }
+  } catch { /* keep current */ }
+}
+
+/** Pre-login safety hydration (anonymous key). No-op once a rider has hydrated. */
 export function initTodayMode() {
   if (hydrated) return;
   hydrated = true;
-  (async () => {
-    try {
-      const raw = await AsyncStorage.getItem(KEY);
-      if (raw) {
-        const d = JSON.parse(raw);
-        if (d.experience && experienceNavigation[d.experience as RiderExperience]) experience = d.experience;
-        if (d.lastRoute) Object.assign(lastRoute, d.lastRoute);
-        emit();
-      }
-    } catch { /* keep default */ }
-  })();
+  loadFrom(activeKey).then(emit);
+}
+
+/** Bind the store to a specific rider and restore THEIR remembered experience.
+ *  Called on login / session restore whenever the auth user changes. */
+export async function hydrateTodayModeForUser(userId: string | null | undefined) {
+  activeKey = keyFor(userId);
+  hydrated = true;
+  // Reset to defaults first so one rider's choice never leaks to another, then
+  // overlay this rider's persisted selection (if any).
+  experience = "training";
+  for (const k of Object.keys(lastRoute)) delete (lastRoute as any)[k];
+  await loadFrom(activeKey);
+  emit();
 }
 
 function persist() {
-  AsyncStorage.setItem(KEY, JSON.stringify({ experience, lastRoute })).catch(() => {});
+  AsyncStorage.setItem(activeKey, JSON.stringify({ experience, lastRoute })).catch(() => {});
 }
 
 export function getExperience(): RiderExperience {
@@ -227,12 +249,20 @@ export function lastRouteFor(exp: RiderExperience): string {
   return lastRoute[exp] || experienceNavigation[exp].defaultRoute;
 }
 
+/** Logout: reset the IN-MEMORY store to defaults but KEEP each rider's persisted
+ *  choice on disk, so it's restored the next time they sign in. */
 export function resetTodayMode() {
   hydrated = false;
+  activeKey = KEY_BASE;
   experience = "training";
   for (const k of Object.keys(lastRoute)) delete (lastRoute as any)[k];
-  AsyncStorage.removeItem(KEY).catch(() => {});
   emit();
+}
+
+/** Account deletion: forget this rider's remembered experience entirely. */
+export function clearTodayModeForUser(userId: string | null | undefined) {
+  AsyncStorage.removeItem(keyFor(userId)).catch(() => {});
+  resetTodayMode();
 }
 
 /** Resolve a nav item by key within the CURRENT experience (for nav handlers). */

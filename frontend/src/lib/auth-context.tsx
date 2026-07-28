@@ -8,7 +8,7 @@ import { refreshCoachFromServer, resetCoach } from "./coach-persona";
 import { resetRiderProfile } from "./rider-profile";
 import { resetNotificationReadState } from "./notifications";
 import { refreshA11yFromServer, resetA11y } from "./a11y";
-import { resetTodayMode } from "./today-mode";
+import { resetTodayMode, hydrateTodayModeForUser, clearTodayModeForUser } from "./today-mode";
 
 const API = (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
 const AUTH_BASE = "https://auth.emergentagent.com";
@@ -132,6 +132,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user) {
       refreshCoachFromServer();
       refreshA11yFromServer();
+      // Restore this rider's remembered riding experience (persists across
+      // sessions until they explicitly choose another mode).
+      hydrateTodayModeForUser(user.user_id);
     }
   }, [user]);
 
@@ -219,10 +222,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     resetRiderProfile();
     resetNotificationReadState();
     resetA11y();
-    resetTodayMode();
+    clearTodayModeForUser(user?.user_id);
     await setToken(null);
     setUser(null);
-  }, []);
+  }, [user]);
 
   const forgotPassword = useCallback(async (email: string) => {
     await post("/api/auth/forgot-password", { email });
