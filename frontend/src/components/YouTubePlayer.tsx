@@ -16,13 +16,14 @@ export default function YouTubePlayer({ videoId, height, width, playing, onState
       height={height}
       width={width}
       play={playing}
+      mute
       videoId={videoId}
       onChangeState={(state: string) => {
         if (state === "playing") onStateChange?.(true);
         else if (state === "paused" || state === "ended") onStateChange?.(false);
       }}
       webViewProps={{ allowsInlineMediaPlayback: true }}
-      initialPlayerParams={{ modestbranding: true, rel: false, controls: true }}
+      initialPlayerParams={{ modestbranding: true, rel: false, controls: false, iv_load_policy: 3, mute: true }}
     />
   );
 }

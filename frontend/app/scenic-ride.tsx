@@ -7,10 +7,11 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import MaskedView from "@react-native-masked-view/masked-view";
 import Svg, { Circle } from "react-native-svg";
+import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 import YouTubePlayer from "@/src/components/YouTubePlayer";
 import { colors, radius } from "@/src/theme";
 import { useScenicRoute, logScenicRide, ytThumb } from "@/src/lib/scenic-routes";
-import { useCoach } from "@/src/lib/coach-persona";
+import { useCoach, useVoiceGuidance, setVoiceGuidance, VoiceGuidance } from "@/src/lib/coach-persona";
 
 const SERIF = Platform.select({ ios: "Georgia", android: "serif", default: "Georgia, 'Times New Roman', serif" }) as string;
 
@@ -84,8 +85,32 @@ export default function ScenicRideScreen() {
   const [elapsed, setElapsed] = React.useState(0);
   const [saving, setSaving] = React.useState(false);
   const [hud, setHud] = React.useState(true);
-  const [audioMode, setAudioMode] = React.useState<"quiet" | "discover" | "guided">("discover");
+  const guidance = useVoiceGuidance();
+  const audioMode: "quiet" | "discover" | "guided" =
+    guidance === "muted" ? "quiet" : guidance === "full" ? "guided" : "discover";
+  const setAudio = (m: "quiet" | "discover" | "guided") => {
+    const map: Record<typeof m, VoiceGuidance> = { quiet: "muted", discover: "essential", guided: "full" } as const;
+    setVoiceGuidance(map[m]);
+  };
   const fade = React.useRef(new Animated.Value(1)).current;
+
+  // Soft, looping ambient soundtrack that replaces the (muted) video audio.
+  const ambient = useAudioPlayer(require("../assets/audio/scenic_ambient.mp3"));
+  React.useEffect(() => {
+    setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
+    try { ambient.loop = true; ambient.volume = 0.18; } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Music follows the ride: plays while riding, softens/mutes in Quiet mode.
+  React.useEffect(() => {
+    try {
+      ambient.volume = audioMode === "quiet" ? 0.06 : 0.18;
+      if (playing) ambient.play(); else ambient.pause();
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing, audioMode]);
+  // Stop the music when leaving the ride.
+  React.useEffect(() => () => { try { ambient.pause(); } catch {} }, [ambient]);
 
   React.useEffect(() => {
     if (!playing) return;
@@ -208,7 +233,7 @@ export default function ScenicRideScreen() {
           <Text style={s.poiName}>{upcoming}</Text>
           <Image source={{ uri: route.thumbnail || ytThumb(route.youtube_id) }} style={s.poiImg} contentFit="cover" />
           <Text style={s.poiDesc}>A scenic highlight along the {subtitle.toLowerCase()} — settle in as you approach.</Text>
-          <Pressable style={s.hearBtn} testID="hear-the-story" onPress={() => setAudioMode("guided")} accessibilityRole="button" accessibilityLabel={`Hear the story of ${upcoming}`}>
+          <Pressable style={s.hearBtn} testID="hear-the-story" onPress={() => setAudio("guided")} accessibilityRole="button" accessibilityLabel={`Hear the story of ${upcoming}`}>
             <Ionicons name="headset" size={16} color="#fff" />
             <Text style={s.hearText}>Hear the story</Text>
           </Pressable>
@@ -233,9 +258,9 @@ export default function ScenicRideScreen() {
           <Metric icon="heart-outline" value="118" label="bpm" />
           <Metric icon="navigate-outline" value={km} label="km" />
           <View style={s.segment}>
-            <Seg icon="leaf-outline" label="Quiet" active={audioMode === "quiet"} onPress={() => setAudioMode("quiet")} />
-            <Seg icon="sparkles-outline" label="Discover" active={audioMode === "discover"} onPress={() => setAudioMode("discover")} />
-            <Seg icon="headset-outline" label="Guided" active={audioMode === "guided"} onPress={() => setAudioMode("guided")} />
+            <Seg icon="leaf-outline" label="Quiet" active={audioMode === "quiet"} onPress={() => setAudio("quiet")} />
+            <Seg icon="sparkles-outline" label="Discover" active={audioMode === "discover"} onPress={() => setAudio("discover")} />
+            <Seg icon="headset-outline" label="Guided" active={audioMode === "guided"} onPress={() => setAudio("guided")} />
           </View>
         </View>
 
@@ -250,7 +275,7 @@ export default function ScenicRideScreen() {
             <NavItem icon="compass-outline" label="Explore" onPress={() => router.replace("/scenic-destinations")} />
             <NavItem icon="bicycle" label="Ride" active />
             <NavItem icon="map-outline" label="Journeys" onPress={() => router.replace("/saved-destinations")} />
-            <NavItem icon="headset-outline" label="Audio" onPress={() => setAudioMode((m) => (m === "guided" ? "quiet" : "guided"))} />
+            <NavItem icon="headset-outline" label="Audio" onPress={() => setAudio(audioMode === "guided" ? "quiet" : "guided")} />
             <NavItem icon="settings-outline" label="Settings" onPress={() => router.push("/settings")} />
             <NavItem icon="people-outline" label="Companion" onPress={() => router.push("/profile")} />
           </View>
