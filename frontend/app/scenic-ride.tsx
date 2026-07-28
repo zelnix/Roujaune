@@ -85,6 +85,10 @@ export default function ScenicRideScreen() {
   const [elapsed, setElapsed] = React.useState(0);
   const [saving, setSaving] = React.useState(false);
   const [hud, setHud] = React.useState(true);
+  const [show, setShow] = React.useState({ location: true, comingUp: true, companion: true, metrics: true });
+  const hideOne = (k: keyof typeof show) => setShow((s) => ({ ...s, [k]: false }));
+  const [musicOn, setMusicOn] = React.useState(true);
+  const [musicLevel, setMusicLevel] = React.useState(2); // 1..4
   const guidance = useVoiceGuidance();
   const audioMode: "quiet" | "discover" | "guided" =
     guidance === "muted" ? "quiet" : guidance === "full" ? "guided" : "discover";
@@ -98,17 +102,18 @@ export default function ScenicRideScreen() {
   const ambient = useAudioPlayer(require("../assets/audio/scenic_ambient.mp3"));
   React.useEffect(() => {
     setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
-    try { ambient.loop = true; ambient.volume = 0.18; } catch {}
+    try { ambient.loop = true; } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  // Music follows the ride: plays while riding, softens/mutes in Quiet mode.
+  // Music follows the ride + the rider's on/off + volume choice.
   React.useEffect(() => {
+    const VOL = [0.08, 0.18, 0.32, 0.5];
     try {
-      ambient.volume = audioMode === "quiet" ? 0.06 : 0.18;
-      if (playing) ambient.play(); else ambient.pause();
+      ambient.volume = musicOn ? VOL[musicLevel - 1] : 0;
+      if (playing && musicOn) ambient.play(); else ambient.pause();
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing, audioMode]);
+  }, [playing, musicOn, musicLevel]);
   // Stop the music when leaving the ride.
   React.useEffect(() => () => { try { ambient.pause(); } catch {} }, [ambient]);
 
@@ -190,29 +195,35 @@ export default function ScenicRideScreen() {
           <GradientText text="SCENIC RIDE" style={s.titleText} />
         </View>
 
-        {/* Left — progress panel */}
-        <View style={s.leftPanel} pointerEvents="box-none">
-          <View style={s.rowCenter}>
-            <Ionicons name="location" size={16} color={colors.yellow} />
-            <Text style={s.placeText} numberOfLines={1}>{route.place || route.name}</Text>
-          </View>
-          <View style={s.divider} />
-          <View style={s.rowCenter}>
-            <Ring pct={pct} />
-            <View style={s.ringLabelWrap}><Text style={s.ringPct}>{Math.round(pct * 100)}%</Text></View>
-            <View style={{ marginLeft: 12 }}>
-              <Text style={s.metaBig}>{Math.round(pct * 100)}%</Text>
-              <Text style={s.metaSub}>of route explored</Text>
+        {/* Music on/off + volume */}
+        <MusicControl on={musicOn} level={musicLevel} onToggle={() => setMusicOn((v) => !v)} onLevel={(l) => { setMusicOn(true); setMusicLevel(l); }} />
+
+        {/* Left — progress panel (tap to hide) */}
+        {show.location && (
+          <Pressable style={s.leftPanel} onPress={() => hideOne("location")} testID="hide-location" accessibilityRole="button" accessibilityLabel="Hide location panel">
+            <Ionicons name="eye-off-outline" size={16} color={colors.textFaint} style={s.hideHint} />
+            <View style={s.rowCenter}>
+              <Ionicons name="location" size={16} color={colors.yellow} />
+              <Text style={s.placeText} numberOfLines={1}>{route.place || route.name}</Text>
             </View>
-          </View>
-          <View style={s.rowCenter}>
-            <Ionicons name="stopwatch-outline" size={22} color={colors.white} />
-            <View style={{ marginLeft: 12 }}>
-              <Text style={s.metaBig}>{remainingMin} min</Text>
-              <Text style={s.metaSub}>remaining</Text>
+            <View style={s.divider} />
+            <View style={s.rowCenter}>
+              <Ring pct={pct} />
+              <View style={s.ringLabelWrap}><Text style={s.ringPct}>{Math.round(pct * 100)}%</Text></View>
+              <View style={{ marginLeft: 12 }}>
+                <Text style={s.metaBig}>{Math.round(pct * 100)}%</Text>
+                <Text style={s.metaSub}>of route explored</Text>
+              </View>
             </View>
-          </View>
-        </View>
+            <View style={s.rowCenter}>
+              <Ionicons name="stopwatch-outline" size={22} color={colors.white} />
+              <View style={{ marginLeft: 12 }}>
+                <Text style={s.metaBig}>{remainingMin} min</Text>
+                <Text style={s.metaSub}>remaining</Text>
+              </View>
+            </View>
+          </Pressable>
+        )}
 
         {/* Center — destination */}
         <View style={s.center2} pointerEvents="none">
@@ -227,42 +238,51 @@ export default function ScenicRideScreen() {
           </View>
         </View>
 
-        {/* Right — coming up */}
-        <View style={s.rightPanel} pointerEvents="box-none">
-          <Text style={s.comingUp}>COMING UP</Text>
-          <Text style={s.poiName}>{upcoming}</Text>
-          <Image source={{ uri: route.thumbnail || ytThumb(route.youtube_id) }} style={s.poiImg} contentFit="cover" />
-          <Text style={s.poiDesc}>A scenic highlight along the {subtitle.toLowerCase()} — settle in as you approach.</Text>
-          <Pressable style={s.hearBtn} testID="hear-the-story" onPress={() => setAudio("guided")} accessibilityRole="button" accessibilityLabel={`Hear the story of ${upcoming}`}>
-            <Ionicons name="headset" size={16} color="#fff" />
-            <Text style={s.hearText}>Hear the story</Text>
+        {/* Right — coming up (tap to hide) */}
+        {show.comingUp && (
+          <Pressable style={s.rightPanel} onPress={() => hideOne("comingUp")} testID="hide-comingup" accessibilityRole="button" accessibilityLabel="Hide coming up panel">
+            <Ionicons name="close" size={15} color={colors.textFaint} style={s.hideHint} />
+            <Text style={s.comingUp}>COMING UP</Text>
+            <Text style={s.poiName}>{upcoming}</Text>
+            <Image source={{ uri: route.thumbnail || ytThumb(route.youtube_id) }} style={s.poiImg} contentFit="cover" />
+            <Text style={s.poiDesc}>A scenic highlight along the {subtitle.toLowerCase()} — settle in as you approach.</Text>
+            <Pressable style={s.hearBtn} testID="hear-the-story" onPress={() => setAudio("guided")} accessibilityRole="button" accessibilityLabel={`Hear the story of ${upcoming}`}>
+              <Ionicons name="headset" size={16} color="#fff" />
+              <Text style={s.hearText}>Hear the story</Text>
+            </Pressable>
           </Pressable>
-        </View>
+        )}
 
-        {/* Companion card */}
-        <View style={s.companion} pointerEvents="box-none">
-          <Image source={persona.image} style={s.avatar} contentFit="cover" contentPosition="top center" />
-          <View style={{ flex: 1 }}>
-            <Text style={s.companionName}>{persona.name}</Text>
-            <Text style={s.companionText}>
-              You&apos;re approaching one of {route.place || route.name}&apos;s most iconic views. Settle in, enjoy the {subtitle.toLowerCase()}, and I&apos;ll share a story as we reach {upcoming}.
-            </Text>
-            <Waveform />
-          </View>
-        </View>
+        {/* Companion card (tap to hide) */}
+        {show.companion && (
+          <Pressable style={s.companion} onPress={() => hideOne("companion")} testID="hide-companion" accessibilityRole="button" accessibilityLabel={`Hide ${persona.name} companion`}>
+            <Image source={persona.image} style={s.avatar} contentFit="cover" contentPosition="top center" />
+            <View style={{ flex: 1 }}>
+              <Text style={s.companionName}>{persona.name}</Text>
+              <Text style={s.companionText}>
+                You&apos;re approaching one of {route.place || route.name}&apos;s most iconic views. Settle in, enjoy the {subtitle.toLowerCase()}, and I&apos;ll share a story as we reach {upcoming}.
+              </Text>
+              <Waveform />
+            </View>
+          </Pressable>
+        )}
 
-        {/* Bottom metrics + audio mode */}
-        <View style={s.metricsBar} pointerEvents="box-none">
-          <Metric icon="time-outline" value={clock(elapsed)} label="Time" />
-          <Metric icon="sync-outline" value="78" label="rpm" />
-          <Metric icon="heart-outline" value="118" label="bpm" />
-          <Metric icon="navigate-outline" value={km} label="km" />
-          <View style={s.segment}>
-            <Seg icon="leaf-outline" label="Quiet" active={audioMode === "quiet"} onPress={() => setAudio("quiet")} />
-            <Seg icon="sparkles-outline" label="Discover" active={audioMode === "discover"} onPress={() => setAudio("discover")} />
-            <Seg icon="headset-outline" label="Guided" active={audioMode === "guided"} onPress={() => setAudio("guided")} />
+        {/* Bottom metrics + audio mode (tap the metrics area to hide) */}
+        {show.metrics && (
+          <View style={s.metricsBar} pointerEvents="box-none">
+            <Pressable style={s.rowCenter} onPress={() => hideOne("metrics")} testID="hide-metrics" accessibilityRole="button" accessibilityLabel="Hide metrics bar">
+              <Metric icon="time-outline" value={clock(elapsed)} label="Time" />
+              <Metric icon="sync-outline" value="78" label="rpm" />
+              <Metric icon="heart-outline" value="118" label="bpm" />
+              <Metric icon="navigate-outline" value={km} label="km" />
+            </Pressable>
+            <View style={s.segment}>
+              <Seg icon="leaf-outline" label="Quiet" active={audioMode === "quiet"} onPress={() => setAudio("quiet")} />
+              <Seg icon="sparkles-outline" label="Discover" active={audioMode === "discover"} onPress={() => setAudio("discover")} />
+              <Seg icon="headset-outline" label="Guided" active={audioMode === "guided"} onPress={() => setAudio("guided")} />
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Bottom nav */}
         <View style={s.nav} pointerEvents="box-none">
@@ -284,7 +304,11 @@ export default function ScenicRideScreen() {
 
       {/* Persistent utility cluster (always tappable, even when HUD hidden) */}
       <View style={s.utility} pointerEvents="box-none">
-        <Pressable style={s.utilBtn} onPress={() => setHud((v) => !v)} testID="hud-toggle" accessibilityRole="button" accessibilityLabel={hud ? "Hide overlay" : "Show overlay"}>
+        <Pressable style={s.utilBtn} onPress={() => {
+          const allShown = hud && show.location && show.comingUp && show.companion && show.metrics;
+          if (allShown) { setHud(false); }
+          else { setHud(true); setShow({ location: true, comingUp: true, companion: true, metrics: true }); }
+        }} testID="hud-toggle" accessibilityRole="button" accessibilityLabel="Show or hide overlay">
           <Ionicons name={hud ? "eye-outline" : "eye-off-outline"} size={20} color="#fff" />
         </Pressable>
         <Pressable style={s.utilBtn} onPress={() => setPlaying((p) => !p)} testID="scenic-playpause" accessibilityRole="button" accessibilityLabel={playing ? "Pause" : "Play"}>
@@ -328,6 +352,22 @@ function NavItem({ icon, label, active, onPress }: { icon: any; label: string; a
   );
 }
 
+function MusicControl({ on, level, onToggle, onLevel }: { on: boolean; level: number; onToggle: () => void; onLevel: (l: number) => void }) {
+  return (
+    <View style={s.music} testID="music-control">
+      <Pressable onPress={onToggle} hitSlop={8} style={s.musicBtn} testID="music-toggle" accessibilityRole="button" accessibilityLabel={on ? "Turn music off" : "Turn music on"}>
+        <Ionicons name={on ? "musical-notes" : "volume-mute"} size={16} color={on ? colors.yellow : colors.textDim} />
+      </Pressable>
+      <View style={s.musicBars}>
+        {[1, 2, 3, 4].map((i) => (
+          <Pressable key={i} onPress={() => onLevel(i)} hitSlop={6} testID={`music-level-${i}`} accessibilityRole="button" accessibilityLabel={`Music volume ${i}`}
+            style={[s.musicBar, { height: 6 + i * 4 }, on && i <= level ? s.musicBarOn : null]} />
+        ))}
+      </View>
+    </View>
+  );
+}
+
 const PANEL = "rgba(14,18,20,0.55)";
 const BORDER = "rgba(255,255,255,0.14)";
 
@@ -344,6 +384,14 @@ const s = StyleSheet.create({
 
   title: { position: "absolute", top: 26, left: 30 },
   titleText: { fontSize: 30, fontWeight: "900", fontStyle: "italic", letterSpacing: 0.5 },
+
+  music: { position: "absolute", top: 74, left: 30, flexDirection: "row", alignItems: "flex-end", gap: 10, backgroundColor: "rgba(14,18,20,0.6)", borderWidth: 1, borderColor: BORDER, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
+  musicBtn: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.06)" },
+  musicBars: { flexDirection: "row", alignItems: "flex-end", gap: 3, height: 24, paddingBottom: 2 },
+  musicBar: { width: 4, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.22)" },
+  musicBarOn: { backgroundColor: colors.yellow },
+
+  hideHint: { position: "absolute", top: 10, right: 10, opacity: 0.6 },
 
   leftPanel: { position: "absolute", top: 150, left: 24, width: 262, backgroundColor: PANEL, borderRadius: radius.xl, borderWidth: 1, borderColor: BORDER, padding: 20, gap: 18 },
   placeText: { color: colors.white, fontSize: 17, fontWeight: "700", marginLeft: 10, flex: 1 },
