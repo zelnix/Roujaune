@@ -1,0 +1,33 @@
+{
+  "summary": "Iter70 — Per-rider isolation fix + new /api/admin/interest API + Riding Experience UI restyle. Backend: 9/9 pytest passing. Isolation VERIFIED — after rider A saves lake-garda (fell back to dutch-countryside as lake-garda isn't seeded here) + registers gravel interest, a freshly-registered rider B sees empty ids:[] and modes:[]; conversely rider A does not see rider B's carolina-greenway/rowing. Admin interest endpoint returns {items:[6 modes], total}, sorted by count desc, 401 anon / 403 rider / 200 admin, gravel count>=1 after A registers. Frontend: today-mode-button renders solid yellow (rgb(245,179,1)), text 'Training', ZERO chevrons; menu shows all 8 modes (training, scenic-cycling, gravel, mountain-bike, walking, running, rowing, climbing); tapping gravel navigates to /coming-soon?mode=gravel showing 'Notify me when this launches'. Nav labels: 'Today' count=1, 'Home' count=0 (rename confirmed). Scenic-destinations lists 22 destination-card testIDs and 22 sibling fav-toggle testIDs — heart is no longer nested inside the card button (nested-<button> HTML warning resolved). Persistence VERIFIED: after switching to Scenic Cycling and reloading, the button still reads 'Scenic ride' and a 'Welcome back — resuming your Scenic ride' ribbon appears. Cleanup: all test-created favourites, interest, and rider B account removed; greenlantern reset to Training. Cold-session /api 401s during login hydration are pre-existing and expected.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter70_isolation_and_admin_interest.py",
+    "/app/test_reports/pytest/iter70.xml",
+    "/app/test_reports/screens/i70_home.jpeg",
+    "/app/test_reports/screens/i70_menu.jpeg",
+    "/app/test_reports/screens/i70_gravel_teaser.jpeg"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "auth.USER_SCOPED now correctly includes scenic_favourites and mode_interest — udb auto-injects user_id on insert/find/update/delete so both collections are per-rider (verified via cross-account isolation test).",
+    "admin_routes.activity_interest aggregates via db.mode_interest (unscoped, correct for a global rollup) and returns a stable 6-mode shape regardless of what's stored — good.",
+    "TodayModeButton: solid yellow with borderBottomWidth 3 + shadow gives the 3D raised look; chevron removed as claimed; pressed state translates Y and reduces borderBottom to 1 → nice tactile press effect.",
+    "DestinationCard heart is now rendered as a sibling of the card Pressable inside an outer <View style={{position:'relative'}}>, absolutely-positioned — resolves the previous <button>-inside-<button> HTML hydration warning (iter69 action item).",
+    "today-mode.ts hydrateTodayModeForUser correctly resets in-memory experience+lastRoute to defaults before overlaying the per-user AsyncStorage key (KEY_BASE:<userId>) — no cross-rider leakage."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter70_isolation_and_admin_interest.py (created)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None persistent. Test-created data cleaned up: rider A favourites (lake-garda + dutch-countryside fallback + german-country-roads round-trip), rider A gravel/mountain-bike interest, rider B account (self-deleted via DELETE /api/auth/me) with its carolina-greenway favourite + rowing interest. UI experience reset to Training for greenlantern.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Rider greenlantern@roujaune.app / rideon9900 and admin roger.parenzee@gmail.com / letmein9900 work. lake-garda is NOT in the seeded scenic catalog on this env — test falls back to dutch-countryside; if E1 seeds lake-garda later the test still works. Test file cleans up all state and safely re-runnable. Ribbon 'Welcome back — resuming your Scenic ride' appears on reload after non-training experience selection — confirms per-rider persistence path in today-mode.ts."
+}

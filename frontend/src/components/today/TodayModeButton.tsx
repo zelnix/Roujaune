@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Modal, Pressable, ScrollView } from "react-native";
+import { View, Text, StyleSheet, Modal, Pressable, ScrollView, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { colors, radius, spacing } from "../../theme";
@@ -16,21 +16,20 @@ export function TodayModeButton({ compact = false }: { compact?: boolean }) {
 
   return (
     <View style={styles.wrap}>
-      {!compact && <Text style={styles.eyebrow} numberOfLines={1}>RIDING EXPERIENCE</Text>}
+      {!compact && <Text style={styles.eyebrow} numberOfLines={1}>EXPERIENCE</Text>}
       <Pressable
         testID="today-mode-button"
         onPress={() => setOpen(true)}
         accessibilityRole="button"
         accessibilityLabel={`Riding experience: ${meta.label}. Change activity`}
-        style={({ hovered }: any) => [styles.selected, hovered && styles.selectedHover]}
+        style={({ pressed }: any) => [styles.selected, pressed && styles.selectedPressed]}
       >
         <View style={styles.iconBubble}>
-          <Ionicons name={meta.icon} size={compact ? 18 : 16} color={colors.bg} />
+          <Ionicons name={meta.icon} size={compact ? 18 : 16} color={colors.yellow} />
         </View>
         {!compact && (
           <Text style={styles.selLabel} numberOfLines={1}>{meta.shortLabel}</Text>
         )}
-        <Ionicons name="chevron-down" size={compact ? 12 : 13} color={colors.yellow} style={compact ? styles.chevCompact : undefined} />
       </Pressable>
 
       <TodayModeMenu
@@ -112,11 +111,16 @@ const styles = StyleSheet.create({
   eyebrow: { color: colors.yellow, fontSize: 7.5, fontWeight: "800", letterSpacing: 0.7, marginBottom: 5, textAlign: "center" },
   selected: {
     width: "100%", alignItems: "center", gap: 4, paddingVertical: 9, paddingHorizontal: 6,
-    borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.yellow, backgroundColor: "rgba(245,179,1,0.16)",
+    borderRadius: radius.md, backgroundColor: colors.yellow,
+    borderBottomWidth: 3, borderBottomColor: "#C6900A",
+    ...(Platform.select({
+      web: { boxShadow: "0px 4px 12px rgba(0,0,0,0.38)" } as any,
+      default: { elevation: 4, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 6, shadowOffset: { width: 0, height: 3 } },
+    })),
   },
-  selectedHover: { backgroundColor: "rgba(245,179,1,0.26)", borderColor: colors.yellow },
-  iconBubble: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: colors.yellow },
-  selLabel: { color: colors.yellow, fontSize: 9.5, fontWeight: "800", textAlign: "center" },
+  selectedPressed: { transform: [{ translateY: 2 }], borderBottomWidth: 1, opacity: 0.96 },
+  iconBubble: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.16)" },
+  selLabel: { color: colors.bg, fontSize: 9.5, fontWeight: "900", textAlign: "center" },
   chevCompact: { marginTop: 1 },
 
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "center", alignItems: "flex-start", paddingLeft: 110, paddingVertical: 40 },

@@ -51,6 +51,10 @@ export function AlbertoCoachCard({ width, onStart, onMessage, compact = false }:
         {ready ? (
           <Image source={persona.image} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition="top center" accessibilityLabel={`Coach ${persona.name}`} />
         ) : null}
+        {/* Subtle lightening wash so the portrait reads a touch brighter. */}
+        {ready ? (
+          <View style={[StyleSheet.absoluteFill, styles.lighten]} pointerEvents="none" />
+        ) : null}
         <LinearGradient
           colors={["transparent", "rgba(10,9,8,0.9)"]}
           start={{ x: 0, y: 0.5 }}
@@ -112,6 +116,7 @@ const styles = StyleSheet.create({
     minHeight: 190,
   },
   portraitWrap: { width: 138, alignSelf: "stretch", minHeight: 190 },
+  lighten: { backgroundColor: "rgba(255,255,255,0.14)" },
   portrait: { width: "100%", height: "100%" },
   body: { flex: 1, padding: spacing.md, justifyContent: "center" },
   kickerRow: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 4 },

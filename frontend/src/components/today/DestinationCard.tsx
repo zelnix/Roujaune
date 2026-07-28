@@ -21,43 +21,47 @@ export function DestinationCard({ route, width, onPress }: { route: ScenicRoute;
   const fav = useScenicFavourites();
   const saved = fav.has(route.id);
   return (
-    <Pressable
-      testID={`destination-card-${route.id}`}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`${route.name}, ${route.place}${route.duration_min ? `, ${route.duration_min} minutes` : ""}`}
-      style={({ hovered }: any) => [styles.card, width ? { width } : { alignSelf: "stretch" }, hovered && styles.cardHover]}
-    >
-      <View style={styles.thumb}>
-        <Image source={{ uri: route.thumbnail || ytThumb(route.youtube_id) }} style={StyleSheet.absoluteFill as any} contentFit="cover" />
-        {!!route.region && (
-          <View style={styles.regionBadge}>
-            <Ionicons name={regionIcon(route.region)} size={11} color={colors.bg} />
-            <Text style={styles.regionBadgeText}>{route.region}</Text>
-          </View>
-        )}
-        <Pressable
-          testID={`fav-toggle-${route.id}`}
-          onPress={(e) => { (e as any).stopPropagation?.(); fav.toggle(route.id); }}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityState={{ selected: saved }}
-          accessibilityLabel={saved ? `Remove ${route.name} from saved` : `Save ${route.name}`}
-          style={styles.heart}
-        >
-          <Ionicons name={saved ? "heart" : "heart-outline"} size={18} color={saved ? colors.red : "#fff"} />
-        </Pressable>
-      </View>
-      <View style={styles.body}>
-        <Text style={styles.title} numberOfLines={1}>{route.name}</Text>
-        <Text style={styles.place} numberOfLines={1}>{route.place}{route.country ? ` · ${route.country}` : ""}</Text>
-        <View style={styles.meta}>
-          {route.duration_min ? <Meta icon="time-outline" label={`${route.duration_min}m`} /> : null}
-          {route.distance_km ? <Meta icon="navigate-outline" label={`${route.distance_km}km`} /> : null}
-          <View style={styles.tagPill}><Text style={styles.tagPillText}>{route.tag}</Text></View>
+    <View style={[styles.outer, width ? { width } : { alignSelf: "stretch" }]}>
+      <Pressable
+        testID={`destination-card-${route.id}`}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={`${route.name}, ${route.place}${route.duration_min ? `, ${route.duration_min} minutes` : ""}`}
+        style={({ hovered }: any) => [styles.card, hovered && styles.cardHover]}
+      >
+        <View style={styles.thumb}>
+          <Image source={{ uri: route.thumbnail || ytThumb(route.youtube_id) }} style={StyleSheet.absoluteFill as any} contentFit="cover" />
+          {!!route.region && (
+            <View style={styles.regionBadge}>
+              <Ionicons name={regionIcon(route.region)} size={11} color={colors.bg} />
+              <Text style={styles.regionBadgeText}>{route.region}</Text>
+            </View>
+          )}
         </View>
-      </View>
-    </Pressable>
+        <View style={styles.body}>
+          <Text style={styles.title} numberOfLines={1}>{route.name}</Text>
+          <Text style={styles.place} numberOfLines={1}>{route.place}{route.country ? ` · ${route.country}` : ""}</Text>
+          <View style={styles.meta}>
+            {route.duration_min ? <Meta icon="time-outline" label={`${route.duration_min}m`} /> : null}
+            {route.distance_km ? <Meta icon="navigate-outline" label={`${route.distance_km}km`} /> : null}
+            <View style={styles.tagPill}><Text style={styles.tagPillText}>{route.tag}</Text></View>
+          </View>
+        </View>
+      </Pressable>
+      {/* Heart is a sibling of the card button (not nested) to avoid a
+          <button> inside <button> on web. */}
+      <Pressable
+        testID={`fav-toggle-${route.id}`}
+        onPress={() => fav.toggle(route.id)}
+        hitSlop={10}
+        accessibilityRole="button"
+        accessibilityState={{ selected: saved }}
+        accessibilityLabel={saved ? `Remove ${route.name} from saved` : `Save ${route.name}`}
+        style={styles.heart}
+      >
+        <Ionicons name={saved ? "heart" : "heart-outline"} size={18} color={saved ? colors.red : "#fff"} />
+      </Pressable>
+    </View>
   );
 }
 
@@ -71,6 +75,7 @@ function Meta({ icon, label }: { icon: any; label: string }) {
 }
 
 const styles = StyleSheet.create({
+  outer: { position: "relative" },
   card: { backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, overflow: "hidden" },
   cardHover: { borderColor: "rgba(255,255,255,0.24)" },
   thumb: { height: 150, backgroundColor: "rgba(255,255,255,0.05)" },

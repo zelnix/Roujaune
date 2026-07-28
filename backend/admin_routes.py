@@ -86,6 +86,21 @@ async def metrics():
     }
 
 
+@admin_router.get("/interest")
+async def activity_interest():
+    """Demand signal for roadmap ('coming soon') activities: how many riders
+    tapped 'Notify me when this launches' for each mode. Powers the HWG console
+    roadmap prioritisation view."""
+    modes = ["gravel", "mountain-bike", "walking", "running", "rowing", "climbing"]
+    pipeline = [{"$group": {"_id": "$mode", "count": {"$sum": 1}}}]
+    rows = await _db.mode_interest.aggregate(pipeline).to_list(100)
+    counts = {r["_id"]: r["count"] for r in rows}
+    items = [{"mode": m, "count": int(counts.get(m, 0))} for m in modes]
+    items.sort(key=lambda x: -x["count"])
+    return {"items": items, "total": int(sum(counts.values())), "time": _now()}
+
+
+
 # --------------------------------------------------------------------------- #
 #  Users                                                                      #
 # --------------------------------------------------------------------------- #
