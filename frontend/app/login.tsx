@@ -13,6 +13,7 @@ export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { signIn, signUp, signInGoogle, signInApple, forgotPassword } = useAuth();
   const [mode, setMode] = useState<"login" | "register">("login");
+  const [step, setStep] = useState<"choose" | "email">("choose");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -69,79 +70,103 @@ export default function LoginScreen() {
           <View style={styles.card}>
             <Text style={styles.tagline}>{mode === "login" ? "Welcome back — let's ride." : "Create your rider account."}</Text>
 
-            {mode === "register" && (
-              <TextInput style={styles.input} placeholder="Name" placeholderTextColor={colors.textFaint}
-                value={name} onChangeText={setName} autoCapitalize="words" testID="name-input" />
-            )}
-            <TextInput style={styles.input} placeholder="Email" placeholderTextColor={colors.textFaint}
-              value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address"
-              autoComplete="email" testID="email-input" />
-            <View style={styles.passwordWrap}>
-              <TextInput style={[styles.input, styles.passwordInput]} placeholder="Password" placeholderTextColor={colors.textFaint}
-                value={password} onChangeText={setPassword} secureTextEntry={!showPassword} testID="password-input" />
-              <Pressable style={styles.eyeBtn} onPress={() => setShowPassword((s) => !s)} hitSlop={10}
-                accessibilityRole="button" accessibilityLabel={showPassword ? "Hide password" : "Show password"} testID="toggle-password">
-                <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color={colors.textDim} />
-              </Pressable>
-            </View>
+            {step === "choose" ? (
+              <>
+                <Pressable style={styles.socialPrimary} onPress={() => social(signInGoogle)} disabled={busy} testID="google-btn">
+                  <Ionicons name="logo-google" size={18} color="#1a1a1a" />
+                  <Text style={styles.socialPrimaryText}>Continue with Google</Text>
+                </Pressable>
 
-            {error ? <Text style={styles.error} testID="auth-error">{error}</Text> : null}
+                {Platform.OS === "ios" && (
+                  <Pressable style={styles.socialApple} onPress={() => social(signInApple)} disabled={busy} testID="apple-btn">
+                    <Ionicons name="logo-apple" size={19} color={colors.white} />
+                    <Text style={styles.socialText}>Continue with Apple</Text>
+                  </Pressable>
+                )}
 
-            <Pressable style={[styles.primary, busy && { opacity: 0.6 }]} onPress={submit} disabled={busy} testID="submit-btn">
-              {busy ? <ActivityIndicator color="#000" /> : <Text style={styles.primaryText}>{mode === "login" ? "Sign in" : "Create account"}</Text>}
-            </Pressable>
+                <View style={styles.divider}><View style={styles.line} /><Text style={styles.or}>OR</Text><View style={styles.line} /></View>
 
-            {mode === "login" && !forgotOpen && (
-              <Pressable onPress={() => { setForgotOpen(true); setForgotSent(false); setError(null); }} testID="forgot-open">
-                <Text style={styles.forgotLink}>Forgot password?</Text>
-              </Pressable>
-            )}
+                <Pressable style={styles.social} onPress={() => { setStep("email"); setError(null); }} disabled={busy} testID="email-btn">
+                  <Ionicons name="mail-outline" size={18} color={colors.white} />
+                  <Text style={styles.socialText}>{mode === "login" ? "Sign in with email" : "Sign up with email"}</Text>
+                </Pressable>
 
-            {mode === "login" && forgotOpen && (
-              <View style={styles.forgotBox}>
-                {forgotSent ? (
-                  <View style={{ gap: 6 }}>
-                    <Text style={styles.forgotTitle}>Check your inbox</Text>
-                    <Text style={styles.forgotHint}>If an account exists for {email.trim() || "that email"}, we&apos;ve sent a reset link. It expires in 60 minutes.</Text>
-                    <Pressable onPress={() => { setForgotOpen(false); setForgotSent(false); }} testID="forgot-done">
-                      <Text style={styles.forgotAction}>Back to sign in</Text>
-                    </Pressable>
-                  </View>
-                ) : (
-                  <View style={{ gap: 8 }}>
-                    <Text style={styles.forgotTitle}>Reset your password</Text>
-                    <Text style={styles.forgotHint}>Enter your email above, then send yourself a reset link.</Text>
-                    <View style={{ flexDirection: "row", gap: 8 }}>
-                      <Pressable style={[styles.forgotBtn, busy && { opacity: 0.6 }]} onPress={sendReset} disabled={busy} testID="forgot-send">
-                        {busy ? <ActivityIndicator color="#000" /> : <Text style={styles.forgotBtnText}>Send reset link</Text>}
-                      </Pressable>
-                      <Pressable style={styles.forgotCancel} onPress={() => { setForgotOpen(false); setError(null); }} testID="forgot-cancel">
-                        <Text style={styles.forgotCancelText}>Cancel</Text>
-                      </Pressable>
-                    </View>
+                {error ? <Text style={styles.error} testID="auth-error">{error}</Text> : null}
+
+                <Pressable onPress={() => { setMode(mode === "login" ? "register" : "login"); setError(null); }} testID="toggle-mode">
+                  <Text style={styles.toggle}>
+                    {mode === "login" ? "New here? Create an account" : "Already have an account? Sign in"}
+                  </Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Pressable style={styles.backRow} onPress={() => { setStep("choose"); setError(null); setForgotOpen(false); }} hitSlop={8} testID="email-back">
+                  <Ionicons name="chevron-back" size={18} color={colors.textDim} />
+                  <Text style={styles.backText}>All sign-in options</Text>
+                </Pressable>
+
+                {mode === "register" && (
+                  <TextInput style={styles.input} placeholder="Name" placeholderTextColor={colors.textFaint}
+                    value={name} onChangeText={setName} autoCapitalize="words" testID="name-input" />
+                )}
+                <TextInput style={styles.input} placeholder="Email" placeholderTextColor={colors.textFaint}
+                  value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address"
+                  autoComplete="email" testID="email-input" />
+                <View style={styles.passwordWrap}>
+                  <TextInput style={[styles.input, styles.passwordInput]} placeholder="Password" placeholderTextColor={colors.textFaint}
+                    value={password} onChangeText={setPassword} secureTextEntry={!showPassword} testID="password-input" />
+                  <Pressable style={styles.eyeBtn} onPress={() => setShowPassword((s) => !s)} hitSlop={10}
+                    accessibilityRole="button" accessibilityLabel={showPassword ? "Hide password" : "Show password"} testID="toggle-password">
+                    <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color={colors.textDim} />
+                  </Pressable>
+                </View>
+
+                {error ? <Text style={styles.error} testID="auth-error">{error}</Text> : null}
+
+                <Pressable style={[styles.primary, busy && { opacity: 0.6 }]} onPress={submit} disabled={busy} testID="submit-btn">
+                  {busy ? <ActivityIndicator color="#000" /> : <Text style={styles.primaryText}>{mode === "login" ? "Sign in" : "Create account"}</Text>}
+                </Pressable>
+
+                {mode === "login" && !forgotOpen && (
+                  <Pressable onPress={() => { setForgotOpen(true); setForgotSent(false); setError(null); }} testID="forgot-open">
+                    <Text style={styles.forgotLink}>Forgot password?</Text>
+                  </Pressable>
+                )}
+
+                {mode === "login" && forgotOpen && (
+                  <View style={styles.forgotBox}>
+                    {forgotSent ? (
+                      <View style={{ gap: 6 }}>
+                        <Text style={styles.forgotTitle}>Check your inbox</Text>
+                        <Text style={styles.forgotHint}>If an account exists for {email.trim() || "that email"}, we&apos;ve sent a reset link. It expires in 60 minutes.</Text>
+                        <Pressable onPress={() => { setForgotOpen(false); setForgotSent(false); }} testID="forgot-done">
+                          <Text style={styles.forgotAction}>Back to sign in</Text>
+                        </Pressable>
+                      </View>
+                    ) : (
+                      <View style={{ gap: 8 }}>
+                        <Text style={styles.forgotTitle}>Reset your password</Text>
+                        <Text style={styles.forgotHint}>Enter your email above, then send yourself a reset link.</Text>
+                        <View style={{ flexDirection: "row", gap: 8 }}>
+                          <Pressable style={[styles.forgotBtn, busy && { opacity: 0.6 }]} onPress={sendReset} disabled={busy} testID="forgot-send">
+                            {busy ? <ActivityIndicator color="#000" /> : <Text style={styles.forgotBtnText}>Send reset link</Text>}
+                          </Pressable>
+                          <Pressable style={styles.forgotCancel} onPress={() => { setForgotOpen(false); setError(null); }} testID="forgot-cancel">
+                            <Text style={styles.forgotCancelText}>Cancel</Text>
+                          </Pressable>
+                        </View>
+                      </View>
+                    )}
                   </View>
                 )}
-              </View>
-            )}
 
-            <Pressable onPress={() => { setMode(mode === "login" ? "register" : "login"); setError(null); }} testID="toggle-mode">
-              <Text style={styles.toggle}>
-                {mode === "login" ? "New here? Create an account" : "Already have an account? Sign in"}
-              </Text>
-            </Pressable>
-
-            <View style={styles.divider}><View style={styles.line} /><Text style={styles.or}>OR</Text><View style={styles.line} /></View>
-
-            <Pressable style={styles.social} onPress={() => social(signInGoogle)} disabled={busy} testID="google-btn">
-              <Ionicons name="logo-google" size={18} color={colors.white} />
-              <Text style={styles.socialText}>Continue with Google</Text>
-            </Pressable>
-
-            {Platform.OS === "ios" && (
-              <Pressable style={[styles.social, { backgroundColor: "#000", borderColor: colors.white }]} onPress={() => social(signInApple)} disabled={busy} testID="apple-btn">
-                <Ionicons name="logo-apple" size={18} color={colors.white} />
-                <Text style={styles.socialText}>Continue with Apple</Text>
-              </Pressable>
+                <Pressable onPress={() => { setMode(mode === "login" ? "register" : "login"); setError(null); }} testID="toggle-mode">
+                  <Text style={styles.toggle}>
+                    {mode === "login" ? "New here? Create an account" : "Already have an account? Sign in"}
+                  </Text>
+                </Pressable>
+              </>
             )}
           </View>
         </ScrollView>
@@ -183,4 +208,9 @@ const styles = StyleSheet.create({
   or: { color: colors.textFaint, fontSize: 11, fontWeight: "700" },
   social: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "rgba(0,0,0,0.35)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingVertical: 13 },
   socialText: { color: colors.white, fontSize: 14.5, fontWeight: "700" },
+  socialPrimary: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#fff", borderRadius: radius.md, paddingVertical: 14 },
+  socialPrimaryText: { color: "#1a1a1a", fontSize: 15, fontWeight: "800" },
+  socialApple: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: "#000", borderWidth: 1, borderColor: colors.white, borderRadius: radius.md, paddingVertical: 13 },
+  backRow: { flexDirection: "row", alignItems: "center", gap: 4, alignSelf: "flex-start", paddingVertical: 4, marginBottom: 2 },
+  backText: { color: colors.textDim, fontSize: 13.5, fontWeight: "600" },
 });
