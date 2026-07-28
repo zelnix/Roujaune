@@ -194,6 +194,16 @@ export async function fetchDiscoveries(routeId?: string): Promise<ScenicDiscover
   } catch { return []; }
 }
 
+/** All of the rider's saved discoveries (the scrapbook), newest first. */
+export function useAllDiscoveries() {
+  const [discoveries, setDiscoveries] = React.useState<ScenicDiscovery[] | null>(null);
+  const load = React.useCallback(() => {
+    fetchDiscoveries().then((d) => setDiscoveries(d));
+  }, []);
+  React.useEffect(() => { load(); }, [load]);
+  return { discoveries: discoveries ?? [], loading: discoveries === null, reload: load };
+}
+
 export async function deleteDiscovery(id: string): Promise<void> {
   try { await fetch(`${base()}/api/scenic/discoveries/${encodeURIComponent(id)}`, { method: "DELETE" }); } catch { /* best effort */ }
 }

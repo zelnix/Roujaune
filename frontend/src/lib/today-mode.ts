@@ -42,7 +42,19 @@ export interface TodayModeMeta {
   availability: Availability;
   route: string;        // default route
   primaryActionLabel: string;
+  heroBg?: { uri: string };  // background photo for coming-soon experiences
 }
+
+// Scenic, on-topic backgrounds for the "coming soon" experiences (keyless,
+// hotlink-friendly Wikimedia Commons photos).
+const COMING_SOON_BG: Partial<Record<RiderExperience, { uri: string }>> = {
+  gravel: { uri: "https://upload.wikimedia.org/wikipedia/commons/e/e6/Dirty_Kanza.png" },
+  "mountain-bike": { uri: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Alexandra_Engen_2012_London_Olympics_002.jpg/1280px-Alexandra_Engen_2012_London_Olympics_002.jpg" },
+  walking: { uri: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Hiking_to_the_Ice_Lakes._San_Juan_National_Forest%2C_Colorado.jpg/1280px-Hiking_to_the_Ice_Lakes._San_Juan_National_Forest%2C_Colorado.jpg" },
+  running: { uri: "https://upload.wikimedia.org/wikipedia/commons/5/52/Kilian.jpg" },
+  rowing: { uri: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Harvard_Rowing_Crew_at_Henley_2004_-2.JPG/1280px-Harvard_Rowing_Crew_at_Henley_2004_-2.JPG" },
+  climbing: { uri: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/HaikuLadder.jpg/1280px-HaikuLadder.jpg" },
+};
 
 /** The eight activity modes shown in the selector. */
 export const TODAY_MODES: TodayModeMeta[] = [
@@ -57,7 +69,9 @@ export const TODAY_MODES: TodayModeMeta[] = [
 ];
 
 export function modeMeta(id: RiderExperience): TodayModeMeta {
-  return TODAY_MODES.find((m) => m.id === id) ?? TODAY_MODES[0];
+  const base = TODAY_MODES.find((m) => m.id === id) ?? TODAY_MODES[0];
+  const heroBg = COMING_SOON_BG[base.id];
+  return heroBg ? { ...base, heroBg } : base;
 }
 
 // Shared utility section — identical across every experience.

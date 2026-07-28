@@ -37,7 +37,7 @@ export default function ComingSoonScreen() {
         </View>
 
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-          <ExperienceHero compact={compact} descriptor={`${meta.description}.`} minHeight={600} testID={`coming-soon-hero-${id}`}>
+          <ExperienceHero compact={compact} source={meta.heroBg} imageTransform={meta.heroBg ? { transform: [{ scale: 1.06 }] } : undefined} descriptor={`${meta.description}.`} minHeight={600} testID={`coming-soon-hero-${id}`}>
             <View style={s.hero}>
               <View style={s.iconWrap}>
                 <Ionicons name={meta.icon} size={40} color={colors.yellow} />

@@ -6,9 +6,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { colors, radius, spacing } from "@/src/theme";
-import { useSavedDestinations, useScenicJourneys, ScenicJourney } from "@/src/lib/scenic-routes";
+import { useSavedDestinations, useScenicJourneys, useAllDiscoveries, ScenicJourney, ScenicDiscovery } from "@/src/lib/scenic-routes";
 import { DestinationCard } from "@/src/components/today/DestinationCard";
 import { ScenicRecapShareModal } from "@/src/components/ScenicRecapShareModal";
+import { DiscoveryDetailModal } from "@/src/components/DiscoveryDetailModal";
 import { useCoach } from "@/src/lib/coach-persona";
 
 function fmtDur(sec?: number | null): string {
@@ -35,8 +36,11 @@ export default function JourneysScreen() {
   const { width } = useWindowDimensions();
   const { routes, loading } = useSavedDestinations();
   const { journeys, loading: jLoading } = useScenicJourneys();
+  const { discoveries, loading: dLoading, reload: reloadDiscoveries } = useAllDiscoveries();
   const coach = useCoach();
   const [share, setShare] = React.useState<ScenicJourney | null>(null);
+  const [detail, setDetail] = React.useState<ScenicDiscovery | null>(null);
+  const [tab, setTab] = React.useState<"rides" | "discoveries">("rides");
 
   const open = (id: string) => router.push(`/scenic-ride?route=${id}` as any);
   const leave = () => { if (router.canGoBack()) router.back(); else router.replace("/"); };
@@ -45,7 +49,13 @@ export default function JourneysScreen() {
   const gap = 12;
   const cardW = cols === 1 ? undefined : Math.floor((Math.min(width, 1200) - 2 * spacing.lg - gap * (cols - 1)) / cols);
 
-  const nothing = !loading && !jLoading && journeys.length === 0 && (!routes || routes.length === 0);
+  // Discovery gallery columns (photos are smaller than destination cards).
+  const gCols = width >= 1000 ? 4 : width >= 640 ? 3 : 2;
+  const gGap = 10;
+  const gCardW = Math.floor((Math.min(width, 1200) - 2 * spacing.lg - gGap * (gCols - 1)) / gCols);
+
+  const anyLoading = loading || jLoading || dLoading;
+  const nothing = !anyLoading && journeys.length === 0 && discoveries.length === 0 && (!routes || routes.length === 0);
 
   return (
     <View style={s.root} testID="saved-destinations">
@@ -58,7 +68,21 @@ export default function JourneysScreen() {
           <Text style={s.title}>Journeys</Text>
         </View>
 
-        {loading || jLoading ? (
+        {/* Tabs */}
+        {!nothing && (
+          <View style={s.tabs}>
+            <Pressable onPress={() => setTab("rides")} style={[s.tab, tab === "rides" && s.tabActive]} testID="tab-rides" accessibilityRole="button" accessibilityState={{ selected: tab === "rides" }}>
+              <Ionicons name="bicycle" size={16} color={tab === "rides" ? colors.bg : colors.textDim} />
+              <Text style={[s.tabText, tab === "rides" && s.tabTextActive]}>Rides</Text>
+            </Pressable>
+            <Pressable onPress={() => setTab("discoveries")} style={[s.tab, tab === "discoveries" && s.tabActive]} testID="tab-discoveries" accessibilityRole="button" accessibilityState={{ selected: tab === "discoveries" }}>
+              <Ionicons name="bookmark" size={15} color={tab === "discoveries" ? colors.bg : colors.textDim} />
+              <Text style={[s.tabText, tab === "discoveries" && s.tabTextActive]}>Discoveries{discoveries.length ? ` · ${discoveries.length}` : ""}</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {anyLoading ? (
           <View style={s.center}><ActivityIndicator color={colors.yellow} /><Text style={s.centerText}>Loading your journeys…</Text></View>
         ) : nothing ? (
           <View style={s.center} testID="saved-empty">
@@ -70,7 +94,7 @@ export default function JourneysScreen() {
               <Text style={s.exploreText}>Explore destinations</Text>
             </Pressable>
           </View>
-        ) : (
+        ) : tab === "rides" ? (
           <ScrollView style={{ flex: 1 }} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
             {/* Completed rides — shareable recaps */}
             {journeys.length > 0 && (
@@ -98,11 +122,55 @@ export default function JourneysScreen() {
               </View>
             )}
           </ScrollView>
+        ) : (
+          /* Discoveries scrapbook */
+          discoveries.length === 0 ? (
+            <View style={s.center} testID="discoveries-empty">
+              <View style={s.emptyIcon}><Ionicons name="bookmark-outline" size={28} color={colors.yellow} /></View>
+              <Text style={s.emptyTitle}>No discoveries yet</Text>
+              <Text style={s.centerText}>While riding, tap the bookmark on a point of interest to keep its photo and story here in your scrapbook.</Text>
+            </View>
+          ) : (
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+              <Text style={s.section}>YOUR SCRAPBOOK</Text>
+              <Text style={s.count}>{discoveries.length} saved {discoveries.length === 1 ? "discovery" : "discoveries"}</Text>
+              <View style={[s.grid, { gap: gGap }]}>
+                {discoveries.map((d) => (
+                  <DiscoveryTile key={d.id} discovery={d} width={gCardW} onPress={() => setDetail(d)} />
+                ))}
+              </View>
+            </ScrollView>
+          )
         )}
       </SafeAreaView>
 
       <ScenicRecapShareModal visible={!!share} journey={share} coachName={coach.name} onClose={() => setShare(null)} />
+      <DiscoveryDetailModal
+        visible={!!detail}
+        discovery={detail}
+        onClose={() => setDetail(null)}
+        onRide={(rid) => { setDetail(null); open(rid); }}
+        onChanged={() => { reloadDiscoveries(); }}
+      />
     </View>
+  );
+}
+
+function DiscoveryTile({ discovery, width, onPress }: { discovery: ScenicDiscovery; width?: number; onPress: () => void }) {
+  return (
+    <Pressable style={[s.tile, width ? { width } : { flex: 1 }]} onPress={onPress} testID={`discovery-${discovery.id}`} accessibilityRole="button" accessibilityLabel={`Open ${discovery.title}`}>
+      {discovery.photo ? (
+        <Image source={{ uri: discovery.photo }} style={s.tileImg} contentFit="cover" />
+      ) : (
+        <View style={[s.tileImg, s.tileFallback]}><Ionicons name="image-outline" size={22} color={colors.textFaint} /></View>
+      )}
+      <View style={s.tileOverlay}>
+        <Text style={s.tileTitle} numberOfLines={1}>{discovery.title}</Text>
+        {(discovery.place || discovery.route_name) ? (
+          <Text style={s.tileMeta} numberOfLines={1}>{discovery.place || discovery.route_name}</Text>
+        ) : null}
+      </View>
+    </Pressable>
   );
 }
 
@@ -167,6 +235,11 @@ const s = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: spacing.md, paddingVertical: 12 },
   backBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 22, backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: colors.border },
   title: { color: colors.white, fontSize: 22, fontWeight: "900", letterSpacing: 0.3 },
+  tabs: { flexDirection: "row", gap: 8, paddingHorizontal: spacing.lg, marginBottom: 12 },
+  tab: { flexDirection: "row", alignItems: "center", gap: 7, paddingVertical: 9, paddingHorizontal: 16, borderRadius: radius.pill, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: colors.border, minHeight: 40 },
+  tabActive: { backgroundColor: colors.yellow, borderColor: colors.yellow },
+  tabText: { color: colors.textDim, fontSize: 13.5, fontWeight: "800" },
+  tabTextActive: { color: colors.bg },
   scroll: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   section: { color: colors.yellow, fontSize: 12, fontWeight: "900", letterSpacing: 1.6, marginBottom: 4 },
   count: { color: colors.textDim, fontSize: 13, fontWeight: "700", marginBottom: 12 },
@@ -197,4 +270,12 @@ const s = StyleSheet.create({
   jShareText: { color: colors.bg, fontSize: 14, fontWeight: "800" },
   jRideBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: radius.md, paddingVertical: 12, paddingHorizontal: 18, minHeight: 46, borderWidth: 1, borderColor: "rgba(255,194,10,0.4)", backgroundColor: "rgba(255,194,10,0.06)" },
   jRideText: { color: colors.yellow, fontSize: 14, fontWeight: "800" },
+
+  // Discovery scrapbook tiles
+  tile: { borderRadius: radius.lg, overflow: "hidden", backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: colors.border, marginBottom: 10 },
+  tileImg: { width: "100%", aspectRatio: 1, backgroundColor: "#0E1512" },
+  tileFallback: { alignItems: "center", justifyContent: "center" },
+  tileOverlay: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: "rgba(5,6,10,0.68)" },
+  tileTitle: { color: colors.white, fontSize: 13, fontWeight: "800" },
+  tileMeta: { color: colors.textDim, fontSize: 11, fontWeight: "600", marginTop: 1 },
 });

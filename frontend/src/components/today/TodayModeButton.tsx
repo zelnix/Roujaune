@@ -27,7 +27,7 @@ export function TodayModeButton({ compact = false }: { compact?: boolean }) {
           <FontAwesome5 name="biking" size={compact ? 17 : 15} color={colors.yellow} />
         </View>
         {!compact && (
-          <Text style={styles.selLabel} numberOfLines={2}>Ride experience</Text>
+          <Text style={styles.selLabel} numberOfLines={2}>Ride Experience</Text>
         )}
       </Pressable>
 
@@ -106,7 +106,7 @@ function TodayModeOption({ meta, selected, onPress }: { meta: TodayModeMeta; sel
 }
 
 const styles = StyleSheet.create({
-  wrap: { width: "100%", alignItems: "center", paddingHorizontal: 8, marginBottom: spacing.md },
+  wrap: { width: "100%", alignItems: "center", paddingHorizontal: 4, marginBottom: spacing.md },
   eyebrow: { color: colors.yellow, fontSize: 7.5, fontWeight: "800", letterSpacing: 0.7, marginBottom: 5, textAlign: "center" },
   selected: {
     width: "100%", alignItems: "center", gap: 4, paddingVertical: 9, paddingHorizontal: 6,
@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
   },
   selectedPressed: { transform: [{ translateY: 2 }], borderBottomWidth: 1, opacity: 0.96 },
   iconBubble: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg },
-  selLabel: { color: colors.bg, fontSize: 10, fontWeight: "900", textAlign: "center", lineHeight: 13 },
+  selLabel: { color: colors.bg, fontSize: 11, fontWeight: "900", textAlign: "center", lineHeight: 14 },
   chevCompact: { marginTop: 1 },
 
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "center", alignItems: "flex-start", paddingLeft: 110, paddingVertical: 40 },

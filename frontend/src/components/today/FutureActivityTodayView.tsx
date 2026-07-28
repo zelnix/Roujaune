@@ -49,7 +49,7 @@ export function FutureActivityTodayView({ mode }: { mode: RiderExperience }) {
   const p = PREVIEW[mode] ?? { heading: "COMING SOON", blurb: "This experience is on the Roujaune roadmap.", bullets: [] };
   return (
     <View style={{ gap: spacing.md }} testID={`future-activity-${mode}`}>
-      <ExperienceHero compact={compact} descriptor={`${meta.description}.`} testID={`future-hero-${mode}`}>
+      <ExperienceHero compact={compact} source={meta.heroBg} imageTransform={meta.heroBg ? { transform: [{ scale: 1.06 }] } : undefined} descriptor={`${meta.description}.`} testID={`future-hero-${mode}`}>
         <View style={styles.card}>
           <View style={styles.iconWrap}>
             <Ionicons name={meta.icon} size={30} color={colors.yellow} />
