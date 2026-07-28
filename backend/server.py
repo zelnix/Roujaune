@@ -379,10 +379,13 @@ api_router.include_router(rider_routes.router)
 api_router.include_router(benchmark_routes.router)
 api_router.include_router(plan_routes.router)
 api_router.include_router(coach_routes.router)
+from routes import scenic as scenic_routes  # noqa: E402
+api_router.include_router(scenic_routes.router)
 app.include_router(api_router)
 app.include_router(push.router)
 app.include_router(admin_routes.admin_router)
 app.include_router(admin_cfg_router)
+app.include_router(scenic_routes.admin_router)
 push.init(db)
 admin_routes.init(db, on_plan_change=_on_plan_change)
 
@@ -460,6 +463,11 @@ async def _seed_plans_on_startup():
         logger.info("Workout catalog seeded/loaded from MongoDB")
     except Exception:
         logging.exception("workout catalog seeding failed")
+    try:
+        await scenic_routes.seed_scenic_routes()
+        logger.info("Scenic routes seeded/loaded from MongoDB")
+    except Exception:
+        logging.exception("scenic route seeding failed")
     try:
         # training_plans is a PER-USER collection; a single-field unique index on
         # `id` breaks multi-rider use (two riders can't each have "couch-to-road")

@@ -1,57 +1,64 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, ImageBackground } from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView, ImageBackground, ActivityIndicator } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { colors, radius, spacing } from "../../theme";
-import { VIRTUAL_ROUTES, getVRoute, VRoute } from "../../lib/vroutes";
+import { useScenicRoutes, useScenicLast, ScenicRoute, ytThumb } from "../../lib/scenic-routes";
 import { ScheduledWorkoutReminder } from "./ScheduledWorkoutReminder";
 
-const base = () => (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
-
-/** Estimate a relaxed scenic ride time from distance (~24 km/h touring pace). */
-function estMinutes(r: VRoute): number {
-  return Math.max(8, Math.round((r.distanceKm / 24) * 60));
+function mins(r: ScenicRoute): number | null {
+  return r.duration_min ?? null;
 }
-function discoveries(r: VRoute): number {
-  return (r.checkpoints?.length ?? 0) || (r.points?.length ?? 0);
+function thumbUri(r: ScenicRoute): string {
+  return r.thumbnail || ytThumb(r.youtube_id);
 }
-
-type LastRide = {
-  available: boolean;
-  routeId?: string;
-  name?: string;
-  place?: string;
-  distance_km?: number;
-  at?: string;
-};
 
 /** Calm, destination-led Today content for the Scenic Cycling experience —
- *  driven by the REAL virtual-route catalog. "Begin Scenic Journey" and every
- *  destination card open the actual immersive route; "Continue your journey"
- *  reflects the rider's genuine last scenic ride (hidden until they have one). */
+ *  driven by the admin-managed scenic-route catalog (POV YouTube rides), fully
+ *  separate from the training Virtual Routes. Every card opens the immersive
+ *  scenic player; "Continue your journey" reflects the rider's genuine last
+ *  scenic ride (hidden until they have one). */
 export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => void }) {
   const router = useRouter();
-  const [last, setLast] = React.useState<LastRide | null>(null);
+  const { routes, loading } = useScenicRoutes();
+  const last = useScenicLast();
 
-  React.useEffect(() => {
-    let alive = true;
-    fetch(`${base()}/api/scenic/last`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (alive && d) setLast(d); })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, []);
+  const open = (id: string) => router.push(`/scenic-ride?route=${id}` as any);
 
-  const hero = VIRTUAL_ROUTES[0];
-  const open = (id: string) => router.push(`/virtual-route?route=${id}` as any);
-  const explore = () => router.push("/routes");
+  if (loading) {
+    return (
+      <View style={styles.loadingWrap} testID="scenic-cycling-today">
+        <ScheduledWorkoutReminder />
+        <ActivityIndicator color={colors.yellow} />
+        <Text style={styles.loadingText}>Finding beautiful roads for you…</Text>
+      </View>
+    );
+  }
 
-  const others = VIRTUAL_ROUTES.filter((r) => r.id !== hero.id);
-  const shortRides = VIRTUAL_ROUTES.filter((r) => estMinutes(r) < 35);
-  const recent = VIRTUAL_ROUTES.slice(-2);
+  // Empty state — never fabricate destinations; wait for admins to publish.
+  if (!routes || routes.length === 0) {
+    return (
+      <View style={{ gap: spacing.md }} testID="scenic-cycling-today">
+        <ScheduledWorkoutReminder />
+        <Text style={styles.h1}>WHERE SHALL WE EXPLORE TODAY?</Text>
+        <View style={styles.empty} testID="scenic-empty">
+          <View style={styles.emptyIcon}><Ionicons name="earth-outline" size={30} color={colors.yellow} /></View>
+          <Text style={styles.emptyTitle}>New scenic destinations are on the way</Text>
+          <Text style={styles.emptyBody}>
+            We’re curating relaxed POV rides through beautiful places. Check back
+            soon — your next journey will appear right here.
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
-  const lastRoute = last?.available && last.routeId ? getVRoute(last.routeId) : null;
+  const hero = routes[0];
+  const others = routes.filter((r) => r.id !== hero.id);
+  const shortRides = routes.filter((r) => (mins(r) ?? 999) < 35);
+  const recent = routes.slice(-2);
+  const lastRoute = last?.available && last.routeId ? routes.find((r) => r.id === last.routeId) : null;
 
   return (
     <View style={{ gap: spacing.md }} testID="scenic-cycling-today">
@@ -59,8 +66,8 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
 
       <Text style={styles.h1}>WHERE SHALL WE EXPLORE TODAY?</Text>
 
-      {/* Hero destination (real route) */}
-      <ImageBackground source={hero.backdrop} style={styles.hero} imageStyle={styles.heroImg} testID="scenic-hero">
+      {/* Hero destination */}
+      <ImageBackground source={{ uri: thumbUri(hero) }} style={styles.hero} imageStyle={styles.heroImg} testID="scenic-hero">
         <View style={styles.heroScrim} />
         <View style={styles.heroTopRow}>
           <View style={styles.povBadge}>
@@ -68,31 +75,27 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
             <Text style={styles.povText}>POV VIDEO</Text>
           </View>
           <View style={styles.guidedBadge}>
-            <Ionicons name="mic" size={11} color={colors.yellow} />
-            <Text style={styles.guidedText}>Guided stories</Text>
+            <Ionicons name="leaf" size={11} color={colors.yellow} />
+            <Text style={styles.guidedText}>Relaxed ride</Text>
           </View>
         </View>
         <View style={{ flex: 1 }} />
         <Text style={styles.heroTitle}>{hero.name.toUpperCase()}</Text>
         <Text style={styles.heroCountry}>{hero.place}</Text>
         <Text style={styles.heroDesc} numberOfLines={2}>
-          A relaxed {hero.tag.toLowerCase()} journey — ride at your own pace and soak in the scenery.
+          {hero.description || `A relaxed ${hero.tag.toLowerCase()} journey — ride at your own pace and soak in the scenery.`}
         </Text>
         <View style={styles.heroStats}>
-          <Stat icon="time-outline" label={`${estMinutes(hero)} minutes`} />
+          {mins(hero) ? <Stat icon="time-outline" label={`${mins(hero)} minutes`} /> : null}
           <Stat icon="leaf-outline" label="Relaxed" />
-          <Stat icon="trending-up-outline" label={`${hero.elevationM} m`} />
-          {discoveries(hero) > 0 && <Stat icon="sparkles-outline" label={`${discoveries(hero)} discoveries`} />}
+          {hero.elevation_m ? <Stat icon="trending-up-outline" label={`${hero.elevation_m} m`} /> : null}
+          {hero.distance_km ? <Stat icon="navigate-outline" label={`${hero.distance_km} km`} /> : null}
         </View>
         <View style={styles.heroCtas}>
           <Pressable testID="begin-scenic-journey" onPress={() => open(hero.id)} accessibilityRole="button" accessibilityLabel={`Begin scenic journey: ${hero.name}`}
             style={({ hovered }: any) => [styles.primaryCta, hovered && styles.primaryCtaHover]}>
             <Ionicons name="play" size={16} color="#fff" />
             <Text style={styles.primaryCtaText}>BEGIN SCENIC JOURNEY</Text>
-          </Pressable>
-          <Pressable testID="explore-destinations" onPress={explore} accessibilityRole="button"
-            style={({ hovered }: any) => [styles.secondaryCta, hovered && styles.secondaryCtaHover]}>
-            <Text style={styles.secondaryCtaText}>EXPLORE DESTINATIONS</Text>
           </Pressable>
         </View>
       </ImageBackground>
@@ -114,7 +117,7 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
           <Text style={styles.sectionTitle}>Continue your journey</Text>
           <Pressable onPress={() => open(lastRoute.id)} accessibilityRole="button" accessibilityLabel={`Resume ${lastRoute.name}`}
             style={({ hovered }: any) => [styles.continueCard, hovered && styles.destCardHover]}>
-            <Image source={lastRoute.backdrop} style={styles.continueThumb} contentFit="cover" />
+            <Image source={{ uri: thumbUri(lastRoute) }} style={styles.continueThumb} contentFit="cover" />
             <View style={{ flex: 1, gap: 3 }}>
               <Text style={styles.continueLabel}>PICK UP WHERE YOU LEFT OFF</Text>
               <Text style={styles.destTitle}>{lastRoute.name}</Text>
@@ -125,9 +128,9 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
         </View>
       )}
 
-      <DestRow title="Recommended for you" data={others} open={open} />
-      <DestRow title="Recently added destinations" data={recent} open={open} tag="New" />
-      <DestRow title="Scenic rides under 35 minutes" data={shortRides} open={open} />
+      {others.length > 0 && <DestRow title="Recommended for you" data={others} open={open} />}
+      {recent.length > 0 && <DestRow title="Recently added destinations" data={recent} open={open} tag="New" />}
+      {shortRides.length > 0 && <DestRow title="Scenic rides under 35 minutes" data={shortRides} open={open} />}
     </View>
   );
 }
@@ -153,24 +156,24 @@ function Pref({ label, value, icon }: { label: string; value: string; icon: any 
   );
 }
 
-function DestRow({ title, data, open, tag }: { title: string; data: VRoute[]; open: (id: string) => void; tag?: string }) {
+function DestRow({ title, data, open, tag }: { title: string; data: ScenicRoute[]; open: (id: string) => void; tag?: string }) {
   if (!data.length) return null;
   return (
     <View style={styles.section} testID={`scenic-row-${title}`}>
       <Text style={styles.sectionTitle}>{title}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
         {data.map((d) => (
-          <Pressable key={d.id} onPress={() => open(d.id)} accessibilityRole="button" accessibilityLabel={`${d.name}, ${d.place}, ${estMinutes(d)} minutes, ${d.tag}`}
+          <Pressable key={d.id} onPress={() => open(d.id)} accessibilityRole="button" accessibilityLabel={`${d.name}, ${d.place}${mins(d) ? `, ${mins(d)} minutes` : ""}, ${d.tag}`}
             style={({ hovered }: any) => [styles.destCard, hovered && styles.destCardHover]}>
             <View style={styles.destThumb}>
-              <Image source={d.backdrop} style={StyleSheet.absoluteFill as any} contentFit="cover" />
+              <Image source={{ uri: thumbUri(d) }} style={StyleSheet.absoluteFill as any} contentFit="cover" />
               {tag ? <View style={styles.newTag}><Text style={styles.newTagText}>{tag}</Text></View> : null}
             </View>
             <Text style={styles.destTitle} numberOfLines={1}>{d.name}</Text>
             <Text style={styles.destCountry} numberOfLines={1}>{d.place}</Text>
             <View style={styles.destMeta}>
               <Ionicons name="time-outline" size={12} color={colors.textFaint} />
-              <Text style={styles.destMetaText}>{estMinutes(d)}m · {d.tag}</Text>
+              <Text style={styles.destMetaText}>{mins(d) ? `${mins(d)}m · ` : ""}{d.tag}</Text>
             </View>
           </Pressable>
         ))}
@@ -181,6 +184,14 @@ function DestRow({ title, data, open, tag }: { title: string; data: VRoute[]; op
 
 const styles = StyleSheet.create({
   h1: { color: colors.white, fontSize: 22, fontWeight: "800", letterSpacing: 0.4 },
+
+  loadingWrap: { gap: spacing.md, paddingVertical: 40, alignItems: "center" },
+  loadingText: { color: colors.textDim, fontSize: 14, fontWeight: "600" },
+
+  empty: { alignItems: "center", gap: 12, backgroundColor: colors.card, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, paddingVertical: 40, paddingHorizontal: 28 },
+  emptyIcon: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(245,179,1,0.12)", borderWidth: 1, borderColor: "rgba(245,179,1,0.35)" },
+  emptyTitle: { color: colors.white, fontSize: 18, fontWeight: "800", textAlign: "center" },
+  emptyBody: { color: colors.textDim, fontSize: 14.5, lineHeight: 22, textAlign: "center", maxWidth: 460 },
 
   hero: { minHeight: 300, borderRadius: radius.xl, overflow: "hidden", padding: 22, justifyContent: "flex-end", backgroundColor: "#0E1512" },
   heroImg: { borderRadius: radius.xl },
@@ -200,9 +211,6 @@ const styles = StyleSheet.create({
   primaryCta: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.red, borderRadius: radius.pill, paddingVertical: 14, paddingHorizontal: 24, minHeight: 48 },
   primaryCtaHover: { backgroundColor: colors.redBright },
   primaryCtaText: { color: "#fff", fontSize: 13.5, fontWeight: "800", letterSpacing: 0.6 },
-  secondaryCta: { justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.35)", borderRadius: radius.pill, paddingVertical: 14, paddingHorizontal: 22, minHeight: 48, backgroundColor: "rgba(0,0,0,0.35)" },
-  secondaryCtaHover: { borderColor: "rgba(255,255,255,0.6)" },
-  secondaryCtaText: { color: "#fff", fontSize: 12.5, fontWeight: "800", letterSpacing: 0.6 },
 
   prefs: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 20, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 16 },
   prefItem: { flexDirection: "row", alignItems: "center", gap: 10 },
