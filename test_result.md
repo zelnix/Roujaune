@@ -103,6 +103,19 @@
 #====================================================================================================
 
 
+accessibility_toggles:
+  - task: "App-wide Large Text + High Contrast accessibility toggles in Settings"
+    implemented: true
+    working: true
+    file: "frontend/src/lib/a11y.ts, frontend/src/lib/text-scale.ts, frontend/app/_layout.tsx, frontend/app/settings.tsx, frontend/src/lib/auth-context.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "Added ACCESSIBILITY card in Settings with Large text + High contrast toggles (for the 50+ audience). Global Text/TextInput render patch (text-scale.ts) injects an override into the INPUT style before RN/RN-Web processes it: Large Text multiplies fontSize/lineHeight by 1.22 app-wide; High Contrast promotes dim/neutral body text to #FFFFFF and bumps light font-weights to 600 (accent colours left vivid). Reactive module-store (a11y.ts) persists both flags per rider via /api/rider/settings (backend already merges arbitrary keys) + AsyncStorage cache; refreshes on login, resets on logout/delete (no cross-account leak). AuthGate re-keys the expo-router <Stack> on toggle so the whole app re-renders instantly. Verified end-to-end on web preview (tablet landscape): both toggles flip, persist, and apply app-wide (sidebar + cards + preview) with text visibly larger and dim copy turned bright/bold; expo-router preserved the current route through the re-key (non-disruptive). Demo account reset to OFF baseline."
+
 backend_refactor_rider_benchmark:
   - task: "server.py restructure — extract Rider + Benchmark domains into routes/ + shared services/"
     implemented: true

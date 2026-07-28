@@ -7,6 +7,7 @@ import { getToken, setToken, loadToken, installFetchAuth } from "./session";
 import { refreshCoachFromServer, resetCoach } from "./coach-persona";
 import { resetRiderProfile } from "./rider-profile";
 import { resetNotificationReadState } from "./notifications";
+import { refreshA11yFromServer, resetA11y } from "./a11y";
 
 const API = (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
 const AUTH_BASE = "https://auth.emergentagent.com";
@@ -127,7 +128,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // fixes the case where coach init ran while logged out (401) and stuck on the
   // default Alberto — now every device reflects the actual selection.
   useEffect(() => {
-    if (user) refreshCoachFromServer();
+    if (user) {
+      refreshCoachFromServer();
+      refreshA11yFromServer();
+    }
   }, [user]);
 
   const signIn = useCallback(async (email: string, password: string) => {
@@ -188,6 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     resetCoach();
     resetRiderProfile();
     resetNotificationReadState();
+    resetA11y();
     await setToken(null);
     setUser(null);
   }, []);
@@ -211,6 +216,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     resetCoach();
     resetRiderProfile();
     resetNotificationReadState();
+    resetA11y();
     await setToken(null);
     setUser(null);
   }, []);

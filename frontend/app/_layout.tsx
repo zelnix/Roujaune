@@ -13,6 +13,12 @@ import { AuthProvider, useAuth } from "@/src/lib/auth-context";
 import { registerForPush } from "@/src/lib/push";
 import { loadCatalog } from "@/src/lib/catalog";
 import { colors } from "@/src/theme";
+import { installA11yTextPatch } from "@/src/lib/text-scale";
+import { useA11y } from "@/src/lib/a11y";
+
+// Install the global Text/TextInput accessibility patch (Large Text + High
+// Contrast) once, before any screen renders.
+installA11yTextPatch();
 
 // Disable logbox errors etc so that users can see the app
 // and agent works as expected.
@@ -54,6 +60,9 @@ function AuthGate() {
   const { user, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  // Subscribe to accessibility prefs. Re-keying the Stack on change forces the
+  // whole app to re-render so Large Text / High Contrast apply everywhere.
+  const a11y = useA11y();
 
   // Register this device for push once the rider is signed in (native only).
   useEffect(() => {
@@ -130,7 +139,7 @@ function AuthGate() {
       </View>
     );
   }
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return <Stack key={`a11y-${a11y.largeText ? "L" : "n"}-${a11y.highContrast ? "H" : "n"}`} screenOptions={{ headerShown: false }} />;
 }
 
 export default function RootLayout() {

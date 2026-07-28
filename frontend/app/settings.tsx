@@ -10,6 +10,7 @@ import { useCoach, setCoach, COACHES, CoachId, COACH_STYLES, VOICE_GUIDANCE_OPTS
 import { resolveBothCoachVoices, ResolvedVoice, COACH_PITCH, loadSpanishVoices, CoachVoiceOption } from "@/src/lib/coach-voice";
 import { getVoiceId, setVoiceId } from "@/src/lib/prefs";
 import { useSettings, WHEEL_PRESETS } from "@/src/lib/settings";
+import { useA11y, setLargeText, setHighContrast } from "@/src/lib/a11y";
 
 const PREVIEW_LINE = "Alright, let's ride. Hold steady and breathe — you've got this.";
 
@@ -17,6 +18,7 @@ export default function SettingsScreen() {
   const persona = useCoach();
   const router = useRouter();
   const { settings, setSetting } = useSettings();
+  const a11y = useA11y();
   const coachStyle = useCoachStyle();
   const voiceGuidance = useVoiceGuidance();
   const speechRate = useCoachRate();
@@ -236,6 +238,18 @@ export default function SettingsScreen() {
         <PrefToggle label="Rest-day reminders" sub="Gentle nudge to recover" on={settings.restReminders} onToggle={() => setSetting("restReminders", !settings.restReminders)} testID="tg-restReminders" />
       </Card>
 
+      <Card testID="accessibility">
+        <SectionTitle label="ACCESSIBILITY" color={CC.rouge} />
+        <PrefToggle label="Large text" sub="Increase text size across the whole app" on={a11y.largeText} onToggle={() => setLargeText(!a11y.largeText)} testID="tg-largeText" divider />
+        <PrefToggle label="High contrast" sub="Brighter, bolder text for easier reading" on={a11y.highContrast} onToggle={() => setHighContrast(!a11y.highContrast)} testID="tg-highContrast" divider />
+        <View style={s.a11yPreview} testID="a11y-preview">
+          <Text style={s.a11yPreviewLabel}>Preview</Text>
+          <Text style={s.a11yPreviewHeading}>Today's ride — Endurance Base</Text>
+          <Text style={s.a11yPreviewBody}>Keep a steady pace in zone 2. Your legs will thank you tomorrow.</Text>
+        </View>
+        <Text style={s.coachHint}>Changes apply everywhere and stay saved to your account across devices.</Text>
+      </Card>
+
       <Card testID="about">
         <SectionTitle label="ABOUT" color={CC.rouge} />
         {[
@@ -277,6 +291,10 @@ const s = StyleSheet.create({
   previewHover: { borderColor: "rgba(255,255,255,0.28)", backgroundColor: "rgba(255,255,255,0.06)" },
   previewText: { color: CC.white, fontSize: 12, fontWeight: "700" },
   coachHint: { color: CC.dim, fontSize: 11.5, marginTop: 12, lineHeight: 16 },
+  a11yPreview: { marginTop: 14, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: CC.borderSoft, backgroundColor: "rgba(255,255,255,0.02)", gap: 6 },
+  a11yPreviewLabel: { color: CC.dim, fontSize: 10.5, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase" },
+  a11yPreviewHeading: { color: CC.white, fontSize: 16, fontWeight: "800" },
+  a11yPreviewBody: { color: CC.dim, fontSize: 13, lineHeight: 19 },
   groupLabel: { color: CC.white, fontSize: 13, fontWeight: "700", marginBottom: 10 },
   optionGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   optionCard: { flexGrow: 1, flexBasis: "47%", backgroundColor: "rgba(255,255,255,0.02)", borderRadius: 12, borderWidth: 1.5, borderColor: CC.borderSoft, paddingVertical: 12, paddingHorizontal: 14 },
