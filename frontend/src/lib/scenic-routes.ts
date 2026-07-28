@@ -130,6 +130,7 @@ export async function logScenicRide(route: ScenicRoute, elapsedSec: number): Pro
           id: route.id,
           name: route.name,
           place: route.place,
+          youtube_id: route.youtube_id,
           distance: route.distance_km ? `${route.distance_km} km` : "",
           elevation: route.elevation_m ? `${route.elevation_m} m` : "",
           tag: route.tag,
@@ -146,6 +147,91 @@ export async function logScenicRide(route: ScenicRoute, elapsedSec: number): Pro
   } catch {
     /* history save is best-effort — never blocks the rider */
   }
+}
+
+// ── Discoveries (rider-saved points of interest) ────────────────────────────
+export type ScenicDiscovery = {
+  id: string;
+  route_id: string;
+  route_name?: string;
+  place?: string;
+  poi_order?: number | null;
+  at_pct?: number | null;
+  title: string;
+  description?: string;
+  narration?: string;
+  photo?: string | null;
+  at?: string;
+};
+
+/** Save a bookmarked POI as a discovery. Idempotent per route+poi_order. */
+export async function saveDiscovery(d: {
+  route_id: string; route_name?: string; place?: string; poi_order?: number;
+  at_pct?: number; title: string; description?: string; narration?: string; photo?: string | null;
+}): Promise<ScenicDiscovery | null> {
+  try {
+    const r = await fetch(`${base()}/api/scenic/discoveries`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(d),
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j?.discovery ?? null;
+  } catch { return null; }
+}
+
+export async function fetchDiscoveries(routeId?: string): Promise<ScenicDiscovery[]> {
+  try {
+    const q = routeId ? `?route_id=${encodeURIComponent(routeId)}` : "";
+    const r = await fetch(`${base()}/api/scenic/discoveries${q}`);
+    if (!r.ok) return [];
+    const j = await r.json();
+    return Array.isArray(j?.discoveries) ? j.discoveries : [];
+  } catch { return []; }
+}
+
+export async function deleteDiscovery(id: string): Promise<void> {
+  try { await fetch(`${base()}/api/scenic/discoveries/${encodeURIComponent(id)}`, { method: "DELETE" }); } catch { /* best effort */ }
+}
+
+export async function updateDiscovery(id: string, patch: { title?: string; description?: string; narration?: string }): Promise<ScenicDiscovery | null> {
+  try {
+    const r = await fetch(`${base()}/api/scenic/discoveries/${encodeURIComponent(id)}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch),
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j?.discovery ?? null;
+  } catch { return null; }
+}
+
+// ── Journeys (completed scenic rides + saved discoveries) ────────────────────
+export type ScenicJourney = {
+  id: string;
+  routeId: string;
+  name: string;
+  place?: string;
+  tag?: string;
+  distance_km?: number | string | null;
+  duration_sec?: number | null;
+  at?: string;
+  thumbnail?: string | null;
+  discoveries: ScenicDiscovery[];
+};
+
+/** The rider's completed scenic rides joined with their saved discoveries,
+ *  newest first — powers the shareable ride recap under Journeys. */
+export function useScenicJourneys() {
+  const [journeys, setJourneys] = React.useState<ScenicJourney[] | null>(null);
+  const load = React.useCallback(() => {
+    fetch(`${base()}/api/scenic/journeys`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("failed"))))
+      .then((d) => setJourneys(Array.isArray(d?.journeys) ? d.journeys : []))
+      .catch(() => setJourneys([]));
+  }, []);
+  React.useEffect(() => { load(); }, [load]);
+  return { journeys: journeys ?? [], loading: journeys === null, reload: load };
 }
 
 // ── Saved Destinations (favourites) — reactive per-rider store ───────────────

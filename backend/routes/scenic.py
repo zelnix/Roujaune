@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import datetime
 import re
+import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -289,6 +290,122 @@ async def add_favourite(route_id: str):
 async def remove_favourite(route_id: str):
     await udb.scenic_favourites.delete_one({"route_id": route_id})
     return {"removed": route_id}
+
+
+# --------------------------------------------------------------------------- #
+#  Discoveries (rider-saved points of interest along a scenic ride)           #
+# --------------------------------------------------------------------------- #
+class DiscoveryIn(BaseModel):
+    route_id: str
+    route_name: Optional[str] = ""
+    place: Optional[str] = ""
+    poi_order: Optional[int] = None
+    at_pct: Optional[float] = None
+    title: str
+    description: Optional[str] = ""
+    narration: Optional[str] = ""
+    photo: Optional[str] = None       # thumbnail / captured frame url
+
+
+class DiscoveryPatch(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    narration: Optional[str] = None
+
+
+@router.get("/scenic/discoveries")
+async def list_discoveries(route_id: Optional[str] = None):
+    """The rider's saved discoveries (all, or for one route), newest first."""
+    filt: dict = {}
+    if route_id:
+        filt["route_id"] = route_id
+    docs = await udb.scenic_discoveries.find(filt, {"_id": 0}).sort("at", -1).to_list(2000)
+    return {"discoveries": docs}
+
+
+@router.post("/scenic/discoveries")
+async def add_discovery(body: DiscoveryIn):
+    """Save a discovery (a POI the rider bookmarked). Idempotent per
+    route+poi_order so tapping save twice does not duplicate it."""
+    now = _now()
+    base_doc = {
+        "route_id": body.route_id,
+        "route_name": (body.route_name or "").strip(),
+        "place": (body.place or "").strip(),
+        "poi_order": body.poi_order,
+        "at_pct": body.at_pct,
+        "title": (body.title or "").strip() or "Discovery",
+        "description": (body.description or "").strip(),
+        "narration": (body.narration or "").strip(),
+        "photo": body.photo or None,
+        "at": now,
+    }
+    if body.poi_order is not None:
+        existing = await udb.scenic_discoveries.find_one(
+            {"route_id": body.route_id, "poi_order": body.poi_order}, {"_id": 0})
+        if existing:
+            await udb.scenic_discoveries.update_one(
+                {"id": existing["id"]}, {"$set": {k: v for k, v in base_doc.items() if k != "at"}})
+            existing.update(base_doc)
+            return {"discovery": existing}
+    did = str(uuid.uuid4())
+    doc = {"id": did, **base_doc}
+    await udb.scenic_discoveries.insert_one(dict(doc))
+    return {"discovery": doc}
+
+
+@router.patch("/scenic/discoveries/{discovery_id}")
+async def edit_discovery(discovery_id: str, body: DiscoveryPatch):
+    updates = {k: (v or "").strip() for k, v in body.dict(exclude_unset=True).items()}
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    res = await udb.scenic_discoveries.update_one({"id": discovery_id}, {"$set": updates})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Discovery not found")
+    doc = await udb.scenic_discoveries.find_one({"id": discovery_id}, {"_id": 0})
+    return {"discovery": doc}
+
+
+@router.delete("/scenic/discoveries/{discovery_id}")
+async def remove_discovery(discovery_id: str):
+    await udb.scenic_discoveries.delete_one({"id": discovery_id})
+    return {"removed": discovery_id}
+
+
+@router.get("/scenic/journeys")
+async def scenic_journeys():
+    """Completed scenic rides (from ride_history, workout_id 'scenic-*') joined
+    with the rider's saved discoveries, newest first — powers the shareable
+    'ride recap' under Journeys. Never fabricated: empty until the rider
+    completes a scenic ride."""
+    rides = await udb.ride_history.find(
+        {"workout_id": {"$regex": "^scenic-"}},
+        {"_id": 0},
+    ).sort("created_at", -1).to_list(500)
+
+    discs = await udb.scenic_discoveries.find({}, {"_id": 0}).sort("at", -1).to_list(2000)
+    by_route: dict = {}
+    for d in discs:
+        by_route.setdefault(d.get("route_id"), []).append(d)
+
+    out = []
+    for r in rides:
+        route = r.get("route") or {}
+        rid = (r.get("workout_id") or "").replace("scenic-", "", 1) or route.get("id")
+        out.append({
+            "id": r.get("id"),
+            "routeId": rid,
+            "name": route.get("name") or (r.get("workout") or "").replace("Scenic Ride · ", ""),
+            "place": route.get("place") or "",
+            "tag": route.get("tag") or "Scenic",
+            "distance_km": r.get("distance_km") or route.get("distance") or None,
+            "duration_sec": r.get("duration_sec"),
+            "at": r.get("created_at"),
+            "thumbnail": (f"https://img.youtube.com/vi/{route.get('youtube_id')}/hqdefault.jpg"
+                          if route.get("youtube_id") else None),
+            "discoveries": by_route.get(rid, []),
+        })
+    return {"journeys": out}
 
 
 # --------------------------------------------------------------------------- #

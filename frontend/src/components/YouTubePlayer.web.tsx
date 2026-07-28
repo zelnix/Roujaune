@@ -48,12 +48,35 @@ export default function YouTubePlayer({ videoId, height, width, playing, startSe
 
   const onLoad = () => {
     boostQuality();
+    // Handshake so YouTube starts emitting periodic infoDelivery events
+    // (currentTime/duration) back to us via postMessage.
+    ref.current?.contentWindow?.postMessage(
+      JSON.stringify({ event: "listening", id: videoId }), "*");
     if (playing) cmd("playVideo");
     onStateChange?.(playing);
     // Re-assert quality shortly after playback settles (YouTube can downshift).
     setTimeout(boostQuality, 1500);
     setTimeout(boostQuality, 4000);
   };
+
+  // Parse YouTube's infoDelivery events for real currentTime + duration.
+  React.useEffect(() => {
+    if (!onProgress || typeof window === "undefined") return;
+    const handler = (e: MessageEvent) => {
+      if (typeof e.data !== "string") return;
+      if (e.data.indexOf("infoDelivery") === -1) return;
+      try {
+        const msg = JSON.parse(e.data);
+        const info = msg?.info;
+        if (!info) return;
+        const cur = typeof info.currentTime === "number" ? info.currentTime : undefined;
+        const dur = typeof info.duration === "number" ? info.duration : undefined;
+        if (cur !== undefined) onProgress(cur, dur ?? 0);
+      } catch { /* ignore non-JSON frames */ }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, [onProgress]);
 
   React.useEffect(() => {
     cmd("mute");

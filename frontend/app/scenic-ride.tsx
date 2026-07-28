@@ -11,9 +11,10 @@ import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 import YouTubePlayer from "@/src/components/YouTubePlayer";
 import { colors, radius } from "@/src/theme";
 import * as Speech from "expo-speech";
-import { useScenicRoute, useScenicPois, ScenicPoi, logScenicRide, ytThumb } from "@/src/lib/scenic-routes";
+import { useScenicRoute, useScenicPois, ScenicPoi, logScenicRide, ytThumb, saveDiscovery, deleteDiscovery, fetchDiscoveries } from "@/src/lib/scenic-routes";
 import { getResume, saveResume, clearResume } from "@/src/lib/scenic-resume";
 import { useCoach, useVoiceGuidance, setVoiceGuidance, VoiceGuidance } from "@/src/lib/coach-persona";
+import { useBleSensors } from "@/src/hooks/useBleSensors";
 
 const SERIF = Platform.select({ ios: "Georgia", android: "serif", default: "Georgia, 'Times New Roman', serif" }) as string;
 
@@ -106,6 +107,20 @@ export default function ScenicRideScreen() {
 
   const [playing, setPlaying] = React.useState(true);
   const [elapsed, setElapsed] = React.useState(r0 ? r0.elapsedSec : 0);
+  const [vpos, setVpos] = React.useState(0); // real video currentTime (sec)
+  const [vdur, setVdur] = React.useState(0); // real video duration (sec)
+  const onVideoProgress = React.useCallback((cur: number, dur: number) => {
+    if (typeof cur === "number" && cur >= 0) setVpos(cur);
+    if (dur && dur > 0) setVdur((d) => (d > 0 ? d : dur));
+  }, []);
+
+  // Live BLE cadence / heart-rate telemetry (native build only). When no
+  // sensor is connected these metrics are hidden from the HUD entirely.
+  const ble = useBleSensors();
+  const hasTelemetry = ble.connected.length > 0;
+  const cadence = ble.readings.cadence;
+  const hr = ble.readings.hr;
+
   const [hud, setHud] = React.useState(true);
   const [show, setShow] = React.useState({ location: true, comingUp: true, companion: true, metrics: true });
   const hideOne = (k: keyof typeof show) => setShow((s) => ({ ...s, [k]: false }));
@@ -156,10 +171,15 @@ export default function ScenicRideScreen() {
 
   const leave = () => { if (router.canGoBack()) router.back(); else router.replace("/"); };
 
-  const durationSec = (route?.duration_min ?? 45) * 60;
   const startPos = r0 ? r0.positionSec : 0;
-  const positionSec = Math.max(0, startPos + (elapsed - (r0 ? r0.elapsedSec : 0)));
-  const pct = Math.min(1, positionSec / durationSec);
+  // Prefer the video's REAL duration/position so progress + POI timing are
+  // pixel-accurate; fall back to the route estimate / wall-clock until the
+  // player reports real numbers.
+  const estDur = (route?.duration_min ?? 45) * 60;
+  const durationSec = vdur > 0 ? vdur : estDur;
+  const estPos = Math.max(0, startPos + (elapsed - (r0 ? r0.elapsedSec : 0)));
+  const positionSec = vpos > 0 ? vpos : estPos;
+  const pct = Math.min(1, durationSec > 0 ? positionSec / durationSec : 0);
   const completed = pct >= 0.98;
 
   // Narrate a point-of-interest with the companion's voice; drives the waveform.
@@ -177,6 +197,39 @@ export default function ScenicRideScreen() {
       onError: () => setNarrating(false),
     });
   }, [narrating, persona.id]);
+
+  // Save / unsave a point of interest as a persisted discovery. Keeps the UI
+  // instant (local set) while persisting to the rider's discoveries.
+  const savedIds = React.useRef<Record<number, string>>({});
+  React.useEffect(() => {
+    if (!route) return;
+    let alive = true;
+    fetchDiscoveries(route.id).then((ds) => {
+      if (!alive) return;
+      const s = new Set<number>();
+      ds.forEach((d) => { if (d.poi_order != null) { s.add(d.poi_order); savedIds.current[d.poi_order] = d.id; } });
+      if (s.size) setSaved(s);
+    });
+    return () => { alive = false; };
+  }, [route]);
+
+  const toggleSave = React.useCallback(async (poi: ScenicPoi) => {
+    if (!route) return;
+    const has = saved.has(poi.order);
+    setSaved((sv) => { const n = new Set(sv); has ? n.delete(poi.order) : n.add(poi.order); return n; });
+    if (has) {
+      const id = savedIds.current[poi.order];
+      if (id) { deleteDiscovery(id); delete savedIds.current[poi.order]; }
+    } else {
+      const d = await saveDiscovery({
+        route_id: route.id, route_name: route.name, place: route.place,
+        poi_order: poi.order, at_pct: poi.at_pct, title: poi.title,
+        description: poi.description, narration: poi.narration,
+        photo: route.thumbnail || ytThumb(route.youtube_id),
+      });
+      if (d?.id) savedIds.current[poi.order] = d.id;
+    }
+  }, [route, saved]);
 
   // Persist an in-progress ride so it can be resumed from the Scenic hero.
   const persistResume = React.useCallback(() => {
@@ -263,7 +316,7 @@ export default function ScenicRideScreen() {
       {/* POV video — full-bleed cover */}
       <View style={s.videoWrap} pointerEvents="none">
         <View style={{ width: cover.w, height: cover.h, marginLeft: (width - cover.w) / 2, marginTop: (height - cover.h) / 2 }}>
-          <YouTubePlayer height={cover.h} width={cover.w} playing={playing} videoId={route.youtube_id} startSeconds={Math.floor(startPos)} onStateChange={setPlaying} />
+          <YouTubePlayer height={cover.h} width={cover.w} playing={playing} videoId={route.youtube_id} startSeconds={Math.floor(startPos)} onStateChange={setPlaying} onProgress={onVideoProgress} />
         </View>
       </View>
 
@@ -338,7 +391,7 @@ export default function ScenicRideScreen() {
                 <Ionicons name={narrating ? "pause" : "headset"} size={16} color="#fff" />
                 <Text style={s.hearText}>{narrating ? "Stop story" : "Hear the story"}</Text>
               </Pressable>
-              <Pressable style={s.poiIconBtn} testID="poi-save" onPress={() => setSaved((sv) => { const n = new Set(sv); n.has(upcomingPoi.order) ? n.delete(upcomingPoi.order) : n.add(upcomingPoi.order); return n; })} accessibilityRole="button" accessibilityLabel="Save this discovery">
+              <Pressable style={s.poiIconBtn} testID="poi-save" onPress={() => toggleSave(upcomingPoi)} accessibilityRole="button" accessibilityLabel="Save this discovery">
                 <Ionicons name={saved.has(upcomingPoi.order) ? "bookmark" : "bookmark-outline"} size={18} color={colors.yellow} />
               </Pressable>
               <Pressable style={s.poiIconBtn} testID="poi-skip" onPress={() => setHiddenPoi((h) => new Set(h).add(upcomingPoi.order))} accessibilityRole="button" accessibilityLabel="Skip this discovery">
@@ -371,8 +424,12 @@ export default function ScenicRideScreen() {
           <View style={s.metricsBar} pointerEvents="box-none">
             <Pressable style={s.rowCenter} onPress={() => hideOne("metrics")} testID="hide-metrics" accessibilityRole="button" accessibilityLabel="Hide metrics bar">
               <Metric icon="time-outline" value={clock(elapsed)} label="Time" />
-              <Metric icon="sync-outline" value="—" label="rpm" />
-              <Metric icon="heart-outline" value="—" label="bpm" />
+              {hasTelemetry && (
+                <Metric icon="sync-outline" value={cadence != null ? String(Math.round(cadence)) : "—"} label="rpm" />
+              )}
+              {hasTelemetry && (
+                <Metric icon="heart-outline" value={hr != null ? String(Math.round(hr)) : "—"} label="bpm" />
+              )}
               <Metric icon="navigate-outline" value={km} label="km" />
             </Pressable>
             <View style={s.segment}>
