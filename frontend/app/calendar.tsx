@@ -1,12 +1,11 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, Animated, Pressable, useWindowDimensions, Modal } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Animated, Pressable, useWindowDimensions, Modal, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { Platform } from "react-native";
 
 import { useCoach } from "@/src/lib/coach-persona";
 import {
@@ -60,7 +59,7 @@ export default function CalendarScreen() {
   const colCenters = React.useRef<number[]>([]);
   const showToast = React.useCallback((text: string, undo?: () => void) => setToast({ id: Date.now(), text, undo }), []);
 
-  const days = week?.days ?? [];
+  const days = React.useMemo<CalendarDay[]>(() => week?.days ?? [], [week]);
   const selDay: CalendarDay | undefined = days[selected];
 
   const measureCol = (i: number) => (e: any) => {

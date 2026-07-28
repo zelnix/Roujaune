@@ -186,7 +186,9 @@ export default function LiveWorkout() {
   React.useEffect(() => {
     if (ble.readings.ts <= 0 || connectionState !== "connected") return;
     sendSensor({ power: ble.readings.power, cadence: ble.readings.cadence, hr: ble.readings.hr, speed: ble.readings.speed });
-  }, [ble.readings.ts, connectionState, sendSensor]);
+    // Fires once per new BLE sample; ts advances with every reading so the
+    // individual power/cadence/hr/speed values are captured fresh each time.
+  }, [ble.readings.ts, ble.readings.power, ble.readings.cadence, ble.readings.hr, ble.readings.speed, connectionState, sendSensor]);
 
   // ---- Live segment driven by the chosen workout ----
   const ftp = settings.ftp || 287;
@@ -517,7 +519,7 @@ export default function LiveWorkout() {
       fetchExtendAdvice();
       submitRoutePR(true);
     }
-  }, [telemetry.elapsed, segTotalSec, endPrompt, paused, pause, fetchExtendAdvice]);
+  }, [telemetry.elapsed, segTotalSec, endPrompt, paused, pause, fetchExtendAdvice, submitRoutePR]);
 
   const timeProgress = Math.min(1, telemetry.elapsed / totalSec);
   const progress = trainerOn ? (terrain.km > 0 ? Math.min(1, telemetry.distance / terrain.km) : 0) : timeProgress;
@@ -647,7 +649,7 @@ export default function LiveWorkout() {
       nextPreviewFiredRef.current = true;
       generateCue("next_preview");
     }
-  }, [activeSeg?.remaining, paused, generateCue]);
+  }, [activeSeg, activeSeg?.remaining, paused, generateCue]);
 
   const onSelectRoute = (id: string) => {
     setVRouteId(id); setShowRoutes(false);

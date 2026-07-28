@@ -110,7 +110,8 @@ backend_refactor_rider_benchmark:
     file: "backend/server.py, backend/routes/rider.py, backend/routes/benchmark.py, backend/services/rider_common.py, backend/services/coach_llm.py, backend/services/plan_common.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
+    verified: "iter64 — 40/40 backend tests pass, ZERO behavioural regression. Rider + Benchmark domains, engine consumers of moved helpers, and admin cross-module config sync all confirmed."
     status_history:
         -working: "NA"
         -agent: "main"
