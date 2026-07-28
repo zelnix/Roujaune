@@ -80,7 +80,7 @@ export const experienceNavigation: Record<RiderExperience, ExperienceNavigation>
   training: {
     experience: "training", defaultRoute: "/",
     items: [
-      { key: "home", label: "Home", icon: "home", route: "/", availability: "available" },
+      { key: "home", label: "Today", icon: "home", route: "/", availability: "available" },
       { key: "workouts", label: "Workouts", icon: "fitness-outline", route: "/workouts", availability: "available" },
       { key: "routes", label: "Virtual Routes", icon: "git-network-outline", route: "/routes", availability: "available" },
       { key: "benchmark", label: "Benchmark Workouts", icon: "speedometer-outline", route: "/benchmark", availability: "available" },

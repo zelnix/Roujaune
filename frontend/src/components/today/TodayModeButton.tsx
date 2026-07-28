@@ -16,21 +16,21 @@ export function TodayModeButton({ compact = false }: { compact?: boolean }) {
 
   return (
     <View style={styles.wrap}>
-      {!compact && <Text style={styles.eyebrow} numberOfLines={1}>TODAY I WANT TO</Text>}
+      {!compact && <Text style={styles.eyebrow} numberOfLines={1}>RIDING EXPERIENCE</Text>}
       <Pressable
         testID="today-mode-button"
         onPress={() => setOpen(true)}
         accessibilityRole="button"
-        accessibilityLabel={`Today mode: ${meta.label}. Change activity`}
+        accessibilityLabel={`Riding experience: ${meta.label}. Change activity`}
         style={({ hovered }: any) => [styles.selected, hovered && styles.selectedHover]}
       >
         <View style={styles.iconBubble}>
-          <Ionicons name={meta.icon} size={compact ? 18 : 16} color={colors.yellow} />
+          <Ionicons name={meta.icon} size={compact ? 18 : 16} color={colors.bg} />
         </View>
         {!compact && (
           <Text style={styles.selLabel} numberOfLines={1}>{meta.shortLabel}</Text>
         )}
-        <Ionicons name="chevron-down" size={compact ? 12 : 13} color={colors.textDim} style={compact ? styles.chevCompact : undefined} />
+        <Ionicons name="chevron-down" size={compact ? 12 : 13} color={colors.yellow} style={compact ? styles.chevCompact : undefined} />
       </Pressable>
 
       <TodayModeMenu
@@ -58,7 +58,7 @@ export function TodayModeMenu({
     <Modal visible={visible} transparent animationType={noMotion ? "none" : "fade"} onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close activity menu">
         <Pressable style={styles.menu} onPress={(e) => e.stopPropagation()}>
-          <Text style={styles.menuTitle}>TODAY I WANT TO</Text>
+          <Text style={styles.menuTitle}>RIDING EXPERIENCE</Text>
           <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 460 }}>
             {TODAY_MODES.map((m) => (
               <TodayModeOption
@@ -86,26 +86,22 @@ function TodayModeOption({ meta, selected, onPress }: { meta: TodayModeMeta; sel
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected }}
-      accessibilityLabel={`${meta.label}. ${meta.description}${soon ? ". Coming soon — tap to preview" : ""}${selected ? ". Selected" : ""}`}
+      accessibilityLabel={`${meta.label}. ${meta.description}${soon ? ". Tap to preview" : ""}${selected ? ". Selected" : ""}`}
       style={({ hovered }: any) => [
         styles.option,
         selected && styles.optionSel,
         hovered && !selected && styles.optionHover,
-        soon && styles.optionSoon,
       ]}
     >
       <View style={[styles.optIcon, selected && styles.optIconSel]}>
-        <Ionicons name={meta.icon} size={20} color={selected ? "#fff" : soon ? colors.textFaint : colors.yellow} />
+        <Ionicons name={meta.icon} size={20} color={selected ? "#fff" : colors.yellow} />
       </View>
       <View style={{ flex: 1 }}>
         <View style={styles.optLabelRow}>
-          <Text style={[styles.optLabel, soon && { color: colors.textDim }]} numberOfLines={1}>{meta.label}</Text>
+          <Text style={styles.optLabel} numberOfLines={1}>{meta.label}</Text>
           {selected && <Ionicons name="checkmark-circle" size={16} color="#fff" />}
         </View>
-        <View style={styles.optLabelRow}>
-          <Text style={styles.optDesc} numberOfLines={1}>{meta.description}</Text>
-          {soon && <Text style={styles.soonBadge}>COMING SOON</Text>}
-        </View>
+        <Text style={styles.optDesc} numberOfLines={1}>{meta.description}</Text>
       </View>
     </Pressable>
   );
@@ -113,14 +109,14 @@ function TodayModeOption({ meta, selected, onPress }: { meta: TodayModeMeta; sel
 
 const styles = StyleSheet.create({
   wrap: { width: "100%", alignItems: "center", paddingHorizontal: 8, marginBottom: spacing.md },
-  eyebrow: { color: colors.textFaint, fontSize: 7.5, fontWeight: "800", letterSpacing: 0.8, marginBottom: 5, textAlign: "center" },
+  eyebrow: { color: colors.yellow, fontSize: 7.5, fontWeight: "800", letterSpacing: 0.7, marginBottom: 5, textAlign: "center" },
   selected: {
-    width: "100%", alignItems: "center", gap: 3, paddingVertical: 8, paddingHorizontal: 6,
-    borderRadius: radius.md, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: "rgba(255,255,255,0.04)",
+    width: "100%", alignItems: "center", gap: 4, paddingVertical: 9, paddingHorizontal: 6,
+    borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.yellow, backgroundColor: "rgba(245,179,1,0.16)",
   },
-  selectedHover: { borderColor: "rgba(255,255,255,0.24)" },
-  iconBubble: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(245,179,1,0.12)", borderWidth: 1, borderColor: "rgba(245,179,1,0.35)" },
-  selLabel: { color: colors.white, fontSize: 9.5, fontWeight: "700", textAlign: "center" },
+  selectedHover: { backgroundColor: "rgba(245,179,1,0.26)", borderColor: colors.yellow },
+  iconBubble: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: colors.yellow },
+  selLabel: { color: colors.yellow, fontSize: 9.5, fontWeight: "800", textAlign: "center" },
   chevCompact: { marginTop: 1 },
 
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "center", alignItems: "flex-start", paddingLeft: 110, paddingVertical: 40 },
