@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, Image, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { useRouter, useFocusEffect } from "expo-router";
+import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing, shadow } from "@/src/theme";
 import { useTelemetry } from "@/src/hooks/useTelemetry";
@@ -75,7 +75,12 @@ export default function VirtualRouteScreen() {
   }, [ble.readings.ts, connectionState, sendSensor]);
 
   const [appearance, setAppearance] = React.useState<RiderAppearanceConfiguration>(DEFAULT_APPEARANCE);
-  const [routeId, setRouteId] = React.useState(VIRTUAL_ROUTES[0].id);
+  const { route: routeParam } = useLocalSearchParams<{ route?: string }>();
+  const initialRouteId = React.useMemo(
+    () => (routeParam && VIRTUAL_ROUTES.some((r) => r.id === routeParam) ? routeParam : VIRTUAL_ROUTES[0].id),
+    [routeParam],
+  );
+  const [routeId, setRouteId] = React.useState(initialRouteId);
   const [phase, setPhase] = React.useState<"setup" | "riding" | "paused">("setup");
   const [reducedMotion, setReducedMotion] = React.useState(false);
   const [autoResistance, setAutoResistance] = React.useState(true);

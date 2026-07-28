@@ -1,39 +1,57 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView, ImageBackground } from "react-native";
+import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { colors, radius, spacing } from "../../theme";
+import { VIRTUAL_ROUTES, getVRoute, VRoute } from "../../lib/vroutes";
 import { ScheduledWorkoutReminder } from "./ScheduledWorkoutReminder";
 
-type Dest = { id: string; title: string; country: string; minutes: number; feel: string; tag?: string };
+const base = () => (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
 
-const CONTINUE: Dest[] = [
-  { id: "garda", title: "Lake Garda Lakeside", country: "Italy", minutes: 42, feel: "Relaxed" },
-];
-const RECOMMENDED: Dest[] = [
-  { id: "hyde", title: "Hyde Park & Kensington", country: "London", minutes: 28, feel: "Gentle" },
-  { id: "swan", title: "Swan River", country: "Perth", minutes: 35, feel: "Relaxed" },
-  { id: "tuscany", title: "Tuscan Hills", country: "Italy", minutes: 55, feel: "Rolling" },
-];
-const RECENT: Dest[] = [
-  { id: "amsterdam", title: "Amsterdam Canals", country: "Netherlands", minutes: 32, feel: "Flat", tag: "New" },
-  { id: "coast", title: "Coastal Road", country: "Amalfi", minutes: 48, feel: "Scenic", tag: "New" },
-];
-const SHORT: Dest[] = [
-  { id: "hyde2", title: "Hyde Park Loop", country: "London", minutes: 22, feel: "Gentle" },
-  { id: "town", title: "Historic Town Ride", country: "Bruges", minutes: 26, feel: "Relaxed" },
-];
-const FAVOURITES: Dest[] = [
-  { id: "garda2", title: "Lake Garda Lakeside", country: "Italy", minutes: 42, feel: "Relaxed" },
-];
+/** Estimate a relaxed scenic ride time from distance (~24 km/h touring pace). */
+function estMinutes(r: VRoute): number {
+  return Math.max(8, Math.round((r.distanceKm / 24) * 60));
+}
+function discoveries(r: VRoute): number {
+  return (r.checkpoints?.length ?? 0) || (r.points?.length ?? 0);
+}
 
-/** Calm, destination-led Today content for the Scenic Cycling experience.
- *  Feels vacation-like — never a performance dashboard. "Begin Scenic Journey"
- *  continues into the existing Roujaune scenic flow (/routes → /virtual-route). */
+type LastRide = {
+  available: boolean;
+  routeId?: string;
+  name?: string;
+  place?: string;
+  distance_km?: number;
+  at?: string;
+};
+
+/** Calm, destination-led Today content for the Scenic Cycling experience —
+ *  driven by the REAL virtual-route catalog. "Begin Scenic Journey" and every
+ *  destination card open the actual immersive route; "Continue your journey"
+ *  reflects the rider's genuine last scenic ride (hidden until they have one). */
 export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => void }) {
   const router = useRouter();
-  const begin = () => router.push("/virtual-route");
+  const [last, setLast] = React.useState<LastRide | null>(null);
+
+  React.useEffect(() => {
+    let alive = true;
+    fetch(`${base()}/api/scenic/last`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (alive && d) setLast(d); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  const hero = VIRTUAL_ROUTES[0];
+  const open = (id: string) => router.push(`/virtual-route?route=${id}` as any);
   const explore = () => router.push("/routes");
+
+  const others = VIRTUAL_ROUTES.filter((r) => r.id !== hero.id);
+  const shortRides = VIRTUAL_ROUTES.filter((r) => estMinutes(r) < 35);
+  const recent = VIRTUAL_ROUTES.slice(-2);
+
+  const lastRoute = last?.available && last.routeId ? getVRoute(last.routeId) : null;
 
   return (
     <View style={{ gap: spacing.md }} testID="scenic-cycling-today">
@@ -41,9 +59,9 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
 
       <Text style={styles.h1}>WHERE SHALL WE EXPLORE TODAY?</Text>
 
-      {/* Hero destination */}
-      <View style={styles.hero} testID="scenic-hero">
-        <View style={styles.heroGlow} />
+      {/* Hero destination (real route) */}
+      <ImageBackground source={hero.backdrop} style={styles.hero} imageStyle={styles.heroImg} testID="scenic-hero">
+        <View style={styles.heroScrim} />
         <View style={styles.heroTopRow}>
           <View style={styles.povBadge}>
             <Ionicons name="videocam" size={12} color="#fff" />
@@ -55,18 +73,19 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
           </View>
         </View>
         <View style={{ flex: 1 }} />
-        <Text style={styles.heroTitle}>LAKE GARDA LAKESIDE JOURNEY</Text>
-        <Text style={styles.heroCountry}>Italy</Text>
-        <Text style={styles.heroDesc}>
-          Ride beside Lake Garda through historic villages, olive-lined roads and mountain scenery.
+        <Text style={styles.heroTitle}>{hero.name.toUpperCase()}</Text>
+        <Text style={styles.heroCountry}>{hero.place}</Text>
+        <Text style={styles.heroDesc} numberOfLines={2}>
+          A relaxed {hero.tag.toLowerCase()} journey — ride at your own pace and soak in the scenery.
         </Text>
         <View style={styles.heroStats}>
-          <Stat icon="time-outline" label="42 minutes" />
+          <Stat icon="time-outline" label={`${estMinutes(hero)} minutes`} />
           <Stat icon="leaf-outline" label="Relaxed" />
-          <Stat icon="sparkles-outline" label="8 discoveries" />
+          <Stat icon="trending-up-outline" label={`${hero.elevationM} m`} />
+          {discoveries(hero) > 0 && <Stat icon="sparkles-outline" label={`${discoveries(hero)} discoveries`} />}
         </View>
         <View style={styles.heroCtas}>
-          <Pressable testID="begin-scenic-journey" onPress={begin} accessibilityRole="button" accessibilityLabel="Begin scenic journey to Lake Garda"
+          <Pressable testID="begin-scenic-journey" onPress={() => open(hero.id)} accessibilityRole="button" accessibilityLabel={`Begin scenic journey: ${hero.name}`}
             style={({ hovered }: any) => [styles.primaryCta, hovered && styles.primaryCtaHover]}>
             <Ionicons name="play" size={16} color="#fff" />
             <Text style={styles.primaryCtaText}>BEGIN SCENIC JOURNEY</Text>
@@ -76,7 +95,7 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
             <Text style={styles.secondaryCtaText}>EXPLORE DESTINATIONS</Text>
           </Pressable>
         </View>
-      </View>
+      </ImageBackground>
 
       {/* Preferences summary */}
       <View style={styles.prefs} testID="scenic-prefs">
@@ -89,11 +108,26 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
         </Pressable>
       </View>
 
-      <DestRow title="Continue your journey" data={CONTINUE} onPress={begin} />
-      <DestRow title="Recommended for you" data={RECOMMENDED} onPress={explore} />
-      <DestRow title="Recently added destinations" data={RECENT} onPress={explore} />
-      <DestRow title="Scenic rides under 30 minutes" data={SHORT} onPress={explore} />
-      <DestRow title="Favourite journeys" data={FAVOURITES} onPress={begin} />
+      {/* Continue your journey — only when the rider actually has a last scenic ride */}
+      {lastRoute && (
+        <View style={styles.section} testID="scenic-continue">
+          <Text style={styles.sectionTitle}>Continue your journey</Text>
+          <Pressable onPress={() => open(lastRoute.id)} accessibilityRole="button" accessibilityLabel={`Resume ${lastRoute.name}`}
+            style={({ hovered }: any) => [styles.continueCard, hovered && styles.destCardHover]}>
+            <Image source={lastRoute.backdrop} style={styles.continueThumb} contentFit="cover" />
+            <View style={{ flex: 1, gap: 3 }}>
+              <Text style={styles.continueLabel}>PICK UP WHERE YOU LEFT OFF</Text>
+              <Text style={styles.destTitle}>{lastRoute.name}</Text>
+              <Text style={styles.destCountry}>{lastRoute.place}</Text>
+            </View>
+            <View style={styles.resumeBtn}><Ionicons name="play" size={16} color="#fff" /><Text style={styles.resumeText}>Resume</Text></View>
+          </Pressable>
+        </View>
+      )}
+
+      <DestRow title="Recommended for you" data={others} open={open} />
+      <DestRow title="Recently added destinations" data={recent} open={open} tag="New" />
+      <DestRow title="Scenic rides under 35 minutes" data={shortRides} open={open} />
     </View>
   );
 }
@@ -119,23 +153,24 @@ function Pref({ label, value, icon }: { label: string; value: string; icon: any 
   );
 }
 
-function DestRow({ title, data, onPress }: { title: string; data: Dest[]; onPress: () => void }) {
+function DestRow({ title, data, open, tag }: { title: string; data: VRoute[]; open: (id: string) => void; tag?: string }) {
+  if (!data.length) return null;
   return (
     <View style={styles.section} testID={`scenic-row-${title}`}>
       <Text style={styles.sectionTitle}>{title}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
         {data.map((d) => (
-          <Pressable key={d.id} onPress={onPress} accessibilityRole="button" accessibilityLabel={`${d.title}, ${d.country}, ${d.minutes} minutes, ${d.feel}`}
+          <Pressable key={d.id} onPress={() => open(d.id)} accessibilityRole="button" accessibilityLabel={`${d.name}, ${d.place}, ${estMinutes(d)} minutes, ${d.tag}`}
             style={({ hovered }: any) => [styles.destCard, hovered && styles.destCardHover]}>
             <View style={styles.destThumb}>
-              <Ionicons name="image-outline" size={22} color="rgba(255,255,255,0.35)" />
-              {d.tag ? <View style={styles.newTag}><Text style={styles.newTagText}>{d.tag}</Text></View> : null}
+              <Image source={d.backdrop} style={StyleSheet.absoluteFill as any} contentFit="cover" />
+              {tag ? <View style={styles.newTag}><Text style={styles.newTagText}>{tag}</Text></View> : null}
             </View>
-            <Text style={styles.destTitle} numberOfLines={1}>{d.title}</Text>
-            <Text style={styles.destCountry} numberOfLines={1}>{d.country}</Text>
+            <Text style={styles.destTitle} numberOfLines={1}>{d.name}</Text>
+            <Text style={styles.destCountry} numberOfLines={1}>{d.place}</Text>
             <View style={styles.destMeta}>
               <Ionicons name="time-outline" size={12} color={colors.textFaint} />
-              <Text style={styles.destMetaText}>{d.minutes}m · {d.feel}</Text>
+              <Text style={styles.destMetaText}>{estMinutes(d)}m · {d.tag}</Text>
             </View>
           </Pressable>
         ))}
@@ -147,26 +182,27 @@ function DestRow({ title, data, onPress }: { title: string; data: Dest[]; onPres
 const styles = StyleSheet.create({
   h1: { color: colors.white, fontSize: 22, fontWeight: "800", letterSpacing: 0.4 },
 
-  hero: { minHeight: 300, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, backgroundColor: "#0E1512", padding: 22, overflow: "hidden", justifyContent: "flex-end" },
-  heroGlow: { position: "absolute", top: -80, right: -60, width: 260, height: 260, borderRadius: 130, backgroundColor: "rgba(67,209,122,0.14)" },
+  hero: { minHeight: 300, borderRadius: radius.xl, overflow: "hidden", padding: 22, justifyContent: "flex-end", backgroundColor: "#0E1512" },
+  heroImg: { borderRadius: radius.xl },
+  heroScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(6,8,7,0.5)" },
   heroTopRow: { position: "absolute", top: 18, left: 22, right: 22, flexDirection: "row", justifyContent: "space-between" },
-  povBadge: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(224,30,43,0.9)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  povBadge: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(224,30,43,0.92)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
   povText: { color: "#fff", fontSize: 9.5, fontWeight: "800", letterSpacing: 0.5 },
-  guidedBadge: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(0,0,0,0.4)", borderWidth: 1, borderColor: "rgba(245,179,1,0.35)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  guidedBadge: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(0,0,0,0.5)", borderWidth: 1, borderColor: "rgba(245,179,1,0.35)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
   guidedText: { color: colors.yellow, fontSize: 9.5, fontWeight: "700" },
   heroTitle: { color: "#fff", fontSize: 26, fontWeight: "900", letterSpacing: 0.4 },
   heroCountry: { color: colors.yellow, fontSize: 14, fontWeight: "700", marginTop: 2 },
-  heroDesc: { color: colors.textDim, fontSize: 14, lineHeight: 20, marginTop: 8, maxWidth: 560 },
+  heroDesc: { color: "rgba(255,255,255,0.85)", fontSize: 14, lineHeight: 20, marginTop: 8, maxWidth: 560 },
   heroStats: { flexDirection: "row", flexWrap: "wrap", gap: 16, marginTop: 14 },
   stat: { flexDirection: "row", alignItems: "center", gap: 6 },
-  statText: { color: colors.text, fontSize: 13, fontWeight: "600" },
+  statText: { color: "#fff", fontSize: 13, fontWeight: "600" },
   heroCtas: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 18 },
   primaryCta: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.red, borderRadius: radius.pill, paddingVertical: 14, paddingHorizontal: 24, minHeight: 48 },
   primaryCtaHover: { backgroundColor: colors.redBright },
   primaryCtaText: { color: "#fff", fontSize: 13.5, fontWeight: "800", letterSpacing: 0.6 },
-  secondaryCta: { justifyContent: "center", borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingVertical: 14, paddingHorizontal: 22, minHeight: 48, backgroundColor: "rgba(255,255,255,0.04)" },
-  secondaryCtaHover: { borderColor: "rgba(255,255,255,0.28)" },
-  secondaryCtaText: { color: colors.white, fontSize: 12.5, fontWeight: "800", letterSpacing: 0.6 },
+  secondaryCta: { justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.35)", borderRadius: radius.pill, paddingVertical: 14, paddingHorizontal: 22, minHeight: 48, backgroundColor: "rgba(0,0,0,0.35)" },
+  secondaryCtaHover: { borderColor: "rgba(255,255,255,0.6)" },
+  secondaryCtaText: { color: "#fff", fontSize: 12.5, fontWeight: "800", letterSpacing: 0.6 },
 
   prefs: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 20, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 16 },
   prefItem: { flexDirection: "row", alignItems: "center", gap: 10 },
@@ -177,9 +213,16 @@ const styles = StyleSheet.create({
 
   section: { gap: 10 },
   sectionTitle: { color: colors.white, fontSize: 15, fontWeight: "800" },
+
+  continueCard: { flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: "rgba(245,179,1,0.28)", padding: 12 },
+  continueThumb: { width: 96, height: 64, borderRadius: radius.md, backgroundColor: "rgba(255,255,255,0.05)" },
+  continueLabel: { color: colors.yellow, fontSize: 10, fontWeight: "800", letterSpacing: 0.6 },
+  resumeBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.red, borderRadius: radius.pill, paddingVertical: 10, paddingHorizontal: 16, minHeight: 44 },
+  resumeText: { color: "#fff", fontSize: 12.5, fontWeight: "800" },
+
   destCard: { width: 190, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: 10, gap: 3 },
   destCardHover: { borderColor: "rgba(255,255,255,0.24)" },
-  destThumb: { height: 96, borderRadius: radius.md, backgroundColor: "rgba(255,255,255,0.05)", alignItems: "center", justifyContent: "center", marginBottom: 6 },
+  destThumb: { height: 96, borderRadius: radius.md, backgroundColor: "rgba(255,255,255,0.05)", overflow: "hidden", marginBottom: 6 },
   newTag: { position: "absolute", top: 8, left: 8, backgroundColor: colors.yellow, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   newTagText: { color: "#241B00", fontSize: 9, fontWeight: "800" },
   destTitle: { color: colors.white, fontSize: 13.5, fontWeight: "700" },

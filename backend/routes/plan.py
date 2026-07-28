@@ -750,3 +750,28 @@ async def rider_missed():
         "missed": [{"date": w.get("date"), "title": w.get("title") or w.get("name")} for w in missed[:5]],
         "guidance": guidance,
     }
+
+
+@router.get("/scenic/last")
+async def scenic_last_ride():
+    """Most recent scenic (virtual) ride for the Scenic Today 'Continue your
+    journey' rail. Scenic rides are logged with workout_id 'virtual-<routeId>'.
+    Returns {available:false} when the rider has not ridden a scenic route yet
+    (we NEVER fabricate one)."""
+    doc = await udb.ride_history.find_one(
+        {"workout_id": {"$regex": "^virtual-"}},
+        sort=[("created_at", -1)],
+    )
+    if not doc:
+        return {"available": False}
+    route = doc.get("route") or {}
+    rid = (doc.get("workout_id") or "").replace("virtual-", "", 1) or route.get("id")
+    return {
+        "available": True,
+        "routeId": rid,
+        "name": route.get("name") or (doc.get("workout") or "").replace("Virtual Ride · ", ""),
+        "place": route.get("place"),
+        "distance_km": doc.get("distance_km"),
+        "duration_sec": doc.get("duration_sec"),
+        "at": doc.get("created_at"),
+    }
