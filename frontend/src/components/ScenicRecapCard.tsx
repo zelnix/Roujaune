@@ -90,8 +90,8 @@ export const ScenicRecapCard = React.forwardRef<View, { journey: ScenicJourney; 
           <Image source={WORDMARK} style={c.wordmark} contentFit="contain" />
 
           <View style={c.thumbWrap}>
-            {journey.thumbnail ? (
-              <Image source={{ uri: journey.thumbnail }} style={c.thumb} contentFit="cover" />
+            {(journey.cover || journey.thumbnail) ? (
+              <Image source={{ uri: (journey.cover || journey.thumbnail) as string }} style={c.thumb} contentFit="cover" />
             ) : (
               <View style={[c.thumb, c.thumbFallback]}><Ionicons name="image-outline" size={28} color={colors.textFaint} /></View>
             )}

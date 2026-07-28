@@ -232,8 +232,18 @@ export type ScenicJourney = {
   duration_sec?: number | null;
   at?: string;
   thumbnail?: string | null;
+  cover?: string | null;
   discoveries: ScenicDiscovery[];
 };
+
+/** Choose a saved discovery photo as a ride's recap cover (null = default). */
+export async function setRecapCover(rideId: string, photo: string | null): Promise<void> {
+  try {
+    await fetch(`${base()}/api/scenic/journeys/${encodeURIComponent(rideId)}/cover`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ photo }),
+    });
+  } catch { /* best effort */ }
+}
 
 /** The rider's completed scenic rides joined with their saved discoveries,
  *  newest first — powers the shareable ride recap under Journeys. */

@@ -506,6 +506,9 @@ async def scenic_journeys():
     for d in discs:
         by_route.setdefault(d.get("route_id"), []).append(d)
 
+    covers = await udb.scenic_recap_covers.find({}, {"_id": 0}).to_list(1000)
+    cover_by_ride = {c.get("ride_id"): c.get("photo") for c in covers}
+
     out = []
     for r in rides:
         route = r.get("route") or {}
@@ -532,9 +535,29 @@ async def scenic_journeys():
             "at": r.get("created_at"),
             "thumbnail": (f"https://img.youtube.com/vi/{route.get('youtube_id')}/hqdefault.jpg"
                           if route.get("youtube_id") else None),
+            "cover": cover_by_ride.get(r.get("id")),
             "discoveries": by_route.get(rid, []),
         })
     return {"journeys": out}
+
+
+class RecapCoverIn(BaseModel):
+    photo: Optional[str] = None    # a discovery photo URL, or null to reset to default
+
+
+@router.put("/scenic/journeys/{ride_id}/cover")
+async def set_recap_cover(ride_id: str, body: RecapCoverIn):
+    """Choose a saved discovery photo as the cover of a ride's shareable recap
+    (or reset to the default route thumbnail when photo is null)."""
+    if body.photo:
+        await udb.scenic_recap_covers.update_one(
+            {"ride_id": ride_id},
+            {"$set": {"ride_id": ride_id, "photo": body.photo, "at": _now()}},
+            upsert=True,
+        )
+    else:
+        await udb.scenic_recap_covers.delete_one({"ride_id": ride_id})
+    return {"ride_id": ride_id, "cover": body.photo}
 
 
 # --------------------------------------------------------------------------- #

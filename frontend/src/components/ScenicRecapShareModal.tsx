@@ -1,11 +1,12 @@
 import React from "react";
 import { View, Text, StyleSheet, Modal, Pressable, ActivityIndicator, Platform, Linking, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { captureRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import * as MediaLibrary from "expo-media-library";
 import { colors, radius } from "@/src/theme";
-import { ScenicJourney } from "@/src/lib/scenic-routes";
+import { ScenicJourney, setRecapCover } from "@/src/lib/scenic-routes";
 import { ScenicRecapCard } from "./ScenicRecapCard";
 
 /** Presents the branded scenic ride recap and lets the rider share or save it. */
@@ -20,8 +21,21 @@ export function ScenicRecapShareModal({
   const cardRef = React.useRef<View>(null);
   const [busy, setBusy] = React.useState<null | "share" | "save">(null);
   const [notice, setNotice] = React.useState<{ msg: string; action?: "settings" } | null>(null);
+  // Live cover override so the card updates the instant a cover is picked.
+  const [cover, setCover] = React.useState<string | null | undefined>(undefined);
 
   React.useEffect(() => { if (visible) setNotice(null); }, [visible]);
+  React.useEffect(() => { setCover(journey?.cover ?? null); }, [journey]);
+
+  const coverPhotos = React.useMemo(
+    () => Array.from(new Set((journey?.discoveries || []).map((d) => d.photo).filter(Boolean) as string[])),
+    [journey],
+  );
+
+  const chooseCover = (photo: string | null) => {
+    setCover(photo);
+    if (journey) setRecapCover(journey.id, photo);
+  };
 
   const capture = async () => {
     await new Promise((r) => setTimeout(r, 250));
@@ -75,8 +89,30 @@ export function ScenicRecapShareModal({
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
           <View style={s.sheet}>
             <View style={s.cardWrap}>
-              <ScenicRecapCard ref={cardRef} journey={journey} coachName={coachName} />
+              <ScenicRecapCard ref={cardRef} journey={{ ...journey, cover: cover === undefined ? journey.cover : cover }} coachName={coachName} />
             </View>
+
+            {coverPhotos.length > 0 ? (
+              <View style={s.coverPicker}>
+                <Text style={s.coverLabel}>COVER PHOTO</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.coverRow}>
+                  <Pressable onPress={() => chooseCover(null)} testID="cover-default" style={[s.coverThumb, (cover == null) && s.coverThumbSel]} accessibilityRole="button" accessibilityLabel="Use default cover">
+                    {journey.thumbnail ? (
+                      <Image source={{ uri: journey.thumbnail }} style={s.coverImg} contentFit="cover" />
+                    ) : (
+                      <View style={[s.coverImg, s.coverImgFallback]}><Ionicons name="logo-youtube" size={18} color={colors.textFaint} /></View>
+                    )}
+                    {cover == null ? <View style={s.coverCheck}><Ionicons name="checkmark" size={13} color={colors.bg} /></View> : null}
+                  </Pressable>
+                  {coverPhotos.map((p) => (
+                    <Pressable key={p} onPress={() => chooseCover(p)} testID="cover-option" style={[s.coverThumb, cover === p && s.coverThumbSel]} accessibilityRole="button" accessibilityLabel="Use this discovery as cover">
+                      <Image source={{ uri: p }} style={s.coverImg} contentFit="cover" />
+                      {cover === p ? <View style={s.coverCheck}><Ionicons name="checkmark" size={13} color={colors.bg} /></View> : null}
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+            ) : null}
 
             {notice ? (
               <View style={s.notice}>
@@ -118,6 +154,15 @@ const s = StyleSheet.create({
   scroll: { flexGrow: 1, alignItems: "center", justifyContent: "center", padding: 20 },
   sheet: { width: "100%", maxWidth: 440, alignItems: "center" },
   cardWrap: { borderRadius: 22, ...Platform.select({ web: { boxShadow: "0px 12px 24px rgba(0,0,0,0.5)" }, default: { shadowColor: "#000", shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 12 } }) },
+  coverPicker: { alignSelf: "stretch", marginTop: 16, maxWidth: 360, width: "100%" },
+  coverLabel: { color: colors.yellow, fontSize: 10.5, fontWeight: "900", letterSpacing: 1.4, marginBottom: 8 },
+  coverRow: { gap: 10, paddingRight: 8 },
+  coverThumb: { width: 64, height: 64, borderRadius: 12, overflow: "hidden", borderWidth: 2, borderColor: "transparent", backgroundColor: "#0E1512" },
+  coverThumbSel: { borderColor: colors.yellow },
+  coverImg: { width: "100%", height: "100%" },
+  coverImgFallback: { alignItems: "center", justifyContent: "center" },
+  coverTag: { position: "absolute", bottom: 0, left: 0, right: 0, textAlign: "center", color: colors.white, fontSize: 9, fontWeight: "800", backgroundColor: "rgba(5,6,10,0.7)", paddingVertical: 2 },
+  coverCheck: { position: "absolute", top: 3, right: 3, width: 18, height: 18, borderRadius: 9, backgroundColor: colors.yellow, alignItems: "center", justifyContent: "center" },
   notice: { marginTop: 16, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 12, borderWidth: 1, borderColor: colors.border, paddingVertical: 10, paddingHorizontal: 14, maxWidth: 360, alignItems: "center" },
   noticeText: { color: colors.white, fontSize: 12.5, textAlign: "center", lineHeight: 18 },
   settingsBtn: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 },

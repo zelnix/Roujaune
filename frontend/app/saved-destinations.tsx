@@ -35,7 +35,7 @@ export default function JourneysScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { routes, loading } = useSavedDestinations();
-  const { journeys, loading: jLoading } = useScenicJourneys();
+  const { journeys, loading: jLoading, reload: reloadJourneys } = useScenicJourneys();
   const { discoveries, loading: dLoading, reload: reloadDiscoveries } = useAllDiscoveries();
   const coach = useCoach();
   const [share, setShare] = React.useState<ScenicJourney | null>(null);
@@ -144,7 +144,7 @@ export default function JourneysScreen() {
         )}
       </SafeAreaView>
 
-      <ScenicRecapShareModal visible={!!share} journey={share} coachName={coach.name} onClose={() => setShare(null)} />
+      <ScenicRecapShareModal visible={!!share} journey={share} coachName={coach.name} onClose={() => { setShare(null); reloadJourneys(); }} />
       <DiscoveryDetailModal
         visible={!!detail}
         discovery={detail}
@@ -179,8 +179,8 @@ function JourneyRecapCard({ journey, onReride, onShare }: { journey: ScenicJourn
   return (
     <View style={s.jcard} testID={`journey-${journey.routeId}`}>
       <Pressable style={s.jtop} onPress={onReride} accessibilityRole="button" accessibilityLabel={`Ride ${journey.name} again`}>
-        {journey.thumbnail ? (
-          <Image source={{ uri: journey.thumbnail }} style={s.jthumb} contentFit="cover" />
+        {(journey.cover || journey.thumbnail) ? (
+          <Image source={{ uri: (journey.cover || journey.thumbnail) as string }} style={s.jthumb} contentFit="cover" />
         ) : (
           <View style={[s.jthumb, s.jthumbFallback]}><Ionicons name="image-outline" size={22} color={colors.textFaint} /></View>
         )}
