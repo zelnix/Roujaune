@@ -4,8 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing } from "../../theme";
 import { RiderExperience, modeMeta, setExperience } from "../../lib/today-mode";
 import { ScheduledWorkoutReminder } from "./ScheduledWorkoutReminder";
-import { HeaderStatus } from "../HeaderStatus";
-import { BrandHeader } from "../BrandHeader";
+import { ExperienceHero } from "./ExperienceHero";
 
 /** Activity-specific preview copy for the roadmap experiences. */
 export const PREVIEW: Record<string, { heading: string; blurb: string; bullets: string[] }> = {
@@ -50,52 +49,47 @@ export function FutureActivityTodayView({ mode }: { mode: RiderExperience }) {
   const p = PREVIEW[mode] ?? { heading: "COMING SOON", blurb: "This experience is on the Roujaune roadmap.", bullets: [] };
   return (
     <View style={{ gap: spacing.md }} testID={`future-activity-${mode}`}>
-      <View style={styles.topRow}>
-        <View style={{ flex: 1 }}>
-          <BrandHeader compact={compact} descriptor={`${meta.description}.`} />
-        </View>
-        <HeaderStatus />
-      </View>
-      <ScheduledWorkoutReminder />
-      <View style={styles.card}>
-        <View style={styles.iconWrap}>
-          <Ionicons name={meta.icon} size={30} color={colors.yellow} />
-        </View>
-        <View style={styles.soonPill}><Text style={styles.soonPillText}>COMING SOON</Text></View>
-        <Text style={styles.heading}>{p.heading}</Text>
-        <Text style={styles.blurb}>{p.blurb}</Text>
-        {p.bullets.length > 0 && (
-          <View style={styles.bullets}>
-            {p.bullets.map((b) => (
-              <View key={b} style={styles.bulletRow}>
-                <Ionicons name="ellipse" size={5} color={colors.yellow} />
-                <Text style={styles.bulletText}>{b}</Text>
-              </View>
-            ))}
+      <ExperienceHero compact={compact} descriptor={`${meta.description}.`} testID={`future-hero-${mode}`}>
+        <View style={styles.card}>
+          <View style={styles.iconWrap}>
+            <Ionicons name={meta.icon} size={30} color={colors.yellow} />
           </View>
-        )}
-        <Pressable
-          testID={`future-cta-${mode}`}
-          disabled
-          accessibilityRole="button"
-          accessibilityState={{ disabled: true }}
-          accessibilityLabel={`${meta.primaryActionLabel}. Coming soon`}
-          style={styles.ctaDisabled}
-        >
-          <Text style={styles.ctaDisabledText}>{meta.primaryActionLabel}</Text>
-        </Pressable>
-        <Pressable testID="back-to-training" onPress={() => setExperience("training")} style={styles.back} accessibilityRole="button">
-          <Ionicons name="arrow-back" size={15} color={colors.textDim} />
-          <Text style={styles.backText}>Back to Train today</Text>
-        </Pressable>
-      </View>
+          <View style={styles.soonPill}><Text style={styles.soonPillText}>COMING SOON</Text></View>
+          <Text style={styles.heading}>{p.heading}</Text>
+          <Text style={styles.blurb}>{p.blurb}</Text>
+          {p.bullets.length > 0 && (
+            <View style={styles.bullets}>
+              {p.bullets.map((b) => (
+                <View key={b} style={styles.bulletRow}>
+                  <Ionicons name="ellipse" size={5} color={colors.yellow} />
+                  <Text style={styles.bulletText}>{b}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+          <Pressable
+            testID={`future-cta-${mode}`}
+            disabled
+            accessibilityRole="button"
+            accessibilityState={{ disabled: true }}
+            accessibilityLabel={`${meta.primaryActionLabel}. Coming soon`}
+            style={styles.ctaDisabled}
+          >
+            <Text style={styles.ctaDisabledText}>{meta.primaryActionLabel}</Text>
+          </Pressable>
+          <Pressable testID="back-to-training" onPress={() => setExperience("training")} style={styles.back} accessibilityRole="button">
+            <Ionicons name="arrow-back" size={15} color={colors.textDim} />
+            <Text style={styles.backText}>Back to Train today</Text>
+          </Pressable>
+        </View>
+      </ExperienceHero>
+      <ScheduledWorkoutReminder />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  topRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 16 },
-  card: { backgroundColor: colors.card, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: 26, alignItems: "center", gap: 12 },
+  card: { backgroundColor: "rgba(10,14,12,0.66)", borderRadius: radius.xl, borderWidth: 1, borderColor: "rgba(255,255,255,0.12)", padding: 26, alignItems: "center", gap: 12 },
   iconWrap: { width: 68, height: 68, borderRadius: 34, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(245,179,1,0.1)", borderWidth: 1, borderColor: "rgba(245,179,1,0.3)" },
   soonPill: { borderWidth: 1, borderColor: "rgba(245,179,1,0.45)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
   soonPillText: { color: colors.yellow, fontSize: 10, fontWeight: "800", letterSpacing: 1 },

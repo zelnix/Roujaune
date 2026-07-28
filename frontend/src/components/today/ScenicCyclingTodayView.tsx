@@ -1,56 +1,15 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, ImageBackground, ActivityIndicator, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { colors, radius, spacing } from "../../theme";
 import { useScenicRoutes, useScenicLast, ScenicRoute, ytThumb } from "../../lib/scenic-routes";
-import { BrandHeader } from "../BrandHeader";
-import { HeaderStatus } from "../HeaderStatus";
-
-const heroBg = require("../../../assets/images/scenic_hero_bg.png");
+import { ExperienceHero, experienceHeroBg } from "./ExperienceHero";
 
 /** Higher-res YouTube still for full-bleed backgrounds (falls back gracefully). */
 function ytThumbMax(id: string): string {
   return `https://img.youtube.com/vi/${id}/maxresdefault.jpg`;
-}
-
-/** Standard Today hero — the same treatment as the Training Today screen: a
- *  full-bleed background photo with the 3D wordmark + tagline + descriptor
- *  overlaid, and the standard status cluster top-right. The photo swaps to
- *  match the selected region for a more immersive feel. */
-function ScenicHeader({ compact, source, children }: { compact: boolean; source: any; children?: React.ReactNode }) {
-  return (
-    <ImageBackground
-      source={source}
-      style={[styles.headerHero, compact && { padding: 16 }]}
-      imageStyle={styles.headerHeroImg}
-      resizeMode="cover"
-      testID="scenic-header"
-      accessibilityLabel="Scenic cycling destination"
-    >
-      <LinearGradient
-        colors={["rgba(5,7,6,0.86)", "rgba(5,7,6,0.4)", "rgba(5,7,6,0.05)", "rgba(5,7,6,0.15)"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0.15 }}
-        style={StyleSheet.absoluteFill as any}
-      />
-      <LinearGradient
-        colors={["transparent", "rgba(5,7,6,0.15)", "rgba(5,7,6,0.72)"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={StyleSheet.absoluteFill as any}
-      />
-      <View style={styles.headerRow}>
-        <View style={{ flex: 1 }}>
-          <BrandHeader compact={compact} descriptor="Where shall we explore today?" />
-        </View>
-        <HeaderStatus />
-      </View>
-      {children ? <View style={styles.heroOverlay}>{children}</View> : null}
-    </ImageBackground>
-  );
 }
 
 function mins(r: ScenicRoute): number | null {
@@ -104,7 +63,7 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
   if (!routes || routes.length === 0) {
     return (
       <View style={{ gap: spacing.md }} testID="scenic-cycling-today">
-        <ScenicHeader compact={compact} source={heroBg} />
+        <ExperienceHero compact={compact} source={experienceHeroBg} descriptor="Where shall we explore today?" testID="scenic-header" />
         <View style={styles.empty} testID="scenic-empty">
           <View style={styles.emptyIcon}><Ionicons name="earth-outline" size={30} color={colors.yellow} /></View>
           <Text style={styles.emptyTitle}>New scenic destinations are on the way</Text>
@@ -134,11 +93,11 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
 
   // Header photo swaps to a matching destination when a region is selected.
   const regionHeroRoute = activeRegion === "All" ? null : routes.find((r) => r.region === activeRegion);
-  const heroSource = regionHeroRoute ? { uri: ytThumbMax(regionHeroRoute.youtube_id) } : heroBg;
+  const heroSource = regionHeroRoute ? { uri: ytThumbMax(regionHeroRoute.youtube_id) } : experienceHeroBg;
 
   return (
     <View style={{ gap: spacing.md }} testID="scenic-cycling-today">
-      <ScenicHeader compact={compact} source={heroSource}>
+      <ExperienceHero compact={compact} source={heroSource} descriptor="Where shall we explore today?" testID="scenic-header">
         {/* Overlaid POV showcase + prefs, sitting on the background photo */}
         <ImageBackground source={{ uri: thumbUri(hero) }} style={styles.hero} imageStyle={styles.heroImg} testID="scenic-hero">
           <View style={styles.heroScrim} />
@@ -209,7 +168,7 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
             <Text style={styles.adjustText}>Adjust journey</Text>
           </Pressable>
         </View>
-      </ScenicHeader>
+      </ExperienceHero>
 
       {/* Continue your journey — only when the rider actually has a last scenic ride */}
       {lastRoute && (
@@ -284,10 +243,6 @@ function DestRow({ title, data, open, tag }: { title: string; data: ScenicRoute[
 
 const styles = StyleSheet.create({
   h1: { color: colors.white, fontSize: 22, fontWeight: "800", letterSpacing: 0.4 },
-  headerHero: { minHeight: 600, borderRadius: radius.xl, overflow: "hidden", padding: 22, paddingTop: 20, justifyContent: "flex-start", backgroundColor: "#0E1512" },
-  headerHeroImg: { borderRadius: radius.xl, transform: [{ scale: 1.55 }, { translateY: -95 }] },
-  headerRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 16 },
-  heroOverlay: { marginTop: "auto", gap: spacing.md, paddingTop: spacing.lg },
   header: { gap: 6, marginBottom: 2 },
   wordmark: { width: 200, height: 30, alignSelf: "flex-start" },
   subtitle: { color: colors.textDim, fontSize: 13.5, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
