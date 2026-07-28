@@ -130,6 +130,12 @@ export default function ScenicRideScreen() {
   const [hiddenPoi, setHiddenPoi] = React.useState<Set<number>>(new Set());
   const [saved, setSaved] = React.useState<Set<number>>(new Set());
   const [narrating, setNarrating] = React.useState(false);
+  // Effortless capture: a subtle "save discovery" prompt + confirmation toast.
+  const [discoveryPrompt, setDiscoveryPrompt] = React.useState<ScenicPoi | null>(null);
+  const [toast, setToast] = React.useState<string | null>(null);
+  const promptedRef = React.useRef<Set<number>>(new Set());
+  const promptTimer = React.useRef<any>(null);
+  const toastTimer = React.useRef<any>(null);
   const [pendingNav, setPendingNav] = React.useState<null | (() => void)>(null);
   const guidance = useVoiceGuidance();
   const audioMode: "quiet" | "discover" | "guided" =
@@ -231,6 +237,26 @@ export default function ScenicRideScreen() {
     }
   }, [route, saved]);
 
+  const showToast = React.useCallback((msg: string) => {
+    setToast(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2600);
+  }, []);
+
+  const acceptPrompt = React.useCallback(async () => {
+    const p = discoveryPrompt;
+    if (!p) return;
+    setDiscoveryPrompt(null);
+    if (promptTimer.current) clearTimeout(promptTimer.current);
+    if (!saved.has(p.order)) await toggleSave(p);
+    showToast(`Saved “${p.title}” to your scrapbook`);
+  }, [discoveryPrompt, saved, toggleSave, showToast]);
+
+  const dismissPrompt = React.useCallback(() => {
+    setDiscoveryPrompt(null);
+    if (promptTimer.current) clearTimeout(promptTimer.current);
+  }, []);
+
   // Persist an in-progress ride so it can be resumed from the Scenic hero.
   const persistResume = React.useCallback(() => {
     if (!route || completed) return;
@@ -274,6 +300,28 @@ export default function ScenicRideScreen() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pct, upcomingPoi, audioMode]);
+
+  // Effortless capture: when the rider reaches a POI, briefly prompt to save it
+  // (one tap) — no need to open the panel. Skips already-saved / skipped POIs.
+  React.useEffect(() => {
+    if (!pois.length) return;
+    const reached = pois.find((p) =>
+      pct >= p.at_pct - 0.003 &&
+      !promptedRef.current.has(p.order) &&
+      !hiddenPoi.has(p.order) &&
+      !saved.has(p.order));
+    if (!reached) return;
+    promptedRef.current.add(reached.order);
+    setDiscoveryPrompt(reached);
+    if (promptTimer.current) clearTimeout(promptTimer.current);
+    promptTimer.current = setTimeout(() => setDiscoveryPrompt(null), 7000);
+  }, [pct, pois, hiddenPoi, saved]);
+
+  // Clear pending timers on unmount.
+  React.useEffect(() => () => {
+    if (promptTimer.current) clearTimeout(promptTimer.current);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+  }, []);
 
   if (loading) {
     return (
@@ -475,6 +523,40 @@ export default function ScenicRideScreen() {
         </Pressable>
       </View>
 
+      {/* Effortless "save discovery" prompt — always visible & tappable */}
+      {discoveryPrompt && (
+        <View style={s.promptWrap} pointerEvents="box-none">
+          <View style={s.prompt}>
+            {discoveryPrompt.image ? (
+              <Image source={{ uri: discoveryPrompt.image }} style={s.promptImg} contentFit="cover" />
+            ) : (
+              <View style={[s.promptImg, s.promptImgFallback]}><Ionicons name="location" size={18} color={colors.yellow} /></View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={s.promptKicker}>NEW DISCOVERY</Text>
+              <Text style={s.promptTitle} numberOfLines={1}>{discoveryPrompt.title}</Text>
+            </View>
+            <Pressable style={s.promptSave} testID="discovery-prompt-save" onPress={acceptPrompt} accessibilityRole="button" accessibilityLabel={`Save ${discoveryPrompt.title} to your scrapbook`}>
+              <Ionicons name="bookmark" size={15} color={colors.bg} />
+              <Text style={s.promptSaveText}>Save</Text>
+            </Pressable>
+            <Pressable style={s.promptClose} testID="discovery-prompt-dismiss" onPress={dismissPrompt} hitSlop={8} accessibilityRole="button" accessibilityLabel="Dismiss">
+              <Ionicons name="close" size={16} color={colors.textDim} />
+            </Pressable>
+          </View>
+        </View>
+      )}
+
+      {/* Confirmation micro-toast */}
+      {toast && (
+        <View style={s.toastWrap} pointerEvents="none">
+          <View style={s.toast}>
+            <Ionicons name="checkmark-circle" size={16} color={colors.yellow} />
+            <Text style={s.toastText}>{toast}</Text>
+          </View>
+        </View>
+      )}
+
       {/* Save & leave / End without saving / Continue dialog */}
       {pendingNav && (
         <View style={s.dialogWrap} testID="leave-dialog">
@@ -621,6 +703,18 @@ const s = StyleSheet.create({
   navLabel: { color: colors.textDim, fontSize: 15, fontWeight: "600" },
 
   utility: { position: "absolute", top: 24, right: 24, flexDirection: "row", gap: 10, zIndex: 20 },
+  promptWrap: { position: "absolute", top: 78, left: 0, right: 0, alignItems: "center", paddingHorizontal: 16, zIndex: 25 },
+  prompt: { flexDirection: "row", alignItems: "center", gap: 10, maxWidth: 440, width: "100%", backgroundColor: "rgba(8,10,10,0.94)", borderRadius: 16, borderWidth: 1, borderColor: "rgba(255,194,10,0.5)", paddingVertical: 8, paddingLeft: 8, paddingRight: 8 },
+  promptImg: { width: 42, height: 42, borderRadius: 10, backgroundColor: "#0E1512" },
+  promptImgFallback: { alignItems: "center", justifyContent: "center" },
+  promptKicker: { color: colors.yellow, fontSize: 9.5, fontWeight: "900", letterSpacing: 1.4 },
+  promptTitle: { color: colors.white, fontSize: 14, fontWeight: "800", marginTop: 1 },
+  promptSave: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.yellow, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14, minHeight: 40 },
+  promptSaveText: { color: colors.bg, fontSize: 13, fontWeight: "800" },
+  promptClose: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
+  toastWrap: { position: "absolute", left: 0, right: 0, bottom: 150, alignItems: "center", zIndex: 25 },
+  toast: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(8,10,10,0.95)", borderRadius: 999, borderWidth: 1, borderColor: "rgba(255,194,10,0.4)", paddingVertical: 9, paddingHorizontal: 16 },
+  toastText: { color: colors.white, fontSize: 13, fontWeight: "700" },
   utilBtn: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.5)", borderWidth: 1, borderColor: BORDER },
   utilExit: { backgroundColor: "rgba(224,30,43,0.85)", borderColor: colors.red },
 

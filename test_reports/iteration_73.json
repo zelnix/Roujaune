@@ -1,0 +1,29 @@
+{
+  "summary": "Iteration 73 — Effortless 'Save discovery' auto-prompt on the Live Scenic Ride HUD tested end-to-end for /scenic-ride?route=lake-achensee as rider greenlantern@roujaune.app. All 5 acceptance criteria pass: (A) as ride progress advances the prompt pill renders near TOP-CENTER with kicker 'NEW DISCOVERY', POI title 'Pertisau Bay', yellow 'Save' button (testID discovery-prompt-save) and dismiss × (testID discovery-prompt-dismiss); (B) tapping Save hides the prompt, shows the toast 'Saved “Pertisau Bay” to your scrapbook' and persists via API — GET /api/scenic/discoveries?route_id=lake-achensee returns 1 discovery with route_id=lake-achensee, poi_order=0, at_pct=0.08, title 'Pertisau Bay' and the correct photo; (C) tapping the dismiss × closes the prompt without saving (discoveries endpoint returns 0); (D) the same POI does NOT re-prompt after either save or dismiss (verified by 4.5s post-action polls); (E) regression — the right-side POINTS OF INTEREST panel bookmark (poi-save) still toggles/persists (clicking after a save removes the discovery via API), HUD renders correctly (progress ring @ 8%, Time / km metrics, Quiet / Discover / Guided segments, SCENIC RIDE title, Alberto companion, POI photo). Testing methodology: the YouTube iframe returns 'Video unavailable' in headless preview so pct is driven by the wall-clock estimate elapsedSec / (duration_min * 60). Rather than wait ~384s for the first POI (0.08 * 80min), the test seeds AsyncStorage key 'roujaune.scenic.resume.v1' with positionSec/elapsedSec=385 while on '/', triggering auth-context's refreshScenicResume() to hydrate the seed, then uses SPA navigation (history.pushState + popstate) into /scenic-ride so the module state (and seeded resume) survives — this makes the prompt appear within ~3s of the ride screen mounting. All test data (1 discovery) was cleaned up via DELETE at the end of the run.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/screens/i73_landed.jpeg",
+    "/app/test_reports/screens/i73_A_after_dismiss.jpeg",
+    "/app/test_reports/screens/i73_B_prompt.jpeg",
+    "/app/test_reports/screens/i73_B_after_save.jpeg"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "scenic-ride.tsx:306-318 — the reached-POI effect keys on `pois`, `pct`, `hiddenPoi`, `saved` but uses `promptedRef` (a ref) to avoid re-prompts. This means dismissing then re-mounting the screen WILL re-prompt (the ref resets). Acceptable for the current flow but worth noting: if the rider leaves & returns, previously-dismissed (but not saved) POIs will prompt again. Saved POIs won't (they're in `saved` which is hydrated from backend).",
+    "scenic-ride.tsx:246-253 — acceptPrompt calls `toggleSave` which does an async network POST but the prompt is hidden immediately and the toast fires unconditionally. If the network fails the rider still sees 'Saved …' with nothing persisted. Consider awaiting the id and only showing the toast on success, or a subdued 'Saving…'/'Save failed — retry' state.",
+    "scenic-ride.tsx:222-238 — toggleSave optimistically flips the `saved` set before awaiting the POST; if the POST throws, the local state is out of sync (no rollback). Not observed in the run, but worth hardening."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "not tested (frontend-only per request)", "frontend": "100% (5/5 acceptance criteria)" },
+  "seed_data_creation": "1 discovery created during the Save test and DELETEd at end of run — no residual test data. localStorage key 'roujaune.scenic.resume.v1' was seeded during the test session (client-side only, no server-side seed).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Because YouTube shows 'Video unavailable' in headless preview, ride pct is driven by the wall-clock estimate (elapsedSec / duration_sec). To reach POI 1 (Pertisau Bay, at_pct=0.08) on lake-achensee (duration_min=80) without waiting ~6.4 min, seed localStorage key 'roujaune.scenic.resume.v1' with positionSec/elapsedSec=385 BEFORE the scenic-ride module reads it — the reliable recipe is: (1) log in, (2) call fetch DELETE on any existing discoveries for the route, (3) setItem the resume seed, (4) page.goto('/') + wait 4.5s so auth-context re-fires refreshScenicResume() and hydrates the seeded value, (5) re-seed once more (belt & braces), (6) SPA-nav via history.pushState('/scenic-ride?route=lake-achensee') + PopStateEvent so the resume module state SURVIVES the navigation. A plain page.goto('/scenic-ride…') will reset the module and start elapsed at 0 (progress stays at 0-1%).",
+  "rca_of_issue": "N/A — feature works exactly as specified."
+}
