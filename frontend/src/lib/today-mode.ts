@@ -188,20 +188,26 @@ const lastRoute: Partial<Record<RiderExperience, string>> = {};
 let hydrated = false;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
+// Set when a NON-training experience is restored from storage (login / restart)
+// so the home screen can show a one-time "Welcome back, resuming …" ribbon.
+let pendingRestore: RiderExperience | null = null;
 
 function keyFor(userId: string | null | undefined): string {
   return userId ? `${KEY_BASE}:${userId}` : KEY_BASE;
 }
 
-async function loadFrom(key: string): Promise<void> {
+async function loadFrom(key: string): Promise<boolean> {
   try {
     const raw = await AsyncStorage.getItem(key);
     if (raw) {
       const d = JSON.parse(raw);
-      if (d.experience && experienceNavigation[d.experience as RiderExperience]) experience = d.experience;
+      let found = false;
+      if (d.experience && experienceNavigation[d.experience as RiderExperience]) { experience = d.experience; found = true; }
       if (d.lastRoute) Object.assign(lastRoute, d.lastRoute);
+      return found;
     }
   } catch { /* keep current */ }
+  return false;
 }
 
 /** Pre-login safety hydration (anonymous key). No-op once a rider has hydrated. */
@@ -220,7 +226,8 @@ export async function hydrateTodayModeForUser(userId: string | null | undefined)
   // overlay this rider's persisted selection (if any).
   experience = "training";
   for (const k of Object.keys(lastRoute)) delete (lastRoute as any)[k];
-  await loadFrom(activeKey);
+  const found = await loadFrom(activeKey);
+  pendingRestore = found && experience !== "training" ? experience : null;
   emit();
 }
 
@@ -269,6 +276,20 @@ export function clearTodayModeForUser(userId: string | null | undefined) {
 export function resolveNav(key: string): NavItem | undefined {
   const cfg = experienceNavigation[experience];
   return [...cfg.items, ...cfg.footer].find((n) => n.key === key);
+}
+
+/** One-time restore note: returns the restored non-training experience once
+ *  (then clears it) so the home screen can show a "Welcome back" ribbon. */
+export function consumeRestoreNote(): RiderExperience | null {
+  const p = pendingRestore;
+  pendingRestore = null;
+  return p;
+}
+
+/** Subscribe to store changes (used by the ribbon to catch async hydration). */
+export function subscribeTodayMode(cb: () => void): () => void {
+  listeners.add(cb);
+  return () => { listeners.delete(cb); };
 }
 
 export function useTodayMode() {

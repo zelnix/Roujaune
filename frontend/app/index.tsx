@@ -19,6 +19,7 @@ import { useCoach } from "@/src/lib/coach-persona";
 import { useTodayMode, resolveNav, rememberRoute, getExperience } from "@/src/lib/today-mode";
 import { ScenicCyclingTodayView } from "@/src/components/today/ScenicCyclingTodayView";
 import { FutureActivityTodayView } from "@/src/components/today/FutureActivityTodayView";
+import { WelcomeBackRibbon } from "@/src/components/today/WelcomeBackRibbon";
 import { useReducedMotionSafe } from "@/src/lib/use-reduced-motion";
 import { useBenchmarkNudge } from "@/src/lib/benchmark/api";
 import { useLiveNotifications, useNotificationReadState } from "@/src/lib/notifications";
@@ -111,6 +112,8 @@ export default function Dashboard() {
             testID="dashboard-scroll"
           >
             <HomeNotificationArea />
+
+            <WelcomeBackRibbon />
 
             <Animated.View style={{ opacity: fade, gap: spacing.md }}>
             {experience === "training" ? (
