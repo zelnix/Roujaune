@@ -5,8 +5,6 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import MaskedView from "@react-native-masked-view/masked-view";
-import Svg, { Circle } from "react-native-svg";
 import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 import YouTubePlayer from "@/src/components/YouTubePlayer";
 import { colors, radius } from "@/src/theme";
@@ -16,84 +14,12 @@ import { useScenicRoute, useScenicPois, ScenicPoi, logScenicRide, ytThumb, saveD
 import { getResume, saveResume, clearResume } from "@/src/lib/scenic-resume";
 import { useCoach, useVoiceGuidance, setVoiceGuidance, VoiceGuidance } from "@/src/lib/coach-persona";
 import { useBleSensors } from "@/src/hooks/useBleSensors";
-import { RideRouteMap, RouteMapPoint } from "@/src/components/RideRouteMap";
-import { ConfettiBurst } from "@/src/components/ConfettiBurst";
+import { RouteMapPoint } from "@/src/components/RideRouteMap";
 import { recapCaption } from "@/src/lib/scenic-recap";
-
-const SERIF = Platform.select({ ios: "Georgia", android: "serif", default: "Georgia, 'Times New Roman', serif" }) as string;
-
-const clock = (s: number) => {
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return `${m}:${String(sec).padStart(2, "0")}`;
-};
-
-/** Warm red→gold gradient text (matches the ROUJAUNE brand ramp). */
-function GradientText({ text, style }: { text: string; style: any }) {
-  if (Platform.OS === "web") {
-    return (
-      <Text
-        style={[style, {
-          // web-only gradient clip
-          backgroundImage: "linear-gradient(95deg, #F2392E 0%, #F5B301 58%, #FFC418 100%)",
-          backgroundClip: "text",
-          WebkitBackgroundClip: "text",
-          WebkitTextFillColor: "transparent",
-          color: "transparent",
-        } as any]}
-      >
-        {text}
-      </Text>
-    );
-  }
-  return (
-    <MaskedView maskElement={<Text style={[style, { color: "#000" }]}>{text}</Text>}>
-      <LinearGradient colors={["#F2392E", "#F5B301", "#FFC418"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0.4 }}>
-        <Text style={[style, { opacity: 0 }]}>{text}</Text>
-      </LinearGradient>
-    </MaskedView>
-  );
-}
-
-/** Yellow progress ring with the percentage centred inside. */
-function Ring({ pct }: { pct: number }) {
-  const size = 54, stroke = 5, r = (size - stroke) / 2, c = 2 * Math.PI * r;
-  return (
-    <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
-      <Svg width={size} height={size} style={{ position: "absolute", transform: [{ rotate: "-90deg" }] }}>
-        <Circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.16)" strokeWidth={stroke} fill="none" />
-        <Circle cx={size / 2} cy={size / 2} r={r} stroke={colors.yellow} strokeWidth={stroke} fill="none"
-          strokeDasharray={c} strokeDashoffset={c * (1 - Math.max(0, Math.min(1, pct)))} strokeLinecap="round" />
-      </Svg>
-    </View>
-  );
-}
-
-/** Audio waveform — animates only while companion narration is playing. */
-function Waveform({ active }: { active?: boolean }) {
-  const bars = [6, 12, 20, 10, 16, 24, 14, 8, 18, 12, 22, 9, 15, 20, 7, 13];
-  const anim = React.useRef(new Animated.Value(0)).current;
-  React.useEffect(() => {
-    if (!active) { anim.stopAnimation(); anim.setValue(0); return; }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(anim, { toValue: 1, duration: 420, useNativeDriver: false }),
-        Animated.timing(anim, { toValue: 0, duration: 420, useNativeDriver: false }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [active, anim]);
-  return (
-    <View style={s.wave}>
-      {bars.map((h, i) => {
-        const min = active ? Math.max(3, h * 0.4) : h;
-        const scaled = anim.interpolate({ inputRange: [0, 1], outputRange: [min, active ? h * (0.7 + (i % 5) * 0.12) : h] });
-        return <Animated.View key={i} style={[s.waveBar, { height: scaled as any, opacity: active ? 1 : 0.7 }]} />;
-      })}
-    </View>
-  );
-}
+import { SERIF, clock, GradientText, Ring, Waveform, Metric, Seg, NavItem, MusicControl } from "@/src/components/scenic/hud-widgets";
+import { RideCompleteOverlay } from "@/src/components/scenic/RideCompleteOverlay";
+import { LeaveRideDialog } from "@/src/components/scenic/LeaveRideDialog";
+import { DiscoveryPrompt, SaveToast } from "@/src/components/scenic/DiscoveryPrompt";
 
 /** Immersive live scenic-ride experience — a full-bleed POV video with a
  *  cinematic, fully hideable HUD (tap the scene to show/hide). */
@@ -583,156 +509,40 @@ export default function ScenicRideScreen() {
 
       {/* Effortless "save discovery" prompt — always visible & tappable */}
       {discoveryPrompt && (
-        <View style={s.promptWrap} pointerEvents="box-none">
-          <View style={s.prompt}>
-            {discoveryPrompt.image ? (
-              <Image source={{ uri: discoveryPrompt.image }} style={s.promptImg} contentFit="cover" />
-            ) : (
-              <View style={[s.promptImg, s.promptImgFallback]}><Ionicons name="location" size={18} color={colors.yellow} /></View>
-            )}
-            <View style={{ flex: 1 }}>
-              <Text style={s.promptKicker}>NEW DISCOVERY</Text>
-              <Text style={s.promptTitle} numberOfLines={1}>{discoveryPrompt.title}</Text>
-            </View>
-            <Pressable style={s.promptSave} testID="discovery-prompt-save" onPress={acceptPrompt} accessibilityRole="button" accessibilityLabel={`Save ${discoveryPrompt.title} to your scrapbook`}>
-              <Ionicons name="bookmark" size={15} color={colors.bg} />
-              <Text style={s.promptSaveText}>Save</Text>
-            </Pressable>
-            <Pressable style={s.promptClose} testID="discovery-prompt-dismiss" onPress={dismissPrompt} hitSlop={8} accessibilityRole="button" accessibilityLabel="Dismiss">
-              <Ionicons name="close" size={16} color={colors.textDim} />
-            </Pressable>
-          </View>
-        </View>
+        <DiscoveryPrompt poi={discoveryPrompt} onSave={acceptPrompt} onDismiss={dismissPrompt} />
       )}
 
       {/* Confirmation micro-toast */}
-      {toast && (
-        <View style={s.toastWrap} pointerEvents="none">
-          <View style={s.toast}>
-            <Ionicons name="checkmark-circle" size={16} color={colors.yellow} />
-            <Text style={s.toastText}>{toast}</Text>
-          </View>
-        </View>
-      )}
+      {toast && <SaveToast message={toast} />}
 
       {/* End-of-ride landscape recap with animated route map */}
       {completed && !ackComplete && (
-        <View style={s.completeWrap} testID="ride-complete">
-          <View style={[s.recapCard, { width: recapCardW }]}>
-            <View style={s.recapHeader}>
-              <View style={s.completeIcon}><Ionicons name="checkmark" size={26} color={colors.bg} /></View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={s.recapTitle}>Ride Complete!</Text>
-                <Text style={s.recapSub} numberOfLines={1}>{route.name}{route.place ? ` · ${route.place}` : ""}</Text>
-              </View>
-              <View style={s.recapStatsRow}>
-                <View style={s.cStat}><Text style={s.cStatVal}>{clock(elapsed)}</Text><Text style={s.cStatLbl}>TIME</Text></View>
-                <View style={s.cStatDivider} />
-                <View style={s.cStat}><Text style={s.cStatVal}>{km}</Text><Text style={s.cStatLbl}>KM</Text></View>
-                <View style={s.cStatDivider} />
-                <View style={s.cStat}><Text style={s.cStatVal}>{sessionSaved.size}</Text><Text style={s.cStatLbl}>SAVED</Text></View>
-              </View>
-            </View>
-
-            <View style={s.mapWrap}>
-              <RideRouteMap width={recapMapW} height={182} seed={route.id} points={rideDiscoveries} />
-            </View>
-
-            <View style={s.recapFooter}>
-              <View style={{ flex: 1, minWidth: 180 }}>
-                {sessionSaved.size >= 3 ? (
-                  <View style={s.explorerBadge} testID="explorer-badge">
-                    <Ionicons name="sparkles" size={15} color={colors.bg} />
-                    <Text style={s.explorerText}>Great explorer! {sessionSaved.size} discoveries this ride</Text>
-                  </View>
-                ) : sessionSaved.size > 0 ? (
-                  <Text style={s.completeNote}>{sessionSaved.size} discover{sessionSaved.size === 1 ? "y" : "ies"} saved to your scrapbook.</Text>
-                ) : (
-                  <Text style={s.completeNote}>Tip: bookmark points of interest next time to build your scrapbook.</Text>
-                )}
-                <Text style={s.recapCaption} numberOfLines={2}>&ldquo;{rideCaption}&rdquo;</Text>
-              </View>
-              <View style={s.recapCtas}>
-                <Pressable style={[s.dialogBtn, s.completePrimary]} testID="complete-journeys" onPress={() => { setAckComplete(true); endRide(false, () => router.replace("/saved-destinations?justFinished=1")); }} accessibilityRole="button" accessibilityLabel="View and share my journey">
-                  <Ionicons name="share-social" size={17} color={colors.bg} />
-                  <Text style={s.completePrimaryText}>View &amp; share</Text>
-                </Pressable>
-                <Pressable style={[s.dialogBtn, s.dialogGhost]} testID="complete-home" onPress={() => { setAckComplete(true); endRide(false, () => router.replace("/")); }} accessibilityRole="button" accessibilityLabel="Back home">
-                  <Text style={[s.dialogBtnText, { color: colors.white }]}>Back home</Text>
-                </Pressable>
-              </View>
-            </View>
-            {sessionSaved.size >= 3 && <ConfettiBurst width={recapCardW} height={360} count={36} originY={26} />}
-          </View>
-        </View>
+        <RideCompleteOverlay
+          routeId={route.id}
+          routeName={route.name}
+          routePlace={route.place}
+          elapsed={elapsed}
+          km={km}
+          savedCount={sessionSaved.size}
+          discoveries={rideDiscoveries}
+          caption={rideCaption}
+          cardWidth={recapCardW}
+          mapWidth={recapMapW}
+          onShare={() => { setAckComplete(true); endRide(false, () => router.replace("/saved-destinations?justFinished=1")); }}
+          onHome={() => { setAckComplete(true); endRide(false, () => router.replace("/")); }}
+        />
       )}
 
       {/* Save & leave / End without saving / Continue dialog */}
       {pendingNav && (
-        <View style={s.dialogWrap} testID="leave-dialog">
-          <View style={s.dialogCard}>
-            <Text style={s.dialogTitle}>Leave this ride?</Text>
-            <Text style={s.dialogSub}>You&apos;re {Math.round(pct * 100)}% through {route.name}.</Text>
-            <Pressable style={[s.dialogBtn, s.dialogPrimary]} testID="dlg-save" onPress={() => { const n = pendingNav; setPendingNav(null); endRide(true, n); }}>
-              <Ionicons name="bookmark" size={16} color="#fff" />
-              <Text style={s.dialogBtnText}>Save &amp; leave</Text>
-            </Pressable>
-            <Pressable style={[s.dialogBtn, s.dialogDanger]} testID="dlg-end" onPress={() => { const n = pendingNav; setPendingNav(null); endRide(false, n); }}>
-              <Ionicons name="stop-circle-outline" size={16} color="#fff" />
-              <Text style={s.dialogBtnText}>End without saving</Text>
-            </Pressable>
-            <Pressable style={[s.dialogBtn, s.dialogGhost]} testID="dlg-continue" onPress={() => setPendingNav(null)}>
-              <Text style={[s.dialogBtnText, { color: colors.white }]}>Continue riding</Text>
-            </Pressable>
-          </View>
-        </View>
+        <LeaveRideDialog
+          routeName={route.name}
+          pct={pct}
+          onSave={() => { const n = pendingNav; setPendingNav(null); endRide(true, n); }}
+          onEnd={() => { const n = pendingNav; setPendingNav(null); endRide(false, n); }}
+          onContinue={() => setPendingNav(null)}
+        />
       )}
-    </View>
-  );
-}
-
-function Metric({ icon, value, label }: { icon: any; value: string; label: string }) {
-  return (
-    <View style={s.metric}>
-      <View style={s.metricIcon}><Ionicons name={icon} size={15} color={colors.yellow} /></View>
-      <View>
-        <Text style={s.metricValue}>{value}</Text>
-        <Text style={s.metricLabel}>{label}</Text>
-      </View>
-    </View>
-  );
-}
-
-function Seg({ icon, label, active, onPress }: { icon: any; label: string; active?: boolean; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} style={[s.seg, active && s.segActive]} accessibilityRole="button" accessibilityState={{ selected: !!active }} accessibilityLabel={label}>
-      <Ionicons name={icon} size={15} color={active ? "#fff" : colors.textDim} />
-      <Text style={[s.segText, active && s.segTextActive]}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function NavItem({ icon, label, active, onPress }: { icon: any; label: string; active?: boolean; onPress?: () => void }) {
-  return (
-    <Pressable onPress={onPress} style={s.navItem} accessibilityRole="button" accessibilityLabel={label} disabled={active}>
-      <Ionicons name={icon} size={19} color={active ? colors.red : colors.textDim} />
-      <Text style={[s.navLabel, active && { color: colors.red, fontWeight: "800" }]}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function MusicControl({ on, level, onToggle, onLevel }: { on: boolean; level: number; onToggle: () => void; onLevel: (l: number) => void }) {
-  return (
-    <View style={s.music} testID="music-control">
-      <Pressable onPress={onToggle} hitSlop={8} style={s.musicBtn} testID="music-toggle" accessibilityRole="button" accessibilityLabel={on ? "Turn music off" : "Turn music on"}>
-        <Ionicons name={on ? "musical-notes" : "volume-mute"} size={16} color={on ? colors.yellow : colors.textDim} />
-      </Pressable>
-      <View style={s.musicBars}>
-        {[1, 2, 3, 4].map((i) => (
-          <Pressable key={i} onPress={() => onLevel(i)} hitSlop={6} testID={`music-level-${i}`} accessibilityRole="button" accessibilityLabel={`Music volume ${i}`}
-            style={[s.musicBar, { height: 6 + i * 4 }, on && i <= level ? s.musicBarOn : null]} />
-        ))}
-      </View>
     </View>
   );
 }
@@ -753,12 +563,6 @@ const s = StyleSheet.create({
 
   title: { position: "absolute", top: 26, left: 30 },
   titleText: { fontSize: 30, fontWeight: "900", fontStyle: "italic", letterSpacing: 0.5 },
-
-  music: { position: "absolute", top: 74, left: 30, flexDirection: "row", alignItems: "flex-end", gap: 10, backgroundColor: "rgba(14,18,20,0.6)", borderWidth: 1, borderColor: BORDER, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
-  musicBtn: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.06)" },
-  musicBars: { flexDirection: "row", alignItems: "flex-end", gap: 3, height: 24, paddingBottom: 2 },
-  musicBar: { width: 4, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.22)" },
-  musicBarOn: { backgroundColor: colors.yellow },
 
   hideHint: { position: "absolute", top: 10, right: 10, opacity: 0.6 },
 
@@ -790,73 +594,19 @@ const s = StyleSheet.create({
   avatar: { width: 52, height: 52, borderRadius: 26, borderWidth: 1.5, borderColor: colors.yellow, backgroundColor: "#0E1512" },
   companionName: { color: colors.yellow, fontSize: 16, fontWeight: "700", fontStyle: "italic" },
   companionText: { color: "rgba(255,255,255,0.9)", fontSize: 13.5, lineHeight: 20, marginTop: 3 },
-  wave: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 8, height: 24 },
-  waveBar: { width: 3, borderRadius: 2, backgroundColor: colors.yellow, opacity: 0.85 },
 
   metricsBar: { position: "absolute", bottom: 92, alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(14,18,20,0.72)", borderRadius: radius.pill, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 12, paddingVertical: 10 },
-  metric: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12 },
-  metricIcon: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(245,179,1,0.14)" },
-  metricValue: { color: colors.white, fontSize: 17, fontWeight: "800", fontVariant: ["tabular-nums"] },
-  metricLabel: { color: colors.textFaint, fontSize: 10.5, fontWeight: "700", marginTop: -1 },
   segment: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)", borderRadius: radius.pill, padding: 4, marginLeft: 6, gap: 2 },
-  seg: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 8, paddingHorizontal: 16, borderRadius: radius.pill },
-  segActive: { backgroundColor: colors.red },
-  segText: { color: colors.textDim, fontSize: 13.5, fontWeight: "700" },
-  segTextActive: { color: "#fff" },
 
   nav: { position: "absolute", bottom: 16, left: 24, right: 24, flexDirection: "row", alignItems: "center", backgroundColor: "rgba(8,10,10,0.78)", borderRadius: radius.pill, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 20, paddingVertical: 12 },
   navBrand: { flexDirection: "row", alignItems: "center", gap: 10, paddingRight: 22, marginRight: 8, borderRightWidth: 1, borderRightColor: "rgba(255,255,255,0.12)" },
   navGlyph: { width: 30, height: 30 },
   navWordmarkImg: { width: 132, height: 22 },
   navItems: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-around" },
-  navItem: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6, paddingHorizontal: 8 },
-  navLabel: { color: colors.textDim, fontSize: 15, fontWeight: "600" },
 
   utility: { position: "absolute", top: 24, right: 24, flexDirection: "row", gap: 10, zIndex: 20 },
-  promptWrap: { position: "absolute", top: 78, left: 0, right: 0, alignItems: "center", paddingHorizontal: 16, zIndex: 25 },
   savedChip: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(255,194,10,0.12)", borderRadius: 999, borderWidth: 1, borderColor: "rgba(255,194,10,0.35)", paddingVertical: 7, paddingHorizontal: 12, alignSelf: "flex-start" },
   savedChipText: { color: colors.yellow, fontSize: 12, fontWeight: "800" },
-  prompt: { flexDirection: "row", alignItems: "center", gap: 10, maxWidth: 440, width: "100%", backgroundColor: "rgba(8,10,10,0.94)", borderRadius: 16, borderWidth: 1, borderColor: "rgba(255,194,10,0.5)", paddingVertical: 8, paddingLeft: 8, paddingRight: 8 },
-  promptImg: { width: 42, height: 42, borderRadius: 10, backgroundColor: "#0E1512" },
-  promptImgFallback: { alignItems: "center", justifyContent: "center" },
-  promptKicker: { color: colors.yellow, fontSize: 9.5, fontWeight: "900", letterSpacing: 1.4 },
-  promptTitle: { color: colors.white, fontSize: 14, fontWeight: "800", marginTop: 1 },
-  promptSave: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.yellow, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14, minHeight: 40 },
-  promptSaveText: { color: colors.bg, fontSize: 13, fontWeight: "800" },
-  promptClose: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
-  toastWrap: { position: "absolute", left: 0, right: 0, bottom: 150, alignItems: "center", zIndex: 25 },
-  toast: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(8,10,10,0.95)", borderRadius: 999, borderWidth: 1, borderColor: "rgba(255,194,10,0.4)", paddingVertical: 9, paddingHorizontal: 16 },
-  toastText: { color: colors.white, fontSize: 13, fontWeight: "700" },
   utilBtn: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.5)", borderWidth: 1, borderColor: BORDER },
   utilExit: { backgroundColor: "rgba(224,30,43,0.85)", borderColor: colors.red },
-
-  dialogWrap: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.62)", alignItems: "center", justifyContent: "center", zIndex: 30, padding: 24 },
-  completeWrap: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(4,5,6,0.85)", alignItems: "center", justifyContent: "center", zIndex: 40, padding: 16 },
-  recapCard: { maxWidth: 820, backgroundColor: "#0B120F", borderRadius: radius.xl, borderWidth: 1, borderColor: "rgba(255,194,10,0.35)", padding: 18 },
-  recapHeader: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" },
-  recapTitle: { color: colors.white, fontSize: 22, fontWeight: "900" },
-  recapSub: { color: colors.textDim, fontSize: 13, fontWeight: "600", marginTop: 2 },
-  recapStatsRow: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.05)", borderRadius: radius.lg, borderWidth: 1, borderColor: BORDER, paddingVertical: 8, paddingHorizontal: 6 },
-  mapWrap: { borderRadius: radius.lg, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,194,10,0.22)" },
-  recapFooter: { flexDirection: "row", alignItems: "center", gap: 16, marginTop: 14, flexWrap: "wrap" },
-  recapCaption: { color: colors.white, fontSize: 12.5, fontStyle: "italic", fontWeight: "600", opacity: 0.9, marginTop: 8, lineHeight: 18 },
-  recapCtas: { flexDirection: "row", alignItems: "center", gap: 10 },
-  completeIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.yellow, alignItems: "center", justifyContent: "center" },
-  cStat: { alignItems: "center", paddingHorizontal: 12 },
-  cStatVal: { color: colors.yellow, fontSize: 17, fontWeight: "900" },
-  cStatLbl: { color: colors.white, fontSize: 9, fontWeight: "700", marginTop: 2, opacity: 0.8, letterSpacing: 1 },
-  cStatDivider: { width: 1, height: 28, backgroundColor: "rgba(255,255,255,0.14)" },
-  explorerBadge: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, alignSelf: "flex-start", backgroundColor: colors.yellow, borderRadius: radius.pill, paddingVertical: 8, paddingHorizontal: 14 },
-  explorerText: { color: colors.bg, fontSize: 13, fontWeight: "900" },
-  completeNote: { color: colors.textDim, fontSize: 13, fontWeight: "700" },
-  completePrimary: { backgroundColor: colors.yellow, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingHorizontal: 20 },
-  completePrimaryText: { color: colors.bg, fontSize: 14, fontWeight: "800" },
-  dialogCard: { width: "100%", maxWidth: 400, backgroundColor: "#0E1512", borderRadius: radius.xl, borderWidth: 1, borderColor: BORDER, padding: 22, gap: 10 },
-  dialogTitle: { color: colors.white, fontSize: 20, fontWeight: "900" },
-  dialogSub: { color: colors.textDim, fontSize: 13.5, marginBottom: 6 },
-  dialogBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: radius.md, paddingVertical: 14, minHeight: 50 },
-  dialogPrimary: { backgroundColor: colors.red },
-  dialogDanger: { backgroundColor: "#3a1216", borderWidth: 1, borderColor: "rgba(224,30,43,0.5)" },
-  dialogGhost: { backgroundColor: "transparent", borderWidth: 1, borderColor: BORDER },
-  dialogBtnText: { color: "#fff", fontSize: 15, fontWeight: "800" },
 });

@@ -1,0 +1,25 @@
+{
+  "summary": "Iteration 74 — Scenic Ride refactor validation (frontend only). Split of frontend/app/scenic-ride.tsx into hud-widgets.tsx / RideCompleteOverlay.tsx / LeaveRideDialog.tsx / DiscoveryPrompt.tsx renders and behaves exactly as before. Logged in as greenlantern@roujaune.app, deep-linked into /scenic-ride?route=lake-garda, and verified: root testID `scenic-ride` mounts (no red screen, no compile error); title GradientText 'SCENIC RIDE' + country/destination/subtitle render; MusicControl group renders and every testID is present (music-control, music-toggle, music-level-1..4) and levels/toggle are tappable; left location panel (hide-location, Ring, %, remaining min), center destination, right POI panel (hide-comingup, POINTS OF INTEREST, POI title/image/description, hear-the-story, poi-save, poi-skip), companion card (hide-companion, avatar, waveform), and bottom metrics bar (hide-metrics, Time/km, Quiet/Discover/Guided segs) all render. Persistent utility cluster works: hud-toggle hides the HUD (fade -> opacity 0, pointerEvents 'none'), a second tap restores the HUD and re-shows all four hide-* panels; scenic-playpause toggles playing; scenic-finish opens leave-dialog with dlg-save/dlg-end/dlg-continue and dlg-continue dismisses back to the ride. Tapping the scene (hud-toggle-scene) also toggles HUD visibility. Individually tapping hide-location, hide-comingup, hide-companion, hide-metrics each removes just that panel (locator count -> 0). Bottom nav renders Home/Explore/Ride/Journeys/Audio/Settings/Companion. poi-save was tappable (no crash). 'Video unavailable' inside the YouTube iframe is expected in headless per the reviewer note and is NOT a regression.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "scenic-ride.tsx L107 useEffect cleanup pauses the initial `ambient` ref via a closure; behaviour unchanged from pre-refactor.",
+    "scenic-ride.tsx still ~548 lines. The refactor lifted widgets/dialogs/overlays out but the screen itself remains large. If future work touches it, further extracting resume/persistResume + POI-reached side-effects into a hook (e.g. useScenicRideState) would keep the file <400 lines.",
+    "Non-blocking: on web a PAGEERROR is emitted by the browser autoplay policy — 'play() failed because the user didn't interact with the document first' — for the ambient/chime audio players. Pre-existing (native-only feature), no user-visible impact.",
+    "hud-widgets.tsx L58-81 Waveform uses `useNativeDriver: false` on Animated.timing (necessary because it animates height). Fine, but on web the loop can keep running when the parent unmounts if `active` becomes false right at unmount time — the current cleanup (return () => loop.stop()) handles it correctly."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (frontend-only per request)", "frontend": "100% — all 18 targeted testIDs render; every documented interaction (hud-toggle, hud-toggle-scene, scenic-playpause, scenic-finish->leave-dialog->dlg-continue, hide-location/comingup/companion/metrics, music-toggle, music-level-4, poi-save) responded correctly"},
+  "seed_data_creation": "None — used existing rider greenlantern@roujaune.app and real /api/scenic route 'lake-garda'.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Scenic Ride refactor is verified. The screen requires auth (auth-context in /app/frontend/app/_layout.tsx redirects to /login). To skip the two-step Google/email chooser: click 'Sign in with email' then fill the two inputs (email, password). Deep-link /scenic-ride?route=<id> works once authenticated. YouTube video shows 'Video unavailable' in headless — expected. RideCompleteOverlay (testID `ride-complete`, testIDs `complete-journeys`, `complete-home`, `explorer-badge`) and DiscoveryPrompt/SaveToast (testIDs `discovery-prompt-save`, `discovery-prompt-dismiss`) only render at pct>=0.98 and when a POI at_pct is reached respectively — not exercised in this validation because the video does not progress in headless. Their imports resolve without errors so the refactor is structurally sound; iteration 73 separately validated the DiscoveryPrompt path by seeding AsyncStorage 'roujaune.scenic.resume.v1' to fast-forward pct.",
+  "rca_of_issue": "N/A — pure structural refactor, no behavioural regressions."
+}
