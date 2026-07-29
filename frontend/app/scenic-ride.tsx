@@ -131,6 +131,8 @@ export default function ScenicRideScreen() {
   const [hiddenPoi, setHiddenPoi] = React.useState<Set<number>>(new Set());
   const [saved, setSaved] = React.useState<Set<number>>(new Set());
   const [sessionSaved, setSessionSaved] = React.useState<Set<number>>(new Set()); // saved during THIS ride
+  const [ackComplete, setAckComplete] = React.useState(false);
+  const celebratedRef = React.useRef(false);
   const [narrating, setNarrating] = React.useState(false);
   // Effortless capture: a subtle "save discovery" prompt + confirmation toast.
   const [discoveryPrompt, setDiscoveryPrompt] = React.useState<ScenicPoi | null>(null);
@@ -300,6 +302,14 @@ export default function ScenicRideScreen() {
   }, [playing, persistResume]);
   // Clear resume once the ride is essentially complete.
   React.useEffect(() => { if (completed) clearResume(); }, [completed]);
+  // Celebrate once when the ride completes (chime + haptic, respecting Quiet).
+  React.useEffect(() => {
+    if (completed && !celebratedRef.current) {
+      celebratedRef.current = true;
+      if (audioMode !== "quiet") { try { chime.seekTo(0); chime.play(); } catch {} }
+      if (Platform.OS !== "web") { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {}); }
+    }
+  }, [completed, audioMode, chime]);
   // Stop narration on unmount.
   React.useEffect(() => () => { Speech.stop(); }, []);
 
@@ -582,6 +592,45 @@ export default function ScenicRideScreen() {
         </View>
       )}
 
+      {/* End-of-ride celebration recap */}
+      {completed && !ackComplete && (
+        <View style={s.completeWrap} testID="ride-complete">
+          <View style={s.completeCard}>
+            <View style={s.completeIcon}><Ionicons name="checkmark" size={36} color={colors.bg} /></View>
+            <Text style={s.completeTitle}>Ride Complete!</Text>
+            <Text style={s.completeSub} numberOfLines={2}>{route.name}{route.place ? ` · ${route.place}` : ""}</Text>
+
+            <View style={s.completeStats}>
+              <View style={s.cStat}><Text style={s.cStatVal}>{clock(elapsed)}</Text><Text style={s.cStatLbl}>TIME</Text></View>
+              <View style={s.cStatDivider} />
+              <View style={s.cStat}><Text style={s.cStatVal}>{km}</Text><Text style={s.cStatLbl}>KM</Text></View>
+              <View style={s.cStatDivider} />
+              <View style={s.cStat}><Text style={s.cStatVal}>{sessionSaved.size}</Text><Text style={s.cStatLbl}>SAVED</Text></View>
+            </View>
+
+            {sessionSaved.size >= 3 ? (
+              <View style={s.explorerBadge} testID="explorer-badge">
+                <Ionicons name="sparkles" size={16} color={colors.bg} />
+                <Text style={s.explorerText}>Great explorer!  You saved {sessionSaved.size} discoveries this ride</Text>
+                <Ionicons name="sparkles" size={16} color={colors.bg} />
+              </View>
+            ) : sessionSaved.size > 0 ? (
+              <Text style={s.completeNote}>{sessionSaved.size} discover{sessionSaved.size === 1 ? "y" : "ies"} saved to your scrapbook</Text>
+            ) : (
+              <Text style={s.completeNote}>Tip: bookmark points of interest next time to build your scrapbook.</Text>
+            )}
+
+            <Pressable style={[s.dialogBtn, s.completePrimary]} testID="complete-journeys" onPress={() => { setAckComplete(true); endRide(false, () => router.replace("/saved-destinations")); }} accessibilityRole="button" accessibilityLabel="View my journey">
+              <Ionicons name="map" size={18} color={colors.bg} />
+              <Text style={s.completePrimaryText}>View my journey</Text>
+            </Pressable>
+            <Pressable style={[s.dialogBtn, s.dialogGhost]} testID="complete-home" onPress={() => { setAckComplete(true); endRide(false, () => router.replace("/")); }} accessibilityRole="button" accessibilityLabel="Back home">
+              <Text style={[s.dialogBtnText, { color: colors.white }]}>Back home</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
       {/* Save & leave / End without saving / Continue dialog */}
       {pendingNav && (
         <View style={s.dialogWrap} testID="leave-dialog">
@@ -746,6 +795,21 @@ const s = StyleSheet.create({
   utilExit: { backgroundColor: "rgba(224,30,43,0.85)", borderColor: colors.red },
 
   dialogWrap: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.62)", alignItems: "center", justifyContent: "center", zIndex: 30, padding: 24 },
+  completeWrap: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(4,5,6,0.82)", alignItems: "center", justifyContent: "center", zIndex: 40, padding: 24 },
+  completeCard: { width: "100%", maxWidth: 420, backgroundColor: "#0E1512", borderRadius: radius.xl, borderWidth: 1, borderColor: "rgba(255,194,10,0.35)", padding: 24, alignItems: "center" },
+  completeIcon: { width: 66, height: 66, borderRadius: 33, backgroundColor: colors.yellow, alignItems: "center", justifyContent: "center", marginBottom: 14 },
+  completeTitle: { color: colors.white, fontSize: 26, fontWeight: "900" },
+  completeSub: { color: colors.textDim, fontSize: 14, fontWeight: "600", marginTop: 6, textAlign: "center" },
+  completeStats: { flexDirection: "row", alignItems: "center", alignSelf: "stretch", marginTop: 18, backgroundColor: "rgba(255,255,255,0.05)", borderRadius: radius.lg, borderWidth: 1, borderColor: BORDER, paddingVertical: 14 },
+  cStat: { flex: 1, alignItems: "center" },
+  cStatVal: { color: colors.yellow, fontSize: 20, fontWeight: "900" },
+  cStatLbl: { color: colors.white, fontSize: 10, fontWeight: "700", marginTop: 3, opacity: 0.8, letterSpacing: 1 },
+  cStatDivider: { width: 1, height: 34, backgroundColor: "rgba(255,255,255,0.14)" },
+  explorerBadge: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, alignSelf: "stretch", marginTop: 16, backgroundColor: colors.yellow, borderRadius: radius.pill, paddingVertical: 11, paddingHorizontal: 14 },
+  explorerText: { color: colors.bg, fontSize: 13.5, fontWeight: "900", textAlign: "center", flexShrink: 1 },
+  completeNote: { color: colors.textDim, fontSize: 13, fontWeight: "600", textAlign: "center", marginTop: 16 },
+  completePrimary: { backgroundColor: colors.yellow, alignSelf: "stretch", marginTop: 18 },
+  completePrimaryText: { color: colors.bg, fontSize: 15, fontWeight: "800" },
   dialogCard: { width: "100%", maxWidth: 400, backgroundColor: "#0E1512", borderRadius: radius.xl, borderWidth: 1, borderColor: BORDER, padding: 22, gap: 10 },
   dialogTitle: { color: colors.white, fontSize: 20, fontWeight: "900" },
   dialogSub: { color: colors.textDim, fontSize: 13.5, marginBottom: 6 },

@@ -705,3 +705,6 @@ STILL PENDING (awaiting approval): Phase 3 (Home banners consolidation, dup CTAs
 
 ## "Discoveries saved this ride" HUD counter (2026-07-28 fork)
 - Tracks discoveries saved during the CURRENT ride via a `sessionSaved` set (distinct from previously-saved POIs primed from the backend on entry). Incremented on a successful new save (prompt or panel bookmark), decremented on un-save. A subtle yellow chip ("N discover(y/ies) saved this ride") appears in the left progress panel when count > 0. Verified via screenshot (counter text renders after saving on lake-achensee).
+
+## End-of-ride recap + "Great explorer" celebration (2026-07-28 fork)
+- When a scenic ride completes (pct>=0.98), a full "Ride Complete!" recap overlay auto-shows in `scenic-ride.tsx` with stats (Time/km/Saved) + CTAs "View my journey" (logs ride → Journeys) and "Back home". A one-time celebratory chime+haptic fires (respects Quiet). When `sessionSaved.size >= 3`, a gold "Great explorer! You saved N discoveries this ride" badge appears; 1-2 shows a scrapbook note; 0 shows a tip. Verified via screenshot (badge + recap render correctly). NOTE: completion isn't reachable in the headless preview (video doesn't autoplay); a temporary demo flag was used only to capture the screenshot and has been fully removed.
