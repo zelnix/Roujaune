@@ -16,6 +16,8 @@ import { useScenicRoute, useScenicPois, ScenicPoi, logScenicRide, ytThumb, saveD
 import { getResume, saveResume, clearResume } from "@/src/lib/scenic-resume";
 import { useCoach, useVoiceGuidance, setVoiceGuidance, VoiceGuidance } from "@/src/lib/coach-persona";
 import { useBleSensors } from "@/src/hooks/useBleSensors";
+import { RideRouteMap, RouteMapPoint } from "@/src/components/RideRouteMap";
+import { recapCaption } from "@/src/lib/scenic-recap";
 
 const SERIF = Platform.select({ ios: "Georgia", android: "serif", default: "Georgia, 'Times New Roman', serif" }) as string;
 
@@ -199,6 +201,26 @@ export default function ScenicRideScreen() {
   const positionSec = vpos > 0 ? vpos : estPos;
   const pct = Math.min(1, durationSec > 0 ? positionSec / durationSec : 0);
   const completed = pct >= 0.98;
+
+  // Landscape end-of-ride recap data: discovery pins along the route + a caption.
+  const rideDiscoveries = React.useMemo<RouteMapPoint[]>(
+    () => [...sessionSaved]
+      .map((o) => pois.find((p) => p.order === o))
+      .filter((p): p is ScenicPoi => !!p)
+      .sort((a, b) => a.at_pct - b.at_pct)
+      .map((p) => ({ at_pct: p.at_pct, title: p.title, photo: p.image })),
+    [sessionSaved, pois],
+  );
+  const rideCaption = React.useMemo(
+    () => recapCaption({
+      id: "", routeId: route?.id || "", name: route?.name || "", place: route?.place,
+      country: route?.country, tag: route?.tag, elevation_m: route?.elevation_m,
+      distance_km: route?.distance_km, duration_sec: elapsed, discoveries: [],
+    } as any, persona?.name),
+    [route, elapsed, persona],
+  );
+  const recapCardW = Math.min(820, width - 32);
+  const recapMapW = recapCardW - 40;
 
   // Narrate a point-of-interest with the companion's voice; drives the waveform.
   const narrate = React.useCallback((text: string, order: number) => {
@@ -592,41 +614,53 @@ export default function ScenicRideScreen() {
         </View>
       )}
 
-      {/* End-of-ride celebration recap */}
+      {/* End-of-ride landscape recap with animated route map */}
       {completed && !ackComplete && (
         <View style={s.completeWrap} testID="ride-complete">
-          <View style={s.completeCard}>
-            <View style={s.completeIcon}><Ionicons name="checkmark" size={36} color={colors.bg} /></View>
-            <Text style={s.completeTitle}>Ride Complete!</Text>
-            <Text style={s.completeSub} numberOfLines={2}>{route.name}{route.place ? ` · ${route.place}` : ""}</Text>
-
-            <View style={s.completeStats}>
-              <View style={s.cStat}><Text style={s.cStatVal}>{clock(elapsed)}</Text><Text style={s.cStatLbl}>TIME</Text></View>
-              <View style={s.cStatDivider} />
-              <View style={s.cStat}><Text style={s.cStatVal}>{km}</Text><Text style={s.cStatLbl}>KM</Text></View>
-              <View style={s.cStatDivider} />
-              <View style={s.cStat}><Text style={s.cStatVal}>{sessionSaved.size}</Text><Text style={s.cStatLbl}>SAVED</Text></View>
+          <View style={[s.recapCard, { width: recapCardW }]}>
+            <View style={s.recapHeader}>
+              <View style={s.completeIcon}><Ionicons name="checkmark" size={26} color={colors.bg} /></View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={s.recapTitle}>Ride Complete!</Text>
+                <Text style={s.recapSub} numberOfLines={1}>{route.name}{route.place ? ` · ${route.place}` : ""}</Text>
+              </View>
+              <View style={s.recapStatsRow}>
+                <View style={s.cStat}><Text style={s.cStatVal}>{clock(elapsed)}</Text><Text style={s.cStatLbl}>TIME</Text></View>
+                <View style={s.cStatDivider} />
+                <View style={s.cStat}><Text style={s.cStatVal}>{km}</Text><Text style={s.cStatLbl}>KM</Text></View>
+                <View style={s.cStatDivider} />
+                <View style={s.cStat}><Text style={s.cStatVal}>{sessionSaved.size}</Text><Text style={s.cStatLbl}>SAVED</Text></View>
+              </View>
             </View>
 
-            {sessionSaved.size >= 3 ? (
-              <View style={s.explorerBadge} testID="explorer-badge">
-                <Ionicons name="sparkles" size={16} color={colors.bg} />
-                <Text style={s.explorerText}>Great explorer!  You saved {sessionSaved.size} discoveries this ride</Text>
-                <Ionicons name="sparkles" size={16} color={colors.bg} />
-              </View>
-            ) : sessionSaved.size > 0 ? (
-              <Text style={s.completeNote}>{sessionSaved.size} discover{sessionSaved.size === 1 ? "y" : "ies"} saved to your scrapbook</Text>
-            ) : (
-              <Text style={s.completeNote}>Tip: bookmark points of interest next time to build your scrapbook.</Text>
-            )}
+            <View style={s.mapWrap}>
+              <RideRouteMap width={recapMapW} height={182} seed={route.id} points={rideDiscoveries} />
+            </View>
 
-            <Pressable style={[s.dialogBtn, s.completePrimary]} testID="complete-journeys" onPress={() => { setAckComplete(true); endRide(false, () => router.replace("/saved-destinations?justFinished=1")); }} accessibilityRole="button" accessibilityLabel="View and share my journey">
-              <Ionicons name="map" size={18} color={colors.bg} />
-              <Text style={s.completePrimaryText}>View my journey</Text>
-            </Pressable>
-            <Pressable style={[s.dialogBtn, s.dialogGhost]} testID="complete-home" onPress={() => { setAckComplete(true); endRide(false, () => router.replace("/")); }} accessibilityRole="button" accessibilityLabel="Back home">
-              <Text style={[s.dialogBtnText, { color: colors.white }]}>Back home</Text>
-            </Pressable>
+            <View style={s.recapFooter}>
+              <View style={{ flex: 1, minWidth: 180 }}>
+                {sessionSaved.size >= 3 ? (
+                  <View style={s.explorerBadge} testID="explorer-badge">
+                    <Ionicons name="sparkles" size={15} color={colors.bg} />
+                    <Text style={s.explorerText}>Great explorer! {sessionSaved.size} discoveries this ride</Text>
+                  </View>
+                ) : sessionSaved.size > 0 ? (
+                  <Text style={s.completeNote}>{sessionSaved.size} discover{sessionSaved.size === 1 ? "y" : "ies"} saved to your scrapbook.</Text>
+                ) : (
+                  <Text style={s.completeNote}>Tip: bookmark points of interest next time to build your scrapbook.</Text>
+                )}
+                <Text style={s.recapCaption} numberOfLines={2}>&ldquo;{rideCaption}&rdquo;</Text>
+              </View>
+              <View style={s.recapCtas}>
+                <Pressable style={[s.dialogBtn, s.completePrimary]} testID="complete-journeys" onPress={() => { setAckComplete(true); endRide(false, () => router.replace("/saved-destinations?justFinished=1")); }} accessibilityRole="button" accessibilityLabel="View and share my journey">
+                  <Ionicons name="share-social" size={17} color={colors.bg} />
+                  <Text style={s.completePrimaryText}>View &amp; share</Text>
+                </Pressable>
+                <Pressable style={[s.dialogBtn, s.dialogGhost]} testID="complete-home" onPress={() => { setAckComplete(true); endRide(false, () => router.replace("/")); }} accessibilityRole="button" accessibilityLabel="Back home">
+                  <Text style={[s.dialogBtnText, { color: colors.white }]}>Back home</Text>
+                </Pressable>
+              </View>
+            </View>
           </View>
         </View>
       )}
@@ -795,21 +829,26 @@ const s = StyleSheet.create({
   utilExit: { backgroundColor: "rgba(224,30,43,0.85)", borderColor: colors.red },
 
   dialogWrap: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.62)", alignItems: "center", justifyContent: "center", zIndex: 30, padding: 24 },
-  completeWrap: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(4,5,6,0.82)", alignItems: "center", justifyContent: "center", zIndex: 40, padding: 24 },
-  completeCard: { width: "100%", maxWidth: 420, backgroundColor: "#0E1512", borderRadius: radius.xl, borderWidth: 1, borderColor: "rgba(255,194,10,0.35)", padding: 24, alignItems: "center" },
-  completeIcon: { width: 66, height: 66, borderRadius: 33, backgroundColor: colors.yellow, alignItems: "center", justifyContent: "center", marginBottom: 14 },
-  completeTitle: { color: colors.white, fontSize: 26, fontWeight: "900" },
-  completeSub: { color: colors.textDim, fontSize: 14, fontWeight: "600", marginTop: 6, textAlign: "center" },
-  completeStats: { flexDirection: "row", alignItems: "center", alignSelf: "stretch", marginTop: 18, backgroundColor: "rgba(255,255,255,0.05)", borderRadius: radius.lg, borderWidth: 1, borderColor: BORDER, paddingVertical: 14 },
-  cStat: { flex: 1, alignItems: "center" },
-  cStatVal: { color: colors.yellow, fontSize: 20, fontWeight: "900" },
-  cStatLbl: { color: colors.white, fontSize: 10, fontWeight: "700", marginTop: 3, opacity: 0.8, letterSpacing: 1 },
-  cStatDivider: { width: 1, height: 34, backgroundColor: "rgba(255,255,255,0.14)" },
-  explorerBadge: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, alignSelf: "stretch", marginTop: 16, backgroundColor: colors.yellow, borderRadius: radius.pill, paddingVertical: 11, paddingHorizontal: 14 },
-  explorerText: { color: colors.bg, fontSize: 13.5, fontWeight: "900", textAlign: "center", flexShrink: 1 },
-  completeNote: { color: colors.textDim, fontSize: 13, fontWeight: "600", textAlign: "center", marginTop: 16 },
-  completePrimary: { backgroundColor: colors.yellow, alignSelf: "stretch", marginTop: 18 },
-  completePrimaryText: { color: colors.bg, fontSize: 15, fontWeight: "800" },
+  completeWrap: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(4,5,6,0.85)", alignItems: "center", justifyContent: "center", zIndex: 40, padding: 16 },
+  recapCard: { maxWidth: 820, backgroundColor: "#0B120F", borderRadius: radius.xl, borderWidth: 1, borderColor: "rgba(255,194,10,0.35)", padding: 18 },
+  recapHeader: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" },
+  recapTitle: { color: colors.white, fontSize: 22, fontWeight: "900" },
+  recapSub: { color: colors.textDim, fontSize: 13, fontWeight: "600", marginTop: 2 },
+  recapStatsRow: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.05)", borderRadius: radius.lg, borderWidth: 1, borderColor: BORDER, paddingVertical: 8, paddingHorizontal: 6 },
+  mapWrap: { borderRadius: radius.lg, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,194,10,0.22)" },
+  recapFooter: { flexDirection: "row", alignItems: "center", gap: 16, marginTop: 14, flexWrap: "wrap" },
+  recapCaption: { color: colors.white, fontSize: 12.5, fontStyle: "italic", fontWeight: "600", opacity: 0.9, marginTop: 8, lineHeight: 18 },
+  recapCtas: { flexDirection: "row", alignItems: "center", gap: 10 },
+  completeIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.yellow, alignItems: "center", justifyContent: "center" },
+  cStat: { alignItems: "center", paddingHorizontal: 12 },
+  cStatVal: { color: colors.yellow, fontSize: 17, fontWeight: "900" },
+  cStatLbl: { color: colors.white, fontSize: 9, fontWeight: "700", marginTop: 2, opacity: 0.8, letterSpacing: 1 },
+  cStatDivider: { width: 1, height: 28, backgroundColor: "rgba(255,255,255,0.14)" },
+  explorerBadge: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, alignSelf: "flex-start", backgroundColor: colors.yellow, borderRadius: radius.pill, paddingVertical: 8, paddingHorizontal: 14 },
+  explorerText: { color: colors.bg, fontSize: 13, fontWeight: "900" },
+  completeNote: { color: colors.textDim, fontSize: 13, fontWeight: "700" },
+  completePrimary: { backgroundColor: colors.yellow, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingHorizontal: 20 },
+  completePrimaryText: { color: colors.bg, fontSize: 14, fontWeight: "800" },
   dialogCard: { width: "100%", maxWidth: 400, backgroundColor: "#0E1512", borderRadius: radius.xl, borderWidth: 1, borderColor: BORDER, padding: 22, gap: 10 },
   dialogTitle: { color: colors.white, fontSize: 20, fontWeight: "900" },
   dialogSub: { color: colors.textDim, fontSize: 13.5, marginBottom: 6 },
