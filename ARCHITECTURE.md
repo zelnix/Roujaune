@@ -84,7 +84,7 @@ PUT    /api/scenic/journeys/{ride_id}/cover       set/reset recap cover photo
 ```
 
 ## Integrations
-- **YouTube** — `react-native-youtube-iframe` (native) + web iframe (4K `hd2160`, `infoDelivery` progress). Video IDs only.
+- **YouTube** — `react-native-youtube-iframe` (native) + web iframe (4K `hd2160`, `infoDelivery` progress). Video IDs only. Native WebView uses `mediaPlaybackRequiresUserAction:false` so the muted POV video autoplays; if autoplay is still blocked (e.g. Expo Go), the ride screen keeps the video tappable and shows a "Tap the video to begin your ride" fallback (`testID=tap-to-start`) until playback actually starts.
 - **emergentintegrations (OpenAI)** — LLM text for coach + scenic POIs. Uses **Emergent LLM key**.
 - **Wikipedia** (keyless) — landmark photos for POIs (compliant User-Agent).
 - **Open-Meteo** (keyless) — weather.

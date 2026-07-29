@@ -48,7 +48,7 @@ export default function YouTubePlayer({ videoId, height, width, playing, startSe
         if (state === "playing") onStateChange?.(true);
         else if (state === "paused" || state === "ended") onStateChange?.(false);
       }}
-      webViewProps={{ allowsInlineMediaPlayback: true }}
+      webViewProps={{ allowsInlineMediaPlayback: true, mediaPlaybackRequiresUserAction: false }}
       initialPlayerParams={{ modestbranding: true, rel: false, controls: false, iv_load_policy: 3, mute: true, start: startSeconds ? Math.floor(startSeconds) : undefined }}
     />
   );

@@ -39,9 +39,18 @@ export default function ScenicRideScreen() {
   const [elapsed, setElapsed] = React.useState(r0 ? r0.elapsedSec : 0);
   const [vpos, setVpos] = React.useState(0); // real video currentTime (sec)
   const [vdur, setVdur] = React.useState(0); // real video duration (sec)
+  // Has the POV video actually begun playing yet? (Autoplay can be blocked in
+  // Expo Go / mobile WebViews — we then surface a "tap to start" fallback.)
+  const [videoStarted, setVideoStarted] = React.useState(false);
+  const [showTapHint, setShowTapHint] = React.useState(false);
   const onVideoProgress = React.useCallback((cur: number, dur: number) => {
     if (typeof cur === "number" && cur >= 0) setVpos(cur);
+    if (cur > 0.4) setVideoStarted(true);
     if (dur && dur > 0) setVdur((d) => (d > 0 ? d : dur));
+  }, []);
+  const onVideoState = React.useCallback((p: boolean) => {
+    setPlaying(p);
+    if (p) setVideoStarted(true);
   }, []);
 
   // Live BLE cadence / heart-rate telemetry (native build only). When no
@@ -115,6 +124,13 @@ export default function ScenicRideScreen() {
   React.useEffect(() => {
     Animated.timing(fade, { toValue: hud ? 1 : 0, duration: 260, useNativeDriver: Platform.OS !== "web" }).start();
   }, [hud, fade]);
+
+  // Reveal the "tap to start" fallback if the video hasn't begun after a beat.
+  React.useEffect(() => {
+    if (videoStarted) { setShowTapHint(false); return; }
+    const t = setTimeout(() => setShowTapHint(true), 2800);
+    return () => clearTimeout(t);
+  }, [videoStarted]);
 
   const leave = () => { if (router.canGoBack()) router.back(); else router.replace("/"); };
 
@@ -339,18 +355,31 @@ export default function ScenicRideScreen() {
     <View style={s.root} testID="scenic-ride">
       <StatusBar style="light" hidden />
 
-      {/* POV video — full-bleed cover */}
-      <View style={s.videoWrap} pointerEvents="none">
+      {/* POV video — full-bleed cover. Until it starts playing we keep the
+          video interactive so a tap can reach YouTube's play button (autoplay
+          may be blocked in Expo Go / mobile WebViews). */}
+      <View style={s.videoWrap} pointerEvents={videoStarted ? "none" : "auto"}>
         <View style={{ width: cover.w, height: cover.h, marginLeft: (width - cover.w) / 2, marginTop: (height - cover.h) / 2 }}>
-          <YouTubePlayer height={cover.h} width={cover.w} playing={playing} videoId={route.youtube_id} startSeconds={Math.floor(startPos)} onStateChange={setPlaying} onProgress={onVideoProgress} />
+          <YouTubePlayer height={cover.h} width={cover.w} playing={playing} videoId={route.youtube_id} startSeconds={Math.floor(startPos)} onStateChange={onVideoState} onProgress={onVideoProgress} />
         </View>
       </View>
 
       {/* subtle legibility vignette */}
       <LinearGradient pointerEvents="none" colors={["rgba(0,0,0,0.45)", "transparent", "transparent", "rgba(0,0,0,0.55)"]} style={StyleSheet.absoluteFill as any} />
 
-      {/* tap-catcher (below HUD) toggles the HUD */}
-      <Pressable style={StyleSheet.absoluteFill as any} onPress={() => setHud((v) => !v)} testID="hud-toggle-scene" accessibilityRole="button" accessibilityLabel={hud ? "Hide overlay" : "Show overlay"} />
+      {/* tap-catcher (below HUD) toggles the HUD — disabled until the video
+          has started so the first tap goes to the player's play button. */}
+      <Pressable style={StyleSheet.absoluteFill as any} pointerEvents={videoStarted ? "auto" : "none"} onPress={() => setHud((v) => !v)} testID="hud-toggle-scene" accessibilityRole="button" accessibilityLabel={hud ? "Hide overlay" : "Show overlay"} />
+
+      {/* "Tap to start" fallback — non-blocking hint pointing at the play button */}
+      {showTapHint && !videoStarted && (
+        <View style={s.tapHintWrap} pointerEvents="none" testID="tap-to-start">
+          <View style={s.tapHint}>
+            <Ionicons name="play-circle" size={20} color={colors.bg} />
+            <Text style={s.tapHintText}>Tap the video to begin your ride</Text>
+          </View>
+        </View>
+      )}
 
       {/* HUD */}
       <Animated.View style={[StyleSheet.absoluteFill as any, { opacity: fade }]} pointerEvents={hud ? "box-none" : "none"}>
@@ -605,6 +634,9 @@ const s = StyleSheet.create({
   navItems: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-around" },
 
   utility: { position: "absolute", top: 24, right: 24, flexDirection: "row", gap: 10, zIndex: 20 },
+  tapHintWrap: { position: "absolute", left: 0, right: 0, bottom: "34%", alignItems: "center", zIndex: 15 },
+  tapHint: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.yellow, borderRadius: 999, paddingVertical: 9, paddingHorizontal: 16 },
+  tapHintText: { color: colors.bg, fontSize: 13.5, fontWeight: "800" },
   savedChip: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(255,194,10,0.12)", borderRadius: 999, borderWidth: 1, borderColor: "rgba(255,194,10,0.35)", paddingVertical: 7, paddingHorizontal: 12, alignSelf: "flex-start" },
   savedChipText: { color: colors.yellow, fontSize: 12, fontWeight: "800" },
   utilBtn: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.5)", borderWidth: 1, borderColor: BORDER },
