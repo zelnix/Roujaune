@@ -4,7 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { colors, radius, spacing } from "@/src/theme";
 import { useSavedDestinations, useScenicJourneys, useAllDiscoveries, ScenicJourney, ScenicDiscovery } from "@/src/lib/scenic-routes";
 import { DestinationCard } from "@/src/components/today/DestinationCard";
@@ -41,6 +41,18 @@ export default function JourneysScreen() {
   const [share, setShare] = React.useState<ScenicJourney | null>(null);
   const [detail, setDetail] = React.useState<ScenicDiscovery | null>(null);
   const [tab, setTab] = React.useState<"rides" | "discoveries">("rides");
+
+  // Coming straight from a completed ride → open its shareable recap card so the
+  // rider can share while the moment is fresh (cover picker is in the modal).
+  const { justFinished } = useLocalSearchParams<{ justFinished?: string }>();
+  const openedRecapRef = React.useRef(false);
+  React.useEffect(() => {
+    if (justFinished && !openedRecapRef.current && !jLoading && journeys.length > 0) {
+      openedRecapRef.current = true;
+      setTab("rides");
+      setShare(journeys[0]);
+    }
+  }, [justFinished, jLoading, journeys]);
 
   const open = (id: string) => router.push(`/scenic-ride?route=${id}` as any);
   const leave = () => { if (router.canGoBack()) router.back(); else router.replace("/"); };

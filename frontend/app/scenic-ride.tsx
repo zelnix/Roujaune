@@ -620,7 +620,7 @@ export default function ScenicRideScreen() {
               <Text style={s.completeNote}>Tip: bookmark points of interest next time to build your scrapbook.</Text>
             )}
 
-            <Pressable style={[s.dialogBtn, s.completePrimary]} testID="complete-journeys" onPress={() => { setAckComplete(true); endRide(false, () => router.replace("/saved-destinations")); }} accessibilityRole="button" accessibilityLabel="View my journey">
+            <Pressable style={[s.dialogBtn, s.completePrimary]} testID="complete-journeys" onPress={() => { setAckComplete(true); endRide(false, () => router.replace("/saved-destinations?justFinished=1")); }} accessibilityRole="button" accessibilityLabel="View and share my journey">
               <Ionicons name="map" size={18} color={colors.bg} />
               <Text style={s.completePrimaryText}>View my journey</Text>
             </Pressable>

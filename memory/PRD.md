@@ -708,3 +708,6 @@ STILL PENDING (awaiting approval): Phase 3 (Home banners consolidation, dup CTAs
 
 ## End-of-ride recap + "Great explorer" celebration (2026-07-28 fork)
 - When a scenic ride completes (pct>=0.98), a full "Ride Complete!" recap overlay auto-shows in `scenic-ride.tsx` with stats (Time/km/Saved) + CTAs "View my journey" (logs ride → Journeys) and "Back home". A one-time celebratory chime+haptic fires (respects Quiet). When `sessionSaved.size >= 3`, a gold "Great explorer! You saved N discoveries this ride" badge appears; 1-2 shows a scrapbook note; 0 shows a tip. Verified via screenshot (badge + recap render correctly). NOTE: completion isn't reachable in the headless preview (video doesn't autoplay); a temporary demo flag was used only to capture the screenshot and has been fully removed.
+
+## "View my journey" → instant shareable recap (2026-07-28 fork)
+- The end-of-ride recap's "View my journey" CTA now navigates to `/saved-destinations?justFinished=1`; the Journeys screen reads `justFinished` and auto-opens the shareable recap card (`ScenicRecapShareModal`) for the newest (just-completed) ride, with the cover-photo picker + Share/Save ready — one-tap sharing while the celebration is fresh. Verified via screenshot (modal auto-opens on the Lake Garda recap with cover picker).
