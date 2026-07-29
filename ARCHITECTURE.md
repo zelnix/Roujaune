@@ -1,7 +1,7 @@
 # ROUJAUNE — Architecture
 
 > Living document. **Keep this up to date** whenever routes, collections, integrations,
-> or major flows change. Last updated: 2026-07-28.
+> or major flows change. Last updated: 2026-07-29.
 
 ROUJAUNE is a cycling **training + scenic-riding** app for riders 50+. It pairs a
 personalised training plan and workouts with an immersive "Scenic Cycling"
@@ -50,7 +50,7 @@ scrapbook, and shareable ride recaps).
 
 - `app/` — **routes** (each file = a screen). Key: `index.tsx` (Today/home), `scenic-destinations.tsx` (explore), `scenic-ride.tsx` (immersive HUD), `saved-destinations.tsx` (**Journeys**: Rides + Discoveries scrapbook), `coming-soon.tsx`, `training.tsx`, `plan.tsx`, `progress.tsx`, `workout*.tsx`, `benchmark/`, `login.tsx`, `onboarding.tsx`, `settings.tsx`, `profile.tsx`.
 - `src/lib/` — data/services + hooks-as-stores. Scenic: `scenic-routes.ts` (routes/POIs/discoveries/journeys/covers APIs), `scenic-resume.ts` (persisted resume), `scenic-recap.ts` (elevation profile + coach caption). Also `auth-context.tsx`, `coach-persona.ts`, `today-mode.ts`, `settings.ts`, `weather.ts`, etc.
-- `src/components/` — reusable UI. Scenic: `ScenicRecapCard`, `ScenicRecapShareModal` (cover picker + share/save), `DiscoveryDetailModal`, `RideRouteMap` (animated route map), `YouTubePlayer(.web).tsx`, `HeaderStatus`, `today/ExperienceHero`, `today/TodayModeButton`, `SideNavigation`.
+- `src/components/` — reusable UI. Scenic: `ScenicRecapCard`, `ScenicRecapShareModal` (cover picker + share/save), `DiscoveryDetailModal`, `RideRouteMap` (animated route map), `ConfettiBurst` (3+ celebration), `YouTubePlayer(.web).tsx`, `HeaderStatus`, `today/ExperienceHero`, `today/TodayModeButton`, `SideNavigation`.
 - `src/hooks/` — `useBleSensors(.web)`, `useCast(.web)`, `useCoachSpeech`, `useTelemetry`, `useWorkoutAudio`.
 - `assets/audio/` — `scenic_ambient.mp3` (HUD ambience), `discovery_chime.wav` (save prompt / completion).
 - `src/theme.ts` — colors/radius/spacing. `+html.tsx`, `_layout.tsx` — router + web shell.
@@ -68,7 +68,7 @@ scenic_favourites, scenic_discoveries, scenic_recap_covers, mode_interest`
 - **`scenic_poi`** (global cache): `{route_id, pois[], source, at}`; each POI `{order, at_pct, title, description, narration, wiki, image}` — LLM-generated (emergentintegrations), enriched with a Wikipedia landmark photo (keyless, flags/maps filtered).
 - **`scenic_discoveries`** (rider): saved POIs `{id, route_id, route_name, place, poi_order, at_pct, title, description, narration, photo, at}`.
 - **`scenic_recap_covers`** (rider): `{ride_id, photo}` — chosen cover for a ride's recap.
-- **Ride flow:** explore → `scenic-ride` HUD (muted 4K YouTube + ambient audio, hideable panels, Quiet/Discover/Guided voice, LLM POIs with real photos). Progress + POI timing use the video's **real currentTime** (`onProgress`). Reaching a POI shows a one-tap **Save-discovery prompt** (chime + haptic, silenced in Quiet). Ride persists via `scenic-resume` (Scenic hero → "Resume ride"). On completion (pct ≥ 0.98) a **landscape recap** overlay shows stats, an **animated `RideRouteMap`** (self-drawing trail + moving rider + discovery photo bubbles), a **"Great explorer!"** badge at 3+ saves, a coach caption, and **View & share** → `/saved-destinations?justFinished=1` (auto-opens the shareable recap card w/ cover picker).
+- **Ride flow:** explore → `scenic-ride` HUD (muted 4K YouTube + ambient audio, hideable panels, Quiet/Discover/Guided voice, LLM POIs with real photos). Progress + POI timing use the video's **real currentTime** (`onProgress`). Reaching a POI shows a one-tap **Save-discovery prompt** (chime + haptic, silenced in Quiet). Ride persists via `scenic-resume` (Scenic hero → "Resume ride"). On completion (pct ≥ 0.98) a **landscape recap** overlay shows stats, an **animated `RideRouteMap`** (self-drawing trail + moving rider + discovery photo bubbles), a **"Great explorer!"** badge + confetti at 3+ saves, a coach caption, and **View & share** → `/saved-destinations?justFinished=1` (auto-opens the shareable recap card w/ cover picker).
 - **Journeys** (`saved-destinations`): tabs **Rides** (completed `ride_history` `scenic-*` joined with discoveries → shareable recap cards) and **Discoveries** (photo scrapbook → `DiscoveryDetailModal`).
 
 ### Key scenic endpoints

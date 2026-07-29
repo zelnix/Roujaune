@@ -17,6 +17,7 @@ import { getResume, saveResume, clearResume } from "@/src/lib/scenic-resume";
 import { useCoach, useVoiceGuidance, setVoiceGuidance, VoiceGuidance } from "@/src/lib/coach-persona";
 import { useBleSensors } from "@/src/hooks/useBleSensors";
 import { RideRouteMap, RouteMapPoint } from "@/src/components/RideRouteMap";
+import { ConfettiBurst } from "@/src/components/ConfettiBurst";
 import { recapCaption } from "@/src/lib/scenic-recap";
 
 const SERIF = Platform.select({ ios: "Georgia", android: "serif", default: "Georgia, 'Times New Roman', serif" }) as string;
@@ -661,6 +662,7 @@ export default function ScenicRideScreen() {
                 </Pressable>
               </View>
             </View>
+            {sessionSaved.size >= 3 && <ConfettiBurst width={recapCardW} height={360} count={36} originY={26} />}
           </View>
         </View>
       )}

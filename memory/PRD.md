@@ -718,3 +718,6 @@ STILL PENDING (awaiting approval): Phase 3 (Home banners consolidation, dup CTAs
 
 ## ARCHITECTURE.md (2026-07-28 fork)
 - Created `/app/ARCHITECTURE.md` — living overview of stack, backend routers, frontend routes/lib/components, user-scoped collections, the full Scenic Cycling data model + flow, key endpoints, integrations, native-only features, and conventions. **Keep it updated as features change.**
+
+## Confetti celebration on 3+ recap (2026-07-29 fork)
+- New `src/components/ConfettiBurst.tsx` (react-native-reanimated): one-shot confetti (gold/white/red/teal pieces spray + fall + rotate + fade). Rendered as the top-most, `pointerEvents="none"` layer of the landscape completion recap in `scenic-ride.tsx`, only when `sessionSaved.size >= 3` (pairs with the "Great explorer!" badge). Verified via screenshot. ARCHITECTURE.md updated.
