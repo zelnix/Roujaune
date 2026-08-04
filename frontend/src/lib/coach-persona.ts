@@ -18,8 +18,8 @@ const albertoImg = require("../../assets/images/coach_alberto_v2.png");
 const adrianaImg = require("../../assets/images/coach_adriana.png");
 
 export const COACHES: Record<CoachId, CoachPersona> = {
-  alberto: { id: "alberto", name: "Alberto", gender: "male", role: "Your Companion Coach", image: albertoImg, voiceNum: 18, pronouns: "he/him", signature: "Alberto" },
-  adriana: { id: "adriana", name: "Adriana", gender: "female", role: "Your Companion Coach", image: adrianaImg, voiceNum: 7, pronouns: "she/her", signature: "Adriana" },
+  alberto: { id: "alberto", name: "Alberto", gender: "male", role: "Your HuCentAI Companion", image: albertoImg, voiceNum: 18, pronouns: "he/him", signature: "Alberto" },
+  adriana: { id: "adriana", name: "Adriana", gender: "female", role: "Your HuCentAI Companion", image: adrianaImg, voiceNum: 7, pronouns: "she/her", signature: "Adriana" },
 };
 
 /* ── coaching style ("balanced" | "performance" | "calm" | "essential") ──── */

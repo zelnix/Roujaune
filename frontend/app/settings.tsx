@@ -66,7 +66,7 @@ export default function SettingsScreen() {
     <AppScaffold active="settings" title="Settings" subtitle="Coach, equipment and app preferences.">
       <View style={s.row}>
         <Card testID="coach-select" style={{ flex: 1 }}>
-          <SectionTitle label="YOUR COMPANION COACH" color={CC.rouge} />
+          <SectionTitle label="YOUR HUCENTAI COMPANION" color={CC.rouge} />
           <View style={s.coachRow}>
             {(Object.keys(COACHES) as CoachId[]).map((id) => {
               const c = COACHES[id]; const on = persona.id === id;
