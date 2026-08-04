@@ -9,6 +9,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing, shadow } from "@/src/theme";
 import { useTelemetry } from "@/src/hooks/useTelemetry";
 import { rideRecorder } from "@/src/lib/ride";
+import { useEntitlement, consumeRide, refreshEntitlement } from "@/src/lib/entitlement";
+import { PaywallModal } from "@/src/components/PaywallModal";
 import { getFavoriteRoute, setFavoriteRoute } from "@/src/lib/prefs";
 import { useSettings } from "@/src/lib/settings";
 import { currentWorkout } from "@/src/data";
@@ -151,6 +153,12 @@ export default function LiveWorkout() {
   const [cueIdx] = React.useState(0);
 
   const { telemetry, connectionState, sendErg, sendTarget, sendInit, sendSensor, pause, resume, simulateDropout } = useTelemetry();
+  // Subscription gating — free tier is limited to N rides of ≤M minutes.
+  const ent = useEntitlement();
+  const [paywall, setPaywall] = React.useState<string | null>(null);
+  const rideKeyRef = React.useRef(`workout-${selected?.id || "ride"}-${Date.now()}`);
+  const gatedRef = React.useRef(false);
+  const freeSecs = ent.freeRideMinutes * 60;
   const { settings, setSetting, loaded } = useSettings();
   const ble = useBleSensors(settings.wheelCircumference);
   const { plan } = usePlan();
@@ -410,6 +418,39 @@ export default function LiveWorkout() {
     router.replace("/");
   };
   const onResumeRide = () => { setEndPrompt(false); if (paused) { resume(); setPaused(false); } };
+
+  // Entitlement gate: premium rides freely; free riders spend one of their
+  // allowance (once), or hit the paywall when they've used them all.
+  React.useEffect(() => {
+    if (!ent.loaded || gatedRef.current) return;
+    gatedRef.current = true;
+    if (ent.premium) return;
+    if (ent.canStartRide) {
+      consumeRide(rideKeyRef.current);
+    } else {
+      if (!paused) { pause(); setPaused(true); }
+      setPaywall(`You've used all ${ent.freeRidesLimit} free rides. Go Premium for unlimited riding.`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ent.loaded, ent.premium, ent.canStartRide]);
+
+  // Free-ride length cap: pause at the free minute limit and offer Premium.
+  React.useEffect(() => {
+    if (ent.premium || paywall) return;
+    if (telemetry.elapsed >= freeSecs) {
+      if (!paused) { pause(); setPaused(true); }
+      setPaywall(`Your free ride reached ${ent.freeRideMinutes} minutes. Go Premium for unlimited, full-length rides.`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [telemetry.elapsed, ent.premium, freeSecs, paywall]);
+
+  const closePaywall = React.useCallback(async () => {
+    const e = await refreshEntitlement();
+    setPaywall(null);
+    if (e.premium) { if (paused) { resume(); setPaused(false); } }
+    else { router.replace("/"); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paused]);
 
   // ---- End-of-workout "Workout Complete" popup + ride extension ----
   const completeShownRef = React.useRef(false);
@@ -837,6 +878,7 @@ export default function LiveWorkout() {
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
       <StatusBar hidden />
+      <PaywallModal visible={!!paywall} onClose={closePaywall} reason={paywall || undefined} />
       <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
         {tablet ? (
           <ScrollView style={styles.flex1} contentContainerStyle={styles.tabletContent} showsVerticalScrollIndicator={false} testID="workout-fit">

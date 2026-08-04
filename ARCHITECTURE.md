@@ -89,9 +89,10 @@ PUT    /api/scenic/journeys/{ride_id}/cover       set/reset recap cover photo
 - **Wikipedia** (keyless) — landmark photos for POIs (compliant User-Agent).
 - **Open-Meteo** (keyless) — weather.
 - **Emergent Google Sign-In**, **Emergent push** (`EMERGENT_PUSH_KEY`), **Emergent Resend** email.
+- **In-app subscriptions** — Apple App Store + Google Play only (no web processor). `react-native-iap` v16 behind `src/hooks/useStore.native.ts` (web/Expo Go use the `useStore.ts` stub). Backend `routes/billing.py` is the entitlement source of truth: user-scoped `billing` collection (`premium_until`, `free_rides_used`, `consumed_keys`), verifies Apple/Google purchases (`/billing/validate`, `IAP_DEV_TRUST` dev fallback). **Model:** free tier = 3 rides × ≤30 min; Premium (`premium_monthly`/`premium_yearly`, yearly default) unlocks everything. Gating lives in `scenic-ride.tsx` + `workout.tsx` (consume on start, 30-min cap → `PaywallModal`); entry points: Settings membership card + `app/upgrade.tsx`.
 
 ## Native-only (needs a device build — not Expo Go/web preview)
-YouTube playback over a ride, BLE cadence/HR sensors (`useBleSensors`), Chromecast (`useCast`), audio (ambient/chime) & haptics, ride-completion recap trigger.
+YouTube playback over a ride, BLE cadence/HR sensors (`useBleSensors`), Chromecast (`useCast`), audio (ambient/chime) & haptics, ride-completion recap trigger, **in-app purchases (`react-native-iap`)**.
 
 ## Test accounts
 - Rider: `greenlantern@roujaune.app` / `rideon9900`

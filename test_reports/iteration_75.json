@@ -1,0 +1,32 @@
+{
+  "summary": "Tested in-app subscription billing feature (backend + frontend). Backend: 4/4 pytest cases pass — products endpoint returns 2 products with premium_yearly default ($79.99) and premium_monthly ($9.99), fresh /billing/status shows premium=false + free_rides_limit=3 + free_ride_minutes=30 + can_start_ride=true, consume-ride increments correctly (3 distinct keys → can_start_ride=false, 4th distinct → HTTP 402, repeated ride_key is idempotent and does NOT double-count), /billing/validate with a bogus receipt while IAP_DEV_TRUST=0 returns 400 'Purchase could not be verified' and does NOT grant premium. Frontend: Settings shows the 'Upgrade to Premium' membership card (testID=settings-membership) at the top with the correct remaining-rides copy ('3 of 3 free rides left'); tapping it navigates to /upgrade which renders the benefits + 'See Premium plans' CTA (testID=upgrade-cta); opening the CTA shows PaywallModal (testID=paywall-modal) with plan-premium_monthly and plan-premium_yearly, the BEST VALUE badge on yearly (default/pre-selected), paywall-subscribe, paywall-restore, and the web note 'Premium is purchased in the ROUJAUNE iOS or Android app.'. After exhausting free rides via API (3x /billing/consume-ride), navigating to /scenic-ride?route=lake-garda surfaces the PaywallModal with the reason 'You've used all 3 free rides. Go Premium for unlimited riding.' — ride is correctly gated. CLEANUP: greenlantern's billing doc was deleted from Mongo after testing (counter reset).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_billing.py",
+    "/app/test_reports/pytest/iter75.xml",
+    "/app/test_reports/screens/i75_settings.jpeg",
+    "/app/test_reports/screens/i75_upgrade.jpeg",
+    "/app/test_reports/screens/i75_paywall.jpeg",
+    "/app/test_reports/screens/i75_scenic_gate.jpeg"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "entitlement.ts: refreshEntitlement/fetchProducts/consumeRide rely on the global fetch monkey-patch in src/lib/session.ts to inject the Bearer token — verified working post-login. Initial 401s in the console before login are expected (module singleton triggers refreshEntitlement on mount).",
+    "billing.py: _doc() uses udb.billing.find_one({}, ...) which is user-scoped by the ContextVar; correct pattern. Consider adding an admin/test helper to reset a rider's billing counter (currently must go direct-to-Mongo for QA cleanup)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_billing.py (new)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None — used existing greenlantern account. Billing doc for user_greenlantern was created during testing and DELETED after cleanup.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "In-app subscription (react-native-iap) is native-only; do NOT flag the web 'Continue / purchase in app' behaviour as a bug. Backend URL: EXPO_PUBLIC_BACKEND_URL. Rider creds: greenlantern@roujaune.app / rideon9900. Login is two-step ('Sign in with email' → email+password → 'Sign in'). Deep-link via history.pushState + popstate. To exhaust rides for gating tests, POST /api/billing/consume-ride 3x with distinct ride_keys using the rider Bearer token, then clean up by deleting greenlantern's doc from the Mongo `billing` collection.",
+  "rca_of_issue": "N/A — all requested billing behaviour works end-to-end."
+}

@@ -20,6 +20,8 @@ import { SERIF, clock, GradientText, Ring, Waveform, Metric, Seg, NavItem, Music
 import { RideCompleteOverlay } from "@/src/components/scenic/RideCompleteOverlay";
 import { LeaveRideDialog } from "@/src/components/scenic/LeaveRideDialog";
 import { DiscoveryPrompt, SaveToast } from "@/src/components/scenic/DiscoveryPrompt";
+import { useEntitlement, consumeRide, refreshEntitlement } from "@/src/lib/entitlement";
+import { PaywallModal } from "@/src/components/PaywallModal";
 
 /** Immersive live scenic-ride experience — a full-bleed POV video with a
  *  cinematic, fully hideable HUD (tap the scene to show/hide). */
@@ -79,6 +81,11 @@ export default function ScenicRideScreen() {
   const promptTimer = React.useRef<any>(null);
   const toastTimer = React.useRef<any>(null);
   const [pendingNav, setPendingNav] = React.useState<null | (() => void)>(null);
+  // Subscription gating — free tier is limited to N rides of ≤M minutes.
+  const ent = useEntitlement();
+  const [paywall, setPaywall] = React.useState<string | null>(null);
+  const rideKeyRef = React.useRef<string>(`${routeId || "ride"}-${Date.now()}`);
+  const gatedRef = React.useRef(false);
   const guidance = useVoiceGuidance();
   const audioMode: "quiet" | "discover" | "guided" =
     guidance === "muted" ? "quiet" : guidance === "full" ? "guided" : "discover";
@@ -144,6 +151,42 @@ export default function ScenicRideScreen() {
   const positionSec = vpos > 0 ? vpos : estPos;
   const pct = Math.min(1, durationSec > 0 ? positionSec / durationSec : 0);
   const completed = pct >= 0.98;
+  const freeSecs = ent.freeRideMinutes * 60;
+
+  // Entitlement gate: on a fresh (non-resumed) ride, premium rides freely;
+  // free riders spend one of their allowance (once), or hit the paywall when
+  // they've used them all.
+  React.useEffect(() => {
+    if (!route || !ent.loaded || gatedRef.current) return;
+    if (ent.premium) { gatedRef.current = true; return; }
+    if (r0) { gatedRef.current = true; return; }  // resuming an already-counted ride
+    gatedRef.current = true;
+    if (ent.canStartRide) {
+      consumeRide(rideKeyRef.current);
+    } else {
+      setPlaying(false);
+      setPaywall(`You've used all ${ent.freeRidesLimit} free rides. Go Premium for unlimited riding.`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route, ent.loaded, ent.premium, ent.canStartRide, r0]);
+
+  // Free-ride length cap: end the ride at the free minute limit and offer Premium.
+  React.useEffect(() => {
+    if (!route || ent.premium || paywall || completed) return;
+    if (elapsed >= freeSecs) {
+      setPlaying(false);
+      setPaywall(`Your free ride reached ${ent.freeRideMinutes} minutes. Go Premium for unlimited, full-length rides.`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elapsed, ent.premium, freeSecs, route, paywall, completed]);
+
+  const closePaywall = React.useCallback(async () => {
+    const e = await refreshEntitlement();
+    setPaywall(null);
+    if (e.premium) { setPlaying(true); }
+    else { leave(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Landscape end-of-ride recap data: discovery pins along the route + a caption.
   const rideDiscoveries = React.useMemo<RouteMapPoint[]>(
@@ -572,6 +615,9 @@ export default function ScenicRideScreen() {
           onContinue={() => setPendingNav(null)}
         />
       )}
+
+      {/* Subscription paywall — shown when free-ride allowance is exhausted */}
+      <PaywallModal visible={!!paywall} onClose={closePaywall} reason={paywall || undefined} />
     </View>
   );
 }

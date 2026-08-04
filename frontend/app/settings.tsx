@@ -11,6 +11,7 @@ import { resolveBothCoachVoices, ResolvedVoice, COACH_PITCH, loadSpanishVoices, 
 import { getVoiceId, setVoiceId } from "@/src/lib/prefs";
 import { useSettings, WHEEL_PRESETS } from "@/src/lib/settings";
 import { useA11y, setLargeText, setHighContrast, setReduceMotion } from "@/src/lib/a11y";
+import { useEntitlement } from "@/src/lib/entitlement";
 
 const PREVIEW_LINE = "Alright, let's ride. Hold steady and breathe — you've got this.";
 
@@ -18,6 +19,7 @@ export default function SettingsScreen() {
   const persona = useCoach();
   const router = useRouter();
   const { settings, setSetting } = useSettings();
+  const ent = useEntitlement();
   const a11y = useA11y();
   const coachStyle = useCoachStyle();
   const voiceGuidance = useVoiceGuidance();
@@ -64,6 +66,21 @@ export default function SettingsScreen() {
 
   return (
     <AppScaffold active="settings" title="Settings" subtitle="Coach, equipment and app preferences.">
+      <Pressable style={s.member} onPress={() => router.push("/upgrade")} testID="settings-membership" accessibilityRole="button" accessibilityLabel="Manage Premium membership">
+        <View style={[s.memberIcon, ent.premium && { backgroundColor: CC.yellow }]}>
+          <Ionicons name="star" size={20} color={ent.premium ? "#141615" : CC.yellow} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.memberTitle}>{ent.premium ? "ROUJAUNE Premium" : "Upgrade to Premium"}</Text>
+          <Text style={s.memberSub}>
+            {ent.premium
+              ? `${ent.plan === "yearly" ? "Yearly" : "Monthly"} plan · active`
+              : `Unlock everything · ${ent.freeRidesRemaining} of ${ent.freeRidesLimit} free rides left`}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={CC.dim} />
+      </Pressable>
+
       <View style={s.row}>
         <Card testID="coach-select" style={{ flex: 1 }}>
           <SectionTitle label="YOUR HUCENTAI TRAINING COMPANION" color={CC.rouge} />
@@ -281,6 +298,10 @@ function PrefToggle({ label, sub, on, onToggle, testID, divider }: { label: stri
 }
 
 const s = StyleSheet.create({
+  member: { flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: "rgba(255,194,10,0.07)", borderWidth: 1, borderColor: "rgba(255,194,10,0.32)", borderRadius: 16, padding: 16, marginBottom: 16 },
+  memberIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,194,10,0.16)" },
+  memberTitle: { color: "#F3F1EA", fontSize: 15.5, fontWeight: "800" },
+  memberSub: { color: "#9A9B98", fontSize: 12.5, marginTop: 2, fontWeight: "600" },
   row: { flexDirection: "row", gap: 16, alignItems: "stretch" },
   coachRow: { flexDirection: "row", gap: 12 },
   coachCard: { flex: 1, alignItems: "center", backgroundColor: "rgba(255,255,255,0.02)", borderRadius: 12, borderWidth: 1.5, borderColor: CC.borderSoft, padding: 14 },
