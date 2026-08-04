@@ -39,7 +39,7 @@ export const heroRoute = {
 
 export const coach = {
   name: "Alberto",
-  role: "Your HuCentAI Companion",
+  role: "Your HuCentAI Training Companion",
   quote: "Ready for\ntoday's climb?",
   support: "You've trained well.\nLet's keep building.",
   cta: "Start Today's Ride",

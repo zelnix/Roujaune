@@ -236,7 +236,7 @@ export function TrainingPlanSidebar({ active, onSelect, persona, onMessage, sync
           </View>
           <View style={{ flex: 1 }}>
             <Text style={s.coachName}>{persona.name}</Text>
-            <Text style={s.coachRole}>Your HuCentAI Companion</Text>
+            <Text style={s.coachRole}>Your HuCentAI Training Companion</Text>
             <Signature size={17} name={persona.signature} />
           </View>
         </View>

@@ -66,7 +66,7 @@ export default function SettingsScreen() {
     <AppScaffold active="settings" title="Settings" subtitle="Coach, equipment and app preferences.">
       <View style={s.row}>
         <Card testID="coach-select" style={{ flex: 1 }}>
-          <SectionTitle label="YOUR HUCENTAI COMPANION" color={CC.rouge} />
+          <SectionTitle label="YOUR HUCENTAI TRAINING COMPANION" color={CC.rouge} />
           <Text style={s.coachExplainer}>HuCentAI · Human-Centred Artificial Intelligence (say &ldquo;Hyoo-cent-eye&rdquo;)</Text>
           <View style={s.coachRow}>
             {(Object.keys(COACHES) as CoachId[]).map((id) => {

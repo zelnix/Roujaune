@@ -104,7 +104,7 @@ export function PhaseCelebrationModal({
                 <Image source={persona.image} style={s.coachAvatar} contentFit="cover" contentPosition="top center" />
                 <View style={{ flex: 1 }}>
                   <Text style={s.coachName}>{persona.name}</Text>
-                  <Text style={s.coachRole}>Your HuCentAI Companion</Text>
+                  <Text style={s.coachRole}>Your HuCentAI Training Companion</Text>
                 </View>
                 <Ionicons name="chatbubble-ellipses" size={16} color={C.yellow} />
               </View>

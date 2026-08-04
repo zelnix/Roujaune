@@ -32,7 +32,7 @@ export function HuCentAIIntro() {
         <Ionicons name="sparkles" size={20} color={colors.bg} />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={s.title}>Meet {persona.name}, your HuCentAI Companion</Text>
+        <Text style={s.title}>Meet {persona.name}, your HuCentAI Training Companion</Text>
         <Text style={s.body}>
           HuCentAI — <Text style={s.em}>Human-Centred Artificial Intelligence</Text> (say “Hyoo-cent-eye”). Guidance built around you: your pace, your goals, your ride.
         </Text>
