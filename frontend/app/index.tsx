@@ -20,6 +20,7 @@ import { useTodayMode, resolveNav, rememberRoute, getExperience } from "@/src/li
 import { ScenicCyclingTodayView } from "@/src/components/today/ScenicCyclingTodayView";
 import { FutureActivityTodayView } from "@/src/components/today/FutureActivityTodayView";
 import { WelcomeBackRibbon } from "@/src/components/today/WelcomeBackRibbon";
+import { HuCentAIIntro } from "@/src/components/today/HuCentAIIntro";
 import { useReducedMotionSafe } from "@/src/lib/use-reduced-motion";
 import { useBenchmarkNudge } from "@/src/lib/benchmark/api";
 import { useLiveNotifications, useNotificationReadState } from "@/src/lib/notifications";
@@ -111,6 +112,8 @@ export default function Dashboard() {
             {experience === "training" && <HomeNotificationArea />}
 
             <WelcomeBackRibbon />
+
+            <HuCentAIIntro />
 
             <Animated.View style={{ opacity: fade, gap: spacing.md }}>
             {experience === "training" ? (

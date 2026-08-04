@@ -67,6 +67,7 @@ export default function SettingsScreen() {
       <View style={s.row}>
         <Card testID="coach-select" style={{ flex: 1 }}>
           <SectionTitle label="YOUR HUCENTAI COMPANION" color={CC.rouge} />
+          <Text style={s.coachExplainer}>HuCentAI · Human-Centred Artificial Intelligence (say &ldquo;Hyoo-cent-eye&rdquo;)</Text>
           <View style={s.coachRow}>
             {(Object.keys(COACHES) as CoachId[]).map((id) => {
               const c = COACHES[id]; const on = persona.id === id;
@@ -292,6 +293,7 @@ const s = StyleSheet.create({
   previewHover: { borderColor: "rgba(255,255,255,0.28)", backgroundColor: "rgba(255,255,255,0.06)" },
   previewText: { color: CC.white, fontSize: 12, fontWeight: "700" },
   coachHint: { color: CC.dim, fontSize: 11.5, marginTop: 12, lineHeight: 16 },
+  coachExplainer: { color: CC.yellow, fontSize: 11.5, fontWeight: "700", marginTop: 4, marginBottom: 4, letterSpacing: 0.2 },
   a11yPreview: { marginTop: 14, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: CC.borderSoft, backgroundColor: "rgba(255,255,255,0.02)", gap: 6 },
   a11yPreviewLabel: { color: CC.dim, fontSize: 10.5, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase" },
   a11yPreviewHeading: { color: CC.white, fontSize: 16, fontWeight: "800" },
