@@ -91,7 +91,9 @@
           "neverForLocation": true,
           "bluetoothAlwaysPermission": "Connect your trainer and heart-rate sensor"
         }
-      ]
+      ],
+      "react-native-health",
+      "react-native-health-connect"
     ],
     "experiments": {
       "typedRoutes": true
