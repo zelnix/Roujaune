@@ -169,7 +169,7 @@ async def activity_detail(activity_id: str):
     uid = auth.current_user_id()
     # Outdoor / uploaded: full cycling activity with samples.
     cid = activity_id[len("import-"):] if activity_id.startswith("import-") else activity_id
-    doc = await udb.cycling_activities.find_one({"$or": [{"id": cid}, {"canonical_activity_id": cid}]})
+    doc = await udb.cycling_activities.find_one({"$or": [{"id": cid}, {"canonical_activity_id": cid}]}, {"_id": 0})
     if doc:
         return _detail_from_cycling(doc, ftp)
     # Indoor / history-only ride (metrics, no GPS samples).

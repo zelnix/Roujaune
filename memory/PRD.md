@@ -721,3 +721,16 @@ STILL PENDING (awaiting approval): Phase 3 (Home banners consolidation, dup CTAs
 
 ## Confetti celebration on 3+ recap (2026-07-29 fork)
 - New `src/components/ConfettiBurst.tsx` (react-native-reanimated): one-shot confetti (gold/white/red/teal pieces spray + fall + rotate + fade). Rendered as the top-most, `pointerEvents="none"` layer of the landscape completion recap in `scenic-ride.tsx`, only when `sessionSaved.size >= 3` (pairs with the "Great explorer!" badge). Verified via screenshot. ARCHITECTURE.md updated.
+
+## HuCentAI rebrand (2026-08 fork)
+- Coach tagline changed to **"Your HuCentAI Training Companion"** (HuCentAI = Human-Centred Artificial Intelligence, "Hyoo-cent-eye") across `coach-persona.ts`, `data.ts`, plan/phase-celebration cards, Settings section header. One-time first-launch explainer `src/components/today/HuCentAIIntro.tsx` on Today; explainer subtitle under Settings coach section.
+
+## In-app subscriptions (App Store / Google Play only) (2026-08 fork)
+- Model: FREE = 3 rides total, each ≤30 min → paywall; PREMIUM (single auto-renewing sub, `premium_monthly`/`premium_yearly`, yearly default) unlocks everything. No free trial.
+- Backend `routes/billing.py` is entitlement source of truth (user-scoped `billing`: premium_until, free_rides_used, consumed_keys). Endpoints: /billing/status, /products, /consume-ride, /validate (Apple/Google verify, IAP_DEV_TRUST fallback), /restore. Store creds placeholders in backend/.env; IAP_DEV_TRUST=0.
+- Frontend: `react-native-iap` v16 via `src/hooks/useStore.native.ts` (web/Expo Go use `useStore.ts` stub); `src/lib/entitlement.ts` store; `PaywallModal.tsx`; `app/upgrade.tsx`; Settings membership card; gating + 30-min cap in `scenic-ride.tsx` & `workout.tsx`; subtle `RideStatusBanner.tsx` ("X free rides left" / Premium) on Today + scenic ride-picker. Purchase path is NATIVE-ONLY. Verified (iter 74/75).
+
+## Ride ingestion + performance analysis — Phase 1+2 (2026-08 fork)
+- Upload outdoor rides (.fit/.gpx/.tcx) → `routes/activities.py` + `activity_parse.py` (fitparse/gpxpy/XML) → TrainingPeaks metrics (NP/IF/TSS, power curve, power+HR zones) → existing `activity_sync.ingest_activities` (dedup/classify/mirror to ride_history, now with user_id). Unified indoor+outdoor list + detail + editable FTP endpoints.
+- Frontend: `app/activities.tsx` (Rides & Analysis list + upload), `app/activity/[id].tsx` (Strava-style detail), `src/components/analysis/RideAnalysis.tsx` (interactive SVG route map + synced elevation/power/HR graph w/ drag scrubber + power curve + zone bars), `src/lib/activities.ts`. Nav item added to training + scenic modes. Verified iter 76 (8/8 backend + frontend).
+- Roadmap: Phase 3 = aggregate PMC (CTL/ATL/TSB) + weekly TSS + all-time power curve; Phase 4 = Strava/Garmin OAuth auto-sync (infra exists in routes/connections.py + providers/). Native map later.

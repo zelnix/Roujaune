@@ -96,14 +96,16 @@ def _parse_tcx(raw: bytes):
                     rec["ele"] = float(txt)
                 elif tag == "distancemeters":
                     rec["dist"] = float(txt)
-                elif tag == "value" and rec["hr"] is None and _tag(list(tp.iter())[0]) is not None:
-                    # HeartRateBpm/Value
-                    rec["hr"] = int(float(txt))
-                elif tag == "cadence":
+                elif tag == "heartratebpm":
+                    # HeartRateBpm has a child <Value>.
+                    for ch in c:
+                        if _tag(ch) == "value" and (ch.text or "").strip():
+                            rec["hr"] = int(float(ch.text.strip()))
+                elif tag == "cadence" and txt:
                     rec["cad"] = int(float(txt))
-                elif tag == "watts":
+                elif tag == "watts" and txt:
                     rec["power"] = float(txt)
-                elif tag == "speed":
+                elif tag == "speed" and txt:
                     rec["speed"] = float(txt)
             except (ValueError, TypeError):
                 continue
