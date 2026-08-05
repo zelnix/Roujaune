@@ -8,6 +8,7 @@ import { useRouter } from "expo-router";
 import { colors, radius, spacing } from "@/src/theme";
 import { useScenicRoutes, ScenicRoute } from "@/src/lib/scenic-routes";
 import { DestinationCard, regionIcon } from "@/src/components/today/DestinationCard";
+import { RideStatusBanner } from "@/src/components/RideStatusBanner";
 
 const REGION_ORDER = ["Alps", "Lakes", "Safari", "Countryside"];
 
@@ -95,6 +96,8 @@ export default function ScenicDestinationsScreen() {
           )}
         </View>
 
+        <RideStatusBanner style={styles.statusBanner} />
+
         {/* Region filter */}
         {regions.length > 0 && (
           <View style={styles.filterBand}>
@@ -151,6 +154,7 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, color: colors.white, fontSize: 15, paddingVertical: 12 },
 
   filterBand: { flexGrow: 0, flexShrink: 0 },
+  statusBanner: { marginHorizontal: spacing.lg, marginTop: spacing.sm },
   filterRow: { flexDirection: "row", gap: 8, paddingHorizontal: spacing.lg, paddingVertical: 12 },
   chip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(245,179,1,0.10)", borderWidth: 1, borderColor: "rgba(245,179,1,0.30)", borderRadius: radius.pill, paddingHorizontal: 14, paddingVertical: 9, minHeight: 40 },
   chipSel: { backgroundColor: colors.yellow, borderColor: colors.yellow },

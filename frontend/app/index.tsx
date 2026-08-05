@@ -21,6 +21,7 @@ import { ScenicCyclingTodayView } from "@/src/components/today/ScenicCyclingToda
 import { FutureActivityTodayView } from "@/src/components/today/FutureActivityTodayView";
 import { WelcomeBackRibbon } from "@/src/components/today/WelcomeBackRibbon";
 import { HuCentAIIntro } from "@/src/components/today/HuCentAIIntro";
+import { RideStatusBanner } from "@/src/components/RideStatusBanner";
 import { useReducedMotionSafe } from "@/src/lib/use-reduced-motion";
 import { useBenchmarkNudge } from "@/src/lib/benchmark/api";
 import { useLiveNotifications, useNotificationReadState } from "@/src/lib/notifications";
@@ -112,6 +113,8 @@ export default function Dashboard() {
             {experience === "training" && <HomeNotificationArea />}
 
             <WelcomeBackRibbon />
+
+            <RideStatusBanner />
 
             <HuCentAIIntro />
 
