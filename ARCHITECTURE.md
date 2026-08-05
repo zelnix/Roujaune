@@ -91,7 +91,13 @@ PUT    /api/scenic/journeys/{ride_id}/cover       set/reset recap cover photo
 - **Emergent Google Sign-In**, **Emergent push** (`EMERGENT_PUSH_KEY`), **Emergent Resend** email.
 - **In-app subscriptions** — Apple App Store + Google Play only (no web processor). `react-native-iap` v16 behind `src/hooks/useStore.native.ts` (web/Expo Go use the `useStore.ts` stub). Backend `routes/billing.py` is the entitlement source of truth: user-scoped `billing` collection (`premium_until`, `free_rides_used`, `consumed_keys`), verifies Apple/Google purchases (`/billing/validate`, `IAP_DEV_TRUST` dev fallback). **Model:** free tier = 3 rides × ≤30 min; Premium (`premium_monthly`/`premium_yearly`, yearly default) unlocks everything. Gating lives in `scenic-ride.tsx` + `workout.tsx` (consume on start, 30-min cap → `PaywallModal`); entry points: Settings membership card + `app/upgrade.tsx`.
 
-## Native-only (needs a device build — not Expo Go/web preview)
+## Ride ingestion & performance analysis
+- **Upload** outdoor rides (`.fit`/`.gpx`/`.tcx`) → `routes/activities.py POST /api/activities/upload` (base64 body). `activity_parse.py` parses tracks (GPS, power, HR, cadence, elevation) and computes TrainingPeaks metrics — **NP** (30s rolling, 4th-power mean), **IF** = NP/FTP, **TSS** = (sec·NP·IF)/(FTP·3600)·100, power curve, power/HR zone time — then feeds the existing `activity_sync.ingest_activities` pipeline (dedup + classify + mirror into `ride_history`, now with `user_id`).
+- **Unified list** `GET /api/activities` (indoor + outdoor from `ride_history`). **Detail** `GET /api/activities/{id}` returns metrics + decimated `route_data.samples` (≤500) + power curve + zones. **FTP** editable via `GET/POST /api/activities/ftp` (stored in `settings.ftp`, `settings.max_hr`).
+- **Frontend:** `app/activities.tsx` (Rides & Analysis list + upload via `expo-document-picker`/`expo-file-system`), `app/activity/[id].tsx` (Strava-style detail), `src/components/analysis/RideAnalysis.tsx` (interactive SVG route map + synced elevation/power/HR graph with a drag scrubber, power curve, zone bars). Nav item "Rides & Analysis" in training + scenic modes. `src/lib/activities.ts` = API client.
+- **Parsers:** `fitparse` (FIT), `gpxpy` (GPX), stdlib XML (TCX).
+- **Roadmap:** Phase 3 = aggregate PMC (CTL/ATL/TSB) + weekly TSS + all-time power curve; Phase 4 = Strava/Garmin auto-sync (OAuth infra already in `routes/connections.py` + `providers/`). Native map (react-native-maps) later; SVG route used everywhere for now.
+
 YouTube playback over a ride, BLE cadence/HR sensors (`useBleSensors`), Chromecast (`useCast`), audio (ambient/chime) & haptics, ride-completion recap trigger, **in-app purchases (`react-native-iap`)**.
 
 ## Test accounts

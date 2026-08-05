@@ -200,6 +200,7 @@ async def _mirror_history(db, doc: dict):
         tss = round((dur / 3600.0) * (30 + te * 12))
     mirror = {
         "id": hid,
+        "user_id": doc.get("user_id"),
         "created_at": doc.get("started_at") or _now(),
         "workout": doc.get("name") or "Outdoor Ride",
         "route": "Outdoor",

@@ -1,0 +1,34 @@
+{
+  "summary": "Tested Ride Ingestion + unified Rides & Analysis (Phase 1+2) backend + frontend. Backend: 8/8 pytest cases pass — POST /api/activities/upload with a 200-point GPX (power/HR/cadence extensions) returns 200 with ok=true, activity_id, np=224 W, if=1.12, tss=7, distance_km=2.15; POST /api/activities/upload with a 180-point Garmin TCX (Position + AltitudeMeters + HeartRateBpm/Value + TPX Watts) returns 200 with metrics populated; POST /api/activities/upload with .csv returns 400 'Unsupported file type .csv'. GET /api/activities lists the uploaded ride as source='upload', indoor_outdoor='outdoor', imported=true, id prefixed 'import-<canonical>', with distance_km/duration_sec/tss populated. GET /api/activities/{canonical_id} returns full detail: has_gps/has_power/has_hr all true, decimated samples[] (~200 points, <=500), power_curve list ([{secs,watts}] for windows up to elapsed), time_in_power_zones with exactly 7 buckets (sum>0), plus np/if/tss/avg_power/avg_hr/avg_cadence. The 'import-<id>' alias also resolves. GET /api/activities/ftp returns {ftp,max_hr}; POST {ftp:230} updates and is reflected in a subsequent GET; FTP <50 or >600 -> 400. FRONTEND: logged into greenlantern (two-step: 'Sign in with email' -> Email/Password placeholders -> 'Sign in'), navigated to /activities via history.pushState — screen title 'Rides & Analysis' rendered, testID=upload-ride button present, 9 ride rows listed including 3 outdoor 'ride-import-*' rows showing name / date / km / duration / TSS. Opening /activity/<canonical_id> renders the metrics grid (DISTANCE 2.15 km, MOVING TIME 3m 19s, AVG POWER 222 W, NORM. POWER 224 W, INTENSITY (IF) 1.12, TSS 7, AVG HR 142 bpm, MAX HR 154 bpm, AVG CADENCE 90 rpm, MAX POWER 267 W, ENERGY 44 kJ), the 'Route' SVG map, the 'Elevation · Power · Heart rate' synced graph with the readout row (TIME 1:40 / ELEV 120 m / POWER 210 W / HR 130 bpm / CAD 85) and 'Drag to scrub' hint, 'Power curve best average W' curve (1s/5s/15s/30s/1m axes visible), and 'Time in power zones FTP 200 W' bars (Z4 1:10 / Z5 1:10 / Z6 1:00). 3 SVGs render on the detail page. The /activity/import-<id> alias also loads full detail. No red screens, no console errors, no missing testIDs. CLEANUP: ran python /tmp/cleanup.py -> deleted 3 upload cycling_activities + 3 import- ride_history mirrors; post-cleanup verification GET /api/activities returned 0 upload rows for greenlantern.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter76_activities_upload.py",
+    "/app/test_reports/pytest/iter76.xml",
+    "/app/test_reports/screens/i76_activities_list.jpeg",
+    "/app/test_reports/screens/i76_activity_detail.jpeg",
+    "/app/test_reports/screens/i76_activity_detail_scrolled.jpeg",
+    "/app/test_reports/screens/i76_activity_detail_import.jpeg"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "activity_parse.py TCX parser at line 99 uses `_tag(list(tp.iter())[0]) is not None` to guard HR value — this always evaluates True. Currently works because Garmin TCX places HR before other Value nodes and cadence lives in its own tag, but if a TCX ever contained a stray <Value> inside another element, HR could be mis-picked. Consider tracking the parent element (HeartRateBpm) explicitly.",
+    "routes/activities.py `activity_detail` returns the raw mongo document via `_detail_from_cycling(doc, ftp)` but the surrounding find() does not project out `_id`. `_detail_from_cycling` builds a fresh dict so _id is not leaked in the response — safe, but consider adding `{'_id': 0}` projection defensively.",
+    "activity_parse.py `_normalized_power` uses a 30s rolling window (not 30s at 1 Hz) — correct for FIT/TCX with 1-Hz samples but for irregular GPX time bases this could deviate. Acceptable for the current TrainingPeaks-style approximation.",
+    "activities.tsx list row testID `ride-import-<canonical>` is stable but very long; kept the format because it matches ride_history.id — good for backend correlation."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter76_activities_upload.py (new — 8 pytest cases)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Test uploaded 3 GPX rides + 1 TCX ride to greenlantern's user db during testing. All 3 upload cycling_activities + 3 import- ride_history mirrors were DELETED via /tmp/cleanup.py after testing. Verified post-cleanup: 0 upload rows remain (total=6 real indoor rides preserved).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend URL: EXPO_PUBLIC_BACKEND_URL (https://roujaune-train.preview.emergentagent.com). Rider creds: greenlantern@roujaune.app / rideon9900. Login: two-step ('Sign in with email' -> placeholders 'Email' and 'Password' (NOT 'you@roujaune.app') -> 'Sign in' button). Tablet viewport 1024x760. Web file picker cannot be automated in headless — always test the upload via POST /api/activities/upload with base64 (see /app/backend/tests/test_iter76_activities_upload.py helpers `_make_gpx` / `_make_tcx`). Deep-link with history.pushState + popstate to /activities and /activity/<canonical_id> (or the import-<id> alias). Cleanup script: python /tmp/cleanup.py — it targets db 'test_database' and deletes provider=upload activities + their import- mirrors. Rerun after any upload-based test.",
+  "rca_of_issue": "N/A — all requested ride-ingest + analysis behaviour works end-to-end."
+}
