@@ -1,24 +1,59 @@
 import React from "react";
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Pressable } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { AppScaffold, Card } from "@/src/components/app-scaffold";
 import { colors } from "@/src/theme";
-import { fetchPmc, fetchRecords, fetchWeeklyDigest, Pmc, PowerRecord, WeeklyDigest } from "@/src/lib/analysis";
-import { PmcChart, PmcSummary, RecordsGrid, WeeklyDigestCard, ForecastSummary } from "@/src/components/analysis/FitnessCharts";
+import {
+  fetchPmc, fetchRecords, fetchWeeklyDigest, fetchFormTarget, fetchWeeklyNote,
+  Pmc, PowerRecord, WeeklyDigest, FormTarget, WeeklyNote,
+} from "@/src/lib/analysis";
+import { PmcChart, PmcSummary, RecordsGrid, WeeklyDigestCard, ForecastSummary, FormTargetCard, CoachWeeklyNote } from "@/src/components/analysis/FitnessCharts";
+import { ShareCardModal } from "@/src/components/ShareCardModal";
+import { AchievementCardData } from "@/src/components/AchievementCard";
+import { useCoach } from "@/src/lib/coach-persona";
 
 export default function FitnessScreen() {
+  const router = useRouter();
+  const coach = useCoach();
   const [pmc, setPmc] = React.useState<Pmc | null>(null);
   const [records, setRecords] = React.useState<{ records: PowerRecord[]; has_data: boolean }>({ records: [], has_data: false });
   const [digest, setDigest] = React.useState<WeeklyDigest | null>(null);
+  const [target, setTarget] = React.useState<FormTarget | null>(null);
+  const [note, setNote] = React.useState<WeeklyNote | null>(null);
+  const [noteLoading, setNoteLoading] = React.useState(true);
   const [loading, setLoading] = React.useState(true);
+  const [share, setShare] = React.useState(false);
 
   React.useEffect(() => {
     let alive = true;
-    Promise.all([fetchPmc(90, 14), fetchRecords(), fetchWeeklyDigest()]).then(([p, r, wd]) => {
+    Promise.all([fetchPmc(90, 14), fetchRecords(), fetchWeeklyDigest(), fetchFormTarget()]).then(([p, r, wd, ft]) => {
       if (!alive) return;
-      setPmc(p); setRecords(r); setDigest(wd); setLoading(false);
+      setPmc(p); setRecords(r); setDigest(wd); setTarget(ft); setLoading(false);
     });
     return () => { alive = false; };
   }, []);
+
+  const loadNote = React.useCallback((refresh = false) => {
+    setNoteLoading(true);
+    fetchWeeklyNote(coach.name, coach.gender, refresh).then((n) => { setNote(n); setNoteLoading(false); });
+  }, [coach.name, coach.gender]);
+
+  React.useEffect(() => { loadNote(false); }, [loadNote]);
+
+  const reloadTarget = React.useCallback(() => { fetchFormTarget().then(setTarget); }, []);
+
+  const shareData: AchievementCardData | null = digest ? {
+    kicker: "WEEKLY RECAP",
+    title: `${digest.this_week.tss} TSS this week`,
+    subtitle: `Week of ${new Date(digest.week_start).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`,
+    stats: [
+      { label: "Rides", value: `${digest.this_week.rides}` },
+      { label: "Hours", value: `${digest.this_week.hours}` },
+      { label: "Distance", value: `${digest.this_week.distance_km} km` },
+    ],
+    coachName: coach.name,
+  } : null;
 
   return (
     <AppScaffold active="fitness" title="Fitness Trends" subtitle="How your training load is shaping your form.">
@@ -29,9 +64,19 @@ export default function FitnessScreen() {
           {digest && (
             <Card>
               <Text style={s.h}>This Week <Text style={s.hDim}>your recap</Text></Text>
-              <WeeklyDigestCard digest={digest} />
+              <WeeklyDigestCard digest={digest} onShare={() => setShare(true)} />
             </Card>
           )}
+
+          <Card>
+            <Text style={s.h}>Coach's Weekly Note <Text style={s.hDim}>recap + one focus</Text></Text>
+            <CoachWeeklyNote note={note} loading={noteLoading} onRefresh={() => loadNote(true)} />
+          </Card>
+
+          <Card>
+            <Text style={s.h}>Form Target <Text style={s.hDim}>arrive fresh on event day</Text></Text>
+            <FormTargetCard target={target} onChanged={reloadTarget} />
+          </Card>
 
           <Card>
             {pmc && <PmcSummary fitness={pmc.fitness} fatigue={pmc.fatigue} form={pmc.form} state={pmc.form_state} ramp={pmc.ramp_rate} weeklyTss={pmc.weekly_tss} />}
@@ -47,11 +92,19 @@ export default function FitnessScreen() {
           </Card>
 
           <Card>
-            <Text style={s.h}>Personal Records <Text style={s.hDim}>all-time best power</Text></Text>
+            <View style={s.recHead}>
+              <Text style={s.h}>Personal Records <Text style={s.hDim}>all-time best power</Text></Text>
+              <Pressable onPress={() => router.push("/climbs")} style={s.climbLink} testID="climbs-link" hitSlop={8}>
+                <Ionicons name="trophy-outline" size={14} color={colors.yellow} />
+                <Text style={s.climbLinkT}>Climb leaderboard</Text>
+                <Ionicons name="chevron-forward" size={13} color={colors.yellow} />
+              </Pressable>
+            </View>
             <RecordsGrid records={records.records} hasData={records.has_data} />
           </Card>
         </ScrollView>
       )}
+      <ShareCardModal visible={share} data={shareData} onClose={() => setShare(false)} />
     </AppScaffold>
   );
 }
@@ -61,4 +114,7 @@ const s = StyleSheet.create({
   h: { color: colors.white, fontSize: 15, fontWeight: "800", marginBottom: 12 },
   hDim: { color: colors.textFaint, fontSize: 12, fontWeight: "600" },
   note: { color: colors.textDim, fontSize: 12, lineHeight: 18, marginTop: 12 },
+  recHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 },
+  climbLink: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 12 },
+  climbLinkT: { color: colors.yellow, fontSize: 12.5, fontWeight: "800" },
 });

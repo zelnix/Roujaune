@@ -7,7 +7,7 @@ TSB (Form) = yesterday's CTL - yesterday's ATL.
 from __future__ import annotations
 
 import math
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 
 from fastapi import APIRouter
 
@@ -259,6 +259,156 @@ async def segment_compare(a: str, b: str):
         "a_name": da.get("name") or "Ride A", "b_name": db_.get("name") or "Ride B",
         "reason": None if out else "no_shared_climb",
     }
+
+
+async def _daily_tss() -> dict:
+    rides = await udb.ride_history.find({}, {"_id": 0, "created_at": 1, "tss": 1, "duration_sec": 1}).to_list(length=2000)
+    daily: dict[str, float] = {}
+    for r in rides:
+        d = _date_of(r.get("created_at"))
+        if not d:
+            continue
+        tss = r.get("tss")
+        if tss is None and r.get("duration_sec"):
+            tss = round((r["duration_sec"] / 3600.0) * 40)
+        if not tss:
+            continue
+        daily[d] = daily.get(d, 0) + float(tss)
+    return daily
+
+
+def _ctl_atl_today(daily: dict, today: date) -> tuple:
+    """Current CTL/ATL by walking the whole history to today. Returns (ctl, atl,
+    ka, kb, recent_avg_daily_load)."""
+    ka = 1 - math.exp(-1 / CTL_TC)
+    kb = 1 - math.exp(-1 / ATL_TC)
+    ctl = atl = 0.0
+    start = date.fromisoformat(min(daily)) if daily else today
+    cur = start
+    while cur <= today:
+        load = daily.get(cur.isoformat(), 0.0)
+        ctl += (load - ctl) * ka
+        atl += (load - atl) * kb
+        cur += timedelta(days=1)
+    recent = sum(daily.get((today - timedelta(days=k)).isoformat(), 0.0) for k in range(14)) / 14.0
+    return ctl, atl, ka, kb, recent
+
+
+@router.get("/event")
+async def get_event():
+    doc = await udb.settings.find_one({"id": "event"}) or {}
+    return {"event_date": doc.get("event_date"), "event_name": doc.get("event_name")}
+
+
+@router.put("/event")
+async def put_event(body: dict):
+    ed = (body or {}).get("event_date")
+    en = (body or {}).get("event_name")
+    await udb.settings.update_one({"id": "event"}, {"$set": {"event_date": ed, "event_name": en}}, upsert=True)
+    return {"event_date": ed, "event_name": en}
+
+
+@router.get("/form-target")
+async def form_target():
+    """Project the rider's Form (TSB) onto their saved event date and say whether
+    they're on track to arrive fresh."""
+    doc = await udb.settings.find_one({"id": "event"}) or {}
+    ed = doc.get("event_date")
+    if not ed:
+        return {"has_event": False}
+    try:
+        target = date.fromisoformat(str(ed)[:10])
+    except Exception:
+        return {"has_event": False}
+    today = datetime.now(timezone.utc).date()
+    days_out = (target - today).days
+    base = {"has_event": True, "event_date": ed, "event_name": doc.get("event_name"), "days_out": days_out}
+    if days_out < 0:
+        return {**base, "past": True}
+
+    daily = await _daily_tss()
+    ctl, atl, ka, kb, proj = _ctl_atl_today(daily, today)
+    p_ctl, p_atl = ctl, atl
+    fctl, fatl = ctl, atl
+    for _ in range(max(0, days_out)):
+        p_ctl, p_atl = fctl, fatl
+        fctl = p_ctl + (proj - p_ctl) * ka
+        fatl = p_atl + (proj - p_atl) * kb
+    form = round(p_ctl - p_atl, 1)  # TSB on event morning
+    state = _form_state(form)
+    return {
+        **base, "past": False,
+        "projected_form": form, "projected_fitness": round(fctl, 1),
+        "state": state, "fresh": form > 5, "projected_daily_tss": round(proj, 1),
+        "current_form": round(ctl - atl, 1), "current_fitness": round(ctl, 1),
+    }
+
+
+@router.get("/climb-leaderboard")
+async def climb_leaderboard():
+    """Group every GPS climb the rider has done into repeatable climbs and rank
+    each climb's attempts fastest-first (PR at the top)."""
+    import segments as seg
+
+    acts = await udb.cycling_activities.find(
+        {"route_data.samples": {"$exists": True}},
+        {"_id": 0, "id": 1, "canonical_activity_id": 1, "name": 1, "started_at": 1, "route_data.samples": 1},
+    ).to_list(length=300)
+
+    entries = []
+    for a in acts:
+        pts = seg.build_track((a.get("route_data") or {}).get("samples") or [])
+        if len(pts) < 6:
+            continue
+        aid = a.get("canonical_activity_id") or a.get("id")
+        for c in seg.detect_climbs(pts):
+            if c.get("start_lat") is None:
+                continue
+            r = seg.resample_climb(pts, c)
+            entries.append({
+                "aid": aid, "name": a.get("name") or "Ride", "date": a.get("started_at"),
+                "gain": c["gain"], "length": c["length"],
+                "start": (c["start_lat"], c["start_lng"]),
+                "time_s": r["time_s"], "avg_speed": r["avg_speed_kmh"],
+            })
+
+    clusters: list = []
+    for e in entries:
+        placed = False
+        for cl in clusters:
+            rep = cl[0]
+            gap = seg.haversine(e["start"], rep["start"])
+            lr = abs(e["length"] - rep["length"]) / max(e["length"], rep["length"], 1.0)
+            if gap < 300 and lr < 0.45:
+                cl.append(e)
+                placed = True
+                break
+        if not placed:
+            clusters.append([e])
+
+    out = []
+    for atts in clusters:
+        if len(atts) < 2:
+            continue
+        ranked = sorted(atts, key=lambda x: (x["time_s"] is None, x["time_s"] or 0))
+        best = ranked[0]["time_s"] or 0
+        gain = round(sum(a["gain"] for a in atts) / len(atts), 1)
+        length = round(sum(a["length"] for a in atts) / len(atts), 1)
+        out.append({
+            "id": f"climb-{round(atts[0]['start'][0], 4)}-{round(atts[0]['start'][1], 4)}",
+            "name": ranked[0]["name"],
+            "gain_m": gain, "length_m": length,
+            "grad_pct": round(gain / length * 100, 1) if length else None,
+            "count": len(atts),
+            "attempts": [{
+                "activity_id": a["aid"], "name": a["name"], "date": a["date"],
+                "time_s": a["time_s"], "avg_speed_kmh": a["avg_speed"],
+                "pr": a["time_s"] == best,
+                "gap_s": round((a["time_s"] or 0) - best, 1) if a["time_s"] is not None else None,
+            } for a in ranked],
+        })
+    out.sort(key=lambda c: -c["count"])
+    return {"climbs": out, "has_data": bool(out)}
 
 
 @router.get("/records")

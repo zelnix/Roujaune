@@ -470,6 +470,95 @@ async def coach_chat(req: CoachChatRequest):
             "plan_updated": plan_updated, "plan_change": applied_note}
 
 
+@router.get("/coach/weekly-note")
+async def coach_weekly_note(coach_name: str = "Alberto", coach_gender: str = "male", refresh: bool = False):
+    """The coach's short spoken recap of the rider's week + one focus for next
+    week. Cached per ISO-week and coach so it's stable and cheap to revisit."""
+    key = os.environ.get("EMERGENT_LLM_KEY")
+    if not key:
+        raise HTTPException(status_code=503, detail="Coaching model not configured")
+
+    now = datetime.now(timezone.utc)
+    wk = now.strftime("%G-W%V")
+    ckey = f"note_{coach_name.lower()}"
+    cache = await udb.settings.find_one({"id": "weekly_note"}) or {}
+    cached = cache.get(ckey)
+    if not refresh and isinstance(cached, dict) and cached.get("week") == wk:
+        return {**cached.get("data", {}), "cached": True}
+
+    def _dt(iso):
+        try:
+            return datetime.fromisoformat(str(iso).replace("Z", "+00:00")).astimezone(timezone.utc)
+        except Exception:
+            return None
+
+    rides = await udb.ride_history.find(
+        {}, {"_id": 0, "created_at": 1, "tss": 1, "duration_sec": 1, "distance_km": 1, "workout": 1}).to_list(length=2000)
+    wk_start = now - timedelta(days=7)
+    prev_start = now - timedelta(days=14)
+
+    def _bucket(lo, hi):
+        tss = secs = dist = rides_n = 0.0
+        names = []
+        for r in rides:
+            t = _dt(r.get("created_at"))
+            if not t or not (lo <= t < hi):
+                continue
+            rides_n += 1
+            tss += float(r.get("tss") or 0)
+            secs += float(r.get("duration_sec") or 0)
+            dist += float(r.get("distance_km") or 0)
+            if r.get("workout"):
+                names.append(r["workout"])
+        return {"tss": round(tss), "hours": round(secs / 3600.0, 1), "rides": int(rides_n),
+                "distance_km": round(dist, 1), "names": names}
+
+    this_wk = _bucket(wk_start, now)
+    last_wk = _bucket(prev_start, wk_start)
+
+    rider = await _rider_line()
+    workouts_txt = ("; ".join(this_wk["names"][:6]) or "no named workouts")
+    prompt = (
+        f"{rider}\n"
+        f"This is the rider's WEEKLY recap. This week: {this_wk['rides']} rides, {this_wk['tss']} TSS, "
+        f"{this_wk['hours']} h, {this_wk['distance_km']} km (sessions: {workouts_txt}). "
+        f"Last week for comparison: {last_wk['rides']} rides, {last_wk['tss']} TSS, {last_wk['hours']} h.\n"
+        "Write a short spoken weekly recap for the rider. Reply with ONLY valid minified JSON (no markdown, no code fences) "
+        'of the shape {"note": string, "focus": string}. '
+        "\"note\": 2 warm sentences recapping the week (praise the effort, reference the numbers or the trend vs last week). "
+        "\"focus\": ONE short, concrete focus for next week (a single actionable sentence). "
+        f"Speak as {coach_name}, first person, no emojis, no quotation marks inside the strings."
+    )
+
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(
+            api_key=key,
+            session_id=f"{coach_name.lower()}-weekly-note",
+            system_message=coach_system(coach_name, coach_gender),
+        ).with_model("anthropic", "claude-sonnet-4-6")
+        reply = await chat.send_message(UserMessage(text=prompt))
+        raw = (reply or "").strip()
+        if raw.startswith("```"):
+            raw = raw.strip("`")
+        s, e = raw.find("{"), raw.rfind("}")
+        data_json = json.loads(raw[s:e + 1]) if s >= 0 and e > s else {}
+        note = str(data_json.get("note", "")).strip().strip('"')
+        focus = str(data_json.get("focus", "")).strip().strip('"')
+        if not note:
+            raise ValueError("empty note")
+        data = {"note": note, "focus": focus, "has_activity": this_wk["rides"] > 0}
+        try:
+            await udb.settings.update_one(
+                {"id": "weekly_note"}, {"$set": {ckey: {"week": wk, "data": data}}}, upsert=True)
+        except Exception:
+            logging.warning("weekly note cache write failed")
+        return {**data, "cached": False}
+    except Exception as e:
+        logging.exception("coach_weekly_note failed")
+        raise HTTPException(status_code=502, detail=f"Weekly note generation failed: {e}")
+
+
 async def _refresh_adaptation_after_ride(req: "CoachDebriefRequest", plan_id: str = ""):
     """Regenerate and cache the coach's plan-adaptation note after a completed
     ride, so the Training Plan reflects the latest session. Best-effort."""

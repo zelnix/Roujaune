@@ -1,10 +1,12 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { View, Text, StyleSheet, Pressable, TextInput, ActivityIndicator } from "react-native";
 import Svg, { Path, Polyline, Line, Rect, Defs, LinearGradient as SvgGrad, Stop } from "react-native-svg";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius } from "@/src/theme";
-import { PmcPoint, PowerRecord, WeeklyDigest } from "@/src/lib/analysis";
+import { PmcPoint, PowerRecord, WeeklyDigest, FormTarget, WeeklyNote, saveEvent } from "@/src/lib/analysis";
+import { useCoach } from "@/src/lib/coach-persona";
+import { useCoachSpeech } from "@/src/hooks/useCoachSpeech";
 
 const FITNESS = "#3FB68B";   // CTL
 const FATIGUE = "#F2792E";   // ATL
@@ -180,7 +182,7 @@ export function RecordsGrid({ records, hasData }: { records: PowerRecord[]; hasD
 
 /** Weekly Digest — this week's TSS, hours, rides, distance (vs last week) plus
  *  any new all-time power records set this week. */
-export function WeeklyDigestCard({ digest }: { digest: WeeklyDigest }) {
+export function WeeklyDigestCard({ digest, onShare }: { digest: WeeklyDigest; onShare?: () => void }) {
   const router = useRouter();
   const tw = digest.this_week, d = digest.deltas;
   const deltaChip = (v: number, unit: string, betterHigh = true) => {
@@ -190,6 +192,12 @@ export function WeeklyDigestCard({ digest }: { digest: WeeklyDigest }) {
   };
   return (
     <View>
+      {onShare && (
+        <Pressable onPress={onShare} style={s.shareBtn} testID="digest-share" hitSlop={8}>
+          <Ionicons name="share-social" size={15} color={colors.yellow} />
+          <Text style={s.shareBtnT}>Share</Text>
+        </Pressable>
+      )}
       <View style={s.wd}>
         <View style={s.wdTile}>
           <Text style={s.wdVal}>{tw.tss}</Text>
@@ -240,6 +248,113 @@ export function WeeklyDigestCard({ digest }: { digest: WeeklyDigest }) {
   );
 }
 
+/** Form Target — set an event date and see whether projected Form lands fresh. */
+export function FormTargetCard({ target, onChanged }: { target: FormTarget | null; onChanged: () => void }) {
+  const [name, setName] = React.useState(target?.event_name || "");
+  const [saving, setSaving] = React.useState(false);
+  React.useEffect(() => { setName(target?.event_name || ""); }, [target?.event_name]);
+
+  const setInWeeks = async (weeks: number) => {
+    setSaving(true);
+    const dt = new Date(); dt.setDate(dt.getDate() + weeks * 7);
+    await saveEvent(dt.toISOString().slice(0, 10), name || "My event");
+    setSaving(false); onChanged();
+  };
+  const clear = async () => { setSaving(true); await saveEvent(null, null); setSaving(false); onChanged(); };
+
+  const has = target?.has_event && !target?.past;
+  const fresh = target?.fresh;
+  const col = fresh ? FORM_POS : (target?.projected_form ?? 0) < -10 ? FORM_NEG : colors.yellow;
+  const dateLabel = target?.event_date ? new Date(target.event_date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
+
+  return (
+    <View>
+      <View style={s.eventInputRow}>
+        <TextInput
+          testID="event-name" value={name} onChangeText={setName} placeholder="Event name (e.g. Gran Fondo)"
+          placeholderTextColor={colors.textFaint} style={s.eventInput}
+        />
+      </View>
+      <View style={s.presetRow}>
+        {[4, 8, 12].map((w) => (
+          <Pressable key={w} onPress={() => setInWeeks(w)} disabled={saving} style={s.preset} testID={`event-in-${w}w`}>
+            <Text style={s.presetT}>In {w} wks</Text>
+          </Pressable>
+        ))}
+        {target?.has_event && (
+          <Pressable onPress={clear} disabled={saving} style={[s.preset, s.presetClear]} testID="event-clear">
+            <Ionicons name="close" size={13} color={colors.textDim} />
+            <Text style={[s.presetT, { color: colors.textDim }]}>Clear</Text>
+          </Pressable>
+        )}
+      </View>
+
+      {target?.has_event && target?.past && (
+        <Text style={s.wdEmpty}>Your event date has passed — set a new one to keep targeting fresh legs.</Text>
+      )}
+      {has && (
+        <View style={[s.targetBox, { borderColor: col + "55", backgroundColor: col + "14" }]} testID="form-target-result">
+          <View style={{ flex: 1 }}>
+            <Text style={s.targetTitle}>{target?.event_name || "Your event"}</Text>
+            <Text style={s.targetSub}>{dateLabel} · {target?.days_out} days out</Text>
+            <Text style={[s.targetVerdict, { color: col }]}>
+              {fresh ? "On track to arrive fresh 🎉" : (target?.projected_form ?? 0) < -10 ? "You'll be carrying fatigue — plan a taper" : "Roughly neutral — a short taper will sharpen you"}
+            </Text>
+          </View>
+          <View style={s.targetStat}>
+            <Text style={[s.targetForm, { color: col }]}>{(target?.projected_form ?? 0) > 0 ? "+" : ""}{Math.round(target?.projected_form ?? 0)}</Text>
+            <Text style={s.targetFormL}>proj. form</Text>
+          </View>
+        </View>
+      )}
+      {!target?.has_event && (
+        <Text style={s.wdEmpty}>Set your goal event and I'll project whether your Form lands fresh on the day — so you can time your taper.</Text>
+      )}
+    </View>
+  );
+}
+
+/** Coach Weekly Note — a short spoken recap + one focus, in the coach's voice. */
+export function CoachWeeklyNote({ note, loading, onRefresh }: { note: WeeklyNote | null; loading: boolean; onRefresh: () => void }) {
+  const coach = useCoach();
+  const { speak, speakingId } = useCoachSpeech(coach.id);
+  const speaking = speakingId === "weekly-note";
+  const full = note ? `${note.note} ${note.focus ? "This week's focus: " + note.focus : ""}` : "";
+  return (
+    <View>
+      {loading ? (
+        <View style={{ paddingVertical: 20, alignItems: "center" }}><ActivityIndicator color={colors.yellow} /></View>
+      ) : note ? (
+        <>
+          <View style={s.noteHead}>
+            <View style={s.coachChip}>
+              <Ionicons name="person-circle" size={18} color={colors.yellow} />
+              <Text style={s.coachChipT}>{coach.name}</Text>
+            </View>
+            <Pressable onPress={() => speak("weekly-note", full)} style={s.playBtn} testID="weekly-note-play" hitSlop={8}>
+              <Ionicons name={speaking ? "stop" : "volume-high"} size={16} color="#241B00" />
+              <Text style={s.playBtnT}>{speaking ? "Stop" : "Listen"}</Text>
+            </Pressable>
+          </View>
+          <Text style={s.noteText}>{note.note}</Text>
+          {note.focus ? (
+            <View style={s.focusBox}>
+              <Ionicons name="flag" size={14} color={colors.yellow} />
+              <Text style={s.focusText}><Text style={{ fontWeight: "800", color: colors.white }}>This week: </Text>{note.focus}</Text>
+            </View>
+          ) : null}
+          <Pressable onPress={onRefresh} style={s.refreshLink} testID="weekly-note-refresh" hitSlop={6}>
+            <Ionicons name="refresh" size={12} color={colors.textDim} />
+            <Text style={s.refreshT}>Regenerate</Text>
+          </Pressable>
+        </>
+      ) : (
+        <Text style={s.wdEmpty}>Your coach's weekly recap will appear here.</Text>
+      )}
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
   empty: { color: colors.textDim, fontSize: 13.5, lineHeight: 20 },
   stripLabel: { color: colors.textFaint, fontSize: 9.5, fontWeight: "800", letterSpacing: 0.8, marginBottom: 2 },
@@ -272,6 +387,34 @@ const s = StyleSheet.create({
   wdRecordSub: { color: colors.textFaint, fontSize: 11.5, marginTop: 1, fontWeight: "600" },
   wdRecordW: { color: colors.yellow, fontSize: 16, fontWeight: "900" },
   wdEmpty: { color: colors.textDim, fontSize: 12.5, lineHeight: 18, marginTop: 4 },
+
+  shareBtn: { position: "absolute", right: 0, top: -2, flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderColor: "rgba(255,194,10,0.4)", borderRadius: radius.pill, paddingVertical: 5, paddingHorizontal: 11, zIndex: 2 },
+  shareBtnT: { color: colors.yellow, fontSize: 12, fontWeight: "800" },
+
+  eventInputRow: { marginBottom: 10 },
+  eventInput: { backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, color: colors.white, fontSize: 14 },
+  presetRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  preset: { flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingVertical: 8, paddingHorizontal: 14, backgroundColor: "rgba(255,255,255,0.03)" },
+  presetClear: { borderColor: "rgba(255,255,255,0.12)" },
+  presetT: { color: colors.white, fontSize: 12.5, fontWeight: "700" },
+  targetBox: { flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 1, borderRadius: radius.lg, padding: 14, marginTop: 14 },
+  targetTitle: { color: colors.white, fontSize: 15, fontWeight: "800" },
+  targetSub: { color: colors.textFaint, fontSize: 11.5, marginTop: 2, fontWeight: "600" },
+  targetVerdict: { fontSize: 12.5, fontWeight: "800", marginTop: 8, lineHeight: 17 },
+  targetStat: { alignItems: "center", minWidth: 68 },
+  targetForm: { fontSize: 30, fontWeight: "900" },
+  targetFormL: { color: colors.textFaint, fontSize: 10, fontWeight: "700", letterSpacing: 0.3 },
+
+  noteHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
+  coachChip: { flexDirection: "row", alignItems: "center", gap: 6 },
+  coachChipT: { color: colors.white, fontSize: 13.5, fontWeight: "800" },
+  playBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.yellow, borderRadius: radius.pill, paddingVertical: 7, paddingHorizontal: 14 },
+  playBtnT: { color: "#241B00", fontSize: 12.5, fontWeight: "800" },
+  noteText: { color: colors.textDim, fontSize: 14, lineHeight: 21 },
+  focusBox: { flexDirection: "row", gap: 8, alignItems: "flex-start", backgroundColor: "rgba(255,194,10,0.08)", borderRadius: radius.md, padding: 12, marginTop: 12 },
+  focusText: { color: colors.textDim, fontSize: 13, lineHeight: 19, flex: 1 },
+  refreshLink: { flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start", marginTop: 12, paddingVertical: 4 },
+  refreshT: { color: colors.textDim, fontSize: 12, fontWeight: "600" },
   cards: { flexDirection: "row", gap: 10 },
   big: { flex: 1, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: 14, alignItems: "center" },
   bigLabel: { color: colors.textFaint, fontSize: 10, fontWeight: "800", letterSpacing: 0.8 },
