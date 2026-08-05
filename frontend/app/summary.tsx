@@ -8,6 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { colors, radius, spacing, shadow } from "@/src/theme";
 import { useSummary, useCoachDebrief, useIntervals } from "@/src/lib/summary";
+import { autoPushCompletedRide } from "@/src/lib/health";
 import { useCoach } from "@/src/lib/coach-persona";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
 import {
@@ -53,6 +54,27 @@ export default function WorkoutComplete() {
   const showToast = React.useCallback((text: string) => setToast({ id: Date.now(), text }), []);
 
   const onMainLayout = (e: LayoutChangeEvent) => setMainW(e.nativeEvent.layout.width);
+
+  // Auto-push the completed ride into Apple Health / Health Connect (once, if
+  // the rider linked it and left auto-push on). Best-effort, silent on preview.
+  const pushedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!saved || pushedRef.current) return;
+    if (!stats?.duration_sec) return;
+    pushedRef.current = true;
+    const end = new Date();
+    const start = new Date(end.getTime() - stats.duration_sec * 1000);
+    autoPushCompletedRide({
+      startDate: start.toISOString(),
+      endDate: end.toISOString(),
+      durationSec: stats.duration_sec,
+      distanceMeters: stats.distance_km ? Math.round(stats.distance_km * 1000) : undefined,
+      calories: stats.calories || undefined,
+      avgHr: stats.avg_hr || undefined,
+      title: route?.name ? `${route.name} ride` : "Roujaune ride",
+      indoorOutdoor: "indoor",
+    }).then((ok) => { if (ok) showToast(`Saved to your health app`); });
+  }, [saved, stats, route, showToast]);
 
   const onClose = () => router.replace("/");
 

@@ -211,6 +211,98 @@ async def imported_activities(limit: int = 50):
     return docs
 
 
+# --- Device-native health sync (Apple Health / Health Connect) ------------
+# These providers read & write on-device via native modules (only inside an
+# installed iOS/Android build). The device performs the actual HealthKit /
+# Health Connect I/O; the backend records the connection status and ingests
+# any imported cycling workouts so they flow into history/progress/coaching.
+_NATIVE_IDS = {"apple_health", "health_connect"}
+
+
+def _native_or_404(provider_id: str):
+    if provider_id not in _NATIVE_IDS:
+        raise HTTPException(404, "Unknown native health provider")
+
+
+def _native_to_activity(provider_id: str, w: dict) -> dict:
+    ext = str(w.get("id") or w.get("startDate") or uuid.uuid4())
+    dur = w.get("durationSec")
+    if dur is None and w.get("startDate") and w.get("endDate"):
+        try:
+            s = datetime.fromisoformat(str(w["startDate"]).replace("Z", "+00:00"))
+            e = datetime.fromisoformat(str(w["endDate"]).replace("Z", "+00:00"))
+            dur = max(0, int((e - s).total_seconds()))
+        except Exception:
+            dur = None
+    return {
+        "external_activity_id": f"{provider_id}:{ext}",
+        "provider": provider_id,
+        "name": w.get("title") or "Cycling",
+        "started_at": w.get("startDate"),
+        "elapsed_seconds": dur,
+        "distance_metres": w.get("distanceMeters"),
+        "calories": w.get("calories"),
+        "average_heart_rate": w.get("avgHr"),
+        "average_power": w.get("avgPower"),
+        "indoor_outdoor": w.get("indoorOutdoor") or "outdoor",
+        "activity_type": "cycling",
+        "device_name": w.get("sourceName"),
+    }
+
+
+@router.post("/connections/native/{provider_id}/link")
+async def native_link(provider_id: str, body: dict):
+    """Mark a device-native health provider connected after on-device permission
+    was granted. Idempotent."""
+    _native_or_404(provider_id)
+    doc = {
+        "id": str(uuid.uuid4()), "provider": provider_id,
+        "connection_status": "connected", "kind": "device_native",
+        "permissions": body.get("permissions", []),
+        "provider_account_id": body.get("account"),
+        "disable_route_import": False, "disable_auto_sync": False,
+        "created_at": now_iso(), "updated_at": now_iso(),
+        "last_sync_attempt_at": None, "last_successful_sync_at": None,
+    }
+    existing = await udb.connected_accounts.find_one({"user_id": auth.current_user_id(), "provider": provider_id})
+    if existing:
+        doc.pop("id"); doc.pop("created_at"); doc.pop("last_successful_sync_at")
+    await udb.connected_accounts.update_one(
+        {"user_id": auth.current_user_id(), "provider": provider_id}, {"$set": doc}, upsert=True)
+    acc = await udb.connected_accounts.find_one({"user_id": auth.current_user_id(), "provider": provider_id})
+    return await _account_view(provider_id, acc)
+
+
+@router.post("/connections/native/{provider_id}/import")
+async def native_import(provider_id: str, body: dict):
+    """Ingest cycling workouts the device read from Apple Health / Health Connect."""
+    _native_or_404(provider_id)
+    await udb.connected_accounts.update_one(
+        {"user_id": auth.current_user_id(), "provider": provider_id},
+        {"$set": {"connection_status": "syncing", "last_sync_attempt_at": now_iso()}})
+    workouts = body.get("workouts") or []
+    acts = [_native_to_activity(provider_id, w) for w in workouts if isinstance(w, dict)]
+    acts = [a for a in acts if a.get("started_at")]
+    ftp = await _rider_ftp()
+    summary = {"imported": 0, "updated": 0, "duplicates": 0}
+    if acts:
+        summary = await activity_sync.ingest_activities(db, auth.current_user_id(), acts, ftp)
+    await udb.connected_accounts.update_one(
+        {"user_id": auth.current_user_id(), "provider": provider_id},
+        {"$set": {"connection_status": "connected", "last_successful_sync_at": now_iso(), "last_error": None}})
+    return {"status": "connected", **summary}
+
+
+@router.post("/connections/native/{provider_id}/pushed")
+async def native_pushed(provider_id: str, body: dict):
+    """Record that the device pushed N Roujaune rides into the health platform."""
+    _native_or_404(provider_id)
+    await udb.connected_accounts.update_one(
+        {"user_id": auth.current_user_id(), "provider": provider_id},
+        {"$set": {"last_successful_sync_at": now_iso(), "connection_status": "connected", "last_error": None}})
+    return {"ok": True, "pushed": int(body.get("count") or 0)}
+
+
 @router.post("/connections/sandbox/import")
 async def sandbox_import(count: int = 3):
     """TEST-ONLY: run the import pipeline with demo outdoor rides (no live provider)."""

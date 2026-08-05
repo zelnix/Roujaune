@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { AppScaffold, Card, SectionTitle, Toggle } from "@/src/components/app-scaffold";
 import { CC } from "@/src/components/calendar";
 import { useSettings } from "@/src/lib/settings";
+import { HealthSyncCard } from "@/src/components/HealthSyncCard";
 import {
   useConnections, useImportedActivities, Provider, startConnect, syncNow, disconnect,
   deleteImported, updateConnSettings, statusChip, relTime, rideTypeLabel,
@@ -153,11 +154,13 @@ export default function ConnectionsScreen() {
         </View>
       </Card>
 
+      <HealthSyncCard showToast={showToast} />
+
       <Card testID="ride-sync">
         <SectionTitle label="OUTDOOR RIDE SYNC" color={CC.rouge} />
         <Text style={s.blurb}>Connect a platform to automatically import your outdoor rides. We only import what you authorise, tokens are encrypted, and you can disconnect or delete imported data anytime.</Text>
         <View style={{ gap: 12, marginTop: 12 }}>
-          {(data?.providers ?? []).map((p) => (
+          {(data?.providers ?? []).filter((p) => p.kind !== "device_native").map((p) => (
             <ProviderRow key={p.id} p={p} onChanged={refresh} showToast={showToast} />
           ))}
         </View>

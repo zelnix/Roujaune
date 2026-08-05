@@ -12,6 +12,9 @@
       "supportsTablet": true,
       "usesAppleSignIn": true,
       "bundleIdentifier": "com.hwg.roujaune",
+      "entitlements": {
+        "com.apple.developer.healthkit": true
+      },
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "Find nearby TVs to cast your ride",
         "NSBonjourServices": [
@@ -21,7 +24,9 @@
         "NSPhotoLibraryUsageDescription": "Set your rider profile photo",
         "NSPhotoLibraryAddUsageDescription": "Save your achievement cards to Photos",
         "NSBluetoothAlwaysUsageDescription": "Connect your trainer and heart-rate sensor",
-        "NSLocationWhenInUseUsageDescription": "Show local weather for today's ride"
+        "NSLocationWhenInUseUsageDescription": "Show local weather for today's ride",
+        "NSHealthShareUsageDescription": "Import your cycling rides",
+        "NSHealthUpdateUsageDescription": "Save your rides to Health"
       }
     },
     "android": {
@@ -34,7 +39,15 @@
         "android.permission.BLUETOOTH_SCAN",
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.health.READ_EXERCISE",
+        "android.permission.health.WRITE_EXERCISE",
+        "android.permission.health.READ_DISTANCE",
+        "android.permission.health.WRITE_DISTANCE",
+        "android.permission.health.READ_TOTAL_CALORIES_BURNED",
+        "android.permission.health.WRITE_TOTAL_CALORIES_BURNED",
+        "android.permission.health.READ_HEART_RATE",
+        "android.permission.health.WRITE_HEART_RATE"
       ],
       "package": "com.hwg.roujaune",
       "googleServicesFile": "./google-services.json"
@@ -92,7 +105,13 @@
           "bluetoothAlwaysPermission": "Connect your trainer and heart-rate sensor"
         }
       ],
-      "react-native-health",
+      [
+        "react-native-health",
+        {
+          "healthSharePermission": "Roujaune reads your cycling rides to show your history.",
+          "healthUpdatePermission": "Roujaune saves your completed rides to Apple Health."
+        }
+      ],
       "react-native-health-connect"
     ],
     "experiments": {

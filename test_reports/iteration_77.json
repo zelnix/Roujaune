@@ -1,0 +1,31 @@
+{
+  "summary": "Backend-only regression + confirmation of bidirectional Health Sync (Apple Health + Android Health Connect). Wrote /app/backend/tests/test_iter77_native_health_sync.py with 14 pytest cases — ALL 14 PASS. Verified: (1) GET /api/connections lists both device_native providers apple_health and health_connect with kind='device_native' and requires_native_build=true; (2) POST /api/connections/native/apple_health/link {permissions:['read','write']} returns connection_status='connected', connected=true, and is idempotent — 2nd call still connected, and /api/connections reflects apple_health.connected=true; (3) POST /api/connections/native/health_connect/link then POST /api/connections/native/health_connect/import with the hc-iter77-1 workout (25 km / 1h / 600 kcal) returned imported+updated>=1 and status='connected'; the ride then appears in GET /api/connections/activities (provider='health_connect', external_activity_id ending 'hc-iter77-1', distance_metres=25000, elapsed_seconds=3600, calories=600, indoor_outdoor='outdoor') AND in GET /api/activities as an imported/import-<id> row with source='health_connect'; (4) POST /api/connections/native/health_connect/pushed {count:1} returned {ok:true, pushed:1} and updated last_successful_sync_at on the connection while keeping connection_status='connected'; (5) POST /api/connections/native/strava/link -> 404, POST /api/connections/native/strava/import -> 404, POST /api/connections/native/garmin/pushed -> 404 (the /native/ path only accepts apple_health + health_connect). REGRESSION: /api/connections still lists cloud OAuth providers garmin (kind=cloud_oauth) and google_fit (kind=cloud_oauth) with their existing status; POST /api/connections/garmin/authorize responded 200 with setup_required=true (creds unset in preview) — OAuth authorize endpoint unaffected. CLEANUP verified post-run: DELETE /api/connections/health_connect/data + POST /api/connections/apple_health/disconnect + POST /api/connections/health_connect/disconnect executed via the module-scoped fixture — final state: apple_health connected=false status='requires_build', health_connect connected=false status='requires_build', imported_activities=0, 0 health_connect/apple_health rows in /api/connections/activities. Greenlantern account is pristine.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter77_native_health_sync.py",
+    "/app/test_reports/pytest/iter77.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/connections.py native_link is idempotent by design: for an existing account it drops id/created_at/last_successful_sync_at from the $set payload so those fields are preserved. Good pattern — matches OAuth-style upsert.",
+    "routes/connections.py native_import: workouts missing startDate are silently filtered out (line 285: `acts = [a for a in acts if a.get('started_at')]`). This is safe but a client sending a malformed batch will see imported=0 with no error. Consider returning a 'skipped' count in the summary for observability.",
+    "routes/connections.py _native_to_activity computes duration from startDate/endDate ISO strings — trailing 'Z' handled via replace('Z','+00:00'). If a client sends startDate in local time without offset, duration will be wrong; not a bug for the documented Health Connect / HealthKit ISO-UTC contract.",
+    "providers/native.py AppleHealthProvider + HealthConnectProvider are registered so /api/connections lists them, but is_configured()=False and refresh/fetch/exchange raise NotImplementedError. Any accidental call to /api/connections/apple_health/authorize would hit `if not p.is_configured(): return {setup_required:true}` — correctly guarded, no crash.",
+    "activity_sync._mirror_history uses `hid = f'import-{canonical}'` so multiple imports of the same workout (same fingerprint) update the same ride_history row — dedup works for HC/Apple Health as well."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter77_native_health_sync.py (new — 14 pytest cases)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "not tested (backend-only run per request)"},
+  "seed_data_creation": "Test linked apple_health + health_connect and imported 1 Health Connect cycling workout (hc-iter77-1) to greenlantern's account. All test data was DELETED post-run via the module-scoped _cleanup fixture: DELETE /api/connections/health_connect/data + POST /api/connections/{apple_health,health_connect}/disconnect. Verified: both native providers now disconnected (status='requires_build'), imported_activities=0.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend URL from EXPO_PUBLIC_BACKEND_URL. Rider creds: greenlantern@roujaune.app / rideon9900 (Bearer token). Native providers live at /api/connections/native/{apple_health|health_connect}/{link|import|pushed}. Any other provider on the /native/ path -> 404. Cloud OAuth providers (garmin, google_fit, strava) live at /api/connections/{id}/authorize|callback|sync. Cleanup for future runs: DELETE /api/connections/health_connect/data + POST /api/connections/apple_health/disconnect + POST /api/connections/health_connect/disconnect. Reuse /app/backend/tests/test_iter77_native_health_sync.py.",
+  "rca_of_issue": "N/A — all requested Health Sync behaviour works end-to-end and regression against cloud OAuth providers is clean."
+}
