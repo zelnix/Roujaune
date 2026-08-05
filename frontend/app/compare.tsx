@@ -1,14 +1,16 @@
 import React from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from "react-native";
-import Svg, { Polyline, Line } from "react-native-svg";
+import Svg, { Polyline, Line, Path } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
 import { AppScaffold, Card } from "@/src/components/app-scaffold";
 import { colors, radius } from "@/src/theme";
 import { fetchActivities, fetchActivity, RideListItem, RideDetail } from "@/src/lib/activities";
+import { fetchSegmentCompare, SegmentCompare, MatchedSegment } from "@/src/lib/analysis";
 
 const A_COL = colors.yellow;
 const B_COL = "#3FB68B";
 const hms = (s?: number) => { if (!s) return "—"; const m = Math.floor(s / 60); return `${m}m`; };
+const mmss = (s?: number | null) => { if (s == null) return "—"; const m = Math.floor(s / 60); const ss = Math.round(s % 60); return `${m}:${String(ss).padStart(2, "0")}`; };
 
 function progressSeries(d: RideDetail): { frac: number; power: number }[] {
   const s = d.samples.filter((x) => x.power != null);
@@ -59,12 +61,111 @@ function DeltaRow({ label, av, bv, unit, better = "high" }: { label: string; av?
   );
 }
 
+function ClimbChart({ seg }: { seg: MatchedSegment }) {
+  const [w, setW] = React.useState(320);
+  const H = 200, padT = 10, padB = 22, padL = 6, padR = 6;
+  const sa = seg.a.series, sb = seg.b.series;
+  const cw = Math.max(1, w - padL - padR), ch = H - padT - padB;
+  const speeds = [...sa, ...sb].map((p) => p.speed).filter((x): x is number => x != null);
+  const maxSpd = Math.max(1, ...speeds) * 1.1;
+  const eles = sa.map((p) => p.ele);
+  const eMin = Math.min(...eles), eMax = Math.max(...eles);
+  const eRange = (eMax - eMin) || 1;
+  const xf = (f: number) => padL + f * cw;
+  const ys = (v: number) => padT + ch - (v / maxSpd) * ch;
+  const ye = (v: number) => padT + ch - ((v - eMin) / eRange) * ch;
+  const eleTop = sa.map((p) => `${xf(p.f).toFixed(1)},${ye(p.ele).toFixed(1)}`).join(" ");
+  const eleArea = `M${padL},${padT + ch} L${eleTop} L${(padL + cw).toFixed(1)},${padT + ch} Z`;
+  const spLine = (arr: typeof sa) => arr.filter((p) => p.speed != null).map((p) => `${xf(p.f).toFixed(1)},${ys(p.speed as number).toFixed(1)}`).join(" ");
+  return (
+    <View onLayout={(e) => setW(e.nativeEvent.layout.width)}>
+      <Svg width={w} height={H}>
+        <Path d={eleArea} fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.14)" strokeWidth={1} />
+        {spLine(sa) ? <Polyline points={spLine(sa)} fill="none" stroke={A_COL} strokeWidth={2.2} /> : null}
+        {spLine(sb) ? <Polyline points={spLine(sb)} fill="none" stroke={B_COL} strokeWidth={2.2} /> : null}
+      </Svg>
+      <Text style={s.axis}>Speed up the climb (grey = elevation) · base → summit</Text>
+    </View>
+  );
+}
+
+function SegRow({ label, av, bv, unit }: { label: string; av?: number | null; bv?: number | null; unit: string }) {
+  return (
+    <View style={s.dRow}>
+      <Text style={s.dLabel}>{label}</Text>
+      <Text style={[s.dVal, { color: A_COL }]}>{av != null ? av : "—"}{av != null ? unit : ""}</Text>
+      <Text style={[s.dVal, { color: B_COL }]}>{bv != null ? bv : "—"}{bv != null ? unit : ""}</Text>
+    </View>
+  );
+}
+
+function SegmentView({ data }: { data: SegmentCompare }) {
+  const [idx, setIdx] = React.useState(0);
+  React.useEffect(() => { setIdx(0); }, [data]);
+  if (!data.matched) {
+    const msg = data.reason === "no_gps"
+      ? "These rides don't have GPS data, so there's no climb to line up. Segment Compare needs two outdoor rides with a GPS track."
+      : "No matching GPS climb was found between these two rides. Pick two rides that both went up the same hill.";
+    return <Text style={s.dim}>{msg}</Text>;
+  }
+  const seg = data.segments[idx];
+  const faster = seg.faster;
+  const absd = Math.abs(seg.delta_s);
+  const bannerColor = faster === "tie" ? colors.textDim : faster === "a" ? A_COL : B_COL;
+  const bannerText = faster === "tie"
+    ? "Dead even — same time up this climb"
+    : `${faster === "a" ? data.a_name : data.b_name} was ${mmss(absd)} faster up this climb`;
+  return (
+    <View style={{ gap: 14 }}>
+      {data.segments.length > 1 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+          {data.segments.map((sg, i) => (
+            <Pressable key={i} onPress={() => setIdx(i)} style={[s.segChip, i === idx && s.segChipOn]} testID={`seg-chip-${i}`}>
+              <Ionicons name="trending-up" size={13} color={i === idx ? colors.bg : colors.textDim} />
+              <Text style={[s.segChipT, i === idx && { color: colors.bg }]}>{Math.round(sg.gain_m)}m · {(sg.length_m / 1000).toFixed(1)}km</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+
+      <View style={[s.banner, { borderColor: bannerColor + "66", backgroundColor: bannerColor + "18" }]} testID="segment-banner">
+        <Ionicons name="flag" size={18} color={bannerColor} />
+        <Text style={[s.bannerText, { color: bannerColor }]}>{bannerText}</Text>
+      </View>
+
+      <View style={s.legend}>
+        <Legend c={A_COL} label={data.a_name} />
+        <Legend c={B_COL} label={data.b_name} />
+      </View>
+      <ClimbChart seg={seg} />
+
+      <View>
+        <View style={s.dHead}>
+          <Text style={[s.dLabel, { color: colors.textFaint }]}>CLIMB · {Math.round(seg.gain_m)}m @ {seg.grad_pct}%</Text>
+          <Text style={[s.dVal, { color: A_COL }]}>A</Text>
+          <Text style={[s.dVal, { color: B_COL }]}>B</Text>
+        </View>
+        <View style={s.dRow}>
+          <Text style={s.dLabel}>Time up climb</Text>
+          <Text style={[s.dVal, { color: A_COL }]}>{mmss(seg.a.time_s)}</Text>
+          <Text style={[s.dVal, { color: B_COL }]}>{mmss(seg.b.time_s)}</Text>
+        </View>
+        <SegRow label="Avg speed" av={seg.a.avg_speed_kmh} bv={seg.b.avg_speed_kmh} unit="" />
+        <Text style={s.hint}>Both rides aligned base-to-summit on the same GPS climb.</Text>
+      </View>
+    </View>
+  );
+}
+
 export default function CompareScreen() {
   const [items, setItems] = React.useState<RideListItem[]>([]);
   const [sel, setSel] = React.useState<string[]>([]);
   const [a, setA] = React.useState<RideDetail | null>(null);
   const [b, setB] = React.useState<RideDetail | null>(null);
   const [loading, setLoading] = React.useState(false);
+  const [mode, setMode] = React.useState<"ride" | "climb">("ride");
+  const [seg, setSeg] = React.useState<SegmentCompare | null>(null);
+  const [segLoading, setSegLoading] = React.useState(false);
 
   React.useEffect(() => { fetchActivities().then(setItems); }, []);
 
@@ -78,6 +179,14 @@ export default function CompareScreen() {
       Promise.all([fetchActivity(sel[0]), fetchActivity(sel[1])]).then(([x, y]) => { setA(x); setB(y); setLoading(false); });
     } else { setA(null); setB(null); }
   }, [sel]);
+
+  // Segment (climb) comparison — fetched only in climb mode with two rides.
+  React.useEffect(() => {
+    if (mode === "climb" && sel.length === 2) {
+      setSegLoading(true);
+      fetchSegmentCompare(sel[0], sel[1]).then((r) => { setSeg(r); setSegLoading(false); });
+    } else { setSeg(null); }
+  }, [mode, sel]);
 
   return (
     <AppScaffold active="activities" title="Compare rides" subtitle="Overlay two rides to see if you're getting faster.">
@@ -104,9 +213,29 @@ export default function CompareScreen() {
           </View>
         </Card>
 
-        {loading && <View style={s.center}><ActivityIndicator color={colors.yellow} /></View>}
+        {sel.length === 2 && (
+          <View style={s.modeRow}>
+            <Pressable onPress={() => setMode("ride")} style={[s.modeBtn, mode === "ride" && s.modeBtnOn]} testID="mode-ride">
+              <Ionicons name="pulse" size={14} color={mode === "ride" ? colors.bg : colors.textDim} />
+              <Text style={[s.modeText, mode === "ride" && { color: colors.bg }]}>Whole ride</Text>
+            </Pressable>
+            <Pressable onPress={() => setMode("climb")} style={[s.modeBtn, mode === "climb" && s.modeBtnOn]} testID="mode-climb">
+              <Ionicons name="trending-up" size={14} color={mode === "climb" ? colors.bg : colors.textDim} />
+              <Text style={[s.modeText, mode === "climb" && { color: colors.bg }]}>Same climb</Text>
+            </Pressable>
+          </View>
+        )}
 
-        {a && b && !loading && (
+        {(loading || segLoading) && <View style={s.center}><ActivityIndicator color={colors.yellow} /></View>}
+
+        {mode === "climb" && sel.length === 2 && !segLoading && seg && (
+          <Card testID="segment-compare">
+            <Text style={s.h}>Same climb, hill-for-hill</Text>
+            <SegmentView data={seg} />
+          </Card>
+        )}
+
+        {mode === "ride" && a && b && !loading && (
           <>
             <Card>
               <View style={s.legend}>
@@ -162,4 +291,13 @@ const s = StyleSheet.create({
   dVal: { width: 60, textAlign: "right", fontSize: 14, fontWeight: "800" },
   dDelta: { width: 70, textAlign: "right", fontSize: 13, fontWeight: "800" },
   hint: { color: colors.textFaint, fontSize: 11.5, marginTop: 10 },
+  modeRow: { flexDirection: "row", gap: 8, backgroundColor: "rgba(255,255,255,0.04)", borderRadius: radius.pill, padding: 4 },
+  modeBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 9, borderRadius: radius.pill },
+  modeBtnOn: { backgroundColor: colors.yellow },
+  modeText: { color: colors.textDim, fontSize: 13, fontWeight: "800" },
+  banner: { flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderRadius: radius.md, paddingVertical: 12, paddingHorizontal: 14 },
+  bannerText: { fontSize: 14.5, fontWeight: "800", flex: 1 },
+  segChip: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingVertical: 7, paddingHorizontal: 12 },
+  segChipOn: { backgroundColor: colors.yellow, borderColor: colors.yellow },
+  segChipT: { color: colors.textDim, fontSize: 12.5, fontWeight: "800" },
 });
