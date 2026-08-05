@@ -96,7 +96,12 @@ PUT    /api/scenic/journeys/{ride_id}/cover       set/reset recap cover photo
 - **Unified list** `GET /api/activities` (indoor + outdoor from `ride_history`). **Detail** `GET /api/activities/{id}` returns metrics + decimated `route_data.samples` (≤500) + power curve + zones. **FTP** editable via `GET/POST /api/activities/ftp` (stored in `settings.ftp`, `settings.max_hr`).
 - **Frontend:** `app/activities.tsx` (Rides & Analysis list + upload via `expo-document-picker`/`expo-file-system`), `app/activity/[id].tsx` (Strava-style detail), `src/components/analysis/RideAnalysis.tsx` (interactive SVG route map + synced elevation/power/HR graph with a drag scrubber, power curve, zone bars). Nav item "Rides & Analysis" in training + scenic modes. `src/lib/activities.ts` = API client.
 - **Parsers:** `fitparse` (FIT), `gpxpy` (GPX), stdlib XML (TCX).
-- **Roadmap:** Phase 3 = aggregate PMC (CTL/ATL/TSB) + weekly TSS + all-time power curve; Phase 4 = Strava/Garmin auto-sync (OAuth infra already in `routes/connections.py` + `providers/`). Native map (react-native-maps) later; SVG route used everywhere for now.
+- **Roadmap:** Phase 3 (DONE) = aggregate PMC + PRs + compare; Phase 4 = Strava/Garmin auto-sync (OAuth infra already in `routes/connections.py` + `providers/`; needs a Strava provider + user API keys). Native map (react-native-maps) later; SVG route used everywhere for now.
+
+## Fitness Trends, Records & Compare — Phase 3
+- `routes/analysis.py`: `GET /api/analysis/pmc?days=` (daily CTL/ATL/TSB from ride_history TSS — TrainingPeaks exp model, 42d/7d) + summary (fitness/fatigue/form, ramp, weekly TSS, form_state); `GET /api/analysis/records` (all-time best power 5s/1m/5m/20m from `cycling_activities.route_data.power_curve`).
+- Frontend: `app/fitness.tsx` (PMC chart + summary + Personal Records), `app/compare.tsx` (pick 2 rides → power overlay + delta table), `src/components/analysis/FitnessCharts.tsx` (`PmcChart`, `PmcSummary`, `RecordsGrid`), `src/lib/analysis.ts`. Nav item "Fitness Trends"; "Compare" button on the rides list.
+
 
 YouTube playback over a ride, BLE cadence/HR sensors (`useBleSensors`), Chromecast (`useCast`), audio (ambient/chime) & haptics, ride-completion recap trigger, **in-app purchases (`react-native-iap`)**.
 

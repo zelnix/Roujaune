@@ -41,10 +41,16 @@ export default function ActivitiesScreen() {
     <AppScaffold active="activities" title="Rides & Analysis" subtitle="Indoor + outdoor rides in one place.">
       <View style={s.headerRow}>
         <Text style={s.count}>{items.length} ride{items.length === 1 ? "" : "s"}</Text>
-        <Pressable style={[s.upload, uploading && { opacity: 0.6 }]} onPress={onUpload} disabled={uploading} testID="upload-ride" accessibilityRole="button" accessibilityLabel="Upload a ride file">
-          {uploading ? <ActivityIndicator color={colors.bg} size="small" /> : <Ionicons name="cloud-upload" size={17} color={colors.bg} />}
-          <Text style={s.uploadText}>{uploading ? "Importing…" : "Upload ride"}</Text>
-        </Pressable>
+        <View style={s.headerBtns}>
+          <Pressable style={s.compare} onPress={() => router.push("/compare")} testID="open-compare" accessibilityRole="button" accessibilityLabel="Compare two rides">
+            <Ionicons name="git-compare" size={16} color={colors.yellow} />
+            <Text style={s.compareText}>Compare</Text>
+          </Pressable>
+          <Pressable style={[s.upload, uploading && { opacity: 0.6 }]} onPress={onUpload} disabled={uploading} testID="upload-ride" accessibilityRole="button" accessibilityLabel="Upload a ride file">
+            {uploading ? <ActivityIndicator color={colors.bg} size="small" /> : <Ionicons name="cloud-upload" size={17} color={colors.bg} />}
+            <Text style={s.uploadText}>{uploading ? "Importing…" : "Upload ride"}</Text>
+          </Pressable>
+        </View>
       </View>
       <Text style={s.hint}>Import a <Text style={s.b}>.fit</Text>, <Text style={s.b}>.gpx</Text> or <Text style={s.b}>.tcx</Text> file from your bike computer, watch or power meter.</Text>
       {msg && <Text style={s.msg}>{msg}</Text>}
@@ -90,6 +96,9 @@ function Stat({ v, u, c }: { v: string; u: string; c?: string }) {
 
 const s = StyleSheet.create({
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 },
+  headerBtns: { flexDirection: "row", alignItems: "center", gap: 10 },
+  compare: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "rgba(255,194,10,0.4)", borderRadius: radius.pill, paddingVertical: 9, paddingHorizontal: 14, minHeight: 44 },
+  compareText: { color: colors.yellow, fontSize: 14, fontWeight: "800" },
   count: { color: colors.white, fontSize: 15, fontWeight: "800" },
   upload: { flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: colors.yellow, borderRadius: radius.pill, paddingVertical: 10, paddingHorizontal: 16, minHeight: 44 },
   uploadText: { color: colors.bg, fontSize: 14, fontWeight: "800" },

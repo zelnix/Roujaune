@@ -385,6 +385,8 @@ from routes import billing as billing_routes  # noqa: E402
 api_router.include_router(billing_routes.router)
 from routes import activities as activities_routes  # noqa: E402
 api_router.include_router(activities_routes.router)
+from routes import analysis as analysis_routes  # noqa: E402
+api_router.include_router(analysis_routes.router)
 app.include_router(api_router)
 app.include_router(push.router)
 app.include_router(admin_routes.admin_router)
