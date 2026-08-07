@@ -4,7 +4,7 @@ import Svg, { Path, Polyline, Line, Rect, Defs, LinearGradient as SvgGrad, Stop 
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius } from "@/src/theme";
-import { PmcPoint, PowerRecord, WeeklyDigest, FormTarget, WeeklyNote, TaperNote, Streak, saveEvent, fetchTaperNote } from "@/src/lib/analysis";
+import { PmcPoint, PowerRecord, WeeklyDigest, FormTarget, WeeklyNote, TaperNote, Streak, Milestones, saveEvent, fetchTaperNote, applyTaper } from "@/src/lib/analysis";
 import { useCoach } from "@/src/lib/coach-persona";
 import { useCoachSpeech } from "@/src/hooks/useCoachSpeech";
 
@@ -254,6 +254,8 @@ export function FormTargetCard({ target, onChanged }: { target: FormTarget | nul
   const [saving, setSaving] = React.useState(false);
   const [taper, setTaper] = React.useState<TaperNote | null>(null);
   const [taperLoading, setTaperLoading] = React.useState(false);
+  const [applying, setApplying] = React.useState(false);
+  const [applyMsg, setApplyMsg] = React.useState<string | null>(null);
   const coach = useCoach();
   const { speak, speakingId } = useCoachSpeech(coach.id);
   React.useEffect(() => { setName(target?.event_name || ""); }, [target?.event_name]);
@@ -267,6 +269,15 @@ export function FormTargetCard({ target, onChanged }: { target: FormTarget | nul
       setTaper(null);
     }
   }, [target?.has_event, target?.past, target?.fresh, target?.event_date, coach.name, coach.gender]);
+
+  const onApplyTaper = async () => {
+    setApplying(true);
+    const r = await applyTaper(coach.name);
+    setApplying(false);
+    if (r?.applied) setApplyMsg(r.already ? `Week ${r.week} is already eased for your taper.` : `Done — I've eased week ${r.week} to taper you. Check your Training Plan.`);
+    else if (r?.reason === "unstructured" || r?.reason === "no_plan") setApplyMsg("Auto-apply needs a structured training plan. I've still laid out the taper steps above for you to follow.");
+    else setApplyMsg("Couldn't adjust the plan automatically — follow the steps above.");
+  };
 
   const setInWeeks = async (weeks: number) => {
     setSaving(true);
@@ -342,6 +353,14 @@ export function FormTargetCard({ target, onChanged }: { target: FormTarget | nul
                   <Text style={s.taperActionT}>{a}</Text>
                 </View>
               ))}
+              {applyMsg ? (
+                <Text style={s.applyMsg}>{applyMsg}</Text>
+              ) : (
+                <Pressable onPress={onApplyTaper} disabled={applying} style={s.applyBtn} testID="taper-apply-btn">
+                  {applying ? <ActivityIndicator size="small" color="#241B00" /> : <Ionicons name="build" size={14} color="#241B00" />}
+                  <Text style={s.applyBtnT}>Apply taper to my plan</Text>
+                </Pressable>
+              )}
             </>
           ) : null}
         </View>
@@ -421,10 +440,50 @@ export function StreakCard({ streak, onShare }: { streak: Streak; onShare: () =>
           <Ionicons key={i} name="flame" size={16} color={i < flames ? "#F2792E" : "rgba(255,255,255,0.1)"} />
         ))}
       </View>
+      {streak.at_risk && (
+        <View style={s.riskBox} testID="streak-at-risk">
+          <Ionicons name="alert-circle" size={16} color="#F2792E" />
+          <Text style={s.riskText}>
+            Your {streak.current_weeks}-week streak is at risk — get a ride in within the next {streak.days_left + 1} day{streak.days_left + 1 === 1 ? "" : "s"} to keep it alive.
+          </Text>
+        </View>
+      )}
       <Pressable onPress={onShare} style={s.streakShare} testID="streak-share" disabled={!active}>
         <Ionicons name="share-social" size={15} color={active ? "#241B00" : colors.textFaint} />
         <Text style={[s.streakShareT, !active && { color: colors.textFaint }]}>Share streak</Text>
       </Pressable>
+    </View>
+  );
+}
+
+/** Milestones — lifetime totals, progress to the next big number, and a
+ *  celebratory highlight (with Share) when the last ride just crossed one. */
+export function MilestonesCard({ data, onShare }: { data: Milestones; onShare: () => void }) {
+  return (
+    <View>
+      {data.recent && (
+        <View style={s.mileCelebrate} testID="milestone-celebrate">
+          <View style={s.mileBadge}><Ionicons name="ribbon" size={22} color="#241B00" /></View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.mileTitle}>Milestone unlocked: {data.recent.label} 🎉</Text>
+            <Text style={s.mileBlurb}>{data.recent.blurb}</Text>
+          </View>
+          <Pressable onPress={onShare} style={s.mileShare} testID="milestone-share">
+            <Ionicons name="share-social" size={15} color="#241B00" />
+            <Text style={s.mileShareT}>Share</Text>
+          </Pressable>
+        </View>
+      )}
+      <View style={s.mileGrid}>
+        <View style={s.mileTile}><Text style={s.mileVal}>{data.total_rides}</Text><Text style={s.mileLabel}>RIDES</Text></View>
+        <View style={s.mileTile}><Text style={s.mileVal}>{Math.round(data.total_km).toLocaleString()}<Text style={s.mileUnit}> km</Text></Text><Text style={s.mileLabel}>DISTANCE</Text></View>
+        <View style={s.mileTile}><Text style={s.mileVal}>{Math.round(data.total_hours)}<Text style={s.mileUnit}> h</Text></Text><Text style={s.mileLabel}>TIME</Text></View>
+        <View style={s.mileTile}><Text style={s.mileVal}>{data.total_tss.toLocaleString()}</Text><Text style={s.mileLabel}>TSS</Text></View>
+      </View>
+      <View style={s.mileNext}>
+        {data.rides_to_next != null && <Text style={s.mileNextT}>🚴 {data.rides_to_next} ride{data.rides_to_next === 1 ? "" : "s"} to {data.next_rides}</Text>}
+        {data.km_to_next != null && <Text style={s.mileNextT}>📏 {Math.round(data.km_to_next).toLocaleString()} km to {data.next_km?.toLocaleString()}</Text>}
+      </View>
     </View>
   );
 }
@@ -496,6 +555,26 @@ const s = StyleSheet.create({
   playBtnSmT: { color: "#241B00", fontSize: 11.5, fontWeight: "800" },
   taperAction: { flexDirection: "row", gap: 8, alignItems: "flex-start", marginTop: 10 },
   taperActionT: { color: colors.textDim, fontSize: 12.5, lineHeight: 18, flex: 1 },
+  applyBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, backgroundColor: colors.yellow, borderRadius: radius.md, paddingVertical: 11, marginTop: 14 },
+  applyBtnT: { color: "#241B00", fontSize: 13, fontWeight: "800" },
+  applyMsg: { color: FITNESS, fontSize: 12.5, lineHeight: 18, marginTop: 14, fontWeight: "600" },
+
+  riskBox: { flexDirection: "row", gap: 8, alignItems: "flex-start", backgroundColor: "rgba(242,121,46,0.1)", borderWidth: 1, borderColor: "rgba(242,121,46,0.4)", borderRadius: radius.md, padding: 12, marginTop: 14 },
+  riskText: { color: "#F2A277", fontSize: 12.5, lineHeight: 18, flex: 1, fontWeight: "600" },
+
+  mileCelebrate: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "rgba(255,194,10,0.12)", borderWidth: 1, borderColor: "rgba(255,194,10,0.45)", borderRadius: radius.lg, padding: 14, marginBottom: 14 },
+  mileBadge: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.yellow, alignItems: "center", justifyContent: "center" },
+  mileTitle: { color: colors.white, fontSize: 14.5, fontWeight: "900" },
+  mileBlurb: { color: colors.textDim, fontSize: 12.5, marginTop: 2, lineHeight: 17 },
+  mileShare: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.yellow, borderRadius: radius.pill, paddingVertical: 8, paddingHorizontal: 14 },
+  mileShareT: { color: "#241B00", fontSize: 12.5, fontWeight: "800" },
+  mileGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  mileTile: { flexGrow: 1, flexBasis: "22%", minWidth: 100, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: 14 },
+  mileVal: { color: colors.white, fontSize: 22, fontWeight: "900" },
+  mileUnit: { color: colors.textFaint, fontSize: 12, fontWeight: "700" },
+  mileLabel: { color: colors.textDim, fontSize: 10.5, fontWeight: "700", marginTop: 4, letterSpacing: 0.3 },
+  mileNext: { flexDirection: "row", flexWrap: "wrap", gap: 16, marginTop: 12 },
+  mileNextT: { color: colors.textDim, fontSize: 12.5, fontWeight: "700" },
 
   streakTop: { flexDirection: "row", alignItems: "center", gap: 14 },
   streakBig: { width: 84, height: 84, borderRadius: 18, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.03)" },

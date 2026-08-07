@@ -1,0 +1,31 @@
+{
+  "summary": "Iter 81 — ROUJAUNE 4 new features (Climb Detail, Milestones, Taper Auto-Apply, Streak Reminder). Backend: 6/6 pytest PASS. climb-detail?id=climb-45.2-6.1108 returns found:true / Col de Test / profile (>=2 pts of {d,ele}) / 2 attempts each with series of {d,speed,t} and exactly 1 PR; bogus id returns found:false (no 500). Milestones (demo) returns total_rides=2, total_km/total_hours/total_tss, recent:null, next_rides:10 (rides_to_next:8), next_km:100 (km_to_next present). Taper-apply: demo (unstructured build-and-climb) => applied:false reason:'unstructured'; greenlantern (structured couch-to-road) => applied:true with int week; second call idempotent applied:true already:true week same (no 500). Streak now includes at_risk (bool), days_left (int), weekday (int in 1..7). Frontend at 1024x1000 demo: /fitness renders Milestones tiles (2 RIDES · 9 km · 1 h · 31 TSS + '8 rides to 10 / 91 km to 100'), Consistency Streak card ('You're on a roll!' · Best streak: 1 week), Form Target -> Alberto's taper plan block with taper-apply-btn tap => 'Auto-apply needs a structured training plan…' message shown (no red screen). /climbs Col de Test card expanded (default) shows PB tag + mini-map + Personal best 10:13 / Attempt 2 13:23; taping testID climb-detail-climb-45.2-6.1108 navigates to /climb/climb-45.2-6.1108 with 'Attempts overlaid' chart (PB 10:13 / 13:23 legend) + 'Every attempt' list (Personal best / Attempt 2).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter81_climb_detail_milestones_taper_apply_streak.py",
+    "/app/test_reports/pytest/iter81.xml",
+    "/app/test_reports/screens/i81_fitness.jpeg",
+    "/app/test_reports/screens/i81_taper_msg.jpeg",
+    "/app/test_reports/screens/i81_climbs.jpeg",
+    "/app/test_reports/screens/i81_climb_detail.jpeg"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/coach.py continues to grow (~950 lines) — future refactor: extract taper/weekly-note/adaptation LLM+JSON helpers into services/*. Not blocking iter 81."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter81_climb_detail_milestones_taper_apply_streak.py (new)"
+  ],
+  "success_rate": {"backend": "100% (6/6 pytest)", "frontend": "100% — Milestones + Consistency Streak + taper-apply-btn unstructured msg on /fitness, climb-detail-climb-45.2-6.1108 nav + Attempts overlaid + Personal best 10:13 + Attempt 2 13:23 on /climb/[id]"},
+  "seed_data_creation": "None persisted. Greenlantern event was PUT to 2026-03-15 (TEST_GL_Event) inside the structured-taper test then restored to its prior value in the same test's finally block. Demo event (Gran Fondo 2026-08-28) untouched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All 4 iter-81 features work end-to-end. Reusable pytest suite: /app/backend/tests/test_iter81_climb_detail_milestones_taper_apply_streak.py. Demo climb id is exactly 'climb-45.2-6.1108' (rounded to 4dp lat/lng). greenlantern's plan_state.eased_weeks now contains a taper-applied week (from the idempotent test); if a later test needs a virgin state, either reset plan_state.eased_weeks or accept the already:true branch. Demo taper-apply UI branch is stable because projected_form=-1 stays not-fresh with Gran Fondo 21d out.",
+  "rca_of_issue": "N/A — confirmation run, all 4 features PASS."
+}

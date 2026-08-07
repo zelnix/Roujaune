@@ -482,7 +482,125 @@ async def training_streak():
         best = max(best, run)
 
     return {"current_weeks": current, "best_weeks": best, "this_week_rides": this_week_rides,
-            "active": active, "weeks_ridden": len(weeks)}
+            "active": active, "weeks_ridden": len(weeks),
+            "at_risk": bool(active and this_week_rides == 0 and today.isoweekday() >= 4),
+            "days_left": 7 - today.isoweekday(), "weekday": today.isoweekday()}
+
+
+def _cluster_climbs(entries: list) -> list:
+    import segments as seg
+    clusters: list = []
+    for e in entries:
+        placed = False
+        for cl in clusters:
+            rep = cl[0]
+            gap = seg.haversine(e["start"], rep["start"])
+            lr = abs(e["length"] - rep["length"]) / max(e["length"], rep["length"], 1.0)
+            if gap < 300 and lr < 0.45:
+                cl.append(e)
+                placed = True
+                break
+        if not placed:
+            clusters.append([e])
+    return clusters
+
+
+@router.get("/climb-detail")
+async def climb_detail(id: str):
+    """Full detail for one repeated climb: shared elevation profile + every
+    attempt's speed/time overlaid, aligned base->summit."""
+    import segments as seg
+    acts = await udb.cycling_activities.find(
+        {"route_data.samples": {"$exists": True}},
+        {"_id": 0, "id": 1, "canonical_activity_id": 1, "name": 1, "started_at": 1, "route_data.samples": 1},
+    ).to_list(length=300)
+
+    entries = []
+    for a in acts:
+        pts = seg.build_track((a.get("route_data") or {}).get("samples") or [])
+        if len(pts) < 6:
+            continue
+        aid = a.get("canonical_activity_id") or a.get("id")
+        for c in seg.detect_climbs(pts):
+            if c.get("start_lat") is None:
+                continue
+            r = seg.resample_climb(pts, c)
+            entries.append({
+                "aid": aid, "name": a.get("name") or "Ride", "date": a.get("started_at"),
+                "gain": c["gain"], "length": c["length"], "start": (c["start_lat"], c["start_lng"]),
+                "time_s": r["time_s"], "avg_speed": r["avg_speed_kmh"],
+                "series": r["series"], "path": seg.climb_path(pts, c),
+            })
+
+    for atts in _cluster_climbs(entries):
+        if len(atts) < 2:
+            continue
+        cid = f"climb-{round(atts[0]['start'][0], 4)}-{round(atts[0]['start'][1], 4)}"
+        if cid != id:
+            continue
+        ranked = sorted(atts, key=lambda x: (x["time_s"] is None, x["time_s"] or 0))
+        best = ranked[0]["time_s"] or 0
+        gain = round(sum(a["gain"] for a in atts) / len(atts), 1)
+        length = round(sum(a["length"] for a in atts) / len(atts), 1)
+        return {
+            "found": True, "id": cid, "name": ranked[0]["name"],
+            "gain_m": gain, "length_m": length,
+            "grad_pct": round(gain / length * 100, 1) if length else None,
+            "count": len(atts), "path": ranked[0]["path"],
+            "profile": [{"d": p["d"], "ele": p["ele"]} for p in ranked[0]["series"]],
+            "attempts": [{
+                "activity_id": a["aid"], "name": a["name"], "date": a["date"],
+                "time_s": a["time_s"], "avg_speed_kmh": a["avg_speed"],
+                "pr": a["time_s"] == best,
+                "gap_s": round((a["time_s"] or 0) - best, 1) if a["time_s"] is not None else None,
+                "series": [{"d": p["d"], "speed": p["speed"], "t": p["t"]} for p in a["series"]],
+            } for a in ranked],
+        }
+    return {"found": False}
+
+
+MILESTONE_RIDES = [10, 25, 50, 100, 150, 200, 250, 300, 400, 500, 750, 1000]
+MILESTONE_KM = [100, 250, 500, 1000, 2500, 5000, 10000, 15000, 20000, 25000, 50000]
+MILESTONE_HOURS = [10, 25, 50, 100, 250, 500, 1000]
+
+
+@router.get("/milestones")
+async def milestones():
+    """Lifetime totals + any big round-number milestone just crossed by the most
+    recent ride, plus the next milestone to chase."""
+    rides = await udb.ride_history.find(
+        {}, {"_id": 0, "created_at": 1, "distance_km": 1, "duration_sec": 1, "tss": 1}).to_list(length=5000)
+    total_rides = len(rides)
+    total_km = round(sum(float(r.get("distance_km") or 0) for r in rides), 1)
+    total_hours = round(sum(float(r.get("duration_sec") or 0) for r in rides) / 3600.0, 1)
+    total_tss = round(sum(float(r.get("tss") or 0) for r in rides))
+
+    last = None
+    for r in rides:
+        c = r.get("created_at") or ""
+        if last is None or c > (last.get("created_at") or ""):
+            last = r
+    last_km = float((last or {}).get("distance_km") or 0)
+
+    recent = None
+    if total_rides in MILESTONE_RIDES:
+        recent = {"kind": "rides", "label": f"{total_rides} rides", "value": total_rides,
+                  "blurb": f"You've now completed {total_rides} rides with ROUJAUNE!"}
+    if recent is None:
+        for m in MILESTONE_KM:
+            if total_km - last_km < m <= total_km:
+                recent = {"kind": "distance", "label": f"{m:,} km", "value": m,
+                          "blurb": f"You've ridden over {m:,} km in total. Incredible mileage!"}
+                break
+
+    next_rides = next((m for m in MILESTONE_RIDES if m > total_rides), None)
+    next_km = next((m for m in MILESTONE_KM if m > total_km), None)
+    return {
+        "total_rides": total_rides, "total_km": total_km, "total_hours": total_hours, "total_tss": total_tss,
+        "recent": recent,
+        "next_rides": next_rides, "rides_to_next": (next_rides - total_rides) if next_rides else None,
+        "next_km": next_km, "km_to_next": round(next_km - total_km, 1) if next_km else None,
+    }
 
 
 @router.get("/records")

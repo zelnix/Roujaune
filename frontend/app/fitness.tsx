@@ -5,10 +5,10 @@ import { useRouter } from "expo-router";
 import { AppScaffold, Card } from "@/src/components/app-scaffold";
 import { colors } from "@/src/theme";
 import {
-  fetchPmc, fetchRecords, fetchWeeklyDigest, fetchFormTarget, fetchWeeklyNote, fetchStreak,
-  Pmc, PowerRecord, WeeklyDigest, FormTarget, WeeklyNote, Streak,
+  fetchPmc, fetchRecords, fetchWeeklyDigest, fetchFormTarget, fetchWeeklyNote, fetchStreak, fetchMilestones,
+  Pmc, PowerRecord, WeeklyDigest, FormTarget, WeeklyNote, Streak, Milestones,
 } from "@/src/lib/analysis";
-import { PmcChart, PmcSummary, RecordsGrid, WeeklyDigestCard, ForecastSummary, FormTargetCard, CoachWeeklyNote, StreakCard } from "@/src/components/analysis/FitnessCharts";
+import { PmcChart, PmcSummary, RecordsGrid, WeeklyDigestCard, ForecastSummary, FormTargetCard, CoachWeeklyNote, StreakCard, MilestonesCard } from "@/src/components/analysis/FitnessCharts";
 import { ShareCardModal } from "@/src/components/ShareCardModal";
 import { AchievementCardData } from "@/src/components/AchievementCard";
 import { useCoach } from "@/src/lib/coach-persona";
@@ -22,15 +22,16 @@ export default function FitnessScreen() {
   const [target, setTarget] = React.useState<FormTarget | null>(null);
   const [note, setNote] = React.useState<WeeklyNote | null>(null);
   const [streak, setStreak] = React.useState<Streak | null>(null);
+  const [milestones, setMilestones] = React.useState<Milestones | null>(null);
   const [noteLoading, setNoteLoading] = React.useState(true);
   const [loading, setLoading] = React.useState(true);
   const [shareData, setShareData] = React.useState<AchievementCardData | null>(null);
 
   React.useEffect(() => {
     let alive = true;
-    Promise.all([fetchPmc(90, 14), fetchRecords(), fetchWeeklyDigest(), fetchFormTarget(), fetchStreak()]).then(([p, r, wd, ft, st]) => {
+    Promise.all([fetchPmc(90, 14), fetchRecords(), fetchWeeklyDigest(), fetchFormTarget(), fetchStreak(), fetchMilestones()]).then(([p, r, wd, ft, st, ms]) => {
       if (!alive) return;
-      setPmc(p); setRecords(r); setDigest(wd); setTarget(ft); setStreak(st); setLoading(false);
+      setPmc(p); setRecords(r); setDigest(wd); setTarget(ft); setStreak(st); setMilestones(ms); setLoading(false);
     });
     return () => { alive = false; };
   }, []);
@@ -74,6 +75,21 @@ export default function FitnessScreen() {
     });
   };
 
+  const shareMilestone = () => {
+    if (!milestones?.recent) return;
+    setShareData({
+      kicker: "MILESTONE",
+      title: milestones.recent.label,
+      subtitle: milestones.recent.blurb,
+      stats: [
+        { label: "Rides", value: `${milestones.total_rides}` },
+        { label: "Distance", value: `${Math.round(milestones.total_km).toLocaleString()} km` },
+        { label: "Hours", value: `${Math.round(milestones.total_hours)}` },
+      ],
+      coachName: coach.name,
+    });
+  };
+
   return (
     <AppScaffold active="fitness" title="Fitness Trends" subtitle="How your training load is shaping your form.">
       {loading ? (
@@ -91,6 +107,13 @@ export default function FitnessScreen() {
             <Card>
               <Text style={s.h}>Consistency Streak <Text style={s.hDim}>keep it alive</Text></Text>
               <StreakCard streak={streak} onShare={shareStreak} />
+            </Card>
+          )}
+
+          {milestones && (
+            <Card>
+              <Text style={s.h}>Milestones <Text style={s.hDim}>your journey so far</Text></Text>
+              <MilestonesCard data={milestones} onShare={shareMilestone} />
             </Card>
           )}
 

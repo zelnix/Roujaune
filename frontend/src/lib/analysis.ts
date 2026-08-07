@@ -37,8 +37,13 @@ export type SegmentCompare = {
 
 export type ClimbAttempt = { activity_id: string; name: string; date: string; time_s: number | null; avg_speed_kmh: number | null; pr: boolean; gap_s: number | null };
 export type ClimbEntry = { id: string; name: string; gain_m: number; length_m: number; grad_pct: number | null; count: number; path: [number, number][]; new_pr: boolean; pr_improvement_s: number | null; attempts: ClimbAttempt[] };
-export type Streak = { current_weeks: number; best_weeks: number; this_week_rides: number; active: boolean; weeks_ridden: number };
+export type Streak = { current_weeks: number; best_weeks: number; this_week_rides: number; active: boolean; weeks_ridden: number; at_risk: boolean; days_left: number; weekday: number };
 export type TaperNote = { has_event: boolean; fresh?: boolean; days_out?: number; projected_form?: number; note?: string; actions?: string[] };
+export type TaperApply = { applied: boolean; week?: number; reason?: string; already?: boolean; summary?: string | null };
+export type Milestones = { total_rides: number; total_km: number; total_hours: number; total_tss: number; recent: { kind: string; label: string; value: number; blurb: string } | null; next_rides: number | null; rides_to_next: number | null; next_km: number | null; km_to_next: number | null };
+export type ClimbDetailPoint = { d: number; ele?: number; speed?: number | null; t?: number };
+export type ClimbDetailAttempt = { activity_id: string; name: string; date: string; time_s: number | null; avg_speed_kmh: number | null; pr: boolean; gap_s: number | null; series: ClimbDetailPoint[] };
+export type ClimbDetail = { found: boolean; id?: string; name?: string; gain_m?: number; length_m?: number; grad_pct?: number | null; count?: number; path?: [number, number][]; profile?: ClimbDetailPoint[]; attempts?: ClimbDetailAttempt[] };
 export type FormTarget = { has_event: boolean; event_date?: string; event_name?: string; days_out?: number; past?: boolean; projected_form?: number; projected_fitness?: number; state?: string; fresh?: boolean; current_form?: number; current_fitness?: number };
 export type WeeklyNote = { note: string; focus: string; has_activity: boolean };
 
@@ -81,6 +86,24 @@ export async function fetchStreak(): Promise<Streak | null> {
 
 export async function fetchTaperNote(coachName: string, coachGender: string, refresh = false): Promise<TaperNote | null> {
   const r = await fetch(`${API}/coach/taper-note?coach_name=${encodeURIComponent(coachName)}&coach_gender=${coachGender}&refresh=${refresh}`);
+  return r.ok ? await r.json() : null;
+}
+
+export async function applyTaper(coachName: string): Promise<TaperApply | null> {
+  const r = await fetch(`${API}/coach/taper-apply`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ coach_name: coachName }),
+  });
+  return r.ok ? await r.json() : null;
+}
+
+export async function fetchMilestones(): Promise<Milestones | null> {
+  const r = await fetch(`${API}/analysis/milestones`);
+  return r.ok ? await r.json() : null;
+}
+
+export async function fetchClimbDetail(id: string): Promise<ClimbDetail | null> {
+  const r = await fetch(`${API}/analysis/climb-detail?id=${encodeURIComponent(id)}`);
   return r.ok ? await r.json() : null;
 }
 

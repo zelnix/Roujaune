@@ -131,6 +131,11 @@ export default function ClimbsScreen() {
                         </View>
                       </Pressable>
                     ))}
+                    <Pressable onPress={() => router.push(`/climb/${encodeURIComponent(c.id)}`)} style={s.detailLink} testID={`climb-detail-${c.id}`}>
+                      <Ionicons name="analytics-outline" size={15} color={colors.yellow} />
+                      <Text style={s.detailLinkT}>View elevation & overlay</Text>
+                      <Ionicons name="chevron-forward" size={14} color={colors.yellow} />
+                    </Pressable>
                   </View>
                 )}
               </Card>
@@ -173,4 +178,6 @@ const s = StyleSheet.create({
   rowSub: { color: colors.textFaint, fontSize: 11.5, marginTop: 1, fontWeight: "600" },
   time: { color: colors.white, fontSize: 16, fontWeight: "900", fontVariant: ["tabular-nums"] },
   gap: { color: colors.textDim, fontSize: 11.5, fontWeight: "700", marginTop: 1 },
+  detailLink: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 12, marginTop: 2 },
+  detailLinkT: { color: colors.yellow, fontSize: 12.5, fontWeight: "800" },
 });

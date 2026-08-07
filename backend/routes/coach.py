@@ -626,6 +626,52 @@ async def coach_taper_note(coach_name: str = "Alberto", coach_gender: str = "mal
         raise HTTPException(status_code=502, detail=f"Taper note generation failed: {e}")
 
 
+@router.post("/coach/taper-apply")
+async def coach_taper_apply(body: dict):
+    """Apply the coach's taper by easing the plan week that leads into the event.
+    Reuses the same auto-ease engine the adaptive plan uses. Idempotent per week."""
+    plan_id = await _active_plan_id()
+    if not plan_id:
+        return {"applied": False, "reason": "no_plan"}
+    plan_def = await plans_admin.get_plan_def(plan_id)
+    if not (plan_def and plan_def.get("weeks")):
+        return {"applied": False, "reason": "unstructured"}
+
+    ev = await udb.settings.find_one({"id": "event"}) or {}
+    ed = ev.get("event_date")
+    days_out = None
+    if ed:
+        try:
+            days_out = (date.fromisoformat(str(ed)[:10]) - datetime.now(timezone.utc).date()).days
+        except Exception:
+            days_out = None
+
+    state = await udb.plan_state.find_one({"id": plan_id}) or {}
+    cur = int(state.get("current_week", 1))
+    last_week = plan_def.get("duration_weeks") or len(plan_def.get("weeks", []))
+    weeks_out = max(1, (days_out + 6) // 7) if (days_out and days_out > 0) else 1
+    target = max(cur, min(last_week, cur + weeks_out - 1))
+
+    eased = set(state.get("eased_weeks", []))
+    if target in eased:
+        return {"applied": True, "week": target, "already": True,
+                "summary": f"Week {target} is already eased for your taper."}
+
+    ops, summary = companion_plan.auto_ease_ops(plan_def, target)
+    applied = await _apply_companion_ops(
+        plan_id, ops, "taper", f"Taper for {ev.get('event_name') or 'your event'} — easing week {target}")
+    if not applied:
+        return {"applied": False, "reason": "no_change", "week": target}
+    eased.add(target)
+    await udb.plan_state.update_one({"id": plan_id}, {"$set": {"eased_weeks": list(eased)}}, upsert=True)
+    coach_name = body.get("coach_name", "Alberto")
+    await _record_adaptation(
+        plan_id, coach_name,
+        f"I've eased week {target} to taper you for {ev.get('event_name') or 'your event'} so you arrive with fresh legs.",
+        "Taper applied")
+    return {"applied": True, "week": target, "summary": summary}
+
+
 async def _refresh_adaptation_after_ride(req: "CoachDebriefRequest", plan_id: str = ""):
     """Regenerate and cache the coach's plan-adaptation note after a completed
     ride, so the Training Plan reflects the latest session. Best-effort."""
