@@ -356,20 +356,25 @@ async def climb_leaderboard():
     ).to_list(length=300)
 
     entries = []
+    latest_date = ""
     for a in acts:
         pts = seg.build_track((a.get("route_data") or {}).get("samples") or [])
         if len(pts) < 6:
             continue
         aid = a.get("canonical_activity_id") or a.get("id")
+        adate = a.get("started_at") or ""
+        if adate > latest_date:
+            latest_date = adate
         for c in seg.detect_climbs(pts):
             if c.get("start_lat") is None:
                 continue
             r = seg.resample_climb(pts, c)
             entries.append({
-                "aid": aid, "name": a.get("name") or "Ride", "date": a.get("started_at"),
+                "aid": aid, "name": a.get("name") or "Ride", "date": adate,
                 "gain": c["gain"], "length": c["length"],
                 "start": (c["start_lat"], c["start_lng"]),
                 "time_s": r["time_s"], "avg_speed": r["avg_speed_kmh"],
+                "path": seg.climb_path(pts, c),
             })
 
     clusters: list = []
@@ -392,14 +397,22 @@ async def climb_leaderboard():
             continue
         ranked = sorted(atts, key=lambda x: (x["time_s"] is None, x["time_s"] or 0))
         best = ranked[0]["time_s"] or 0
+        second = ranked[1]["time_s"] if len(ranked) > 1 and ranked[1]["time_s"] is not None else None
         gain = round(sum(a["gain"] for a in atts) / len(atts), 1)
         length = round(sum(a["length"] for a in atts) / len(atts), 1)
+        # A "new PR" = the fastest attempt is the rider's most recent ride overall,
+        # and it beat their previous best on this climb.
+        pr_att = ranked[0]
+        new_pr = bool(latest_date and pr_att["date"] == latest_date and second is not None and best < second)
         out.append({
             "id": f"climb-{round(atts[0]['start'][0], 4)}-{round(atts[0]['start'][1], 4)}",
             "name": ranked[0]["name"],
             "gain_m": gain, "length_m": length,
             "grad_pct": round(gain / length * 100, 1) if length else None,
             "count": len(atts),
+            "path": pr_att.get("path") or [],
+            "new_pr": new_pr,
+            "pr_improvement_s": round(second - best, 1) if (new_pr and second is not None) else None,
             "attempts": [{
                 "activity_id": a["aid"], "name": a["name"], "date": a["date"],
                 "time_s": a["time_s"], "avg_speed_kmh": a["avg_speed"],
@@ -407,8 +420,69 @@ async def climb_leaderboard():
                 "gap_s": round((a["time_s"] or 0) - best, 1) if a["time_s"] is not None else None,
             } for a in ranked],
         })
-    out.sort(key=lambda c: -c["count"])
+    out.sort(key=lambda c: (not c["new_pr"], -c["count"]))
     return {"climbs": out, "has_data": bool(out)}
+
+
+@router.get("/streak")
+async def training_streak():
+    """Weekly consistency streak: consecutive ISO weeks (up to now) with at least
+    one ride. Returns current + best streak and this week's ride count."""
+    rides = await udb.ride_history.find({}, {"_id": 0, "created_at": 1}).to_list(length=3000)
+    weeks = set()
+    for r in rides:
+        d = _date_of(r.get("created_at"))
+        if not d:
+            continue
+        try:
+            iso = date.fromisoformat(d).isocalendar()
+            weeks.add((iso[0], iso[1]))
+        except Exception:
+            continue
+    today = datetime.now(timezone.utc).date()
+    cur_iso = today.isocalendar()
+    this_week_key = (cur_iso[0], cur_iso[1])
+    this_week_rides = 0
+    for r in rides:
+        d = _date_of(r.get("created_at"))
+        if not d:
+            continue
+        try:
+            i = date.fromisoformat(d).isocalendar()
+        except Exception:
+            continue
+        if (i[0], i[1]) == this_week_key:
+            this_week_rides += 1
+
+    # Walk backwards week by week from the current week.
+    def prev_week(y, w):
+        d = date.fromisocalendar(y, w, 1) - timedelta(days=7)
+        i = d.isocalendar()
+        return (i[0], i[1])
+
+    current = 0
+    cursor = this_week_key
+    # If no ride this week yet, the streak is still "alive" if last week had one.
+    if this_week_key not in weeks:
+        cursor = prev_week(*this_week_key)
+    while cursor in weeks:
+        current += 1
+        cursor = prev_week(*cursor)
+    # If they rode this week, count it too (loop above already did if present).
+    active = this_week_key in weeks or (current > 0)
+
+    # Best streak across all recorded weeks.
+    best = 0
+    for wk in weeks:
+        run = 0
+        c = wk
+        while c in weeks:
+            run += 1
+            c = prev_week(*c)
+        best = max(best, run)
+
+    return {"current_weeks": current, "best_weeks": best, "this_week_rides": this_week_rides,
+            "active": active, "weeks_ridden": len(weeks)}
 
 
 @router.get("/records")

@@ -4,7 +4,7 @@ import Svg, { Path, Polyline, Line, Rect, Defs, LinearGradient as SvgGrad, Stop 
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius } from "@/src/theme";
-import { PmcPoint, PowerRecord, WeeklyDigest, FormTarget, WeeklyNote, saveEvent } from "@/src/lib/analysis";
+import { PmcPoint, PowerRecord, WeeklyDigest, FormTarget, WeeklyNote, TaperNote, Streak, saveEvent, fetchTaperNote } from "@/src/lib/analysis";
 import { useCoach } from "@/src/lib/coach-persona";
 import { useCoachSpeech } from "@/src/hooks/useCoachSpeech";
 
@@ -252,7 +252,21 @@ export function WeeklyDigestCard({ digest, onShare }: { digest: WeeklyDigest; on
 export function FormTargetCard({ target, onChanged }: { target: FormTarget | null; onChanged: () => void }) {
   const [name, setName] = React.useState(target?.event_name || "");
   const [saving, setSaving] = React.useState(false);
+  const [taper, setTaper] = React.useState<TaperNote | null>(null);
+  const [taperLoading, setTaperLoading] = React.useState(false);
+  const coach = useCoach();
+  const { speak, speakingId } = useCoachSpeech(coach.id);
   React.useEffect(() => { setName(target?.event_name || ""); }, [target?.event_name]);
+
+  // When the rider won't arrive fresh, ask the coach for a taper plan.
+  React.useEffect(() => {
+    if (target?.has_event && !target?.past && target?.fresh === false) {
+      setTaperLoading(true);
+      fetchTaperNote(coach.name, coach.gender).then((t) => { setTaper(t); setTaperLoading(false); });
+    } else {
+      setTaper(null);
+    }
+  }, [target?.has_event, target?.past, target?.fresh, target?.event_date, coach.name, coach.gender]);
 
   const setInWeeks = async (weeks: number) => {
     setSaving(true);
@@ -307,6 +321,31 @@ export function FormTargetCard({ target, onChanged }: { target: FormTarget | nul
           </View>
         </View>
       )}
+
+      {has && !fresh && (
+        <View style={s.taperBox} testID="taper-plan">
+          {taperLoading ? (
+            <View style={{ paddingVertical: 14, alignItems: "center" }}><ActivityIndicator color={colors.yellow} /></View>
+          ) : taper?.note ? (
+            <>
+              <View style={s.taperHead}>
+                <View style={s.coachChip}><Ionicons name="person-circle" size={16} color={colors.yellow} /><Text style={s.coachChipT}>{coach.name}'s taper plan</Text></View>
+                <Pressable onPress={() => speak("taper", `${taper.note} ${(taper.actions || []).join(". ")}`)} style={s.playBtnSm} testID="taper-play" hitSlop={8}>
+                  <Ionicons name={speakingId === "taper" ? "stop" : "volume-high"} size={14} color="#241B00" />
+                  <Text style={s.playBtnSmT}>{speakingId === "taper" ? "Stop" : "Listen"}</Text>
+                </Pressable>
+              </View>
+              <Text style={s.noteText}>{taper.note}</Text>
+              {(taper.actions || []).map((a, i) => (
+                <View key={i} style={s.taperAction}>
+                  <Ionicons name="checkmark-circle" size={15} color={FITNESS} />
+                  <Text style={s.taperActionT}>{a}</Text>
+                </View>
+              ))}
+            </>
+          ) : null}
+        </View>
+      )}
       {!target?.has_event && (
         <Text style={s.wdEmpty}>Set your goal event and I'll project whether your Form lands fresh on the day — so you can time your taper.</Text>
       )}
@@ -351,6 +390,41 @@ export function CoachWeeklyNote({ note, loading, onRefresh }: { note: WeeklyNote
       ) : (
         <Text style={s.wdEmpty}>Your coach's weekly recap will appear here.</Text>
       )}
+    </View>
+  );
+}
+
+/** Share Streaks — weekly consistency streak with a shareable card. */
+export function StreakCard({ streak, onShare }: { streak: Streak; onShare: () => void }) {
+  const active = streak.active && streak.current_weeks > 0;
+  const flames = Math.min(streak.current_weeks, 8);
+  return (
+    <View>
+      <View style={s.streakTop}>
+        <View style={[s.streakBig, { borderColor: active ? "rgba(242,121,46,0.5)" : colors.border }]}>
+          <Ionicons name="flame" size={22} color={active ? "#F2792E" : colors.textFaint} />
+          <Text style={[s.streakNum, { color: active ? colors.white : colors.textDim }]}>{streak.current_weeks}</Text>
+          <Text style={s.streakUnit}>week{streak.current_weeks === 1 ? "" : "s"}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.streakTitle}>{active ? "You're on a roll!" : "Start a new streak"}</Text>
+          <Text style={s.streakSub}>
+            {active
+              ? `${streak.current_weeks} week${streak.current_weeks === 1 ? "" : "s"} in a row with a ride${streak.this_week_rides === 0 ? " — ride this week to keep it alive" : ""}.`
+              : "Ride at least once this week to begin your consistency streak."}
+          </Text>
+          <Text style={s.streakBest}>Best streak: {streak.best_weeks} week{streak.best_weeks === 1 ? "" : "s"} · {streak.weeks_ridden} week{streak.weeks_ridden === 1 ? "" : "s"} ridden</Text>
+        </View>
+      </View>
+      <View style={s.flames}>
+        {Array.from({ length: 8 }).map((_, i) => (
+          <Ionicons key={i} name="flame" size={16} color={i < flames ? "#F2792E" : "rgba(255,255,255,0.1)"} />
+        ))}
+      </View>
+      <Pressable onPress={onShare} style={s.streakShare} testID="streak-share" disabled={!active}>
+        <Ionicons name="share-social" size={15} color={active ? "#241B00" : colors.textFaint} />
+        <Text style={[s.streakShareT, !active && { color: colors.textFaint }]}>Share streak</Text>
+      </Pressable>
     </View>
   );
 }
@@ -415,6 +489,24 @@ const s = StyleSheet.create({
   focusText: { color: colors.textDim, fontSize: 13, lineHeight: 19, flex: 1 },
   refreshLink: { flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start", marginTop: 12, paddingVertical: 4 },
   refreshT: { color: colors.textDim, fontSize: 12, fontWeight: "600" },
+
+  taperBox: { backgroundColor: "rgba(63,182,139,0.07)", borderWidth: 1, borderColor: "rgba(63,182,139,0.28)", borderRadius: radius.md, padding: 14, marginTop: 12 },
+  taperHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
+  playBtnSm: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.yellow, borderRadius: radius.pill, paddingVertical: 6, paddingHorizontal: 12 },
+  playBtnSmT: { color: "#241B00", fontSize: 11.5, fontWeight: "800" },
+  taperAction: { flexDirection: "row", gap: 8, alignItems: "flex-start", marginTop: 10 },
+  taperActionT: { color: colors.textDim, fontSize: 12.5, lineHeight: 18, flex: 1 },
+
+  streakTop: { flexDirection: "row", alignItems: "center", gap: 14 },
+  streakBig: { width: 84, height: 84, borderRadius: 18, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.03)" },
+  streakNum: { fontSize: 26, fontWeight: "900", marginTop: 2, lineHeight: 28 },
+  streakUnit: { color: colors.textFaint, fontSize: 10.5, fontWeight: "700" },
+  streakTitle: { color: colors.white, fontSize: 15.5, fontWeight: "800" },
+  streakSub: { color: colors.textDim, fontSize: 12.5, lineHeight: 18, marginTop: 3 },
+  streakBest: { color: colors.textFaint, fontSize: 11.5, fontWeight: "600", marginTop: 6 },
+  flames: { flexDirection: "row", gap: 6, marginTop: 14 },
+  streakShare: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: colors.yellow, borderRadius: radius.md, paddingVertical: 11, marginTop: 14 },
+  streakShareT: { color: "#241B00", fontSize: 13.5, fontWeight: "800" },
   cards: { flexDirection: "row", gap: 10 },
   big: { flex: 1, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: 14, alignItems: "center" },
   bigLabel: { color: colors.textFaint, fontSize: 10, fontWeight: "800", letterSpacing: 0.8 },

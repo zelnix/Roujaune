@@ -559,6 +559,73 @@ async def coach_weekly_note(coach_name: str = "Alberto", coach_gender: str = "ma
         raise HTTPException(status_code=502, detail=f"Weekly note generation failed: {e}")
 
 
+@router.get("/coach/taper-note")
+async def coach_taper_note(coach_name: str = "Alberto", coach_gender: str = "male", refresh: bool = False):
+    """When the rider's projected Form won't be fresh for their event, the coach
+    suggests how to ease the final week to arrive sharp. Reads the saved event +
+    the rider's current fitness/form. Cached per event+coach."""
+    key = os.environ.get("EMERGENT_LLM_KEY")
+    if not key:
+        raise HTTPException(status_code=503, detail="Coaching model not configured")
+
+    # Pull the projected form-target from the analysis route (same math).
+    from routes.analysis import form_target as _form_target
+    ft = await _form_target()
+    if not ft.get("has_event") or ft.get("past"):
+        return {"has_event": False}
+    if ft.get("fresh"):
+        return {"has_event": True, "fresh": True, "days_out": ft.get("days_out")}
+
+    ckey = f"taper_{coach_name.lower()}"
+    stamp = f"{ft.get('event_date')}|{ft.get('projected_form')}"
+    cache = await udb.settings.find_one({"id": "taper_note"}) or {}
+    cached = cache.get(ckey)
+    if not refresh and isinstance(cached, dict) and cached.get("stamp") == stamp:
+        return {**cached.get("data", {}), "cached": True}
+
+    rider = await _rider_line()
+    prompt = (
+        f"{rider}\n"
+        f"The rider is targeting '{ft.get('event_name') or 'their event'}' in {ft.get('days_out')} days. "
+        f"Right now their fitness (CTL) is {ft.get('current_fitness')} and form (TSB) is {ft.get('current_form')}. "
+        f"If they keep their recent training rhythm, their projected form on event morning is {ft.get('projected_form')} "
+        f"(a rider wants roughly +5 to +15 to feel fresh). This is not fresh enough.\n"
+        "As their coach, suggest how to TAPER the final week so they arrive sharp. Reply with ONLY valid minified JSON "
+        '(no markdown) of the shape {"note": string, "actions": [string, string, string]}. '
+        "\"note\": 2 warm sentences explaining the taper plan and why it lifts their form. "
+        "\"actions\": 2-3 short, concrete steps for the final 7-10 days (e.g. cut volume ~40%, keep some intensity short and sharp, add rest days). "
+        f"Speak as {coach_name}, first person, no emojis, no quotation marks inside strings."
+    )
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(
+            api_key=key,
+            session_id=f"{coach_name.lower()}-taper",
+            system_message=coach_system(coach_name, coach_gender),
+        ).with_model("anthropic", "claude-sonnet-4-6")
+        reply = await chat.send_message(UserMessage(text=prompt))
+        raw = (reply or "").strip()
+        if raw.startswith("```"):
+            raw = raw.strip("`")
+        s, e = raw.find("{"), raw.rfind("}")
+        dj = json.loads(raw[s:e + 1]) if s >= 0 and e > s else {}
+        note = str(dj.get("note", "")).strip().strip('"')
+        actions = [str(a).strip() for a in (dj.get("actions") or []) if str(a).strip()][:3]
+        if not note:
+            raise ValueError("empty taper note")
+        data = {"has_event": True, "fresh": False, "days_out": ft.get("days_out"),
+                "projected_form": ft.get("projected_form"), "note": note, "actions": actions}
+        try:
+            await udb.settings.update_one(
+                {"id": "taper_note"}, {"$set": {ckey: {"stamp": stamp, "data": data}}}, upsert=True)
+        except Exception:
+            logging.warning("taper note cache write failed")
+        return {**data, "cached": False}
+    except Exception as e:
+        logging.exception("coach_taper_note failed")
+        raise HTTPException(status_code=502, detail=f"Taper note generation failed: {e}")
+
+
 async def _refresh_adaptation_after_ride(req: "CoachDebriefRequest", plan_id: str = ""):
     """Regenerate and cache the coach's plan-adaptation note after a completed
     ride, so the Training Plan reflects the latest session. Best-effort."""

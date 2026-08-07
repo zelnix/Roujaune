@@ -136,6 +136,19 @@ def resample_climb(pts: List[dict], climb: dict, n: int = 50) -> dict:
     return {"time_s": round(total_t, 1), "avg_speed_kmh": avg_speed, "series": series}
 
 
+def climb_path(pts: List[dict], climb: dict, n: int = 24) -> List[list]:
+    """Simplified [lat,lng] polyline of the climb for a map thumbnail."""
+    start, end = climb["start"], climb["end"]
+    seg_pts = [p for p in pts[start:end + 1] if p.get("lat") is not None]
+    if not seg_pts:
+        return []
+    step = max(1, len(seg_pts) // n)
+    sampled = seg_pts[::step]
+    if sampled[-1] is not seg_pts[-1]:
+        sampled.append(seg_pts[-1])
+    return [[round(p["lat"], 5), round(p["lng"], 5)] for p in sampled]
+
+
 def match_climbs(climbs_a: List[dict], pts_a: List[dict],
                  climbs_b: List[dict], pts_b: List[dict],
                  max_start_gap: float = 300.0, len_tol: float = 0.45) -> List[tuple]:

@@ -5,10 +5,10 @@ import { useRouter } from "expo-router";
 import { AppScaffold, Card } from "@/src/components/app-scaffold";
 import { colors } from "@/src/theme";
 import {
-  fetchPmc, fetchRecords, fetchWeeklyDigest, fetchFormTarget, fetchWeeklyNote,
-  Pmc, PowerRecord, WeeklyDigest, FormTarget, WeeklyNote,
+  fetchPmc, fetchRecords, fetchWeeklyDigest, fetchFormTarget, fetchWeeklyNote, fetchStreak,
+  Pmc, PowerRecord, WeeklyDigest, FormTarget, WeeklyNote, Streak,
 } from "@/src/lib/analysis";
-import { PmcChart, PmcSummary, RecordsGrid, WeeklyDigestCard, ForecastSummary, FormTargetCard, CoachWeeklyNote } from "@/src/components/analysis/FitnessCharts";
+import { PmcChart, PmcSummary, RecordsGrid, WeeklyDigestCard, ForecastSummary, FormTargetCard, CoachWeeklyNote, StreakCard } from "@/src/components/analysis/FitnessCharts";
 import { ShareCardModal } from "@/src/components/ShareCardModal";
 import { AchievementCardData } from "@/src/components/AchievementCard";
 import { useCoach } from "@/src/lib/coach-persona";
@@ -21,15 +21,16 @@ export default function FitnessScreen() {
   const [digest, setDigest] = React.useState<WeeklyDigest | null>(null);
   const [target, setTarget] = React.useState<FormTarget | null>(null);
   const [note, setNote] = React.useState<WeeklyNote | null>(null);
+  const [streak, setStreak] = React.useState<Streak | null>(null);
   const [noteLoading, setNoteLoading] = React.useState(true);
   const [loading, setLoading] = React.useState(true);
-  const [share, setShare] = React.useState(false);
+  const [shareData, setShareData] = React.useState<AchievementCardData | null>(null);
 
   React.useEffect(() => {
     let alive = true;
-    Promise.all([fetchPmc(90, 14), fetchRecords(), fetchWeeklyDigest(), fetchFormTarget()]).then(([p, r, wd, ft]) => {
+    Promise.all([fetchPmc(90, 14), fetchRecords(), fetchWeeklyDigest(), fetchFormTarget(), fetchStreak()]).then(([p, r, wd, ft, st]) => {
       if (!alive) return;
-      setPmc(p); setRecords(r); setDigest(wd); setTarget(ft); setLoading(false);
+      setPmc(p); setRecords(r); setDigest(wd); setTarget(ft); setStreak(st); setLoading(false);
     });
     return () => { alive = false; };
   }, []);
@@ -43,17 +44,35 @@ export default function FitnessScreen() {
 
   const reloadTarget = React.useCallback(() => { fetchFormTarget().then(setTarget); }, []);
 
-  const shareData: AchievementCardData | null = digest ? {
-    kicker: "WEEKLY RECAP",
-    title: `${digest.this_week.tss} TSS this week`,
-    subtitle: `Week of ${new Date(digest.week_start).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`,
-    stats: [
-      { label: "Rides", value: `${digest.this_week.rides}` },
-      { label: "Hours", value: `${digest.this_week.hours}` },
-      { label: "Distance", value: `${digest.this_week.distance_km} km` },
-    ],
-    coachName: coach.name,
-  } : null;
+  const shareDigest = () => {
+    if (!digest) return;
+    setShareData({
+      kicker: "WEEKLY RECAP",
+      title: `${digest.this_week.tss} TSS this week`,
+      subtitle: `Week of ${new Date(digest.week_start).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`,
+      stats: [
+        { label: "Rides", value: `${digest.this_week.rides}` },
+        { label: "Hours", value: `${digest.this_week.hours}` },
+        { label: "Distance", value: `${digest.this_week.distance_km} km` },
+      ],
+      coachName: coach.name,
+    });
+  };
+
+  const shareStreak = () => {
+    if (!streak) return;
+    setShareData({
+      kicker: "CONSISTENCY STREAK",
+      title: `${streak.current_weeks} week${streak.current_weeks === 1 ? "" : "s"} in a row`,
+      subtitle: "Every week, another ride in the bank",
+      stats: [
+        { label: "Current", value: `${streak.current_weeks} wk` },
+        { label: "Best", value: `${streak.best_weeks} wk` },
+        { label: "This week", value: `${streak.this_week_rides} rides` },
+      ],
+      coachName: coach.name,
+    });
+  };
 
   return (
     <AppScaffold active="fitness" title="Fitness Trends" subtitle="How your training load is shaping your form.">
@@ -64,7 +83,14 @@ export default function FitnessScreen() {
           {digest && (
             <Card>
               <Text style={s.h}>This Week <Text style={s.hDim}>your recap</Text></Text>
-              <WeeklyDigestCard digest={digest} onShare={() => setShare(true)} />
+              <WeeklyDigestCard digest={digest} onShare={shareDigest} />
+            </Card>
+          )}
+
+          {streak && (
+            <Card>
+              <Text style={s.h}>Consistency Streak <Text style={s.hDim}>keep it alive</Text></Text>
+              <StreakCard streak={streak} onShare={shareStreak} />
             </Card>
           )}
 
@@ -104,7 +130,7 @@ export default function FitnessScreen() {
           </Card>
         </ScrollView>
       )}
-      <ShareCardModal visible={share} data={shareData} onClose={() => setShare(false)} />
+      <ShareCardModal visible={!!shareData} data={shareData} onClose={() => setShareData(null)} />
     </AppScaffold>
   );
 }

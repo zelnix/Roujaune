@@ -1,22 +1,74 @@
 import React from "react";
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Pressable } from "react-native";
+import Svg, { Polyline, Circle } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { AppScaffold, Card } from "@/src/components/app-scaffold";
 import { colors, radius } from "@/src/theme";
 import { fetchClimbLeaderboard, ClimbEntry } from "@/src/lib/analysis";
+import { ShareCardModal } from "@/src/components/ShareCardModal";
+import { AchievementCardData } from "@/src/components/AchievementCard";
+import { useCoach } from "@/src/lib/coach-persona";
 
 const mmss = (s?: number | null) => { if (s == null) return "—"; const m = Math.floor(s / 60); const ss = Math.round(s % 60); return `${m}:${String(ss).padStart(2, "0")}`; };
 const dstr = (iso?: string) => { if (!iso) return ""; try { return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }); } catch { return ""; } };
 
+/** Tiny map thumbnail of a climb's GPS path, normalised into a fixed box. */
+function ClimbMiniMap({ path, w = 84, h = 60 }: { path: [number, number][]; w?: number; h?: number }) {
+  if (!path || path.length < 2) {
+    return <View style={[mm.box, { width: w, height: h, alignItems: "center", justifyContent: "center" }]}><Ionicons name="map-outline" size={18} color={colors.textFaint} /></View>;
+  }
+  const pad = 8;
+  const lats = path.map((p) => p[0]), lngs = path.map((p) => p[1]);
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+  const rLat = (maxLat - minLat) || 1e-6, rLng = (maxLng - minLng) || 1e-6;
+  // Keep aspect roughly correct: scale both by the larger span.
+  const span = Math.max(rLat, rLng);
+  const cx = (minLng + maxLng) / 2, cy = (minLat + maxLat) / 2;
+  const iw = w - pad * 2, ih = h - pad * 2;
+  const pts = path.map(([lat, lng]) => {
+    const x = pad + iw / 2 + ((lng - cx) / span) * iw;
+    const y = pad + ih / 2 - ((lat - cy) / span) * ih; // flip: north up
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const [sx, sy] = pts[0].split(",").map(Number);
+  const [ex, ey] = pts[pts.length - 1].split(",").map(Number);
+  return (
+    <View style={[mm.box, { width: w, height: h }]}>
+      <Svg width={w} height={h}>
+        <Polyline points={pts.join(" ")} fill="none" stroke={colors.yellow} strokeWidth={2.2} strokeLinejoin="round" strokeLinecap="round" />
+        <Circle cx={sx} cy={sy} r={3} fill="#3FB68B" />
+        <Circle cx={ex} cy={ey} r={3} fill={colors.rouge ?? "#C91727"} />
+      </Svg>
+    </View>
+  );
+}
+
 export default function ClimbsScreen() {
   const router = useRouter();
+  const coach = useCoach();
   const [data, setData] = React.useState<{ climbs: ClimbEntry[]; has_data: boolean } | null>(null);
   const [open, setOpen] = React.useState<string | null>(null);
+  const [share, setShare] = React.useState<AchievementCardData | null>(null);
 
   React.useEffect(() => {
     fetchClimbLeaderboard().then((d) => { setData(d); if (d.climbs[0]) setOpen(d.climbs[0].id); });
   }, []);
+
+  const prClimb = data?.climbs.find((c) => c.new_pr) || null;
+
+  const celebrate = (c: ClimbEntry) => setShare({
+    kicker: "NEW PERSONAL BEST",
+    title: c.name,
+    subtitle: `${Math.round(c.gain_m)} m · ${(c.length_m / 1000).toFixed(1)} km climb`,
+    stats: [
+      { label: "New PB", value: mmss(c.attempts[0]?.time_s) },
+      { label: "Faster by", value: mmss(c.pr_improvement_s) },
+      { label: "Attempts", value: `${c.count}` },
+    ],
+    coachName: coach.name,
+  });
 
   return (
     <AppScaffold active="fitness" title="Climb Leaderboard" subtitle="Every attempt at your repeated climbs, ranked fastest first.">
@@ -32,14 +84,31 @@ export default function ClimbsScreen() {
         </Card>
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingBottom: 40 }}>
+          {prClimb && (
+            <View style={s.celebrate} testID="pr-celebrate">
+              <View style={s.celebrateIcon}><Ionicons name="trophy" size={22} color="#241B00" /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.celebrateT}>New personal best! 🎉</Text>
+                <Text style={s.celebrateS}>You just took {mmss(prClimb.pr_improvement_s)} off your best on {prClimb.name}.</Text>
+              </View>
+              <Pressable onPress={() => celebrate(prClimb)} style={s.celebrateBtn} testID="pr-share">
+                <Ionicons name="share-social" size={15} color="#241B00" />
+                <Text style={s.celebrateBtnT}>Share</Text>
+              </Pressable>
+            </View>
+          )}
+
           {data.climbs.map((c) => {
             const isOpen = open === c.id;
             return (
               <Card key={c.id} testID={`climb-${c.id}`}>
                 <Pressable onPress={() => setOpen(isOpen ? null : c.id)} style={s.head} testID={`climb-toggle-${c.id}`}>
-                  <View style={s.badge}><Ionicons name="trending-up" size={18} color={colors.yellow} /></View>
+                  <ClimbMiniMap path={c.path} />
                   <View style={{ flex: 1 }}>
-                    <Text style={s.name} numberOfLines={1}>{c.name}</Text>
+                    <View style={s.nameRow}>
+                      <Text style={s.name} numberOfLines={1}>{c.name}</Text>
+                      {c.new_pr && <View style={s.prTag}><Ionicons name="flame" size={11} color="#241B00" /><Text style={s.prTagT}>PB</Text></View>}
+                    </View>
                     <Text style={s.meta}>{Math.round(c.gain_m)} m · {(c.length_m / 1000).toFixed(1)} km · {c.grad_pct}% · {c.count} attempts</Text>
                   </View>
                   <Ionicons name={isOpen ? "chevron-up" : "chevron-down"} size={18} color={colors.textDim} />
@@ -69,19 +138,32 @@ export default function ClimbsScreen() {
           })}
         </ScrollView>
       )}
+      <ShareCardModal visible={!!share} data={share} onClose={() => setShare(null)} />
     </AppScaffold>
   );
 }
+
+const mm = StyleSheet.create({
+  box: { borderRadius: 10, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: colors.border, overflow: "hidden" },
+});
 
 const s = StyleSheet.create({
   center: { paddingVertical: 60, alignItems: "center" },
   empty: { alignItems: "center", paddingVertical: 24, gap: 8 },
   emptyT: { color: colors.white, fontSize: 15, fontWeight: "800" },
   emptyS: { color: colors.textDim, fontSize: 13, lineHeight: 19, textAlign: "center", maxWidth: 340 },
+  celebrate: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "rgba(255,194,10,0.12)", borderWidth: 1, borderColor: "rgba(255,194,10,0.45)", borderRadius: radius.lg, padding: 14 },
+  celebrateIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.yellow, alignItems: "center", justifyContent: "center" },
+  celebrateT: { color: colors.white, fontSize: 15, fontWeight: "900" },
+  celebrateS: { color: colors.textDim, fontSize: 12.5, marginTop: 2, lineHeight: 17 },
+  celebrateBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.yellow, borderRadius: radius.pill, paddingVertical: 8, paddingHorizontal: 14 },
+  celebrateBtnT: { color: "#241B00", fontSize: 12.5, fontWeight: "800" },
   head: { flexDirection: "row", alignItems: "center", gap: 12 },
-  badge: { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,194,10,0.14)", alignItems: "center", justifyContent: "center" },
-  name: { color: colors.white, fontSize: 15.5, fontWeight: "800" },
-  meta: { color: colors.textFaint, fontSize: 12, marginTop: 2, fontWeight: "600" },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  name: { color: colors.white, fontSize: 15.5, fontWeight: "800", flexShrink: 1 },
+  prTag: { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: colors.yellow, borderRadius: 6, paddingVertical: 2, paddingHorizontal: 6 },
+  prTagT: { color: "#241B00", fontSize: 10, fontWeight: "900" },
+  meta: { color: colors.textFaint, fontSize: 12, marginTop: 3, fontWeight: "600" },
   list: { marginTop: 8, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)" },
   row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.04)" },
   rank: { width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.06)", alignItems: "center", justifyContent: "center" },
