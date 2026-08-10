@@ -76,6 +76,36 @@ export default function ClimbDetailScreen() {
             </View>
             <AttemptChart detail={detail} />
           </Card>
+          {(detail.splits && detail.splits.length > 0) && (
+            <Card>
+              <Text style={s.h}>Split times <Text style={s.hDim}>who was fastest where</Text></Text>
+              <View style={s.splitHeadRow}>
+                <Text style={[s.splitCell, s.splitLabelCell, { color: colors.textFaint }]}>SEGMENT</Text>
+                {(detail.attempts || []).map((a, i) => (
+                  <Text key={i} style={[s.splitCell, { color: a.pr ? colors.yellow : colors.textDim }]} numberOfLines={1}>{a.pr ? "PB" : `#${i + 1}`}</Text>
+                ))}
+              </View>
+              {detail.splits.map((sp) => (
+                <View key={sp.index} style={s.splitRow}>
+                  <View style={s.splitLabelCell}>
+                    <Text style={s.splitName}>Split {sp.index}</Text>
+                    <Text style={s.splitDist}>{(sp.from_d / 1000).toFixed(1)}–{(sp.to_d / 1000).toFixed(1)} km</Text>
+                  </View>
+                  {(detail.attempts || []).map((a, i) => {
+                    const t = sp.times[a.activity_id];
+                    const fastest = sp.fastest === a.activity_id;
+                    return (
+                      <View key={i} style={[s.splitCellBox, fastest && s.splitFastest]}>
+                        <Text style={[s.splitTime, fastest && { color: "#241B00" }]}>{mmss(t)}</Text>
+                        {fastest ? <Ionicons name="flash" size={10} color="#241B00" /> : null}
+                      </View>
+                    );
+                  })}
+                </View>
+              ))}
+              <Text style={s.splitHint}>Each attempt's time through equal-distance segments. ⚡ = fastest.</Text>
+            </Card>
+          )}
           <Card>
             <Text style={s.h}>Every attempt</Text>
             {(detail.attempts || []).map((a, i) => (
@@ -121,4 +151,15 @@ const s = StyleSheet.create({
   rowSub: { color: colors.textFaint, fontSize: 11.5, marginTop: 1, fontWeight: "600" },
   time: { color: colors.white, fontSize: 16, fontWeight: "900", fontVariant: ["tabular-nums"] },
   gap: { color: colors.textDim, fontSize: 11.5, fontWeight: "700", marginTop: 1 },
+  hDim: { color: colors.textFaint, fontSize: 12, fontWeight: "600" },
+  splitHeadRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
+  splitRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)" },
+  splitCell: { flex: 1, fontSize: 11.5, fontWeight: "800", textAlign: "center" },
+  splitLabelCell: { flex: 1.4 },
+  splitName: { color: colors.white, fontSize: 13, fontWeight: "800" },
+  splitDist: { color: colors.textFaint, fontSize: 11, marginTop: 1, fontWeight: "600" },
+  splitCellBox: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 3, paddingVertical: 5, borderRadius: 8 },
+  splitFastest: { backgroundColor: colors.yellow },
+  splitTime: { color: colors.white, fontSize: 13, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  splitHint: { color: colors.textFaint, fontSize: 11, marginTop: 10, lineHeight: 16 },
 });

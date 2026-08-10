@@ -424,67 +424,111 @@ async def climb_leaderboard():
     return {"climbs": out, "has_data": bool(out)}
 
 
-@router.get("/streak")
-async def training_streak():
-    """Weekly consistency streak: consecutive ISO weeks (up to now) with at least
-    one ride. Returns current + best streak and this week's ride count."""
+def _prev_week(y, w):
+    d = date.fromisocalendar(y, w, 1) - timedelta(days=7)
+    i = d.isocalendar()
+    return (i[0], i[1])
+
+
+def _run_from(covered: set, this_week_key: tuple) -> tuple:
+    """Current streak length walking back over `covered` weeks + the first
+    uncovered (gap) week where it stops."""
+    current = 0
+    cursor = this_week_key
+    if this_week_key not in covered:
+        cursor = _prev_week(*this_week_key)
+    while cursor in covered:
+        current += 1
+        cursor = _prev_week(*cursor)
+    return current, cursor
+
+
+async def _ride_weeks() -> tuple:
     rides = await udb.ride_history.find({}, {"_id": 0, "created_at": 1}).to_list(length=3000)
     weeks = set()
+    per_week: dict = {}
     for r in rides:
         d = _date_of(r.get("created_at"))
         if not d:
             continue
         try:
             iso = date.fromisoformat(d).isocalendar()
-            weeks.add((iso[0], iso[1]))
         except Exception:
             continue
+        key = (iso[0], iso[1])
+        weeks.add(key)
+        per_week[key] = per_week.get(key, 0) + 1
+    return weeks, per_week
+
+
+@router.get("/streak")
+async def training_streak():
+    """Weekly consistency streak (with optional Streak Freeze tokens that bridge
+    an off-week). Returns current + best streak, this week's rides, at-risk nudge,
+    and freeze-token state."""
+    ride_weeks, per_week = await _ride_weeks()
+    freeze = await udb.settings.find_one({"id": "streak_freeze"}) or {}
+    frozen = set(tuple(x) for x in freeze.get("frozen", []))
+    covered = ride_weeks | frozen
+
     today = datetime.now(timezone.utc).date()
-    cur_iso = today.isocalendar()
-    this_week_key = (cur_iso[0], cur_iso[1])
-    this_week_rides = 0
-    for r in rides:
-        d = _date_of(r.get("created_at"))
-        if not d:
-            continue
-        try:
-            i = date.fromisoformat(d).isocalendar()
-        except Exception:
-            continue
-        if (i[0], i[1]) == this_week_key:
-            this_week_rides += 1
+    this_iso = today.isocalendar()
+    this_week_key = (this_iso[0], this_iso[1])
+    this_week_rides = per_week.get(this_week_key, 0)
 
-    # Walk backwards week by week from the current week.
-    def prev_week(y, w):
-        d = date.fromisocalendar(y, w, 1) - timedelta(days=7)
-        i = d.isocalendar()
-        return (i[0], i[1])
+    current, gap = _run_from(covered, this_week_key)
+    active = this_week_key in covered or current > 0
 
-    current = 0
-    cursor = this_week_key
-    # If no ride this week yet, the streak is still "alive" if last week had one.
-    if this_week_key not in weeks:
-        cursor = prev_week(*this_week_key)
-    while cursor in weeks:
-        current += 1
-        cursor = prev_week(*cursor)
-    # If they rode this week, count it too (loop above already did if present).
-    active = this_week_key in weeks or (current > 0)
-
-    # Best streak across all recorded weeks.
     best = 0
-    for wk in weeks:
+    for wk in covered:
         run = 0
         c = wk
-        while c in weeks:
+        while c in covered:
             run += 1
-            c = prev_week(*c)
+            c = _prev_week(*c)
         best = max(best, run)
 
+    earned = min(3, 1 + len(ride_weeks) // 4)
+    tokens = max(0, earned - len(frozen))
+    before_gap = _prev_week(*gap)
+    # A freeze helps when the gap week is a real off-week and the week before it
+    # was covered (so bridging extends the run) and the rider has a token.
+    can_freeze = bool(tokens > 0 and gap not in covered and before_gap in covered and current > 0)
+
     return {"current_weeks": current, "best_weeks": best, "this_week_rides": this_week_rides,
-            "active": active, "weeks_ridden": len(weeks),
+            "active": active, "weeks_ridden": len(ride_weeks),
             "at_risk": bool(active and this_week_rides == 0 and today.isoweekday() >= 4),
-            "days_left": 7 - today.isoweekday(), "weekday": today.isoweekday()}
+            "days_left": 7 - today.isoweekday(), "weekday": today.isoweekday(),
+            "freeze_tokens": tokens, "frozen_weeks": len(frozen), "can_freeze": can_freeze,
+            "gap_week": f"{gap[0]}-W{gap[1]:02d}"}
+
+
+@router.post("/streak-freeze")
+async def streak_freeze():
+    """Spend a Streak Freeze token to bridge the off-week that's breaking the
+    current streak."""
+    ride_weeks, per_week = await _ride_weeks()
+    freeze = await udb.settings.find_one({"id": "streak_freeze"}) or {}
+    frozen = set(tuple(x) for x in freeze.get("frozen", []))
+    covered = ride_weeks | frozen
+
+    today = datetime.now(timezone.utc).date()
+    this_iso = today.isocalendar()
+    this_week_key = (this_iso[0], this_iso[1])
+    current, gap = _run_from(covered, this_week_key)
+
+    earned = min(3, 1 + len(ride_weeks) // 4)
+    tokens = max(0, earned - len(frozen))
+    before_gap = _prev_week(*gap)
+    if tokens <= 0:
+        return {"ok": False, "reason": "no_tokens"}
+    if gap in covered or before_gap not in covered or current <= 0:
+        return {"ok": False, "reason": "nothing_to_freeze"}
+
+    frozen.add(gap)
+    await udb.settings.update_one(
+        {"id": "streak_freeze"}, {"$set": {"frozen": [list(f) for f in frozen]}}, upsert=True)
+    return {"ok": True, "frozen_week": f"{gap[0]}-W{gap[1]:02d}"}
 
 
 def _cluster_climbs(entries: list) -> list:
@@ -542,12 +586,14 @@ async def climb_detail(id: str):
         best = ranked[0]["time_s"] or 0
         gain = round(sum(a["gain"] for a in atts) / len(atts), 1)
         length = round(sum(a["length"] for a in atts) / len(atts), 1)
+        splits = _climb_splits(ranked, length, n=4)
         return {
             "found": True, "id": cid, "name": ranked[0]["name"],
             "gain_m": gain, "length_m": length,
             "grad_pct": round(gain / length * 100, 1) if length else None,
             "count": len(atts), "path": ranked[0]["path"],
             "profile": [{"d": p["d"], "ele": p["ele"]} for p in ranked[0]["series"]],
+            "splits": splits,
             "attempts": [{
                 "activity_id": a["aid"], "name": a["name"], "date": a["date"],
                 "time_s": a["time_s"], "avg_speed_kmh": a["avg_speed"],
@@ -557,6 +603,43 @@ async def climb_detail(id: str):
             } for a in ranked],
         }
     return {"found": False}
+
+
+def _climb_splits(ranked: list, length: float, n: int = 4) -> list:
+    """Split the climb into n equal-distance segments; each attempt's time per
+    split, with the fastest attempt flagged."""
+    bounds = [length * i / n for i in range(n + 1)]
+
+    def t_at(series, d):
+        if not series:
+            return 0.0
+        if d <= series[0]["d"]:
+            return series[0]["t"]
+        if d >= series[-1]["d"]:
+            return series[-1]["t"]
+        for k in range(len(series) - 1):
+            if series[k + 1]["d"] >= d:
+                a, b = series[k], series[k + 1]
+                span = (b["d"] - a["d"]) or 1.0
+                f = (d - a["d"]) / span
+                return a["t"] + (b["t"] - a["t"]) * f
+        return series[-1]["t"]
+
+    splits = []
+    for i in range(n):
+        lo, hi = bounds[i], bounds[i + 1]
+        times = {}
+        for a in ranked:
+            s = a["series"]
+            if not s:
+                continue
+            times[a["aid"]] = round(t_at(s, hi) - t_at(s, lo), 1)
+        fastest = min(times, key=times.get) if times else None
+        splits.append({
+            "index": i + 1, "from_d": round(lo), "to_d": round(hi),
+            "times": times, "fastest": fastest,
+        })
+    return splits
 
 
 MILESTONE_RIDES = [10, 25, 50, 100, 150, 200, 250, 300, 400, 500, 750, 1000]
@@ -593,13 +676,27 @@ async def milestones():
                           "blurb": f"You've ridden over {m:,} km in total. Incredible mileage!"}
                 break
 
-    next_rides = next((m for m in MILESTONE_RIDES if m > total_rides), None)
-    next_km = next((m for m in MILESTONE_KM if m > total_km), None)
+    def _prev_next(total, arr):
+        prev, nxt = 0, None
+        for m in arr:
+            if m <= total:
+                prev = m
+            else:
+                nxt = m
+                break
+        return prev, nxt
+
+    prev_rides, next_rides = _prev_next(total_rides, MILESTONE_RIDES)
+    prev_km, next_km = _prev_next(total_km, MILESTONE_KM)
+    rides_progress = round((total_rides - prev_rides) / (next_rides - prev_rides), 3) if next_rides else 1.0
+    km_progress = round((total_km - prev_km) / (next_km - prev_km), 3) if next_km else 1.0
     return {
         "total_rides": total_rides, "total_km": total_km, "total_hours": total_hours, "total_tss": total_tss,
         "recent": recent,
         "next_rides": next_rides, "rides_to_next": (next_rides - total_rides) if next_rides else None,
+        "prev_rides": prev_rides, "rides_progress": rides_progress,
         "next_km": next_km, "km_to_next": round(next_km - total_km, 1) if next_km else None,
+        "prev_km": prev_km, "km_progress": km_progress,
     }
 
 

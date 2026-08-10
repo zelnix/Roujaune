@@ -626,6 +626,58 @@ async def coach_taper_note(coach_name: str = "Alberto", coach_gender: str = "mal
         raise HTTPException(status_code=502, detail=f"Taper note generation failed: {e}")
 
 
+@router.get("/coach/milestone-note")
+async def coach_milestone_note(coach_name: str = "Alberto", coach_gender: str = "male", refresh: bool = False):
+    """A short spoken congratulations from the coach when the rider just crossed a
+    big lifetime milestone. Cached per milestone+coach."""
+    key = os.environ.get("EMERGENT_LLM_KEY")
+    if not key:
+        raise HTTPException(status_code=503, detail="Coaching model not configured")
+    from routes.analysis import milestones as _ms
+    ms = await _ms()
+    rec = ms.get("recent")
+    if not rec:
+        return {"has_milestone": False}
+
+    ckey = f"note_{coach_name.lower()}"
+    stamp = f"{rec['kind']}-{rec['value']}"
+    cache = await udb.settings.find_one({"id": "milestone_note"}) or {}
+    cached = cache.get(ckey)
+    if not refresh and isinstance(cached, dict) and cached.get("stamp") == stamp:
+        return {**cached.get("data", {}), "cached": True}
+
+    rider = await _rider_line()
+    prompt = (
+        f"{rider}\n"
+        f"The rider just hit a big lifetime milestone: {rec['label']} ({rec['blurb']}). "
+        "Congratulate them warmly. Reply with ONLY valid minified JSON (no markdown) of the shape "
+        '{"note": string}. "note": 2 upbeat sentences celebrating this milestone and encouraging the next one. '
+        f"Speak as {coach_name}, first person, no emojis, no quotation marks inside the string."
+    )
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(api_key=key, session_id=f"{coach_name.lower()}-milestone",
+                       system_message=coach_system(coach_name, coach_gender)).with_model("anthropic", "claude-sonnet-4-6")
+        reply = await chat.send_message(UserMessage(text=prompt))
+        raw = (reply or "").strip()
+        if raw.startswith("```"):
+            raw = raw.strip("`")
+        s, e = raw.find("{"), raw.rfind("}")
+        dj = json.loads(raw[s:e + 1]) if s >= 0 and e > s else {}
+        note = str(dj.get("note", "")).strip().strip('"')
+        if not note:
+            raise ValueError("empty milestone note")
+        data = {"has_milestone": True, "label": rec["label"], "note": note}
+        try:
+            await udb.settings.update_one({"id": "milestone_note"}, {"$set": {ckey: {"stamp": stamp, "data": data}}}, upsert=True)
+        except Exception:
+            logging.warning("milestone note cache write failed")
+        return {**data, "cached": False}
+    except Exception as e:
+        logging.exception("coach_milestone_note failed")
+        raise HTTPException(status_code=502, detail=f"Milestone note generation failed: {e}")
+
+
 @router.post("/coach/taper-apply")
 async def coach_taper_apply(body: dict):
     """Apply the coach's taper by easing the plan week that leads into the event.

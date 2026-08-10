@@ -1,0 +1,30 @@
+{
+  "summary": "Iter 82 — ROUJAUNE 4 new features confirmation (Milestone Progress Ring, Climb Detail Splits, Coach Milestone Shout-out, Streak Freeze). Backend: 5/5 pytest PASS. GET /api/analysis/milestones (demo) returns prev_rides=0, rides_progress in [0,1], prev_km, km_progress in [0,1] alongside existing totals/next. GET /api/analysis/climb-detail?id=climb-45.2-6.1108 (demo) returns splits array of exactly 4 items; each split has index (1..4), from_d, to_d (>from_d), times dict keyed by BOTH attempt activity_ids with numeric values, and a fastest activity_id that corresponds to the minimum of times. GET /api/analysis/streak returns a non-null dict (regression: duplicate stub removed) — freeze_tokens (int>=0), frozen_weeks (int>=0), can_freeze (bool), gap_week (non-empty string). POST /api/analysis/streak-freeze on demo returns 200 with {ok:false, reason:'nothing_to_freeze'} (no 500). GET /api/coach/milestone-note?coach_name=Alberto&coach_gender=male on demo returns 200 with {has_milestone:false} (no LLM call, no 500). Frontend @ 1024x1050 demo: /fitness shows Milestones card with a yellow progress ring displaying '8' + 'to 10' in the center (rides_progress=0.2 arc), Consistency Streak card shows '1 Streak Freeze banked'. /climb/climb-45.2-6.1108 shows Split times table with 4 rows (Split 1..4, distances 0.0-0.6 / 0.6-1.3 / 1.3-1.9 / 1.9-2.5 km); PB column cell highlighted yellow with ⚡ icon in every split (2:19, 2:38, 2:38, 2:38) vs #2 (2:57, 3:28, 3:29, 3:29). No red-screen or console errors on either screen.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter82_progress_ring_splits_freeze_milestone_note.py",
+    "/app/test_reports/pytest/iter82.xml",
+    "/app/test_reports/screens/i82_fitness.jpeg",
+    "/app/test_reports/screens/i82_climb_detail.jpeg",
+    "/app/test_reports/screens/i82_splits.jpeg"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/coach.py continues to grow (~1000 lines) — future refactor: extract LLM+JSON parsing helpers (weekly-note / taper-note / milestone-note share nearly identical JSON extraction + cache patterns) into services/coach_notes.py. Not blocking."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter82_progress_ring_splits_freeze_milestone_note.py (new)"
+  ],
+  "success_rate": {"backend": "100% (5/5 pytest)", "frontend": "100% — Milestones ring '8 to 10' + '1 Streak Freeze banked' on /fitness; 'Split times' table with 4 rows and yellow-highlighted PB fastest cell in every split on /climb/climb-45.2-6.1108"},
+  "seed_data_creation": "None. Read-only tests. Streak-freeze POST short-circuits on demo (nothing_to_freeze) so no settings.streak_freeze mutation occurs.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All 4 iter-82 features (Milestone Progress Ring, Climb Detail Splits, Coach Milestone Shout-out, Streak Freeze) pass end-to-end on demo. Reusable pytest: /app/backend/tests/test_iter82_progress_ring_splits_freeze_milestone_note.py. Demo state assumptions: total_rides=2 (so prev_rides=0, rides_to_next=8, next_rides=10, no recent milestone → milestone-note returns has_milestone:false). Streak on demo has weeks_ridden=1 → freeze_tokens=1, but can_freeze=False (no gap to bridge on current streak), so POST /streak-freeze returns nothing_to_freeze — exactly the expected happy-path fallback. Duplicate '@router.get(/streak)' stub in routes/analysis.py is confirmed gone (streak endpoint returns full object, not null).",
+  "rca_of_issue": "N/A — confirmation + regression run, all 5 backend endpoints and 2 frontend screens PASS."
+}

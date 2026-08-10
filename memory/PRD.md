@@ -773,3 +773,11 @@ STILL PENDING (awaiting approval): Phase 3 (Home banners consolidation, dup CTAs
 - **Milestones:** `GET /api/analysis/milestones` → lifetime totals + `recent` (round-number milestone crossed by the last ride, else null) + next ride/km targets w/ remaining. `/fitness` 'Milestones' card (tiles + progress-to-next; celebration banner + Share only when recent!=null). MILESTONE_RIDES/KM/HOURS constants in analysis.py.
 - **Streak Reminders (in-app, NOT push):** `/api/analysis/streak` now returns `at_risk` (active streak && 0 rides this week && weekday>=Thu) + `days_left` + `weekday`; StreakCard shows an amber nudge (testID streak-at-risk) when at_risk.
 - Verified: testing agent iter81 (backend 6/6 pytest + frontend all checks). NOTE: greenlantern plan_state.eased_weeks now has the taper-applied week (idempotent, harmless).
+
+## Analysis Suite Round 5 — Milestone Ring, Climb Splits, Milestone Shout-out, Streak Freeze (2026-08 fork)
+- **Milestone Progress Ring:** `/api/analysis/milestones` adds prev_rides/rides_progress + prev_km/km_progress (0..1). MilestonesCard renders an SVG `ProgressRing` toward the nearest next milestone (center 'X to N').
+- **Climb Detail Splits:** `/api/analysis/climb-detail` adds `splits[]` (n=4 equal-distance segments; `_climb_splits` interpolates per-attempt time via series d/t; `fastest` flagged). `/climb/[id]` renders a 'Split times' table highlighting the fastest attempt per split.
+- **Coach Milestone Shout-out:** `GET /api/coach/milestone-note` — when milestones.recent!=null, LLM (claude) returns `{has_milestone,note}`, cached per milestone in udb.settings 'milestone_note'. MilestonesCard celebration banner gets a Listen (TTS) button. {has_milestone:false} when nothing recent.
+- **Streak Freeze:** `/api/analysis/streak` adds freeze_tokens (earned=min(3,1+weeks_ridden//4)-frozen), frozen_weeks, can_freeze, gap_week; `POST /api/analysis/streak-freeze` spends a token to bridge the breaking off-week (stored in udb.settings 'streak_freeze'.frozen; streak calc unions ride-weeks with frozen). StreakCard shows banked tokens + 'Use a freeze' button when can_freeze.
+- BUGFIX: removed an accidental duplicate `@router.get("/streak")` stub that shadowed the real route and returned null.
+- Verified: testing agent iter82 (backend 5/5 pytest + frontend all checks, no bugs).

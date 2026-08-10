@@ -106,7 +106,7 @@ export default function FitnessScreen() {
           {streak && (
             <Card>
               <Text style={s.h}>Consistency Streak <Text style={s.hDim}>keep it alive</Text></Text>
-              <StreakCard streak={streak} onShare={shareStreak} />
+              <StreakCard streak={streak} onShare={shareStreak} onFrozen={() => fetchStreak().then(setStreak)} />
             </Card>
           )}
 

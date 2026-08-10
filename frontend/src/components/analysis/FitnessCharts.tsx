@@ -1,10 +1,10 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable, TextInput, ActivityIndicator } from "react-native";
-import Svg, { Path, Polyline, Line, Rect, Defs, LinearGradient as SvgGrad, Stop } from "react-native-svg";
+import Svg, { Path, Polyline, Line, Rect, Circle, Defs, LinearGradient as SvgGrad, Stop } from "react-native-svg";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius } from "@/src/theme";
-import { PmcPoint, PowerRecord, WeeklyDigest, FormTarget, WeeklyNote, TaperNote, Streak, Milestones, saveEvent, fetchTaperNote, applyTaper } from "@/src/lib/analysis";
+import { PmcPoint, PowerRecord, WeeklyDigest, FormTarget, WeeklyNote, TaperNote, Streak, Milestones, MilestoneNote, saveEvent, fetchTaperNote, applyTaper, fetchMilestoneNote, useStreakFreeze } from "@/src/lib/analysis";
 import { useCoach } from "@/src/lib/coach-persona";
 import { useCoachSpeech } from "@/src/hooks/useCoachSpeech";
 
@@ -414,9 +414,16 @@ export function CoachWeeklyNote({ note, loading, onRefresh }: { note: WeeklyNote
 }
 
 /** Share Streaks — weekly consistency streak with a shareable card. */
-export function StreakCard({ streak, onShare }: { streak: Streak; onShare: () => void }) {
+export function StreakCard({ streak, onShare, onFrozen }: { streak: Streak; onShare: () => void; onFrozen?: () => void }) {
   const active = streak.active && streak.current_weeks > 0;
   const flames = Math.min(streak.current_weeks, 8);
+  const [freezing, setFreezing] = React.useState(false);
+  const onFreeze = async () => {
+    setFreezing(true);
+    const r = await useStreakFreeze();
+    setFreezing(false);
+    if (r?.ok) onFrozen?.();
+  };
   return (
     <View>
       <View style={s.streakTop}>
@@ -448,6 +455,21 @@ export function StreakCard({ streak, onShare }: { streak: Streak; onShare: () =>
           </Text>
         </View>
       )}
+      <View style={s.freezeRow}>
+        <View style={s.freezeTokens}>
+          <Ionicons name="snow" size={15} color="#5B8DEF" />
+          <Text style={s.freezeTokensT}>{streak.freeze_tokens} Streak Freeze{streak.freeze_tokens === 1 ? "" : "s"} banked</Text>
+        </View>
+        {streak.can_freeze && (
+          <Pressable onPress={onFreeze} disabled={freezing} style={s.freezeBtn} testID="streak-freeze-btn">
+            {freezing ? <ActivityIndicator size="small" color="#0A1E3F" /> : <Ionicons name="snow" size={14} color="#0A1E3F" />}
+            <Text style={s.freezeBtnT}>Use a freeze</Text>
+          </Pressable>
+        )}
+      </View>
+      {streak.can_freeze && (
+        <Text style={s.freezeHint}>You missed a week — spend a freeze to bridge it and keep your streak going.</Text>
+      )}
       <Pressable onPress={onShare} style={s.streakShare} testID="streak-share" disabled={!active}>
         <Ionicons name="share-social" size={15} color={active ? "#241B00" : colors.textFaint} />
         <Text style={[s.streakShareT, !active && { color: colors.textFaint }]}>Share streak</Text>
@@ -456,9 +478,47 @@ export function StreakCard({ streak, onShare }: { streak: Streak; onShare: () =>
   );
 }
 
-/** Milestones — lifetime totals, progress to the next big number, and a
- *  celebratory highlight (with Share) when the last ride just crossed one. */
+function ProgressRing({ progress, size = 88, label, sub }: { progress: number; size?: number; label: string; sub: string }) {
+  const stroke = 8;
+  const r = (size - stroke) / 2;
+  const cx = size / 2, cy = size / 2;
+  const circ = 2 * Math.PI * r;
+  const p = Math.max(0, Math.min(1, progress));
+  return (
+    <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
+      <Svg width={size} height={size}>
+        <Circle cx={cx} cy={cy} r={r} stroke="rgba(255,255,255,0.1)" strokeWidth={stroke} fill="none" />
+        <Circle cx={cx} cy={cy} r={r} stroke={colors.yellow} strokeWidth={stroke} fill="none"
+          strokeDasharray={`${circ}`} strokeDashoffset={circ * (1 - p)} strokeLinecap="round"
+          transform={`rotate(-90 ${cx} ${cy})`} />
+      </Svg>
+      <View style={{ position: "absolute", alignItems: "center" }}>
+        <Text style={ms.ringLabel}>{label}</Text>
+        <Text style={ms.ringSub}>{sub}</Text>
+      </View>
+    </View>
+  );
+}
+
+/** Milestones — lifetime totals, a progress ring toward the next big number, and
+ *  a celebratory highlight (Share + coach shout-out) when one was just crossed. */
 export function MilestonesCard({ data, onShare }: { data: Milestones; onShare: () => void }) {
+  const coach = useCoach();
+  const { speak, speakingId } = useCoachSpeech(coach.id);
+  const [note, setNote] = React.useState<MilestoneNote | null>(null);
+
+  // Coach shout-out only when a milestone was just unlocked.
+  React.useEffect(() => {
+    if (data.recent) fetchMilestoneNote(coach.name, coach.gender).then(setNote);
+    else setNote(null);
+  }, [data.recent?.value, coach.name, coach.gender]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Ring tracks whichever milestone is closer (rides vs km).
+  const useRides = data.next_rides != null && (data.next_km == null || data.rides_progress >= data.km_progress);
+  const ringP = useRides ? data.rides_progress : data.km_progress;
+  const ringLabel = useRides ? `${data.rides_to_next}` : `${Math.round(data.km_to_next || 0).toLocaleString()}`;
+  const ringSub = useRides ? `to ${data.next_rides}` : `km to ${data.next_km?.toLocaleString()}`;
+
   return (
     <View>
       {data.recent && (
@@ -466,27 +526,41 @@ export function MilestonesCard({ data, onShare }: { data: Milestones; onShare: (
           <View style={s.mileBadge}><Ionicons name="ribbon" size={22} color="#241B00" /></View>
           <View style={{ flex: 1 }}>
             <Text style={s.mileTitle}>Milestone unlocked: {data.recent.label} 🎉</Text>
-            <Text style={s.mileBlurb}>{data.recent.blurb}</Text>
+            <Text style={s.mileBlurb}>{note?.note || data.recent.blurb}</Text>
           </View>
-          <Pressable onPress={onShare} style={s.mileShare} testID="milestone-share">
-            <Ionicons name="share-social" size={15} color="#241B00" />
-            <Text style={s.mileShareT}>Share</Text>
-          </Pressable>
+          <View style={{ gap: 8 }}>
+            {note?.note ? (
+              <Pressable onPress={() => speak("milestone", note.note as string)} style={s.mileListen} testID="milestone-listen">
+                <Ionicons name={speakingId === "milestone" ? "stop" : "volume-high"} size={14} color="#241B00" />
+                <Text style={s.mileShareT}>{speakingId === "milestone" ? "Stop" : "Listen"}</Text>
+              </Pressable>
+            ) : null}
+            <Pressable onPress={onShare} style={s.mileShare} testID="milestone-share">
+              <Ionicons name="share-social" size={15} color="#241B00" />
+              <Text style={s.mileShareT}>Share</Text>
+            </Pressable>
+          </View>
         </View>
       )}
-      <View style={s.mileGrid}>
-        <View style={s.mileTile}><Text style={s.mileVal}>{data.total_rides}</Text><Text style={s.mileLabel}>RIDES</Text></View>
-        <View style={s.mileTile}><Text style={s.mileVal}>{Math.round(data.total_km).toLocaleString()}<Text style={s.mileUnit}> km</Text></Text><Text style={s.mileLabel}>DISTANCE</Text></View>
-        <View style={s.mileTile}><Text style={s.mileVal}>{Math.round(data.total_hours)}<Text style={s.mileUnit}> h</Text></Text><Text style={s.mileLabel}>TIME</Text></View>
-        <View style={s.mileTile}><Text style={s.mileVal}>{data.total_tss.toLocaleString()}</Text><Text style={s.mileLabel}>TSS</Text></View>
-      </View>
-      <View style={s.mileNext}>
-        {data.rides_to_next != null && <Text style={s.mileNextT}>🚴 {data.rides_to_next} ride{data.rides_to_next === 1 ? "" : "s"} to {data.next_rides}</Text>}
-        {data.km_to_next != null && <Text style={s.mileNextT}>📏 {Math.round(data.km_to_next).toLocaleString()} km to {data.next_km?.toLocaleString()}</Text>}
+      <View style={s.mileTopRow}>
+        {(data.next_rides != null || data.next_km != null) && (
+          <ProgressRing progress={ringP} label={ringLabel} sub={ringSub} />
+        )}
+        <View style={s.mileGrid}>
+          <View style={s.mileTile}><Text style={s.mileVal}>{data.total_rides}</Text><Text style={s.mileLabel}>RIDES</Text></View>
+          <View style={s.mileTile}><Text style={s.mileVal}>{Math.round(data.total_km).toLocaleString()}<Text style={s.mileUnit}> km</Text></Text><Text style={s.mileLabel}>DISTANCE</Text></View>
+          <View style={s.mileTile}><Text style={s.mileVal}>{Math.round(data.total_hours)}<Text style={s.mileUnit}> h</Text></Text><Text style={s.mileLabel}>TIME</Text></View>
+          <View style={s.mileTile}><Text style={s.mileVal}>{data.total_tss.toLocaleString()}</Text><Text style={s.mileLabel}>TSS</Text></View>
+        </View>
       </View>
     </View>
   );
 }
+
+const ms = StyleSheet.create({
+  ringLabel: { color: colors.white, fontSize: 20, fontWeight: "900" },
+  ringSub: { color: colors.textFaint, fontSize: 10, fontWeight: "700" },
+});
 
 const s = StyleSheet.create({
   empty: { color: colors.textDim, fontSize: 13.5, lineHeight: 20 },
@@ -561,20 +635,26 @@ const s = StyleSheet.create({
 
   riskBox: { flexDirection: "row", gap: 8, alignItems: "flex-start", backgroundColor: "rgba(242,121,46,0.1)", borderWidth: 1, borderColor: "rgba(242,121,46,0.4)", borderRadius: radius.md, padding: 12, marginTop: 14 },
   riskText: { color: "#F2A277", fontSize: 12.5, lineHeight: 18, flex: 1, fontWeight: "600" },
+  freezeRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 14 },
+  freezeTokens: { flexDirection: "row", alignItems: "center", gap: 6 },
+  freezeTokensT: { color: colors.textDim, fontSize: 12.5, fontWeight: "700" },
+  freezeBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#5B8DEF", borderRadius: radius.pill, paddingVertical: 8, paddingHorizontal: 14 },
+  freezeBtnT: { color: "#0A1E3F", fontSize: 12.5, fontWeight: "800" },
+  freezeHint: { color: colors.textFaint, fontSize: 11.5, lineHeight: 17, marginTop: 8 },
 
   mileCelebrate: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "rgba(255,194,10,0.12)", borderWidth: 1, borderColor: "rgba(255,194,10,0.45)", borderRadius: radius.lg, padding: 14, marginBottom: 14 },
   mileBadge: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.yellow, alignItems: "center", justifyContent: "center" },
   mileTitle: { color: colors.white, fontSize: 14.5, fontWeight: "900" },
   mileBlurb: { color: colors.textDim, fontSize: 12.5, marginTop: 2, lineHeight: 17 },
   mileShare: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.yellow, borderRadius: radius.pill, paddingVertical: 8, paddingHorizontal: 14 },
+  mileListen: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.yellow, borderRadius: radius.pill, paddingVertical: 8, paddingHorizontal: 14 },
   mileShareT: { color: "#241B00", fontSize: 12.5, fontWeight: "800" },
-  mileGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  mileTile: { flexGrow: 1, flexBasis: "22%", minWidth: 100, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: 14 },
-  mileVal: { color: colors.white, fontSize: 22, fontWeight: "900" },
-  mileUnit: { color: colors.textFaint, fontSize: 12, fontWeight: "700" },
-  mileLabel: { color: colors.textDim, fontSize: 10.5, fontWeight: "700", marginTop: 4, letterSpacing: 0.3 },
-  mileNext: { flexDirection: "row", flexWrap: "wrap", gap: 16, marginTop: 12 },
-  mileNextT: { color: colors.textDim, fontSize: 12.5, fontWeight: "700" },
+  mileTopRow: { flexDirection: "row", alignItems: "center", gap: 14 },
+  mileGrid: { flex: 1, flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  mileTile: { flexGrow: 1, flexBasis: "40%", minWidth: 90, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: 12 },
+  mileVal: { color: colors.white, fontSize: 20, fontWeight: "900" },
+  mileUnit: { color: colors.textFaint, fontSize: 11, fontWeight: "700" },
+  mileLabel: { color: colors.textDim, fontSize: 10, fontWeight: "700", marginTop: 3, letterSpacing: 0.3 },
 
   streakTop: { flexDirection: "row", alignItems: "center", gap: 14 },
   streakBig: { width: 84, height: 84, borderRadius: 18, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.03)" },
