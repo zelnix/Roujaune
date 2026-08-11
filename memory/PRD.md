@@ -824,3 +824,11 @@ STILL PENDING (awaiting approval): Phase 3 (Home banners consolidation, dup CTAs
 - Plan Badge: profile shows 'Premium · Annual/Monthly' pill (premium-badge) via useEntitlement.
 - Ride experience button: dropped biking icon; now shows current experience (meta.label/shortLabel) + chevron.
 - Demo premium grant used for badge test then REVOKED (pristine).
+
+## Automated Store Screen-Capture + Store-Listing system (admin-only) (2026-08 fork)
+- New `backend/screen_capture.py` (self-contained `capture_router`, prefix `/api/admin/screen-captures`, gated by `auth.require_admin` — HWG service token or admin session). Playwright headless Chromium (installed) logs into the Expo WEB build as demo@roujaune.app, traverses 10 screens (home, plan, workouts, workout_list, scenic, progress, fitness, calendar, profile, wellness), captures raw viewport PNGs (1280x800 @2x), frames each on a branded 2048x1536 App-Store canvas via Pillow (caption headline + yellow accent line + device bezel + rounded screenshot + ROUJAUNE wordmark), and stores raw/framed/thumb base64 in Mongo `screen_captures`. App Store listing copy (title/subtitle/promotional_text/description/keywords) is generated via the Emergent LLM key (claude-sonnet-4-6) into `app_meta` key="store_listing". Job progress tracked in `capture_jobs` (_id="current").
+- Endpoints: GET /screens, POST /refresh {screens?:[keys]} (async background job, 409 if running), GET /status, GET "" (list metadata+thumb only), GET /export (ZIP of raw+framed+listing txt/json), GET /store-listing, PUT /store-listing (partial), POST /store-listing/generate, GET /{key}?variant=framed|raw|thumb (PNG).
+- Base URL read from `EXPO_PUBLIC_BACKEND_URL` (frontend/.env) so it tracks the current preview URL — never hardcoded. Demo account set `email_verified=true` for clean store shots.
+- Verified: testing agent iter90 13/13 PASS (auth matrix 401/401/403/200, 10 screens, list excludes raw/framed, store-listing GET/partial-PUT, variant PNG + 422/404, ZIP export). Full 10-screen capture + LLM copy confirmed working end-to-end (framed images visually verified).
+- `playwright==1.62.0` + `pillow==12.3.0` added to backend requirements.
+- PAUSED (user-approved) minor tasks still parked: Grant confirmation email, gifted-premium expiry reminder, profile NaN/undefined defaults.

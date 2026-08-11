@@ -34,6 +34,7 @@ import companion_plan
 import auth
 import push
 import admin_routes
+import screen_capture
 from auth import udb
 
 
@@ -390,10 +391,12 @@ api_router.include_router(analysis_routes.router)
 app.include_router(api_router)
 app.include_router(push.router)
 app.include_router(admin_routes.admin_router)
+app.include_router(screen_capture.capture_router)
 app.include_router(admin_cfg_router)
 app.include_router(scenic_routes.admin_router)
 push.init(db)
 admin_routes.init(db, on_plan_change=_on_plan_change)
+screen_capture.init(db)
 
 app.add_middleware(auth.AuthMiddleware)
 # CORS origins are env-driven (comma-separated CORS_ORIGINS). Defaults to "*" when

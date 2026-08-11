@@ -1,0 +1,37 @@
+{
+  "summary": "Backend-only verification of the new admin-only Screen-Capture + Store-Listing system at /api/admin/screen-captures. Wrote /app/backend/tests/test_iter90_screen_captures_admin.py (13 tests, all PASS). Verified: (1) AUTH matrix — 401 with no Bearer, 401 with wrong Bearer, 403 with a RIDER session token (demo@roujaune.app), 200 with the HWG service token. (2) /screens returns exactly 10 screens with the expected keys {home, plan, workouts, workout_list, scenic, progress, fitness, calendar, profile, wellness}. (3) /status returns valid shape (status ∈ idle|running|done|error; has total, done, screens). (4) List (GET '') returns items containing thumb_base64 but NEITHER raw_base64 NOR framed_base64. (5) /store-listing GET returns all 5 fields (title, subtitle, promotional_text, description, keywords). (6) PUT /store-listing with {subtitle:'Test subtitle'} updated ONLY subtitle; title and description unchanged and persistence confirmed via follow-up GET. Original subtitle was restored ('Train Smarter. Ride Legends.') after the test. (7) GET /{key}?variant=framed returns image/png 200 with a valid PNG magic header; variant=bogus returns 422; unknown key returns 404. (8) /export returns application/zip 200 with Content-Disposition: attachment and a valid ZIP magic header. No 409 concurrency check was triggered (per instructions we did NOT POST /refresh to avoid the ~90s capture). Success rate backend: 100% (13/13).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter90_screen_captures_admin.py",
+    "/app/test_reports/pytest/iter90.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "screen_capture.py cleanly excludes MongoDB _id from every response (find({}, {'_id': 0, ...})).",
+    "capture_router is gated globally via `dependencies=[Depends(auth.require_admin)]`, so require_user() runs first (→ 401 when unauthenticated) then role check (→ 403 for riders). Matches the AUTH matrix requirement precisely.",
+    "List endpoint correctly projects out raw_base64 and framed_base64 to keep the payload light — verified in test.",
+    "The `/{key}` route accepts any string, so /nonexistentkey routes here and returns 404 via the DB lookup (works as tested). Because the route is declared AFTER /screens, /status, /export, /store-listing they take precedence — path ordering is correct.",
+    "Partial PUT via `{k: v for k, v in body.model_dump().items() if v is not None}` correctly preserves untouched fields. `updates` includes an 'updated_at' field written to Mongo but not returned by GET (harmless — GET strips _id and returns whatever is in the doc, which does include updated_at; not asserted against)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter90_screen_captures_admin.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (13/13)",
+    "frontend": "n/a (skipped per request)"
+  },
+  "seed_data_creation": "None. Used the DB seeded by the main agent's earlier full refresh (10 captures + generated store listing). The PUT-subtitle test restores the original subtitle after mutation.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The router prefix is /api/admin/screen-captures. Auth is enforced by the shared auth.require_admin dependency, so all endpoints return 401 without a Bearer, 403 with a rider Bearer, and 200 with the HWG service token (Bearer hwg_svc_roujaune_0KR5RCmk6XI-TInq6iQTZyFXlRZGMn9J). Do NOT POST /refresh unless a 409 concurrency check is explicitly needed — it takes ~90s and hits the live preview URL. Do NOT drop the screen_captures collection. The rider account for the 403 test is demo@roujaune.app / demo9900 via POST /api/auth/login. Reusable pytest lives at /app/backend/tests/test_iter90_screen_captures_admin.py.",
+  "rca_of_issue": "n/a — verification pass, no bugs found. All 8 review criteria confirmed green."
+}
