@@ -14,6 +14,7 @@ import { useA11y, setLargeText, setHighContrast, setReduceMotion } from "@/src/l
 import { useEntitlement } from "@/src/lib/entitlement";
 import { useCoachSpeech } from "@/src/hooks/useCoachSpeech";
 import { fetchEmailPrefs, setEmailPrefs, emailDigestNow } from "@/src/lib/analysis";
+import { WeeklyEmailPreview } from "@/src/components/WeeklyEmailPreview";
 
 const PREVIEW_LINE = "Alright, let's ride. Hold steady and breathe — you've got this.";
 
@@ -42,6 +43,7 @@ export default function SettingsScreen() {
   const [digestDay, setDigestDay] = React.useState(0);
   const [sendingDigest, setSendingDigest] = React.useState(false);
   const [digestMsg, setDigestMsg] = React.useState<string | null>(null);
+  const [showEmailPreview, setShowEmailPreview] = React.useState(false);
   React.useEffect(() => { fetchEmailPrefs().then((p) => { setEmailWeekly(!!p.weekly_digest); setDigestDay(p.digest_weekday ?? 0); }); }, []);
   const toggleEmailWeekly = async () => {
     const next = !emailWeekly;
@@ -285,6 +287,12 @@ export default function SettingsScreen() {
       <Card testID="email-prefs">
         <SectionTitle label="EMAIL" color={CC.rouge} />
         <PrefToggle label="Weekly recap email" sub="Get your training week in review, once a week" on={emailWeekly} onToggle={toggleEmailWeekly} testID="tg-emailWeekly" />
+        <Pressable onPress={() => setShowEmailPreview((v) => !v)} testID="toggle-email-preview" style={s.previewLink} hitSlop={6}
+          accessibilityRole="button" accessibilityState={{ expanded: showEmailPreview }}>
+          <Ionicons name={showEmailPreview ? "eye-off-outline" : "eye-outline"} size={14} color={CC.yellow} />
+          <Text style={s.previewLinkT}>{showEmailPreview ? "Hide email preview" : "Preview the email"}</Text>
+        </Pressable>
+        {showEmailPreview ? <WeeklyEmailPreview /> : null}
         {emailWeekly && (
           <View style={s.dayPickerWrap} testID="digest-day-picker">
             <Text style={s.groupLabel}>Send it on</Text>
@@ -370,6 +378,8 @@ const s = StyleSheet.create({
   digestBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 14, borderWidth: 1, borderColor: "rgba(255,194,10,0.4)", backgroundColor: "rgba(255,194,10,0.06)", borderRadius: 12, paddingVertical: 12 },
   digestBtnT: { color: CC.yellow, fontSize: 13.5, fontWeight: "800" },
   digestMsg: { color: "#3FB68B", fontSize: 12.5, fontWeight: "700", marginTop: 10, textAlign: "center" },
+  previewLink: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12 },
+  previewLinkT: { color: CC.yellow, fontSize: 12.5, fontWeight: "800" },
   dayPickerWrap: { marginTop: 14, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)", paddingTop: 14 },
   dayRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
   dayChip: { flexGrow: 1, alignItems: "center", borderWidth: 1, borderColor: CC.border, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 6, backgroundColor: "rgba(255,255,255,0.03)", minWidth: 44 },

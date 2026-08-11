@@ -208,3 +208,20 @@ def weekly_digest_email_html(name: str, digest: dict, unsub_url: str | None = No
             "</p>"
         )
     return _shell("Your week in review", body)
+
+
+def milestone_email_html(name: str, items: list[dict]) -> str:
+    hero = items[0]
+    chips = "".join(
+        f"<li style='margin-bottom:6px;'><b style='color:{BRAND_YELLOW};'>{it['label']}</b> — {it['blurb']}</li>"
+        for it in items
+    )
+    body = (
+        f"<p>Hi {name},</p>"
+        f"<p style='font-size:17px;'>🎉 <b style='color:#F3F1EA;'>{hero['label']}</b> — {hero['blurb']}</p>"
+        + (f"<p style='margin-top:16px;color:#F3F1EA;'>You just unlocked:</p>"
+           f"<ul style='margin:6px 0 0;padding-left:18px;color:#C9CAC7;'>{chips}</ul>" if len(items) > 1 else "")
+        + "<p style='margin-top:20px;'>Every kilometre counts. Keep the momentum going — your next "
+          "milestone is already in sight.</p>"
+    )
+    return _shell("A new milestone! 🏆", body)

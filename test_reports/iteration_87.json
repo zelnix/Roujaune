@@ -1,0 +1,28 @@
+{
+  "summary": "Frontend-only verification of 3 resumed features on ROUJAUNE preview (demo@roujaune.app). PASS — all target testIDs render and behave as specified. (1) /settings Email Preview: 'toggle-email-preview' is present, tapping renders the compact 'email-preview' card containing 'Harmony Wellness Group', 'Your week in review', 'ROUJAUNE' brand, and 4 stat tiles (TSS=14, TIME=0.2 h, RIDES=1, DISTANCE=4.5 km) with delta lines; label toggles 'Preview the email' → 'Hide email preview' → back on second tap (card unmounts). (2) /fitness Season Recap: 'season-share' opens ShareCardModal; 'season-backdrop-pick' with label 'Add your own backdrop photo' is rendered under the season card; 'share-card-share' and 'share-card-save' both present. Did NOT tap backdrop-pick (native picker). (3) Regressions: 'tg-emailWeekly' toggles the day picker (digest-day-picker + chips digest-day-0..6 all present when ON, disappear when OFF); 'send-digest-now' renders (not tapped, per instructions); 'preview-alberto' renders; /fitness 'digest-email' renders; /milestones loads (Milestone Wall).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/tmp/settings_preview_open.png",
+    "/tmp/share_modal_open.png",
+    "/tmp/milestones.png"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "WeeklyEmailPreview.tsx:14 — useEffect fetch has no try/catch; if fetchWeeklyDigest rejects, loading stays true forever (spinner never dismisses). Consider .catch(() => setLoading(false)) so the 'Ride this week and your recap will fill in…' fallback shows on transient failures.",
+    "settings.tsx:290 — Pressable 'toggle-email-preview' should probably render inside the email-prefs Card only when tg-emailWeekly is ON (or at least the copy could adapt), otherwise a user with weekly OFF still sees a working preview which is fine — just noting for UX consistency.",
+    "ShareCardModal — season-backdrop-pick uses expo-image-picker which is native-only; on web the button is a no-op. If web export is a target, add a Platform.OS === 'web' guard with a friendly toast, or hide the button on web."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100% (3/3 features + 4/4 regressions)"},
+  "seed_data_creation": "None. Only read-only navigation + one benign toggle flip of tg-emailWeekly (flipped back to original state). No emails triggered.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login flow requires clicking testID='email-btn' first to reveal 'email-input'/'password-input'/'submit-btn'. Use 1024x1000 viewport. Demo rider (demo@roujaune.app/demo9900) has TSS=14, 1 ride, 4.5 km this week — matches preview tiles. Avoid tapping 'send-digest-now' (real email) and season-backdrop-pick (native picker crashes on web).",
+  "rca_of_issue": "n/a — feature verification, no bugs found."
+}

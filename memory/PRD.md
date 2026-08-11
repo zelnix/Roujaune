@@ -807,3 +807,8 @@ STILL PENDING (awaiting approval): Phase 3 (Home banners consolidation, dup CTAs
 
 ## Round 8b (COMPLETE)
 - HWG service token finalized: env HWG_SERVICE_TOKEN (fixed value from HWG), principal "HWG Console". CORS locked to the 4 HWG origins. Old ADMIN_API_TOKEN removed. Curl-verified (token 200, old 401, all 4 origins CORS pass, evil blocked, rider app unaffected).
+
+## Round 9 (COMPLETE — iter 87 PASS)
+- Milestone Email: celebratory email on crossing rides/km/hours milestones (baselines on first run, dedup). Hooked after ride save. emailer.milestone_email_html.
+- Recap Backdrop Photo: riders add own photo behind Season share image (expo-image-picker, season-backdrop-pick) — AchievementCard bgUri.
+- Email Preview: WeeklyEmailPreview in Settings EMAIL card (toggle-email-preview) shows a compact rendition of the weekly recap email.

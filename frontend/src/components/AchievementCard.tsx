@@ -19,6 +19,7 @@ export type AchievementCardData = {
   coachName: string;
   hero?: { label: string; value: string };  // focal callout (e.g. biggest climb)
   watermark?: string;                        // giant faint backdrop text (e.g. year)
+  bgUri?: string;                            // rider-chosen backdrop photo (Season)
 };
 
 /** A 1080×1350-ratio branded card captured to an image for sharing. Fixed pixel
@@ -28,11 +29,11 @@ export const CARD_H = 450;
 
 export const AchievementCard = React.forwardRef<View, { data: AchievementCardData }>(
   function AchievementCard({ data }, ref) {
-    const { isPlanEnd, variant, kicker, title, subtitle, stats, coachName, hero, watermark } = data;
+    const { isPlanEnd, variant, kicker, title, subtitle, stats, coachName, hero, watermark, bgUri } = data;
     const isSeason = variant === "season";
     return (
       <View ref={ref} collapsable={false} style={c.card}>
-        <ImageBackground source={BG} style={StyleSheet.absoluteFill as any} resizeMode="cover">
+        <ImageBackground source={bgUri ? { uri: bgUri } : BG} style={StyleSheet.absoluteFill as any} resizeMode="cover">
           <LinearGradient
             colors={isSeason
               ? ["rgba(5,6,6,0.45)", "rgba(5,6,6,0.72)", "rgba(5,6,6,0.96)"]

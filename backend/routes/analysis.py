@@ -801,6 +801,55 @@ async def milestones():
     }
 
 
+async def check_and_email_milestones():
+    """Fire a celebratory email the moment a rider crosses a big milestone
+    (rides / distance / hours). Baselines silently on first run so we never spam
+    milestones a rider already had. Called (best-effort) after a ride is saved."""
+    user = auth._current_user.get()
+    if not user or not user.get("email"):
+        return
+    ms = await milestones()
+    reached: list[tuple[str, str, str]] = []
+    for m in MILESTONE_RIDES:
+        if ms["total_rides"] >= m:
+            reached.append((f"rides:{m}", f"{m} rides", f"You've completed {m} rides with ROUJAUNE!"))
+    for m in MILESTONE_KM:
+        if ms["total_km"] >= m:
+            reached.append((f"km:{m}", f"{m:,} km", f"You've ridden {m:,} km in total — incredible mileage!"))
+    for m in MILESTONE_HOURS:
+        if ms["total_hours"] >= m:
+            reached.append((f"hours:{m}", f"{m} hours", f"You've spent {m} hours in the saddle!"))
+    reached_keys = {k for k, _, _ in reached}
+
+    doc = await udb.settings.find_one({"id": "milestone_emails"}) or {}
+    emailed = set(doc.get("emailed", []))
+    if not doc.get("baselined"):
+        # First time we see this rider — record what's already done, send nothing.
+        await udb.settings.update_one(
+            {"id": "milestone_emails"},
+            {"$set": {"emailed": sorted(reached_keys), "baselined": True}}, upsert=True)
+        return
+
+    new_keys = reached_keys - emailed
+    if not new_keys:
+        return
+    # Celebrate the newly-crossed milestones (biggest first).
+    def _rank(item):
+        kind, m = item[0].split(":")
+        return ({"km": 3, "hours": 2, "rides": 1}[kind], int(m))
+    new_items = sorted([r for r in reached if r[0] in new_keys], key=_rank, reverse=True)
+    items = [{"label": lbl, "blurb": blurb} for _, lbl, blurb in new_items]
+    name = (user.get("name") or "there").split(" ")[0]
+    ok = await emailer.send_email(
+        user["email"], f"🏆 {items[0]['label']} — a new ROUJAUNE milestone!",
+        emailer.milestone_email_html(name, items))
+    if ok:
+        await udb.settings.update_one(
+            {"id": "milestone_emails"},
+            {"$set": {"emailed": sorted(reached_keys)}}, upsert=True)
+
+
+
 @router.get("/records")
 async def records():
     """All-time best average power for key durations across every ride that has

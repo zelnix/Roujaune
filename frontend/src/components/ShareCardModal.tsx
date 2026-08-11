@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { captureRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import * as MediaLibrary from "expo-media-library";
+import * as ImagePicker from "expo-image-picker";
 import { C } from "./plan";
 import { AchievementCard, AchievementCardData } from "./AchievementCard";
 
@@ -19,10 +20,33 @@ export function ShareCardModal({
   const cardRef = React.useRef<View>(null);
   const [busy, setBusy] = React.useState<null | "share" | "save">(null);
   const [notice, setNotice] = React.useState<{ msg: string; action?: "settings" } | null>(null);
+  const [bgUri, setBgUri] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    if (visible) setNotice(null);
+    if (visible) { setNotice(null); setBgUri(null); }
   }, [visible]);
+
+  const pickBackdrop = async () => {
+    if (busy) return;
+    setNotice(null);
+    try {
+      let perm = await ImagePicker.getMediaLibraryPermissionsAsync();
+      if (!perm.granted && perm.canAskAgain) {
+        perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      }
+      if (!perm.granted) {
+        setNotice({ msg: "Photo access is off, so we can't add your photo. You can enable it in Settings.", action: "settings" });
+        return;
+      }
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true, aspect: [4, 5], quality: 0.85,
+      });
+      if (!res.canceled && res.assets?.[0]?.uri) setBgUri(res.assets[0].uri);
+    } catch (e) {
+      setNotice({ msg: "Couldn't open your photos. Please try again." });
+    }
+  };
 
   const capture = async () => {
     // small settle so the card + background image are painted before capture
@@ -84,8 +108,22 @@ export function ShareCardModal({
         <Pressable style={StyleSheet.absoluteFill as any} onPress={onClose} accessibilityLabel="Close" />
         <View style={s.sheet}>
           <View style={s.cardWrap}>
-            <AchievementCard ref={cardRef} data={data} />
+            <AchievementCard ref={cardRef} data={{ ...data, bgUri: bgUri ?? undefined }} />
           </View>
+
+          {data.variant === "season" ? (
+            <Pressable testID="season-backdrop-pick" onPress={pickBackdrop} disabled={!!busy}
+              accessibilityRole="button" accessibilityLabel="Choose a backdrop photo for your season card"
+              style={({ hovered }: any) => [s.bgBtn, hovered && s.bgBtnHover]}>
+              <Ionicons name={bgUri ? "image" : "image-outline"} size={15} color={C.yellow} />
+              <Text style={s.bgBtnText}>{bgUri ? "Change backdrop photo" : "Add your own backdrop photo"}</Text>
+              {bgUri ? (
+                <Pressable onPress={() => setBgUri(null)} hitSlop={8} accessibilityLabel="Remove backdrop photo" style={s.bgClear}>
+                  <Ionicons name="close-circle" size={16} color={C.dim} />
+                </Pressable>
+              ) : null}
+            </Pressable>
+          ) : null}
 
           {notice ? (
             <View style={s.notice}>
@@ -130,6 +168,10 @@ const s = StyleSheet.create({
   settingsBtn: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 },
   settingsText: { color: C.yellow, fontSize: 12.5, fontWeight: "700" },
   actions: { flexDirection: "row", gap: 12, marginTop: 20 },
+  bgBtn: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 16, borderWidth: 1, borderColor: "rgba(255,194,10,0.4)", backgroundColor: "rgba(255,194,10,0.06)", borderRadius: 12, paddingVertical: 10, paddingHorizontal: 16 },
+  bgBtnHover: { backgroundColor: "rgba(255,194,10,0.12)", borderColor: "rgba(255,194,10,0.6)" },
+  bgBtnText: { color: C.yellow, fontSize: 13, fontWeight: "800" },
+  bgClear: { marginLeft: 2 },
   primaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.yellow, borderRadius: 14, paddingVertical: 13, paddingHorizontal: 34, minHeight: 48, minWidth: 130 },
   primaryText: { color: "#241B00", fontSize: 15, fontWeight: "800" },
   secondaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, paddingVertical: 13, paddingHorizontal: 30, minHeight: 48, minWidth: 120, borderWidth: 1, borderColor: "rgba(255,194,10,0.4)", backgroundColor: "rgba(255,194,10,0.06)" },

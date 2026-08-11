@@ -311,6 +311,12 @@ async def _save_ride_history(body: SummarizeRequest, result: dict) -> Optional[s
             "debrief": None,
         }
         await udb.ride_history.insert_one(doc)
+        try:
+            import asyncio
+            from routes.analysis import check_and_email_milestones
+            asyncio.create_task(check_and_email_milestones())  # celebratory email, non-blocking
+        except Exception as e:
+            logger.warning(f"milestone email hook failed: {e}")
         return rid
     except Exception as e:  # never block the summary on history write
         logger.warning(f"ride_history insert failed: {e}")
