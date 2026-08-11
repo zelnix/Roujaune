@@ -800,3 +800,7 @@ STILL PENDING (awaiting approval): Phase 3 (Home banners consolidation, dup CTAs
 - Unsubscribe: one-tap link in weekly email footer -> public GET /api/analysis/unsubscribe?token= (branded confirmation page); per-rider unsub_token
 - Send Day Choice: email_prefs.digest_weekday (0-6); Settings day picker; weekly loop sends on each rider's chosen day (daily 08:00 UTC tick)
 - Season Photo Theme: AchievementCard variant='season' (year watermark + BIGGEST CLIMB hero band + 6-stat grid) for the shareable season image
+
+## Round 8 (COMPLETE — iter 86 PASS)
+- External HWG admin console access: static service token (ADMIN_API_TOKEN in backend/.env). Send `Authorization: Bearer <token>` to any /api/admin/* endpoint -> full admin (synthetic principal svc_admin_console). Added at top of auth._resolve_token (constant-time compare). Interactive admin login unchanged. CORS lockable via CORS_ORIGINS env (awaiting admin domain).
+- PAUSED (to resume): Milestone Email, Recap Backdrop Photo, Email Preview.

@@ -194,6 +194,13 @@ async def _create_session(user_id: str) -> str:
 async def _resolve_token(token: str):
     if not token:
         return None
+    # External admin console: a static service token (ADMIN_API_TOKEN) grants
+    # admin access via `Authorization: Bearer <token>`. Constant-time compare.
+    _svc = os.environ.get("ADMIN_API_TOKEN", "")
+    if _svc and secrets.compare_digest(token, _svc):
+        return {"user_id": "svc_admin_console", "email": "console@harmonywellnessgroup.com.au",
+                "name": "HWG Admin Console", "role": "admin",
+                "provider": "service-token", "is_admin_store": True}
     sess = await _db.user_sessions.find_one({"session_token": token}, {"_id": 0})
     if sess:
         exp = sess.get("expires_at")
