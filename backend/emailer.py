@@ -154,7 +154,7 @@ def welcome_email_html(name: str) -> str:
     return _shell("Welcome to ROUJAUNE", body)
 
 
-def weekly_digest_email_html(name: str, digest: dict, unsub_url: str | None = None) -> str:
+def weekly_digest_email_html(name: str, digest: dict, unsub_url: str | None = None, preview: bool = False) -> str:
     tw = digest.get("this_week", {}) or {}
     d = digest.get("deltas", {}) or {}
 
@@ -193,7 +193,14 @@ def weekly_digest_email_html(name: str, digest: dict, unsub_url: str | None = No
         + _tile(f"{tw.get('distance_km', 0)} km", "DISTANCE", _delta(d.get("distance_km", 0), "km"))
         + "</tr></table>"
     )
+    banner = (
+        "<div style='background:rgba(255,194,10,0.14);border:1px solid rgba(255,194,10,0.5);"
+        "border-radius:12px;padding:10px 14px;margin-bottom:16px;color:#FFD24A;font-size:13px;"
+        "font-weight:700;text-align:center;'>🔍 This is a PREVIEW of your weekly recap email — "
+        "sent because you asked to see what it looks like.</div>"
+    ) if preview else ""
     body = (
+        f"{banner}"
         f"<p>Hi {name},</p>"
         "<p>Here's your training recap for the week.</p>"
         f"{grid}{rec_html}"

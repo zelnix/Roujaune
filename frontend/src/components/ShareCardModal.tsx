@@ -1,10 +1,12 @@
 import React from "react";
-import { View, Text, StyleSheet, Modal, Pressable, ActivityIndicator, Platform, Linking } from "react-native";
+import { View, Text, StyleSheet, Modal, Pressable, ActivityIndicator, Platform, Linking, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { captureRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import * as MediaLibrary from "expo-media-library";
 import * as ImagePicker from "expo-image-picker";
+import { fetchDiscoveries } from "../lib/scenic-routes";
 import { C } from "./plan";
 import { AchievementCard, AchievementCardData } from "./AchievementCard";
 
@@ -21,10 +23,22 @@ export function ShareCardModal({
   const [busy, setBusy] = React.useState<null | "share" | "save">(null);
   const [notice, setNotice] = React.useState<{ msg: string; action?: "settings" } | null>(null);
   const [bgUri, setBgUri] = React.useState<string | null>(null);
+  const [discoPhotos, setDiscoPhotos] = React.useState<string[]>([]);
 
   React.useEffect(() => {
     if (visible) { setNotice(null); setBgUri(null); }
   }, [visible]);
+
+  React.useEffect(() => {
+    if (visible && data?.variant === "season") {
+      fetchDiscoveries().then((ds) => {
+        const photos = Array.from(new Set(ds.map((d) => d.photo).filter(Boolean) as string[]));
+        setDiscoPhotos(photos);
+      }).catch(() => setDiscoPhotos([]));
+    } else {
+      setDiscoPhotos([]);
+    }
+  }, [visible, data?.variant]);
 
   const pickBackdrop = async () => {
     if (busy) return;
@@ -125,6 +139,27 @@ export function ShareCardModal({
             </Pressable>
           ) : null}
 
+          {data.variant === "season" && discoPhotos.length > 0 ? (
+            <View style={s.discoWrap} testID="season-discovery-picker">
+              <Text style={s.discoLabel}>Or pick from your Discoveries</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.discoRow}>
+                {discoPhotos.map((uri) => {
+                  const on = bgUri === uri;
+                  return (
+                    <Pressable key={uri} testID="season-discovery-thumb" onPress={() => setBgUri(uri)}
+                      accessibilityRole="button" accessibilityLabel="Use this discovery photo as backdrop"
+                      style={[s.thumb, on && s.thumbOn]}>
+                      <Image source={{ uri }} style={s.thumbImg} contentFit="cover" />
+                      {on ? (
+                        <View style={s.thumbCheck}><Ionicons name="checkmark-circle" size={18} color={C.yellow} /></View>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          ) : null}
+
           {notice ? (
             <View style={s.notice}>
               <Text style={s.noticeText}>{notice.msg}</Text>
@@ -172,6 +207,13 @@ const s = StyleSheet.create({
   bgBtnHover: { backgroundColor: "rgba(255,194,10,0.12)", borderColor: "rgba(255,194,10,0.6)" },
   bgBtnText: { color: C.yellow, fontSize: 13, fontWeight: "800" },
   bgClear: { marginLeft: 2 },
+  discoWrap: { marginTop: 12, alignSelf: "stretch" },
+  discoLabel: { color: C.dim, fontSize: 11.5, fontWeight: "700", marginBottom: 8, textAlign: "center" },
+  discoRow: { gap: 8, paddingHorizontal: 4 },
+  thumb: { width: 56, height: 70, borderRadius: 10, overflow: "hidden", borderWidth: 2, borderColor: "transparent" },
+  thumbOn: { borderColor: C.yellow },
+  thumbImg: { width: "100%", height: "100%" },
+  thumbCheck: { position: "absolute", right: 2, top: 2, backgroundColor: "rgba(11,12,12,0.7)", borderRadius: 10 },
   primaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.yellow, borderRadius: 14, paddingVertical: 13, paddingHorizontal: 34, minHeight: 48, minWidth: 130 },
   primaryText: { color: "#241B00", fontSize: 15, fontWeight: "800" },
   secondaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, paddingVertical: 13, paddingHorizontal: 30, minHeight: 48, minWidth: 120, borderWidth: 1, borderColor: "rgba(255,194,10,0.4)", backgroundColor: "rgba(255,194,10,0.06)" },

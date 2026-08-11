@@ -1,0 +1,60 @@
+{
+  "summary": "Frontend-only verification of three features on demo@roujaune.app: (A) Season-card backdrop from Discoveries in ShareCardModal, (B) on-demand 'Send me a test' weekly-recap preview button on /settings, (C) milestone badges on /milestones. Regressions: tg-emailWeekly + digest-day-picker on /settings, and Weekly Digest 'Send test' (digest-email) on /fitness. All items pass. No send buttons were tapped.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "detailed_results": {
+    "settings_email_card": {
+      "send-digest-now_present": true,
+      "send-digest-now_text": "Send me a test now",
+      "clearly_labelled_preview_hint_present": true,
+      "hint_text": "We'll email you a clearly-labelled preview so you can see exactly what arrives.",
+      "toggle-email-preview_present": true,
+      "email-preview_revealed_on_toggle": true,
+      "tapped_send_button": false
+    },
+    "settings_regression": {
+      "tg-emailWeekly_present": true,
+      "state_when_ON_reveals_digest-day-picker": true,
+      "digest-day-0_to_6_present": true
+    },
+    "fitness_season_share": {
+      "digest-email_send_test_button_present": true,
+      "season-share_opens_modal": true,
+      "season-backdrop-pick_present": true,
+      "season-discovery-picker_present": false,
+      "note_on_discovery_picker": "Absent for demo account — the ShareCardModal.fetchDiscoveries() returned no photos. Request explicitly states this is acceptable ('If there are no discoveries, the strip is simply absent (acceptable)').",
+      "share-card-share_present": true,
+      "share-card-save_present": true
+    },
+    "milestones_wall": {
+      "screen_renders": true,
+      "summary_shown": "0 of 30 milestones earned",
+      "badges_rendered_count": 30,
+      "all_locked_as_expected": true,
+      "first_locked_badge": "badge-rides-10",
+      "tapping_locked_badge_did_not_open_share_modal": true,
+      "tapping_locked_badge_did_not_crash": true,
+      "categories_visible": ["Rides", "Distance", "Hours"]
+    }
+  },
+  "test_report_links": [
+    "/app/test_reports/screens/i88_settings_email.jpeg",
+    "/app/test_reports/screens/i88_share_modal.jpeg",
+    "/app/test_reports/screens/i88_milestones.jpeg",
+    "/app/test_reports/screens/i88_fitness_top.jpeg"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped per request)", "frontend": "100%"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Demo account has 0 photo-based Discoveries so season-discovery-picker is intentionally absent (acceptable per spec). All milestones locked (rider stats: 2 rides / 9 km / 1 h — below 10/100/10 thresholds). Do NOT tap send-digest-now, digest-email, or complete any ride — those send real emails / consume free rides.",
+  "rca_of_issue": "N/A — no bugs found."
+}

@@ -949,7 +949,7 @@ async def put_email_prefs(body: dict):
 
 @router.post("/email-digest")
 async def email_digest():
-    """Send the signed-in rider their weekly recap by email, right now."""
+    """Send the signed-in rider a PREVIEW/test of their weekly recap email now."""
     user = auth.require_user()
     email = user.get("email")
     if not email:
@@ -958,8 +958,8 @@ async def email_digest():
     name = (user.get("name") or "there").split(" ")[0]
     token = await _ensure_unsub_token(user["user_id"])
     ok = await emailer.send_email(
-        email, "Your ROUJAUNE week in review",
-        emailer.weekly_digest_email_html(name, digest, _unsub_url(token)),
+        email, "[Preview] Your ROUJAUNE week in review",
+        emailer.weekly_digest_email_html(name, digest, _unsub_url(token), preview=True),
     )
     if not ok:
         raise HTTPException(status_code=502, detail="Couldn't send the email right now. Please try again shortly.")

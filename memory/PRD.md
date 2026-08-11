@@ -812,3 +812,9 @@ STILL PENDING (awaiting approval): Phase 3 (Home banners consolidation, dup CTAs
 - Milestone Email: celebratory email on crossing rides/km/hours milestones (baselines on first run, dedup). Hooked after ride save. emailer.milestone_email_html.
 - Recap Backdrop Photo: riders add own photo behind Season share image (expo-image-picker, season-backdrop-pick) — AchievementCard bgUri.
 - Email Preview: WeeklyEmailPreview in Settings EMAIL card (toggle-email-preview) shows a compact rendition of the weekly recap email.
+
+## Round 10 (COMPLETE — iter 88 PASS)
+- Discovery Backdrop: pick a Season-card backdrop from Discoveries scrapbook (season-discovery-picker) + camera roll.
+- Send Digest Test: on-demand digest email now a clearly-labelled '[Preview]' with banner; buttons relabelled 'Send me a test now' / 'Send test'.
+- Milestone Share Card: earned milestone badges on /milestones are shareable via ShareCardModal.
+- Admin grant: roger.parenzee@gmail.com (user_f4b48fb94eff) given ANNUAL premium (plan yearly, product premium_yearly, premium_until 2027-08-11) via direct billing upsert (source admin_grant). Verified is_premium=True.

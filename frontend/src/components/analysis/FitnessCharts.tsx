@@ -190,7 +190,7 @@ export function WeeklyDigestCard({ digest, onShare }: { digest: WeeklyDigest; on
     setEmailing(true); setEmailMsg(null);
     const r = await emailDigestNow();
     setEmailing(false);
-    setEmailMsg(r.ok ? "Sent — check your inbox 📬" : "Couldn't send right now. Please try again.");
+    setEmailMsg(r.ok ? "Preview sent — check your inbox 📬" : "Couldn't send right now. Please try again.");
   };
   const tw = digest.this_week, d = digest.deltas;
   const deltaChip = (v: number, unit: string, betterHigh = true) => {
@@ -203,7 +203,7 @@ export function WeeklyDigestCard({ digest, onShare }: { digest: WeeklyDigest; on
       <View style={s.digestActions}>
         <Pressable onPress={onEmail} disabled={emailing} style={s.emailBtn} testID="digest-email" hitSlop={8}>
           {emailing ? <ActivityIndicator size="small" color={colors.yellow} /> : <Ionicons name="mail" size={14} color={colors.yellow} />}
-          <Text style={s.shareBtnT}>Email me</Text>
+          <Text style={s.shareBtnT}>Send test</Text>
         </Pressable>
         {onShare && (
           <Pressable onPress={onShare} style={s.shareBtnInline} testID="digest-share" hitSlop={8}>

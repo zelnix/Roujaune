@@ -58,7 +58,7 @@ export default function SettingsScreen() {
     setSendingDigest(true); setDigestMsg(null);
     const r = await emailDigestNow();
     setSendingDigest(false);
-    setDigestMsg(r.ok ? "Sent — check your inbox 📬" : "Couldn't send right now. Please try again.");
+    setDigestMsg(r.ok ? "Preview sent — check your inbox 📬" : "Couldn't send right now. Please try again.");
   };
 
   const refreshVoices = React.useCallback(async () => {
@@ -310,11 +310,12 @@ export default function SettingsScreen() {
           </View>
         )}
         <Pressable onPress={sendDigestNow} disabled={sendingDigest} testID="send-digest-now" style={s.digestBtn}
-          accessibilityRole="button" accessibilityLabel="Email me this week's recap now">
+          accessibilityRole="button" accessibilityLabel="Send me a test of this week's recap email now">
           <Ionicons name="mail" size={15} color={CC.yellow} />
-          <Text style={s.digestBtnT}>{sendingDigest ? "Sending…" : "Email me this week's recap now"}</Text>
+          <Text style={s.digestBtnT}>{sendingDigest ? "Sending…" : "Send me a test now"}</Text>
         </Pressable>
         {digestMsg ? <Text style={s.digestMsg} testID="send-digest-msg">{digestMsg}</Text> : null}
+        <Text style={s.digestHint}>We'll email you a clearly-labelled preview so you can see exactly what arrives.</Text>
       </Card>
 
       <Card testID="accessibility">
@@ -378,6 +379,7 @@ const s = StyleSheet.create({
   digestBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 14, borderWidth: 1, borderColor: "rgba(255,194,10,0.4)", backgroundColor: "rgba(255,194,10,0.06)", borderRadius: 12, paddingVertical: 12 },
   digestBtnT: { color: CC.yellow, fontSize: 13.5, fontWeight: "800" },
   digestMsg: { color: "#3FB68B", fontSize: 12.5, fontWeight: "700", marginTop: 10, textAlign: "center" },
+  digestHint: { color: CC.dim, fontSize: 11, marginTop: 8, textAlign: "center", lineHeight: 15 },
   previewLink: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12 },
   previewLinkT: { color: CC.yellow, fontSize: 12.5, fontWeight: "800" },
   dayPickerWrap: { marginTop: 14, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)", paddingTop: 14 },

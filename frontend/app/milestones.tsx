@@ -1,14 +1,33 @@
 import React from "react";
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AppScaffold, Card } from "@/src/components/app-scaffold";
 import { colors, radius } from "@/src/theme";
 import { fetchMilestoneWall, MilestoneWall } from "@/src/lib/analysis";
+import { ShareCardModal } from "@/src/components/ShareCardModal";
+import { AchievementCardData } from "@/src/components/AchievementCard";
+import { useCoach } from "@/src/lib/coach-persona";
 
 export default function MilestoneWallScreen() {
   const [wall, setWall] = React.useState<MilestoneWall | null>(null);
+  const [shareData, setShareData] = React.useState<AchievementCardData | null>(null);
+  const coach = useCoach();
 
   React.useEffect(() => { fetchMilestoneWall().then(setWall); }, []);
+
+  const shareBadge = (cat: MilestoneWall["categories"][number], value: number, label: string) => {
+    const title = cat.key === "distance" ? `${value.toLocaleString()} km`
+      : cat.key === "hours" ? `${value.toLocaleString()} hours`
+      : `${value.toLocaleString()} rides`;
+    const unit = cat.key === "distance" ? " km" : cat.key === "hours" ? " h" : "";
+    setShareData({
+      kicker: "MILESTONE UNLOCKED",
+      title,
+      subtitle: `${cat.title} milestone · ROUJAUNE`,
+      stats: [{ label: `Total ${cat.title.toLowerCase()}`, value: `${cat.current.toLocaleString()}${unit}` }],
+      coachName: coach.name,
+    });
+  };
 
   return (
     <AppScaffold active="fitness" title="Milestone Wall" subtitle="Every badge you've earned — and what's next.">
@@ -38,20 +57,25 @@ export default function MilestoneWallScreen() {
               </View>
               <View style={s.badgeGrid}>
                 {cat.rows.map((r) => (
-                  <View key={r.value} style={[s.badge, r.reached ? s.badgeOn : s.badgeOff]} testID={`badge-${cat.key}-${r.value}`}>
+                  <Pressable key={r.value} disabled={!r.reached} onPress={() => shareBadge(cat, r.value, r.label)}
+                    style={[s.badge, r.reached ? s.badgeOn : s.badgeOff]} testID={`badge-${cat.key}-${r.value}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={r.reached ? `Share your ${r.label} ${cat.title} milestone` : `${r.label} ${cat.title} — locked`}>
                     <Ionicons
                       name={r.reached ? "checkmark-circle" : "lock-closed"}
                       size={16}
                       color={r.reached ? "#241B00" : colors.textFaint}
                     />
                     <Text style={[s.badgeLabel, r.reached ? { color: "#241B00" } : { color: colors.textDim }]}>{r.label}</Text>
-                  </View>
+                    {r.reached ? <Ionicons name="share-social" size={13} color="#241B00" style={{ marginLeft: 2 }} /> : null}
+                  </Pressable>
                 ))}
               </View>
             </Card>
           ))}
         </ScrollView>
       )}
+      <ShareCardModal visible={!!shareData} data={shareData} onClose={() => setShareData(null)} />
     </AppScaffold>
   );
 }
