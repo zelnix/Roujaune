@@ -781,3 +781,10 @@ STILL PENDING (awaiting approval): Phase 3 (Home banners consolidation, dup CTAs
 - **Streak Freeze:** `/api/analysis/streak` adds freeze_tokens (earned=min(3,1+weeks_ridden//4)-frozen), frozen_weeks, can_freeze, gap_week; `POST /api/analysis/streak-freeze` spends a token to bridge the breaking off-week (stored in udb.settings 'streak_freeze'.frozen; streak calc unions ride-weeks with frozen). StreakCard shows banked tokens + 'Use a freeze' button when can_freeze.
 - BUGFIX: removed an accidental duplicate `@router.get("/streak")` stub that shadowed the real route and returned null.
 - Verified: testing agent iter82 (backend 5/5 pytest + frontend all checks, no bugs).
+
+## Round 5 (COMPLETE — iter 83 PASS)
+- Season Recap card on /fitness (shareable) — GET /api/analysis/season-recap
+- Milestone Wall screen /milestones (earned/locked badges) — GET /api/analysis/milestone-wall, linked from /fitness Milestones card
+- Split PR Highlights in /climb/[id] — climb-detail returns recent_split_prs; amber banner + flame on split rows
+- Freeze Auto-Suggest — StreakCard "Protect this week with a freeze" (suggest_freeze)
+- GEMINI COACH VOICE: GET /api/coach/speak (Gemini TTS gemini-2.5-flash-preview-tts, GEMINI_API_KEY; Alberto=Charon, Adriana=Aoede). useCoachSpeech now streams this (web blob / native uri+bearer) via expo-audio with expo-speech fallback. Workout real-time cues (useWorkoutAudio) unchanged.

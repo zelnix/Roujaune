@@ -1,0 +1,34 @@
+{
+  "summary": "Iter 83 — ROUJAUNE final 4-feature block (Season Recap, Split PR Highlights, Milestone Wall, Freeze Auto-Suggest) + Gemini TTS coach voices. Backend: 6/6 pytest PASS (test_iter83_season_recap_wall_split_prs_gemini_tts.py). Frontend @ 1024x1000 demo: verified end-to-end. All new testIDs render.\n\n1) GET /api/analysis/season-recap (demo) → 200 with year=2026, rides=2, has_data=true and full field set {distance_km, hours, tss, climbs_conquered, biggest_climb_m, longest_ride_km, records_set}.\n2) GET /api/analysis/milestone-wall (demo) → 200. 3 categories (rides/distance/hours), 30 rows total, each row.reached is consistent with category.current (verified all 30), rows sorted ascending, earned≤total.\n3) GET /api/analysis/climb-detail?id=climb-45.2-6.1108 (discovered via /climb-leaderboard) → 200, includes recent_split_prs (list — empty here because most-recent attempt IS the PB) and recent_activity_id (non-empty). Splits array still present.\n4) GET /api/coach/speak?text=…&coach_id=alberto and coach_id=adriana (with demo bearer) → 200, content-type audio/wav, body >1 KB, valid RIFF/WAVE header. Without auth → 401 (verified).\n5) FRONTEND /fitness (demo): testIDs season-share, milestone-wall-link, weekly-note-play all present. Season Recap card renders '2026 Season'. Milestones card has 'Milestone wall' link that navigates to /milestones. Consistency Streak shows '1 Streak Freeze banked'.\n6) FRONTEND /milestones (demo): renders 'Milestone Wall' header + '0 of 30 milestones earned' summary bar. All 30 badges present (badge-rides-10..1000, badge-distance-100..50000, badge-hours-10..1000). Badges styled locked (demo total_rides=2, km=9, hours=1 — below first thresholds), which correctly matches earned=0.\n7) FRONTEND /climb/climb-45.2-6.1108 (demo): Split times card renders 4 rows (0.0–0.6/0.6–1.3/1.3–1.9/1.9–2.5 km). split-pr-highlight banner NOT rendered — expected, because recent_split_prs is empty on this climb (recent attempt is also the PB). Backend field is present.\n8) FRONTEND Gemini voice: Weekly Note 'Listen' button (testID weekly-note-play) fires GET /api/coach/speak?coach_id=alberto&text=… → 200 audio/wav. Label toggled 'Listen' → 'Stop'. No crash, no red screen.\n9) REGRESSION: /fitness still shows This Week recap, Consistency Streak with freeze, Form/Fitness, Personal Records, Milestones. /climbs → repeated-climb detail navigates and renders.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter83_season_recap_wall_split_prs_gemini_tts.py",
+    "/app/test_reports/pytest/iter83.xml",
+    "/app/test_reports/screens/i83_fitness.jpeg",
+    "/app/test_reports/screens/i83_milestones.jpeg",
+    "/app/test_reports/screens/i83_climb_detail.jpeg"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/coach.py is now ~1000 lines including the Gemini TTS block. Extract TTS (_pcm_to_wav / _gemini_tts_sync / /coach/speak) into services/coach_tts.py to keep coach.py focused. Not blocking.",
+    "TTS in-memory _tts_cache is process-local; if backend runs multiple workers the cache hit-rate degrades, and it never persists across restarts. Consider Mongo/GridFS-backed cache keyed by sha256(model|voice|text) for durable replays. Not blocking."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter83_season_recap_wall_split_prs_gemini_tts.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (6/6 pytest — season-recap, milestone-wall, split-PR climb-detail, /coach/speak 401 unauthed, /coach/speak alberto+adriana 200 audio/wav)",
+    "frontend": "100% — season-share + milestone-wall-link + weekly-note-play visible on /fitness; Milestone Wall renders 30 badges; Weekly Note Listen fires /api/coach/speak → 200 audio/wav and toggles to Stop"
+  },
+  "seed_data_creation": "None. Read-only tests. Gemini TTS calls hit the real API twice (alberto+adriana, tiny prompts) plus one call from the frontend Listen click.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All iter-83 features (Season Recap card + backend, Split PR Highlights, Milestone Wall screen + backend, Gemini TTS /api/coach/speak with Alberto+Adriana) pass on demo. Reusable pytest: test_iter83_season_recap_wall_split_prs_gemini_tts.py. Demo state: total_rides=2, km≈9 → milestone wall shows 0/30 earned (all locked); climb-45.2-6.1108 has 2 attempts and the recent attempt IS the PB → recent_split_prs=[] → split-pr-highlight banner intentionally hidden. To force the amber banner, seed a slower 'most-recent' attempt that beats the PB only on one split. GEMINI_API_KEY is live in backend/.env; each Listen click bills a small TTS request (cached in _tts_cache by sha256(model|voice|text)). For UI login, direct localStorage token set (`localStorage.setItem('roujaune_token', <access_token>)`) is the reliable path — the /login modal flow in the web preview did not submit reliably in playwright.",
+  "rca_of_issue": "N/A — feature-completion round; every endpoint and screen requested passes."
+}

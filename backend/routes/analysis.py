@@ -491,22 +491,22 @@ async def training_streak():
     earned = min(3, 1 + len(ride_weeks) // 4)
     tokens = max(0, earned - len(frozen))
     before_gap = _prev_week(*gap)
-    # A freeze helps when the gap week is a real off-week and the week before it
-    # was covered (so bridging extends the run) and the rider has a token.
     can_freeze = bool(tokens > 0 and gap not in covered and before_gap in covered and current > 0)
+    at_risk = bool(active and this_week_rides == 0 and today.isoweekday() >= 4)
 
     return {"current_weeks": current, "best_weeks": best, "this_week_rides": this_week_rides,
             "active": active, "weeks_ridden": len(ride_weeks),
-            "at_risk": bool(active and this_week_rides == 0 and today.isoweekday() >= 4),
+            "at_risk": at_risk,
             "days_left": 7 - today.isoweekday(), "weekday": today.isoweekday(),
             "freeze_tokens": tokens, "frozen_weeks": len(frozen), "can_freeze": can_freeze,
+            "suggest_freeze": bool(can_freeze or (at_risk and tokens > 0)),
             "gap_week": f"{gap[0]}-W{gap[1]:02d}"}
 
 
 @router.post("/streak-freeze")
 async def streak_freeze():
-    """Spend a Streak Freeze token to bridge the off-week that's breaking the
-    current streak."""
+    """Spend a Streak Freeze token — bridges the off-week breaking the streak, or
+    (if the streak is at risk this week) pre-emptively protects the current week."""
     ride_weeks, per_week = await _ride_weeks()
     freeze = await udb.settings.find_one({"id": "streak_freeze"}) or {}
     frozen = set(tuple(x) for x in freeze.get("frozen", []))
@@ -515,20 +515,28 @@ async def streak_freeze():
     today = datetime.now(timezone.utc).date()
     this_iso = today.isocalendar()
     this_week_key = (this_iso[0], this_iso[1])
+    this_week_rides = per_week.get(this_week_key, 0)
     current, gap = _run_from(covered, this_week_key)
 
     earned = min(3, 1 + len(ride_weeks) // 4)
     tokens = max(0, earned - len(frozen))
     before_gap = _prev_week(*gap)
+    active = this_week_key in covered or current > 0
+    at_risk = bool(active and this_week_rides == 0 and today.isoweekday() >= 4)
+
     if tokens <= 0:
         return {"ok": False, "reason": "no_tokens"}
-    if gap in covered or before_gap not in covered or current <= 0:
+    if gap not in covered and before_gap in covered and current > 0:
+        target = gap  # bridge the off-week that breaks the run
+    elif at_risk and this_week_key not in covered:
+        target = this_week_key  # pre-emptively protect this week
+    else:
         return {"ok": False, "reason": "nothing_to_freeze"}
 
-    frozen.add(gap)
+    frozen.add(target)
     await udb.settings.update_one(
         {"id": "streak_freeze"}, {"$set": {"frozen": [list(f) for f in frozen]}}, upsert=True)
-    return {"ok": True, "frozen_week": f"{gap[0]}-W{gap[1]:02d}"}
+    return {"ok": True, "frozen_week": f"{target[0]}-W{target[1]:02d}"}
 
 
 def _cluster_climbs(entries: list) -> list:
@@ -547,6 +555,89 @@ def _cluster_climbs(entries: list) -> list:
         if not placed:
             clusters.append([e])
     return clusters
+
+
+@router.get("/milestone-wall")
+async def milestone_wall():
+    """Every milestone across rides / distance / hours, marked earned or locked."""
+    ms = await milestones()
+
+    def _rows(arr, total, unit=""):
+        return [{"value": m, "label": f"{m:,}{unit}", "reached": total >= m} for m in arr]
+
+    cats = [
+        {"key": "rides", "title": "Rides", "icon": "bicycle", "current": ms["total_rides"],
+         "rows": _rows(MILESTONE_RIDES, ms["total_rides"])},
+        {"key": "distance", "title": "Distance", "icon": "map", "current": round(ms["total_km"]),
+         "rows": _rows(MILESTONE_KM, ms["total_km"], " km")},
+        {"key": "hours", "title": "Hours", "icon": "time", "current": round(ms["total_hours"]),
+         "rows": _rows(MILESTONE_HOURS, ms["total_hours"], " h")},
+    ]
+    earned = sum(1 for c in cats for r in c["rows"] if r["reached"])
+    total = sum(len(c["rows"]) for c in cats)
+    return {"categories": cats, "earned": earned, "total": total}
+
+
+@router.get("/season-recap")
+async def season_recap(year: int | None = None):
+    """Shareable end-of-season summary: distance, climbs conquered, records set."""
+    import segments as seg
+    now = datetime.now(timezone.utc)
+    y = year or now.year
+
+    rides = await udb.ride_history.find(
+        {}, {"_id": 0, "created_at": 1, "distance_km": 1, "duration_sec": 1, "tss": 1}).to_list(length=5000)
+    total_rides = total_km = total_hours = total_tss = 0.0
+    longest_km = 0.0
+    for r in rides:
+        d = _date_of(r.get("created_at"))
+        if not d or not d.startswith(str(y)):
+            continue
+        total_rides += 1
+        km = float(r.get("distance_km") or 0)
+        total_km += km
+        longest_km = max(longest_km, km)
+        total_hours += float(r.get("duration_sec") or 0) / 3600.0
+        total_tss += float(r.get("tss") or 0)
+
+    # Climbs conquered + biggest climb this season.
+    acts = await udb.cycling_activities.find(
+        {"route_data.samples": {"$exists": True}},
+        {"_id": 0, "id": 1, "canonical_activity_id": 1, "started_at": 1, "route_data.samples": 1,
+         "route_data.power_curve": 1}).to_list(length=400)
+    entries, biggest = [], 0.0
+    for a in acts:
+        if not str(a.get("started_at") or "").startswith(str(y)):
+            continue
+        pts = seg.build_track((a.get("route_data") or {}).get("samples") or [])
+        if len(pts) < 6:
+            continue
+        for c in seg.detect_climbs(pts):
+            if c.get("start_lat") is None:
+                continue
+            biggest = max(biggest, c["gain"])
+            entries.append({"start": (c["start_lat"], c["start_lng"]), "length": c["length"]})
+    climbs_conquered = len(_cluster_climbs(entries))
+
+    # Records set this season: power windows whose all-time best was set this year.
+    best = {}
+    for a in await udb.cycling_activities.find(
+            {"route_data.power_curve": {"$exists": True, "$ne": None}},
+            {"_id": 0, "started_at": 1, "route_data.power_curve": 1}).to_list(length=1000):
+        yr = str(a.get("started_at") or "")[:4]
+        for p in (a.get("route_data") or {}).get("power_curve") or []:
+            w, watts = p["secs"], p["watts"]
+            if w not in best or watts > best[w]["watts"]:
+                best[w] = {"watts": watts, "year": yr}
+    records_set = sum(1 for w in RECORD_WINDOWS if w in best and best[w]["year"] == str(y))
+
+    return {
+        "year": y, "rides": int(total_rides), "distance_km": round(total_km),
+        "hours": round(total_hours), "tss": round(total_tss),
+        "climbs_conquered": climbs_conquered, "biggest_climb_m": round(biggest),
+        "longest_ride_km": round(longest_km, 1), "records_set": records_set,
+        "has_data": total_rides > 0,
+    }
 
 
 @router.get("/climb-detail")
@@ -587,13 +678,23 @@ async def climb_detail(id: str):
         gain = round(sum(a["gain"] for a in atts) / len(atts), 1)
         length = round(sum(a["length"] for a in atts) / len(atts), 1)
         splits = _climb_splits(ranked, length, n=4)
+        # Split PRs: sections the rider's MOST RECENT attempt was fastest through,
+        # even if that ride wasn't the overall PB.
+        recent_aid = max(atts, key=lambda a: a.get("date") or "")["aid"]
+        pb_aid = ranked[0]["aid"]
+        recent_split_prs = []
+        if recent_aid != pb_aid:
+            for sp in splits:
+                if sp["fastest"] == recent_aid:
+                    recent_split_prs.append({"index": sp["index"], "from_d": sp["from_d"],
+                                             "to_d": sp["to_d"], "time_s": sp["times"].get(recent_aid)})
         return {
             "found": True, "id": cid, "name": ranked[0]["name"],
             "gain_m": gain, "length_m": length,
             "grad_pct": round(gain / length * 100, 1) if length else None,
             "count": len(atts), "path": ranked[0]["path"],
             "profile": [{"d": p["d"], "ele": p["ele"]} for p in ranked[0]["series"]],
-            "splits": splits,
+            "splits": splits, "recent_split_prs": recent_split_prs, "recent_activity_id": recent_aid,
             "attempts": [{
                 "activity_id": a["aid"], "name": a["name"], "date": a["date"],
                 "time_s": a["time_s"], "avg_speed_kmh": a["avg_speed"],

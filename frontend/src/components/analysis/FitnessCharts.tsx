@@ -450,9 +450,17 @@ export function StreakCard({ streak, onShare, onFrozen }: { streak: Streak; onSh
       {streak.at_risk && (
         <View style={s.riskBox} testID="streak-at-risk">
           <Ionicons name="alert-circle" size={16} color="#F2792E" />
-          <Text style={s.riskText}>
-            Your {streak.current_weeks}-week streak is at risk — get a ride in within the next {streak.days_left + 1} day{streak.days_left + 1 === 1 ? "" : "s"} to keep it alive.
-          </Text>
+          <View style={{ flex: 1 }}>
+            <Text style={s.riskText}>
+              Your {streak.current_weeks}-week streak is at risk — get a ride in within the next {streak.days_left + 1} day{streak.days_left + 1 === 1 ? "" : "s"} to keep it alive.
+            </Text>
+            {streak.suggest_freeze && !streak.can_freeze && (
+              <Pressable onPress={onFreeze} disabled={freezing} style={s.protectBtn} testID="streak-protect-btn">
+                {freezing ? <ActivityIndicator size="small" color="#0A1E3F" /> : <Ionicons name="snow" size={14} color="#0A1E3F" />}
+                <Text style={s.freezeBtnT}>Protect this week with a freeze</Text>
+              </Pressable>
+            )}
+          </View>
         </View>
       )}
       <View style={s.freezeRow}>
@@ -562,6 +570,41 @@ const ms = StyleSheet.create({
   ringSub: { color: colors.textFaint, fontSize: 10, fontWeight: "700" },
 });
 
+/** Season Recap — a shareable end-of-season summary. */
+export function SeasonRecapCard({ data, onShare }: { data: import("@/src/lib/analysis").SeasonRecap; onShare: () => void }) {
+  const tiles = [
+    { icon: "map" as const, val: `${data.distance_km.toLocaleString()}`, unit: "km", label: "DISTANCE" },
+    { icon: "trending-up" as const, val: `${data.climbs_conquered}`, unit: "", label: "CLIMBS" },
+    { icon: "flash" as const, val: `${data.records_set}`, unit: "", label: "RECORDS" },
+    { icon: "bicycle" as const, val: `${data.rides}`, unit: "", label: "RIDES" },
+    { icon: "time" as const, val: `${data.hours}`, unit: "h", label: "HOURS" },
+    { icon: "flag" as const, val: `${data.biggest_climb_m.toLocaleString()}`, unit: "m", label: "BIGGEST CLIMB" },
+  ];
+  return (
+    <View>
+      <View style={s.seasonHead}>
+        <View>
+          <Text style={s.seasonYear}>{data.year} Season</Text>
+          <Text style={s.seasonSub}>Everything you've conquered this year</Text>
+        </View>
+        <Pressable onPress={onShare} style={s.mileShare} testID="season-share">
+          <Ionicons name="share-social" size={15} color="#241B00" />
+          <Text style={s.mileShareT}>Share</Text>
+        </Pressable>
+      </View>
+      <View style={s.seasonGrid}>
+        {tiles.map((t) => (
+          <View key={t.label} style={s.seasonTile}>
+            <Ionicons name={t.icon} size={16} color={colors.yellow} />
+            <Text style={s.seasonVal}>{t.val}<Text style={s.mileUnit}>{t.unit ? ` ${t.unit}` : ""}</Text></Text>
+            <Text style={s.mileLabel}>{t.label}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
   empty: { color: colors.textDim, fontSize: 13.5, lineHeight: 20 },
   stripLabel: { color: colors.textFaint, fontSize: 9.5, fontWeight: "800", letterSpacing: 0.8, marginBottom: 2 },
@@ -655,6 +698,13 @@ const s = StyleSheet.create({
   mileVal: { color: colors.white, fontSize: 20, fontWeight: "900" },
   mileUnit: { color: colors.textFaint, fontSize: 11, fontWeight: "700" },
   mileLabel: { color: colors.textDim, fontSize: 10, fontWeight: "700", marginTop: 3, letterSpacing: 0.3 },
+
+  seasonHead: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 10, marginBottom: 14 },
+  seasonYear: { color: colors.white, fontSize: 20, fontWeight: "900" },
+  seasonSub: { color: colors.textFaint, fontSize: 12, marginTop: 2, fontWeight: "600" },
+  seasonGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  seasonTile: { flexGrow: 1, flexBasis: "30%", minWidth: 95, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: 12, alignItems: "center", gap: 3 },
+  seasonVal: { color: colors.white, fontSize: 20, fontWeight: "900", marginTop: 2 },
 
   streakTop: { flexDirection: "row", alignItems: "center", gap: 14 },
   streakBig: { width: 84, height: 84, borderRadius: 18, borderWidth: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.03)" },

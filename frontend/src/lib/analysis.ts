@@ -37,15 +37,20 @@ export type SegmentCompare = {
 
 export type ClimbAttempt = { activity_id: string; name: string; date: string; time_s: number | null; avg_speed_kmh: number | null; pr: boolean; gap_s: number | null };
 export type ClimbEntry = { id: string; name: string; gain_m: number; length_m: number; grad_pct: number | null; count: number; path: [number, number][]; new_pr: boolean; pr_improvement_s: number | null; attempts: ClimbAttempt[] };
-export type Streak = { current_weeks: number; best_weeks: number; this_week_rides: number; active: boolean; weeks_ridden: number; at_risk: boolean; days_left: number; weekday: number; freeze_tokens: number; frozen_weeks: number; can_freeze: boolean; gap_week: string };
+export type Streak = { current_weeks: number; best_weeks: number; this_week_rides: number; active: boolean; weeks_ridden: number; at_risk: boolean; days_left: number; weekday: number; freeze_tokens: number; frozen_weeks: number; can_freeze: boolean; suggest_freeze: boolean; gap_week: string };
 export type TaperNote = { has_event: boolean; fresh?: boolean; days_out?: number; projected_form?: number; note?: string; actions?: string[] };
 export type TaperApply = { applied: boolean; week?: number; reason?: string; already?: boolean; summary?: string | null };
 export type Milestones = { total_rides: number; total_km: number; total_hours: number; total_tss: number; recent: { kind: string; label: string; value: number; blurb: string } | null; next_rides: number | null; rides_to_next: number | null; prev_rides: number; rides_progress: number; next_km: number | null; km_to_next: number | null; prev_km: number; km_progress: number };
 export type MilestoneNote = { has_milestone: boolean; label?: string; note?: string };
 export type ClimbSplit = { index: number; from_d: number; to_d: number; times: Record<string, number>; fastest: string | null };
+export type SplitPr = { index: number; from_d: number; to_d: number; time_s: number | null };
+export type SeasonRecap = { year: number; rides: number; distance_km: number; hours: number; tss: number; climbs_conquered: number; biggest_climb_m: number; longest_ride_km: number; records_set: number; has_data: boolean };
+export type MilestoneWallRow = { value: number; label: string; reached: boolean };
+export type MilestoneWallCategory = { key: string; title: string; icon: string; current: number; rows: MilestoneWallRow[] };
+export type MilestoneWall = { categories: MilestoneWallCategory[]; earned: number; total: number };
 export type ClimbDetailPoint = { d: number; ele?: number; speed?: number | null; t?: number };
 export type ClimbDetailAttempt = { activity_id: string; name: string; date: string; time_s: number | null; avg_speed_kmh: number | null; pr: boolean; gap_s: number | null; series: ClimbDetailPoint[] };
-export type ClimbDetail = { found: boolean; id?: string; name?: string; gain_m?: number; length_m?: number; grad_pct?: number | null; count?: number; path?: [number, number][]; profile?: ClimbDetailPoint[]; splits?: ClimbSplit[]; attempts?: ClimbDetailAttempt[] };
+export type ClimbDetail = { found: boolean; id?: string; name?: string; gain_m?: number; length_m?: number; grad_pct?: number | null; count?: number; path?: [number, number][]; profile?: ClimbDetailPoint[]; splits?: ClimbSplit[]; recent_split_prs?: SplitPr[]; recent_activity_id?: string; attempts?: ClimbDetailAttempt[] };
 export type FormTarget = { has_event: boolean; event_date?: string; event_name?: string; days_out?: number; past?: boolean; projected_form?: number; projected_fitness?: number; state?: string; fresh?: boolean; current_form?: number; current_fitness?: number };
 export type WeeklyNote = { note: string; focus: string; has_activity: boolean };
 
@@ -111,6 +116,16 @@ export async function fetchMilestoneNote(coachName: string, coachGender: string,
 
 export async function useStreakFreeze(): Promise<{ ok: boolean; reason?: string; frozen_week?: string } | null> {
   const r = await fetch(`${API}/analysis/streak-freeze`, { method: "POST" });
+  return r.ok ? await r.json() : null;
+}
+
+export async function fetchSeasonRecap(year?: number): Promise<SeasonRecap | null> {
+  const r = await fetch(`${API}/analysis/season-recap${year ? `?year=${year}` : ""}`);
+  return r.ok ? await r.json() : null;
+}
+
+export async function fetchMilestoneWall(): Promise<MilestoneWall | null> {
+  const r = await fetch(`${API}/analysis/milestone-wall`);
   return r.ok ? await r.json() : null;
 }
 

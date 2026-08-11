@@ -79,16 +79,29 @@ export default function ClimbDetailScreen() {
           {(detail.splits && detail.splits.length > 0) && (
             <Card>
               <Text style={s.h}>Split times <Text style={s.hDim}>who was fastest where</Text></Text>
+              {detail.recent_split_prs && detail.recent_split_prs.length > 0 && (
+                <View style={s.prBox} testID="split-pr-highlight">
+                  <Ionicons name="flame" size={16} color="#F2792E" />
+                  <Text style={s.prText}>
+                    Your latest ride was fastest through {detail.recent_split_prs.length} split{detail.recent_split_prs.length === 1 ? "" : "s"} ({detail.recent_split_prs.map((p) => `#${p.index}`).join(", ")}) — fresh split PR{detail.recent_split_prs.length === 1 ? "" : "s"} even without the overall PB.
+                  </Text>
+                </View>
+              )}
               <View style={s.splitHeadRow}>
                 <Text style={[s.splitCell, s.splitLabelCell, { color: colors.textFaint }]}>SEGMENT</Text>
                 {(detail.attempts || []).map((a, i) => (
                   <Text key={i} style={[s.splitCell, { color: a.pr ? colors.yellow : colors.textDim }]} numberOfLines={1}>{a.pr ? "PB" : `#${i + 1}`}</Text>
                 ))}
               </View>
-              {detail.splits.map((sp) => (
+              {detail.splits.map((sp) => {
+                const isPr = (detail.recent_split_prs || []).some((p) => p.index === sp.index);
+                return (
                 <View key={sp.index} style={s.splitRow}>
                   <View style={s.splitLabelCell}>
-                    <Text style={s.splitName}>Split {sp.index}</Text>
+                    <View style={s.splitNameRow}>
+                      <Text style={s.splitName}>Split {sp.index}</Text>
+                      {isPr ? <Ionicons name="flame" size={12} color="#F2792E" /> : null}
+                    </View>
                     <Text style={s.splitDist}>{(sp.from_d / 1000).toFixed(1)}–{(sp.to_d / 1000).toFixed(1)} km</Text>
                   </View>
                   {(detail.attempts || []).map((a, i) => {
@@ -102,7 +115,8 @@ export default function ClimbDetailScreen() {
                     );
                   })}
                 </View>
-              ))}
+                );
+              })}
               <Text style={s.splitHint}>Each attempt's time through equal-distance segments. ⚡ = fastest.</Text>
             </Card>
           )}
@@ -157,6 +171,9 @@ const s = StyleSheet.create({
   splitCell: { flex: 1, fontSize: 11.5, fontWeight: "800", textAlign: "center" },
   splitLabelCell: { flex: 1.4 },
   splitName: { color: colors.white, fontSize: 13, fontWeight: "800" },
+  splitNameRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  prBox: { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: "rgba(242,121,46,0.1)", borderWidth: 1, borderColor: "rgba(242,121,46,0.4)", borderRadius: radius.md, padding: 12, marginBottom: 12 },
+  prText: { color: "#F2A277", fontSize: 12.5, lineHeight: 18, flex: 1, fontWeight: "600" },
   splitDist: { color: colors.textFaint, fontSize: 11, marginTop: 1, fontWeight: "600" },
   splitCellBox: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 3, paddingVertical: 5, borderRadius: 8 },
   splitFastest: { backgroundColor: colors.yellow },

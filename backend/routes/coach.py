@@ -39,6 +39,89 @@ router = APIRouter()
 from routes.plan import get_plan, WELLNESS_DATA  # noqa: E402
 
 
+# ── Coach voice (Gemini TTS) ────────────────────────────────────────────────
+# Natural spoken coach summaries. Alberto (male) and Adriana (female) both speak
+# English with a warm, light Spanish accent to match their personas. Audio is
+# generated server-side with the rider-provided Gemini key and cached by a hash
+# of (coach, text) so replays are instant and don't re-bill.
+import io as _io
+import wave as _wave
+import hashlib as _hashlib
+from fastapi import Query  # noqa: E402
+from fastapi.responses import Response  # noqa: E402
+
+_GEMINI_TTS_MODEL = os.environ.get("GEMINI_TTS_MODEL", "gemini-2.5-flash-preview-tts")
+_COACH_VOICES = {
+    "alberto": {"voice": "Charon", "desc": "a warm, confident male cycling coach with a light Spanish accent"},
+    "adriana": {"voice": "Aoede", "desc": "a warm, encouraging female cycling coach with a light Spanish accent"},
+}
+_tts_cache: Dict[str, bytes] = {}
+
+
+def _pcm_to_wav(pcm: bytes) -> bytes:
+    """Gemini returns 24kHz mono signed 16-bit PCM; wrap it in a WAV container."""
+    out = _io.BytesIO()
+    with _wave.open(out, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(24000)
+        wav.writeframes(pcm)
+    return out.getvalue()
+
+
+def _gemini_tts_sync(text: str, voice: str, desc: str) -> bytes:
+    from google import genai
+    from google.genai import types
+    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    prompt = (
+        f"Read the following as {desc}. Keep it natural, upbeat and clear, "
+        f"with gentle pauses between sentences:\n\n{text}"
+    )
+    result = client.models.generate_content(
+        model=_GEMINI_TTS_MODEL,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            response_modalities=["AUDIO"],
+            speech_config=types.SpeechConfig(
+                voice_config=types.VoiceConfig(
+                    prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=voice)
+                )
+            ),
+        ),
+    )
+    for cand in (result.candidates or []):
+        for part in (cand.content.parts or []):
+            if part.inline_data and part.inline_data.data:
+                data = part.inline_data.data
+                return _pcm_to_wav(data if isinstance(data, bytes) else bytes(data))
+    raise ValueError("Gemini returned no audio")
+
+
+@router.get("/coach/speak")
+async def coach_speak(text: str = Query(..., max_length=6000), coach_id: str = Query("alberto")):
+    """Stream a natural spoken version of a coach note as WAV (Gemini TTS)."""
+    if not os.environ.get("GEMINI_API_KEY"):
+        raise HTTPException(status_code=503, detail="Voice model not configured")
+    text = (text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Empty text")
+    cfg = _COACH_VOICES.get(coach_id, _COACH_VOICES["alberto"])
+    key = _hashlib.sha256(f"{_GEMINI_TTS_MODEL}|{cfg['voice']}|{text}".encode()).hexdigest()
+    wav = _tts_cache.get(key)
+    if wav is None:
+        try:
+            wav = await asyncio.to_thread(_gemini_tts_sync, text, cfg["voice"], cfg["desc"])
+        except Exception as exc:  # noqa: BLE001
+            logging.getLogger("server").warning("Coach TTS failed: %s", type(exc).__name__)
+            raise HTTPException(status_code=502, detail="Voice generation failed")
+        if len(_tts_cache) > 200:
+            _tts_cache.clear()
+        _tts_cache[key] = wav
+    return Response(content=wav, media_type="audio/wav",
+                    headers={"Cache-Control": "private, max-age=86400"})
+
+
+
 @router.post("/coach/cue")
 async def coach_cue(req: CoachCueRequest):
     """Generate a live, in-persona coaching cue from the rider's telemetry."""

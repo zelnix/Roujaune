@@ -5,10 +5,10 @@ import { useRouter } from "expo-router";
 import { AppScaffold, Card } from "@/src/components/app-scaffold";
 import { colors } from "@/src/theme";
 import {
-  fetchPmc, fetchRecords, fetchWeeklyDigest, fetchFormTarget, fetchWeeklyNote, fetchStreak, fetchMilestones,
-  Pmc, PowerRecord, WeeklyDigest, FormTarget, WeeklyNote, Streak, Milestones,
+  fetchPmc, fetchRecords, fetchWeeklyDigest, fetchFormTarget, fetchWeeklyNote, fetchStreak, fetchMilestones, fetchSeasonRecap,
+  Pmc, PowerRecord, WeeklyDigest, FormTarget, WeeklyNote, Streak, Milestones, SeasonRecap,
 } from "@/src/lib/analysis";
-import { PmcChart, PmcSummary, RecordsGrid, WeeklyDigestCard, ForecastSummary, FormTargetCard, CoachWeeklyNote, StreakCard, MilestonesCard } from "@/src/components/analysis/FitnessCharts";
+import { PmcChart, PmcSummary, RecordsGrid, WeeklyDigestCard, ForecastSummary, FormTargetCard, CoachWeeklyNote, StreakCard, MilestonesCard, SeasonRecapCard } from "@/src/components/analysis/FitnessCharts";
 import { ShareCardModal } from "@/src/components/ShareCardModal";
 import { AchievementCardData } from "@/src/components/AchievementCard";
 import { useCoach } from "@/src/lib/coach-persona";
@@ -23,15 +23,16 @@ export default function FitnessScreen() {
   const [note, setNote] = React.useState<WeeklyNote | null>(null);
   const [streak, setStreak] = React.useState<Streak | null>(null);
   const [milestones, setMilestones] = React.useState<Milestones | null>(null);
+  const [season, setSeason] = React.useState<SeasonRecap | null>(null);
   const [noteLoading, setNoteLoading] = React.useState(true);
   const [loading, setLoading] = React.useState(true);
   const [shareData, setShareData] = React.useState<AchievementCardData | null>(null);
 
   React.useEffect(() => {
     let alive = true;
-    Promise.all([fetchPmc(90, 14), fetchRecords(), fetchWeeklyDigest(), fetchFormTarget(), fetchStreak(), fetchMilestones()]).then(([p, r, wd, ft, st, ms]) => {
+    Promise.all([fetchPmc(90, 14), fetchRecords(), fetchWeeklyDigest(), fetchFormTarget(), fetchStreak(), fetchMilestones(), fetchSeasonRecap()]).then(([p, r, wd, ft, st, ms, sr]) => {
       if (!alive) return;
-      setPmc(p); setRecords(r); setDigest(wd); setTarget(ft); setStreak(st); setMilestones(ms); setLoading(false);
+      setPmc(p); setRecords(r); setDigest(wd); setTarget(ft); setStreak(st); setMilestones(ms); setSeason(sr); setLoading(false);
     });
     return () => { alive = false; };
   }, []);
@@ -90,6 +91,21 @@ export default function FitnessScreen() {
     });
   };
 
+  const shareSeason = () => {
+    if (!season) return;
+    setShareData({
+      kicker: `${season.year} SEASON`,
+      title: `${season.distance_km.toLocaleString()} km conquered`,
+      subtitle: `${season.rides} rides · ${season.hours} hours in the saddle`,
+      stats: [
+        { label: "Climbs", value: `${season.climbs_conquered}` },
+        { label: "Records", value: `${season.records_set}` },
+        { label: "Biggest climb", value: `${season.biggest_climb_m.toLocaleString()} m` },
+      ],
+      coachName: coach.name,
+    });
+  };
+
   return (
     <AppScaffold active="fitness" title="Fitness Trends" subtitle="How your training load is shaping your form.">
       {loading ? (
@@ -112,8 +128,21 @@ export default function FitnessScreen() {
 
           {milestones && (
             <Card>
-              <Text style={s.h}>Milestones <Text style={s.hDim}>your journey so far</Text></Text>
+              <View style={s.recHead}>
+                <Text style={s.h}>Milestones <Text style={s.hDim}>your journey so far</Text></Text>
+                <Pressable onPress={() => router.push("/milestones")} style={s.climbLink} testID="milestone-wall-link" hitSlop={8}>
+                  <Ionicons name="ribbon-outline" size={14} color={colors.yellow} />
+                  <Text style={s.climbLinkT}>Milestone wall</Text>
+                  <Ionicons name="chevron-forward" size={13} color={colors.yellow} />
+                </Pressable>
+              </View>
               <MilestonesCard data={milestones} onShare={shareMilestone} />
+            </Card>
+          )}
+
+          {season && season.has_data && (
+            <Card>
+              <SeasonRecapCard data={season} onShare={shareSeason} />
             </Card>
           )}
 
