@@ -804,3 +804,6 @@ STILL PENDING (awaiting approval): Phase 3 (Home banners consolidation, dup CTAs
 ## Round 8 (COMPLETE — iter 86 PASS)
 - External HWG admin console access: static service token (ADMIN_API_TOKEN in backend/.env). Send `Authorization: Bearer <token>` to any /api/admin/* endpoint -> full admin (synthetic principal svc_admin_console). Added at top of auth._resolve_token (constant-time compare). Interactive admin login unchanged. CORS lockable via CORS_ORIGINS env (awaiting admin domain).
 - PAUSED (to resume): Milestone Email, Recap Backdrop Photo, Email Preview.
+
+## Round 8b (COMPLETE)
+- HWG service token finalized: env HWG_SERVICE_TOKEN (fixed value from HWG), principal "HWG Console". CORS locked to the 4 HWG origins. Old ADMIN_API_TOKEN removed. Curl-verified (token 200, old 401, all 4 origins CORS pass, evil blocked, rider app unaffected).
