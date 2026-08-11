@@ -37,15 +37,20 @@ export default function SettingsScreen() {
   const geminiPlaying = (id: CoachId) => geminiFor(id).speakingId === `preview-${id}`;
   const previewGeminiVoice = (id: CoachId) => geminiFor(id).speak(`preview-${id}`, PREVIEW_LINE);
 
-  // Weekly recap email opt-in (Resend) + on-demand send.
+  // Weekly recap email opt-in (Resend) + preferred send day + on-demand send.
   const [emailWeekly, setEmailWeekly] = React.useState(false);
+  const [digestDay, setDigestDay] = React.useState(0);
   const [sendingDigest, setSendingDigest] = React.useState(false);
   const [digestMsg, setDigestMsg] = React.useState<string | null>(null);
-  React.useEffect(() => { fetchEmailPrefs().then((p) => setEmailWeekly(!!p.weekly_digest)); }, []);
+  React.useEffect(() => { fetchEmailPrefs().then((p) => { setEmailWeekly(!!p.weekly_digest); setDigestDay(p.digest_weekday ?? 0); }); }, []);
   const toggleEmailWeekly = async () => {
     const next = !emailWeekly;
     setEmailWeekly(next);
-    await setEmailPrefs(next);
+    await setEmailPrefs({ weekly_digest: next });
+  };
+  const chooseDigestDay = async (d: number) => {
+    setDigestDay(d);
+    await setEmailPrefs({ digest_weekday: d });
   };
   const sendDigestNow = async () => {
     setSendingDigest(true); setDigestMsg(null);
@@ -279,7 +284,23 @@ export default function SettingsScreen() {
 
       <Card testID="email-prefs">
         <SectionTitle label="EMAIL" color={CC.rouge} />
-        <PrefToggle label="Weekly recap email" sub="Get your training week in review, every Monday" on={emailWeekly} onToggle={toggleEmailWeekly} testID="tg-emailWeekly" />
+        <PrefToggle label="Weekly recap email" sub="Get your training week in review, once a week" on={emailWeekly} onToggle={toggleEmailWeekly} testID="tg-emailWeekly" />
+        {emailWeekly && (
+          <View style={s.dayPickerWrap} testID="digest-day-picker">
+            <Text style={s.groupLabel}>Send it on</Text>
+            <View style={s.dayRow}>
+              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((lbl, i) => {
+                const on = digestDay === i;
+                return (
+                  <Pressable key={lbl} testID={`digest-day-${i}`} onPress={() => chooseDigestDay(i)} accessibilityState={{ selected: on }}
+                    style={[s.dayChip, on && s.dayChipOn]}>
+                    <Text style={[s.dayChipT, on && { color: CC.white }]}>{lbl}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        )}
         <Pressable onPress={sendDigestNow} disabled={sendingDigest} testID="send-digest-now" style={s.digestBtn}
           accessibilityRole="button" accessibilityLabel="Email me this week's recap now">
           <Ionicons name="mail" size={15} color={CC.yellow} />
@@ -349,6 +370,11 @@ const s = StyleSheet.create({
   digestBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 14, borderWidth: 1, borderColor: "rgba(255,194,10,0.4)", backgroundColor: "rgba(255,194,10,0.06)", borderRadius: 12, paddingVertical: 12 },
   digestBtnT: { color: CC.yellow, fontSize: 13.5, fontWeight: "800" },
   digestMsg: { color: "#3FB68B", fontSize: 12.5, fontWeight: "700", marginTop: 10, textAlign: "center" },
+  dayPickerWrap: { marginTop: 14, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)", paddingTop: 14 },
+  dayRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
+  dayChip: { flexGrow: 1, alignItems: "center", borderWidth: 1, borderColor: CC.border, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 6, backgroundColor: "rgba(255,255,255,0.03)", minWidth: 44 },
+  dayChipOn: { backgroundColor: CC.rouge + "22", borderColor: CC.rouge },
+  dayChipT: { color: CC.dim, fontSize: 12.5, fontWeight: "800" },
   coachExplainer: { color: CC.yellow, fontSize: 11.5, fontWeight: "700", marginTop: 4, marginBottom: 4, letterSpacing: 0.2 },
   a11yPreview: { marginTop: 14, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: CC.borderSoft, backgroundColor: "rgba(255,255,255,0.02)", gap: 6 },
   a11yPreviewLabel: { color: CC.dim, fontSize: 10.5, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase" },

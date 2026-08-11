@@ -73,6 +73,7 @@ _PUBLIC = {
     "/api/auth/register", "/api/auth/login", "/api/auth/google", "/api/auth/apple",
     "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/verify-email",
     "/api/admin/login", "/api/admin/logout", "/api/openapi.json",
+    "/api/analysis/unsubscribe",
 }
 
 
@@ -231,12 +232,23 @@ def _public_user(u: dict) -> dict:
     return out
 
 
+_last_base_url = os.environ.get("PUBLIC_BASE_URL", "")
+
+
 def _base_url(request: Request) -> str:
     """Public origin of the incoming request (survives the ingress proxy), used
     to build email links that open in a browser on any device."""
+    global _last_base_url
     proto = request.headers.get("x-forwarded-proto") or request.url.scheme or "https"
     host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
-    return f"{proto}://{host}"
+    _last_base_url = f"{proto}://{host}"
+    return _last_base_url
+
+
+def cached_base_url() -> str:
+    """Best-known public origin for request-less senders (e.g. the weekly digest
+    loop). Falls back to PUBLIC_BASE_URL env; empty if never seen a request yet."""
+    return _last_base_url or os.environ.get("PUBLIC_BASE_URL", "")
 
 
 async def _send_verification(user: dict, request: Request) -> bool:

@@ -144,15 +144,17 @@ export async function fetchWeeklyDigest(): Promise<WeeklyDigest | null> {
   return r.ok ? await r.json() : null;
 }
 
-export async function fetchEmailPrefs(): Promise<{ weekly_digest: boolean }> {
+export type EmailPrefs = { weekly_digest: boolean; digest_weekday: number };
+
+export async function fetchEmailPrefs(): Promise<EmailPrefs> {
   const r = await fetch(`${API}/analysis/email-prefs`);
-  return r.ok ? await r.json() : { weekly_digest: false };
+  return r.ok ? await r.json() : { weekly_digest: false, digest_weekday: 0 };
 }
 
-export async function setEmailPrefs(weekly_digest: boolean): Promise<void> {
+export async function setEmailPrefs(prefs: Partial<EmailPrefs>): Promise<void> {
   await fetch(`${API}/analysis/email-prefs`, {
     method: "PUT", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ weekly_digest }),
+    body: JSON.stringify(prefs),
   });
 }
 

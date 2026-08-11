@@ -154,7 +154,7 @@ def welcome_email_html(name: str) -> str:
     return _shell("Welcome to ROUJAUNE", body)
 
 
-def weekly_digest_email_html(name: str, digest: dict) -> str:
+def weekly_digest_email_html(name: str, digest: dict, unsub_url: str | None = None) -> str:
     tw = digest.get("this_week", {}) or {}
     d = digest.get("deltas", {}) or {}
 
@@ -200,4 +200,11 @@ def weekly_digest_email_html(name: str, digest: dict) -> str:
         "<p style='margin-top:20px;color:#9A9B98;font-size:13px;'>Open ROUJAUNE to see your fitness "
         "trend, streak and milestones.</p>"
     )
+    if unsub_url:
+        body += (
+            "<p style='margin-top:18px;color:#7C7D7A;font-size:12px;line-height:1.5;'>"
+            "Don't want these weekly recaps? "
+            f"<a href='{unsub_url}' style='color:{BRAND_YELLOW};'>Unsubscribe in one tap</a>."
+            "</p>"
+        )
     return _shell("Your week in review", body)

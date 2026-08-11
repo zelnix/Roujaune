@@ -1,0 +1,33 @@
+{
+  "summary": "Iter85 — email-prefs (weekly digest opt-in + rider-chosen send day), public one-tap unsubscribe, and bold Season Recap share card. Backend: 9/9 pytest passed (partial-update semantics of PUT /api/analysis/email-prefs verified; PUT {digest_weekday:3} preserves weekly_digest; PUT {weekly_digest:true} then GET returns both fields; public GET /api/analysis/unsubscribe?token=bogus returns HTTP 200 HTML containing 'not recognised' WITHOUT any Bearer header; season-recap/milestone-wall/weekly-digest regressions all 200). Demo reset to {weekly_digest:false, digest_weekday:0} at teardown. Frontend: /settings EMAIL card renders tg-emailWeekly; toggling ON reveals digest-day-picker with chips digest-day-0..6 (Mon..Sun); tapping digest-day-3 selects Thu (rouge border rgb(201,23,39)) and PERSISTS across page reload; send-digest-now and preview-alberto both present. /fitness Season Recap 'Share' opens ShareCardModal with the new themed card: giant faint '2026' year watermark, highlighted 'BIGGEST CLIMB 171 m' hero band, and 6-stat grid (Distance/Rides/Hours/Climbs/Records/Longest) — no clipping at 1024x1000; share-card-share + share-card-save both render. /milestones and home screen render cleanly. digest-email button still present on /fitness.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter85_email_prefs_unsub_regression.py",
+    "/app/test_reports/pytest/iter85.xml",
+    "/app/test_reports/screens/i85_settings_email.jpeg",
+    "/app/test_reports/screens/i85_settings_reload.jpeg",
+    "/app/test_reports/screens/i85_share_modal.jpeg",
+    "/app/test_reports/screens/i85_milestones.jpeg",
+    "/app/test_reports/screens/i85_home.jpeg"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "analysis.py is 1006 lines — approaching the 700-line guidance; consider splitting the email/unsubscribe block, climb/PMC block, and season/milestone block into submodules (non-blocking).",
+    "PUT /api/analysis/email-prefs silently ignores out-of-range digest_weekday (0-6); returning 400 for invalid ints would be stricter, but current behaviour is safe and idempotent."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter85_email_prefs_unsub_regression.py (new)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None. Demo rider email-prefs left at {weekly_digest:false, digest_weekday:0} (pristine) via pytest teardown, as requested.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iter85 verified partial-update semantics for /api/analysis/email-prefs (weekly-only and weekday-only PUTs), public HTML unsubscribe (no auth, bogus/missing token → 200 'not recognised'), and season recap regression. Frontend confirmed digest-day-picker persistence and no clipping on the new themed ShareCardModal (year watermark + BIGGEST CLIMB band + 6-stat grid). POST /api/analysis/email-digest was intentionally NOT called to avoid sending a real email.",
+  "rca_of_issue": ""
+}

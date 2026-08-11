@@ -834,9 +834,12 @@ async def records():
 # ── Weekly digest email (Resend) ────────────────────────────────────────────
 import asyncio  # noqa: E402
 import logging  # noqa: E402
+import secrets  # noqa: E402
 import emailer  # noqa: E402
+from fastapi.responses import HTMLResponse  # noqa: E402
 
 _dlog = logging.getLogger("server")
+WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 
 def _iso_week(dt: datetime) -> str:
@@ -844,20 +847,55 @@ def _iso_week(dt: datetime) -> str:
     return f"{ic[0]}-W{ic[1]:02d}"
 
 
+async def _ensure_unsub_token(uid: str) -> str:
+    """One stable, unguessable token per rider used for one-tap email unsubscribe."""
+    db = udb._db
+    doc = await db.settings.find_one({"user_id": uid, "id": "email_prefs"}) or {}
+    tok = doc.get("unsub_token")
+    if not tok:
+        tok = secrets.token_urlsafe(24)
+        await db.settings.update_one(
+            {"user_id": uid, "id": "email_prefs"},
+            {"$set": {"unsub_token": tok}, "$setOnInsert": {"user_id": uid, "id": "email_prefs"}},
+            upsert=True,
+        )
+    return tok
+
+
+def _unsub_url(token: str) -> str:
+    base = auth.cached_base_url()
+    return f"{base}/api/analysis/unsubscribe?token={token}" if base else ""
+
+
 @router.get("/email-prefs")
 async def get_email_prefs():
-    """Whether the rider has opted in to the weekly digest email."""
+    """The rider's weekly digest email settings: opt-in + preferred send day."""
     doc = await udb.settings.find_one({"id": "email_prefs"}) or {}
-    return {"weekly_digest": bool(doc.get("weekly_digest", False))}
+    wd = doc.get("digest_weekday")
+    return {
+        "weekly_digest": bool(doc.get("weekly_digest", False)),
+        "digest_weekday": int(wd) if isinstance(wd, int) and 0 <= wd <= 6 else 0,
+    }
 
 
 @router.put("/email-prefs")
 async def put_email_prefs(body: dict):
-    await udb.settings.update_one(
-        {"id": "email_prefs"},
-        {"$set": {"weekly_digest": bool(body.get("weekly_digest"))}}, upsert=True,
-    )
-    return {"ok": True, "weekly_digest": bool(body.get("weekly_digest"))}
+    """Partial update — only the provided keys change."""
+    upd: dict = {}
+    if "weekly_digest" in body:
+        upd["weekly_digest"] = bool(body.get("weekly_digest"))
+    if "digest_weekday" in body:
+        try:
+            d = int(body.get("digest_weekday"))
+            if 0 <= d <= 6:
+                upd["digest_weekday"] = d
+        except (TypeError, ValueError):
+            pass
+    if upd:
+        await udb.settings.update_one({"id": "email_prefs"}, {"$set": upd}, upsert=True)
+    doc = await udb.settings.find_one({"id": "email_prefs"}) or {}
+    return {"ok": True, "weekly_digest": bool(doc.get("weekly_digest", False)),
+            "digest_weekday": int(doc.get("digest_weekday", 0) or 0)}
 
 
 @router.post("/email-digest")
@@ -869,21 +907,59 @@ async def email_digest():
         raise HTTPException(status_code=400, detail="No email on file for this account")
     digest = await weekly_digest()
     name = (user.get("name") or "there").split(" ")[0]
+    token = await _ensure_unsub_token(user["user_id"])
     ok = await emailer.send_email(
         email, "Your ROUJAUNE week in review",
-        emailer.weekly_digest_email_html(name, digest),
+        emailer.weekly_digest_email_html(name, digest, _unsub_url(token)),
     )
     if not ok:
         raise HTTPException(status_code=502, detail="Couldn't send the email right now. Please try again shortly.")
     return {"ok": True}
 
 
+def _unsub_page(ok: bool) -> HTMLResponse:
+    title = "You're unsubscribed" if ok else "Link not recognised"
+    msg = ("You won't receive the weekly recap email any more. You can turn it back "
+           "on any time in the ROUJAUNE app under Settings → Email."
+           if ok else "This unsubscribe link is invalid or has already been used.")
+    icon, color = ("✓", "#FFC20A") if ok else ("!", "#C91727")
+    return HTMLResponse(f"""\
+<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>{title} · ROUJAUNE</title></head>
+<body style="margin:0;background:#0B0C0C;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#F3F1EA;">
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div style="max-width:420px;width:100%;background:#141615;border:1px solid rgba(255,194,10,0.28);border-radius:18px;padding:34px 30px;text-align:center;">
+    <div style="font-size:22px;font-weight:800;letter-spacing:1px;margin-bottom:22px;">ROU<span style="color:#FFC20A;">JAUNE</span></div>
+    <div style="width:66px;height:66px;border-radius:50%;border:3px solid {color};display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-size:32px;color:{color};font-weight:800;">{icon}</div>
+    <h1 style="font-size:20px;margin:0 0 10px;">{title}</h1>
+    <p style="color:#C9CAC7;font-size:15px;line-height:1.6;margin:0;">{msg}</p>
+  </div>
+</div></body></html>""")
+
+
+@router.get("/unsubscribe")
+async def unsubscribe(token: str = ""):
+    """One-tap public unsubscribe from the weekly digest email (no login)."""
+    if not token:
+        return _unsub_page(False)
+    db = udb._db
+    doc = await db.settings.find_one({"id": "email_prefs", "unsub_token": token})
+    if not doc:
+        return _unsub_page(False)
+    await db.settings.update_one(
+        {"user_id": doc["user_id"], "id": "email_prefs"},
+        {"$set": {"weekly_digest": False}},
+    )
+    return _unsub_page(True)
+
+
 async def _run_weekly_digests():
-    """Email opted-in, email-verified riders their weekly recap once per ISO week
-    (Mondays ~08:00 UTC). Best-effort; skips riders with no activity."""
+    """Email opted-in, email-verified riders their weekly recap once per ISO week,
+    on each rider's chosen weekday (~08:00 UTC). Best-effort; skips no-activity."""
     now = datetime.now(timezone.utc)
-    if now.weekday() != 0 or now.hour != 8:  # Monday 08:00–08:59 UTC window
+    if now.hour != 8:  # single daily 08:00–08:59 UTC window
         return
+    today = now.weekday()
     week = _iso_week(now)
     db = udb._db
     users = await db.users.find(
@@ -897,6 +973,8 @@ async def _run_weekly_digests():
         prefs = await db.settings.find_one({"user_id": uid, "id": "email_prefs"}) or {}
         if not prefs.get("weekly_digest") or prefs.get("last_sent_week") == week:
             continue
+        if int(prefs.get("digest_weekday", 0) or 0) != today:  # rider's chosen send day
+            continue
         token = auth._current_user.set({"user_id": uid})
         try:
             digest = await weekly_digest()
@@ -905,9 +983,10 @@ async def _run_weekly_digests():
         if not digest.get("has_activity"):
             continue
         name = (u.get("name") or "there").split(" ")[0]
+        unsub = await _ensure_unsub_token(uid)
         ok = await emailer.send_email(
             email, "Your ROUJAUNE week in review",
-            emailer.weekly_digest_email_html(name, digest),
+            emailer.weekly_digest_email_html(name, digest, _unsub_url(unsub)),
         )
         if ok:
             await db.settings.update_one(
@@ -917,7 +996,7 @@ async def _run_weekly_digests():
 
 
 async def weekly_digest_loop():
-    """Hourly tick that fires the weekly digest send during the Monday window."""
+    """Hourly tick that fires the weekly digest send during the daily 08:00 window."""
     while True:
         try:
             await _run_weekly_digests()

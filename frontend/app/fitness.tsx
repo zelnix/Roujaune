@@ -102,16 +102,19 @@ export default function FitnessScreen() {
   const shareSeason = () => {
     if (!season || !season.has_data) return;
     setShareData({
-      kicker: `${season.year} SEASON`,
+      variant: "season",
+      watermark: `${season.year}`,
+      kicker: `${season.year} · YEAR IN REVIEW`,
       title: `My ${season.year} on the bike`,
       subtitle: `${season.rides} rides · ${season.hours} hours in the saddle`,
+      hero: { label: "Biggest climb", value: `${season.biggest_climb_m.toLocaleString()} m` },
       stats: [
         { label: "Distance", value: `${season.distance_km.toLocaleString()} km` },
         { label: "Rides", value: `${season.rides}` },
         { label: "Hours", value: `${season.hours}` },
         { label: "Climbs", value: `${season.climbs_conquered}` },
         { label: "Records", value: `${season.records_set}` },
-        { label: "Big climb", value: `${season.biggest_climb_m.toLocaleString()} m` },
+        { label: "Longest", value: `${season.longest_ride_km} km` },
       ],
       coachName: coach.name,
     });

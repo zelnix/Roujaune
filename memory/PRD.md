@@ -795,3 +795,8 @@ STILL PENDING (awaiting approval): Phase 3 (Home banners consolidation, dup CTAs
 - Badge Nudge: MilestoneNudgeBanner on Home (within 3 rides / 25 km of next badge) -> /milestones
 - Voice Preview: Settings coach 'Hear a sample' now plays the real Gemini voice
 - RESEND EMAIL (own account, Harmony Wellness Group <noreply@harmonywellnessgroup.com.au>, RESEND_API_KEY, domain verified): emailer.py -> direct Resend API. Welcome (on register), verification, password reset, weekly digest. GET/PUT /api/analysis/email-prefs, POST /api/analysis/email-digest, weekly_digest_loop (Mon ~08:00 UTC, opted-in verified riders). Settings EMAIL card + Weekly Digest 'Email me' button.
+
+## Round 7 (COMPLETE — iter 85 PASS)
+- Unsubscribe: one-tap link in weekly email footer -> public GET /api/analysis/unsubscribe?token= (branded confirmation page); per-rider unsub_token
+- Send Day Choice: email_prefs.digest_weekday (0-6); Settings day picker; weekly loop sends on each rider's chosen day (daily 08:00 UTC tick)
+- Season Photo Theme: AchievementCard variant='season' (year watermark + BIGGEST CLIMB hero band + 6-stat grid) for the shareable season image
