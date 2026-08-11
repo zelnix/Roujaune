@@ -57,17 +57,28 @@ export const AchievementCard = React.forwardRef<View, { data: AchievementCardDat
           <Text style={c.title} numberOfLines={2}>{title}</Text>
           <Text style={c.subtitle}>{subtitle}</Text>
 
-          <View style={c.statsRow}>
-            {stats.map((s, i) => (
-              <React.Fragment key={s.label}>
-                {i > 0 ? <View style={c.statDivider} /> : null}
-                <View style={c.stat}>
-                  <Text style={c.statValue}>{s.value}</Text>
+          {stats.length > 3 ? (
+            <View style={c.statsGrid}>
+              {stats.map((s) => (
+                <View key={s.label} style={c.gridStat}>
+                  <Text style={c.gridValue} numberOfLines={1} adjustsFontSizeToFit>{s.value}</Text>
                   <Text style={c.statLabel}>{s.label}</Text>
                 </View>
-              </React.Fragment>
-            ))}
-          </View>
+              ))}
+            </View>
+          ) : (
+            <View style={c.statsRow}>
+              {stats.map((s, i) => (
+                <React.Fragment key={s.label}>
+                  {i > 0 ? <View style={c.statDivider} /> : null}
+                  <View style={c.stat}>
+                    <Text style={c.statValue}>{s.value}</Text>
+                    <Text style={c.statLabel}>{s.label}</Text>
+                  </View>
+                </React.Fragment>
+              ))}
+            </View>
+          )}
 
           <View style={c.footer}>
             <Ionicons name="bicycle" size={15} color={C.yellow} />
@@ -95,6 +106,13 @@ const c = StyleSheet.create({
   },
   stat: { flex: 1, alignItems: "center" },
   statValue: { color: C.yellow, fontSize: 24, fontWeight: "900" },
+  statsGrid: {
+    flexDirection: "row", flexWrap: "wrap", justifyContent: "center", marginTop: 22,
+    backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 16, borderWidth: 1,
+    borderColor: "rgba(255,194,10,0.28)", paddingVertical: 12, paddingHorizontal: 6, alignSelf: "stretch",
+  },
+  gridStat: { width: "33.33%", alignItems: "center", paddingVertical: 12, paddingHorizontal: 4 },
+  gridValue: { color: C.yellow, fontSize: 21, fontWeight: "900" },
   statLabel: { color: C.white, fontSize: 11, fontWeight: "600", marginTop: 3, opacity: 0.85, textTransform: "uppercase", letterSpacing: 1 },
   statDivider: { width: 1, height: 38, backgroundColor: "rgba(255,255,255,0.14)" },
   footer: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: "auto", paddingTop: 18 },

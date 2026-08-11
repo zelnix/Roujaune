@@ -24,18 +24,26 @@ export default function FitnessScreen() {
   const [streak, setStreak] = React.useState<Streak | null>(null);
   const [milestones, setMilestones] = React.useState<Milestones | null>(null);
   const [season, setSeason] = React.useState<SeasonRecap | null>(null);
+  const currentYear = new Date().getFullYear();
+  const [seasonYear, setSeasonYear] = React.useState(currentYear);
   const [noteLoading, setNoteLoading] = React.useState(true);
   const [loading, setLoading] = React.useState(true);
   const [shareData, setShareData] = React.useState<AchievementCardData | null>(null);
 
   React.useEffect(() => {
     let alive = true;
-    Promise.all([fetchPmc(90, 14), fetchRecords(), fetchWeeklyDigest(), fetchFormTarget(), fetchStreak(), fetchMilestones(), fetchSeasonRecap()]).then(([p, r, wd, ft, st, ms, sr]) => {
+    Promise.all([fetchPmc(90, 14), fetchRecords(), fetchWeeklyDigest(), fetchFormTarget(), fetchStreak(), fetchMilestones()]).then(([p, r, wd, ft, st, ms]) => {
       if (!alive) return;
-      setPmc(p); setRecords(r); setDigest(wd); setTarget(ft); setStreak(st); setMilestones(ms); setSeason(sr); setLoading(false);
+      setPmc(p); setRecords(r); setDigest(wd); setTarget(ft); setStreak(st); setMilestones(ms); setLoading(false);
     });
     return () => { alive = false; };
   }, []);
+
+  React.useEffect(() => {
+    let alive = true;
+    fetchSeasonRecap(seasonYear).then((sr) => { if (alive) setSeason(sr); });
+    return () => { alive = false; };
+  }, [seasonYear]);
 
   const loadNote = React.useCallback((refresh = false) => {
     setNoteLoading(true);
@@ -92,15 +100,18 @@ export default function FitnessScreen() {
   };
 
   const shareSeason = () => {
-    if (!season) return;
+    if (!season || !season.has_data) return;
     setShareData({
       kicker: `${season.year} SEASON`,
-      title: `${season.distance_km.toLocaleString()} km conquered`,
+      title: `My ${season.year} on the bike`,
       subtitle: `${season.rides} rides · ${season.hours} hours in the saddle`,
       stats: [
+        { label: "Distance", value: `${season.distance_km.toLocaleString()} km` },
+        { label: "Rides", value: `${season.rides}` },
+        { label: "Hours", value: `${season.hours}` },
         { label: "Climbs", value: `${season.climbs_conquered}` },
         { label: "Records", value: `${season.records_set}` },
-        { label: "Biggest climb", value: `${season.biggest_climb_m.toLocaleString()} m` },
+        { label: "Big climb", value: `${season.biggest_climb_m.toLocaleString()} m` },
       ],
       coachName: coach.name,
     });
@@ -140,9 +151,15 @@ export default function FitnessScreen() {
             </Card>
           )}
 
-          {season && season.has_data && (
+          {season && (
             <Card>
-              <SeasonRecapCard data={season} onShare={shareSeason} />
+              <SeasonRecapCard
+                data={season}
+                onShare={shareSeason}
+                onPrevYear={() => setSeasonYear((y) => y - 1)}
+                onNextYear={() => setSeasonYear((y) => Math.min(currentYear, y + 1))}
+                canNext={seasonYear < currentYear}
+              />
             </Card>
           )}
 

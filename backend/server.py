@@ -503,6 +503,13 @@ async def _seed_plans_on_startup():
         logger.info("Benchmark reminder loop started")
     except Exception:
         logging.exception("failed to start benchmark reminder loop")
+    # Weekly digest email loop (Resend) — Mondays ~08:00 UTC to opted-in riders.
+    try:
+        from routes.analysis import weekly_digest_loop
+        asyncio.create_task(weekly_digest_loop())
+        logger.info("Weekly digest email loop started")
+    except Exception:
+        logging.exception("failed to start weekly digest loop")
 
 
 @app.on_event("shutdown")

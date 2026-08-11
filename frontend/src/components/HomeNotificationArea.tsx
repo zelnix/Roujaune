@@ -11,6 +11,7 @@ import { BenchmarkReminderBanner } from "./BenchmarkReminderBanner";
 import { RebenchmarkNudgeBanner } from "./RebenchmarkNudgeBanner";
 import { VerifyEmailBanner } from "./VerifyEmailBanner";
 import { MissedWorkoutBanner } from "./MissedWorkoutBanner";
+import { MilestoneNudgeBanner, useMilestoneNudge } from "./MilestoneNudgeBanner";
 
 function daysUntil(dateStr: string): number {
   const d = new Date(dateStr + "T00:00:00");
@@ -33,6 +34,7 @@ export function HomeNotificationArea() {
   const { week } = useBenchmarkWeek();
   const { review } = useBenchmarkPlanReview();
   const { nudge } = useBenchmarkNudge();
+  const milestoneNudge = useMilestoneNudge();
 
   const verifyActive = !!user && user.provider === "password" && !user.email_verified;
   const upcomingTests = (week.active ? (week.days || []) : [])
@@ -55,6 +57,7 @@ export function HomeNotificationArea() {
   if (missedActive) items.push({ key: "missed", node: <MissedWorkoutBanner data={missed} /> });
   if (benchmarkActive) items.push({ key: "benchmark", node: <BenchmarkReminderBanner only={benchmarkOnly} /> });
   if (planUpdated) items.push({ key: "plan", node: <PlanUpdatedNudge /> });
+  if (milestoneNudge.show) items.push({ key: "milestone", node: <MilestoneNudgeBanner nudge={milestoneNudge} /> });
 
   if (items.length === 0) return null;
   const extra = items.length - 1;

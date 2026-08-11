@@ -4,7 +4,7 @@ import Svg, { Path, Polyline, Line, Rect, Circle, Defs, LinearGradient as SvgGra
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius } from "@/src/theme";
-import { PmcPoint, PowerRecord, WeeklyDigest, FormTarget, WeeklyNote, TaperNote, Streak, Milestones, MilestoneNote, saveEvent, fetchTaperNote, applyTaper, fetchMilestoneNote, useStreakFreeze } from "@/src/lib/analysis";
+import { PmcPoint, PowerRecord, WeeklyDigest, FormTarget, WeeklyNote, TaperNote, Streak, Milestones, MilestoneNote, saveEvent, fetchTaperNote, applyTaper, fetchMilestoneNote, useStreakFreeze, emailDigestNow } from "@/src/lib/analysis";
 import { useCoach } from "@/src/lib/coach-persona";
 import { useCoachSpeech } from "@/src/hooks/useCoachSpeech";
 
@@ -184,6 +184,14 @@ export function RecordsGrid({ records, hasData }: { records: PowerRecord[]; hasD
  *  any new all-time power records set this week. */
 export function WeeklyDigestCard({ digest, onShare }: { digest: WeeklyDigest; onShare?: () => void }) {
   const router = useRouter();
+  const [emailing, setEmailing] = React.useState(false);
+  const [emailMsg, setEmailMsg] = React.useState<string | null>(null);
+  const onEmail = async () => {
+    setEmailing(true); setEmailMsg(null);
+    const r = await emailDigestNow();
+    setEmailing(false);
+    setEmailMsg(r.ok ? "Sent — check your inbox 📬" : "Couldn't send right now. Please try again.");
+  };
   const tw = digest.this_week, d = digest.deltas;
   const deltaChip = (v: number, unit: string, betterHigh = true) => {
     if (!v) return <Text style={[s.wdDelta, { color: colors.textFaint }]}>±0 vs last wk</Text>;
@@ -192,12 +200,19 @@ export function WeeklyDigestCard({ digest, onShare }: { digest: WeeklyDigest; on
   };
   return (
     <View>
-      {onShare && (
-        <Pressable onPress={onShare} style={s.shareBtn} testID="digest-share" hitSlop={8}>
-          <Ionicons name="share-social" size={15} color={colors.yellow} />
-          <Text style={s.shareBtnT}>Share</Text>
+      <View style={s.digestActions}>
+        <Pressable onPress={onEmail} disabled={emailing} style={s.emailBtn} testID="digest-email" hitSlop={8}>
+          {emailing ? <ActivityIndicator size="small" color={colors.yellow} /> : <Ionicons name="mail" size={14} color={colors.yellow} />}
+          <Text style={s.shareBtnT}>Email me</Text>
         </Pressable>
-      )}
+        {onShare && (
+          <Pressable onPress={onShare} style={s.shareBtnInline} testID="digest-share" hitSlop={8}>
+            <Ionicons name="share-social" size={15} color={colors.yellow} />
+            <Text style={s.shareBtnT}>Share</Text>
+          </Pressable>
+        )}
+      </View>
+      {emailMsg ? <Text style={s.emailMsg} testID="digest-email-msg">{emailMsg}</Text> : null}
       <View style={s.wd}>
         <View style={s.wdTile}>
           <Text style={s.wdVal}>{tw.tss}</Text>
@@ -570,8 +585,12 @@ const ms = StyleSheet.create({
   ringSub: { color: colors.textFaint, fontSize: 10, fontWeight: "700" },
 });
 
-/** Season Recap — a shareable end-of-season summary. */
-export function SeasonRecapCard({ data, onShare }: { data: import("@/src/lib/analysis").SeasonRecap; onShare: () => void }) {
+/** Season Recap — a shareable end-of-season summary with a year picker so riders
+ *  can look back at any past season. */
+export function SeasonRecapCard({ data, onShare, onPrevYear, onNextYear, canNext }: {
+  data: import("@/src/lib/analysis").SeasonRecap; onShare: () => void;
+  onPrevYear: () => void; onNextYear: () => void; canNext: boolean;
+}) {
   const tiles = [
     { icon: "map" as const, val: `${data.distance_km.toLocaleString()}`, unit: "km", label: "DISTANCE" },
     { icon: "trending-up" as const, val: `${data.climbs_conquered}`, unit: "", label: "CLIMBS" },
@@ -583,24 +602,36 @@ export function SeasonRecapCard({ data, onShare }: { data: import("@/src/lib/ana
   return (
     <View>
       <View style={s.seasonHead}>
-        <View>
-          <Text style={s.seasonYear}>{data.year} Season</Text>
-          <Text style={s.seasonSub}>Everything you've conquered this year</Text>
+        <View style={s.seasonTitleRow}>
+          <Pressable onPress={onPrevYear} testID="season-prev" hitSlop={10} style={s.seasonNav}>
+            <Ionicons name="chevron-back" size={18} color={colors.white} />
+          </Pressable>
+          <View>
+            <Text style={s.seasonYear}>{data.year} Season</Text>
+            <Text style={s.seasonSub}>Everything you conquered</Text>
+          </View>
+          <Pressable onPress={onNextYear} disabled={!canNext} testID="season-next" hitSlop={10} style={s.seasonNav}>
+            <Ionicons name="chevron-forward" size={18} color={canNext ? colors.white : colors.textFaint} />
+          </Pressable>
         </View>
-        <Pressable onPress={onShare} style={s.mileShare} testID="season-share">
+        <Pressable onPress={onShare} disabled={!data.has_data} style={[s.mileShare, !data.has_data && { opacity: 0.4 }]} testID="season-share">
           <Ionicons name="share-social" size={15} color="#241B00" />
           <Text style={s.mileShareT}>Share</Text>
         </Pressable>
       </View>
-      <View style={s.seasonGrid}>
-        {tiles.map((t) => (
-          <View key={t.label} style={s.seasonTile}>
-            <Ionicons name={t.icon} size={16} color={colors.yellow} />
-            <Text style={s.seasonVal}>{t.val}<Text style={s.mileUnit}>{t.unit ? ` ${t.unit}` : ""}</Text></Text>
-            <Text style={s.mileLabel}>{t.label}</Text>
-          </View>
-        ))}
-      </View>
+      {data.has_data ? (
+        <View style={s.seasonGrid}>
+          {tiles.map((t) => (
+            <View key={t.label} style={s.seasonTile}>
+              <Ionicons name={t.icon} size={16} color={colors.yellow} />
+              <Text style={s.seasonVal}>{t.val}<Text style={s.mileUnit}>{t.unit ? ` ${t.unit}` : ""}</Text></Text>
+              <Text style={s.mileLabel}>{t.label}</Text>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <Text style={s.wdEmpty}>No rides logged in {data.year} yet. Pick another season, or get out and ride to fill this one in.</Text>
+      )}
     </View>
   );
 }
@@ -640,6 +671,10 @@ const s = StyleSheet.create({
 
   shareBtn: { position: "absolute", right: 0, top: -2, flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderColor: "rgba(255,194,10,0.4)", borderRadius: radius.pill, paddingVertical: 5, paddingHorizontal: 11, zIndex: 2 },
   shareBtnT: { color: colors.yellow, fontSize: 12, fontWeight: "800" },
+  digestActions: { flexDirection: "row", justifyContent: "flex-end", gap: 8, marginBottom: 12 },
+  emailBtn: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderColor: "rgba(255,194,10,0.4)", borderRadius: radius.pill, paddingVertical: 6, paddingHorizontal: 12 },
+  shareBtnInline: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderColor: "rgba(255,194,10,0.4)", borderRadius: radius.pill, paddingVertical: 6, paddingHorizontal: 12 },
+  emailMsg: { color: FITNESS, fontSize: 12, fontWeight: "700", marginBottom: 10, textAlign: "right" },
 
   eventInputRow: { marginBottom: 10 },
   eventInput: { backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, color: colors.white, fontSize: 14 },
@@ -700,6 +735,8 @@ const s = StyleSheet.create({
   mileLabel: { color: colors.textDim, fontSize: 10, fontWeight: "700", marginTop: 3, letterSpacing: 0.3 },
 
   seasonHead: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 10, marginBottom: 14 },
+  seasonTitleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  seasonNav: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: colors.border },
   seasonYear: { color: colors.white, fontSize: 20, fontWeight: "900" },
   seasonSub: { color: colors.textFaint, fontSize: 12, marginTop: 2, fontWeight: "600" },
   seasonGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },

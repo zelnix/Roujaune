@@ -788,3 +788,10 @@ STILL PENDING (awaiting approval): Phase 3 (Home banners consolidation, dup CTAs
 - Split PR Highlights in /climb/[id] — climb-detail returns recent_split_prs; amber banner + flame on split rows
 - Freeze Auto-Suggest — StreakCard "Protect this week with a freeze" (suggest_freeze)
 - GEMINI COACH VOICE: GET /api/coach/speak (Gemini TTS gemini-2.5-flash-preview-tts, GEMINI_API_KEY; Alberto=Charon, Adriana=Aoede). useCoachSpeech now streams this (web blob / native uri+bearer) via expo-audio with expo-speech fallback. Workout real-time cues (useWorkoutAudio) unchanged.
+
+## Round 6 (COMPLETE — iter 84 PASS)
+- Season Photo: AchievementCard 6-stat grid; season share -> saveable/shareable branded image
+- Recap Reminder: year picker on Season Recap card (season-prev/season-next); refetches per year
+- Badge Nudge: MilestoneNudgeBanner on Home (within 3 rides / 25 km of next badge) -> /milestones
+- Voice Preview: Settings coach 'Hear a sample' now plays the real Gemini voice
+- RESEND EMAIL (own account, Harmony Wellness Group <noreply@harmonywellnessgroup.com.au>, RESEND_API_KEY, domain verified): emailer.py -> direct Resend API. Welcome (on register), verification, password reset, weekly digest. GET/PUT /api/analysis/email-prefs, POST /api/analysis/email-digest, weekly_digest_loop (Mon ~08:00 UTC, opted-in verified riders). Settings EMAIL card + Weekly Digest 'Email me' button.

@@ -9,7 +9,7 @@ from __future__ import annotations
 import math
 from datetime import datetime, timedelta, timezone, date
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 import auth
 
@@ -829,3 +829,98 @@ async def records():
         ],
         "has_data": bool(best),
     }
+
+
+# ── Weekly digest email (Resend) ────────────────────────────────────────────
+import asyncio  # noqa: E402
+import logging  # noqa: E402
+import emailer  # noqa: E402
+
+_dlog = logging.getLogger("server")
+
+
+def _iso_week(dt: datetime) -> str:
+    ic = dt.isocalendar()
+    return f"{ic[0]}-W{ic[1]:02d}"
+
+
+@router.get("/email-prefs")
+async def get_email_prefs():
+    """Whether the rider has opted in to the weekly digest email."""
+    doc = await udb.settings.find_one({"id": "email_prefs"}) or {}
+    return {"weekly_digest": bool(doc.get("weekly_digest", False))}
+
+
+@router.put("/email-prefs")
+async def put_email_prefs(body: dict):
+    await udb.settings.update_one(
+        {"id": "email_prefs"},
+        {"$set": {"weekly_digest": bool(body.get("weekly_digest"))}}, upsert=True,
+    )
+    return {"ok": True, "weekly_digest": bool(body.get("weekly_digest"))}
+
+
+@router.post("/email-digest")
+async def email_digest():
+    """Send the signed-in rider their weekly recap by email, right now."""
+    user = auth.require_user()
+    email = user.get("email")
+    if not email:
+        raise HTTPException(status_code=400, detail="No email on file for this account")
+    digest = await weekly_digest()
+    name = (user.get("name") or "there").split(" ")[0]
+    ok = await emailer.send_email(
+        email, "Your ROUJAUNE week in review",
+        emailer.weekly_digest_email_html(name, digest),
+    )
+    if not ok:
+        raise HTTPException(status_code=502, detail="Couldn't send the email right now. Please try again shortly.")
+    return {"ok": True}
+
+
+async def _run_weekly_digests():
+    """Email opted-in, email-verified riders their weekly recap once per ISO week
+    (Mondays ~08:00 UTC). Best-effort; skips riders with no activity."""
+    now = datetime.now(timezone.utc)
+    if now.weekday() != 0 or now.hour != 8:  # Monday 08:00–08:59 UTC window
+        return
+    week = _iso_week(now)
+    db = udb._db
+    users = await db.users.find(
+        {"provider": "password", "email_verified": True},
+        {"_id": 0, "user_id": 1, "email": 1, "name": 1},
+    ).to_list(length=5000)
+    for u in users:
+        uid, email = u.get("user_id"), u.get("email")
+        if not uid or not email:
+            continue
+        prefs = await db.settings.find_one({"user_id": uid, "id": "email_prefs"}) or {}
+        if not prefs.get("weekly_digest") or prefs.get("last_sent_week") == week:
+            continue
+        token = auth._current_user.set({"user_id": uid})
+        try:
+            digest = await weekly_digest()
+        finally:
+            auth._current_user.reset(token)
+        if not digest.get("has_activity"):
+            continue
+        name = (u.get("name") or "there").split(" ")[0]
+        ok = await emailer.send_email(
+            email, "Your ROUJAUNE week in review",
+            emailer.weekly_digest_email_html(name, digest),
+        )
+        if ok:
+            await db.settings.update_one(
+                {"user_id": uid, "id": "email_prefs"},
+                {"$set": {"last_sent_week": week}}, upsert=True,
+            )
+
+
+async def weekly_digest_loop():
+    """Hourly tick that fires the weekly digest send during the Monday window."""
+    while True:
+        try:
+            await _run_weekly_digests()
+        except Exception:  # noqa: BLE001
+            _dlog.exception("weekly digest loop error")
+        await asyncio.sleep(3600)

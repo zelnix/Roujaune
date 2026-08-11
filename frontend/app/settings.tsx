@@ -12,6 +12,8 @@ import { getVoiceId, setVoiceId } from "@/src/lib/prefs";
 import { useSettings, WHEEL_PRESETS } from "@/src/lib/settings";
 import { useA11y, setLargeText, setHighContrast, setReduceMotion } from "@/src/lib/a11y";
 import { useEntitlement } from "@/src/lib/entitlement";
+import { useCoachSpeech } from "@/src/hooks/useCoachSpeech";
+import { fetchEmailPrefs, setEmailPrefs, emailDigestNow } from "@/src/lib/analysis";
 
 const PREVIEW_LINE = "Alright, let's ride. Hold steady and breathe — you've got this.";
 
@@ -27,7 +29,30 @@ export default function SettingsScreen() {
   const voices = React.useRef<Record<CoachId, ResolvedVoice> | null>(null);
   const [available, setAvailable] = React.useState<CoachVoiceOption[]>([]);
   const [savedVoice, setSavedVoice] = React.useState<Record<CoachId, string | null>>({ alberto: null, adriana: null });
-  const [previewing, setPreviewing] = React.useState<CoachId | null>(null);
+  // Preview the rider's ACTUAL coach voice (Gemini natural TTS) — the same voice
+  // they hear in spoken summaries and coach chat. One hook per coach.
+  const speakAlberto = useCoachSpeech("alberto");
+  const speakAdriana = useCoachSpeech("adriana");
+  const geminiFor = (id: CoachId) => (id === "alberto" ? speakAlberto : speakAdriana);
+  const geminiPlaying = (id: CoachId) => geminiFor(id).speakingId === `preview-${id}`;
+  const previewGeminiVoice = (id: CoachId) => geminiFor(id).speak(`preview-${id}`, PREVIEW_LINE);
+
+  // Weekly recap email opt-in (Resend) + on-demand send.
+  const [emailWeekly, setEmailWeekly] = React.useState(false);
+  const [sendingDigest, setSendingDigest] = React.useState(false);
+  const [digestMsg, setDigestMsg] = React.useState<string | null>(null);
+  React.useEffect(() => { fetchEmailPrefs().then((p) => setEmailWeekly(!!p.weekly_digest)); }, []);
+  const toggleEmailWeekly = async () => {
+    const next = !emailWeekly;
+    setEmailWeekly(next);
+    await setEmailPrefs(next);
+  };
+  const sendDigestNow = async () => {
+    setSendingDigest(true); setDigestMsg(null);
+    const r = await emailDigestNow();
+    setSendingDigest(false);
+    setDigestMsg(r.ok ? "Sent — check your inbox 📬" : "Couldn't send right now. Please try again.");
+  };
 
   const refreshVoices = React.useCallback(async () => {
     const saved = { alberto: await getVoiceId("alberto"), adriana: await getVoiceId("adriana") };
@@ -40,7 +65,6 @@ export default function SettingsScreen() {
 
   const previewVoice = async (id: CoachId, voiceId?: string) => {
     Speech.stop();
-    setPreviewing(id);
     const v = voiceId
       ? { id: voiceId, lang: available.find((o) => o.id === voiceId)?.lang ?? "es-ES" }
       : (voices.current?.[id] ?? (await resolveBothCoachVoices({ alberto: savedVoice.alberto, adriana: savedVoice.adriana }))[id]);
@@ -49,9 +73,6 @@ export default function SettingsScreen() {
       language: v.lang,
       pitch: COACH_PITCH[id],
       rate: speechRate,
-      onDone: () => setPreviewing(null),
-      onStopped: () => setPreviewing(null),
-      onError: () => setPreviewing(null),
     });
   };
 
@@ -95,11 +116,11 @@ export default function SettingsScreen() {
                   <Text style={[s.coachName, on && { color: CC.white }]}>{c.name}</Text>
                   <Text style={s.coachRole}>{c.gender === "male" ? "Spanish accent · male" : "Spanish accent · female"}</Text>
                   {on && <View style={s.coachCheck}><Ionicons name="checkmark" size={13} color="#04210F" /></View>}
-                  <Pressable testID={`preview-${id}`} onPress={() => previewVoice(id)} hitSlop={8}
-                    accessibilityRole="button" accessibilityLabel={`Preview ${c.name}'s voice`}
+                  <Pressable testID={`preview-${id}`} onPress={() => previewGeminiVoice(id)} hitSlop={8}
+                    accessibilityRole="button" accessibilityLabel={`Hear a sample of ${c.name}'s voice`}
                     style={({ hovered }: any) => [s.previewBtn, hovered && s.previewHover]}>
-                    <Ionicons name={previewing === id ? "volume-high" : "play"} size={13} color={CC.white} />
-                    <Text style={s.previewText}>{previewing === id ? "Playing…" : "Preview voice"}</Text>
+                    <Ionicons name={geminiPlaying(id) ? "stop" : "volume-high"} size={13} color={CC.white} />
+                    <Text style={s.previewText}>{geminiPlaying(id) ? "Stop" : "Hear a sample"}</Text>
                   </Pressable>
                 </Pressable>
               );
@@ -256,6 +277,17 @@ export default function SettingsScreen() {
         <PrefToggle label="Rest-day reminders" sub="Gentle nudge to recover" on={settings.restReminders} onToggle={() => setSetting("restReminders", !settings.restReminders)} testID="tg-restReminders" />
       </Card>
 
+      <Card testID="email-prefs">
+        <SectionTitle label="EMAIL" color={CC.rouge} />
+        <PrefToggle label="Weekly recap email" sub="Get your training week in review, every Monday" on={emailWeekly} onToggle={toggleEmailWeekly} testID="tg-emailWeekly" />
+        <Pressable onPress={sendDigestNow} disabled={sendingDigest} testID="send-digest-now" style={s.digestBtn}
+          accessibilityRole="button" accessibilityLabel="Email me this week's recap now">
+          <Ionicons name="mail" size={15} color={CC.yellow} />
+          <Text style={s.digestBtnT}>{sendingDigest ? "Sending…" : "Email me this week's recap now"}</Text>
+        </Pressable>
+        {digestMsg ? <Text style={s.digestMsg} testID="send-digest-msg">{digestMsg}</Text> : null}
+      </Card>
+
       <Card testID="accessibility">
         <SectionTitle label="ACCESSIBILITY" color={CC.rouge} />
         <PrefToggle label="Large text" sub="Increase text size across the whole app" on={a11y.largeText} onToggle={() => setLargeText(!a11y.largeText)} testID="tg-largeText" divider />
@@ -314,6 +346,9 @@ const s = StyleSheet.create({
   previewHover: { borderColor: "rgba(255,255,255,0.28)", backgroundColor: "rgba(255,255,255,0.06)" },
   previewText: { color: CC.white, fontSize: 12, fontWeight: "700" },
   coachHint: { color: CC.dim, fontSize: 11.5, marginTop: 12, lineHeight: 16 },
+  digestBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 14, borderWidth: 1, borderColor: "rgba(255,194,10,0.4)", backgroundColor: "rgba(255,194,10,0.06)", borderRadius: 12, paddingVertical: 12 },
+  digestBtnT: { color: CC.yellow, fontSize: 13.5, fontWeight: "800" },
+  digestMsg: { color: "#3FB68B", fontSize: 12.5, fontWeight: "700", marginTop: 10, textAlign: "center" },
   coachExplainer: { color: CC.yellow, fontSize: 11.5, fontWeight: "700", marginTop: 4, marginBottom: 4, letterSpacing: 0.2 },
   a11yPreview: { marginTop: 14, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: CC.borderSoft, backgroundColor: "rgba(255,255,255,0.02)", gap: 6 },
   a11yPreviewLabel: { color: CC.dim, fontSize: 10.5, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase" },

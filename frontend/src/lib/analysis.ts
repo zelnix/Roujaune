@@ -144,6 +144,23 @@ export async function fetchWeeklyDigest(): Promise<WeeklyDigest | null> {
   return r.ok ? await r.json() : null;
 }
 
+export async function fetchEmailPrefs(): Promise<{ weekly_digest: boolean }> {
+  const r = await fetch(`${API}/analysis/email-prefs`);
+  return r.ok ? await r.json() : { weekly_digest: false };
+}
+
+export async function setEmailPrefs(weekly_digest: boolean): Promise<void> {
+  await fetch(`${API}/analysis/email-prefs`, {
+    method: "PUT", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ weekly_digest }),
+  });
+}
+
+export async function emailDigestNow(): Promise<{ ok: boolean }> {
+  const r = await fetch(`${API}/analysis/email-digest`, { method: "POST" });
+  return r.ok ? await r.json() : { ok: false };
+}
+
 export async function fetchSegmentCompare(a: string, b: string): Promise<SegmentCompare | null> {
   const r = await fetch(`${API}/analysis/segment-compare?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`);
   return r.ok ? await r.json() : null;

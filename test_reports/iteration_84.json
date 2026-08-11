@@ -1,0 +1,36 @@
+{
+  "summary": "Iter 84 — ROUJAUNE 4 UX enhancements + Resend email (own account, verified domain harmonywellnessgroup.com.au). Backend 12/12 pytest PASS. Frontend @ 1024x1000 desktop demo: all listed testIDs render and integrations verified.\n\nBackend (test_iter84_email_prefs_digest_resend.py):\n1) GET /api/analysis/email-prefs (demo) → 200 {weekly_digest:false}.\n2) PUT /api/analysis/email-prefs {weekly_digest:true} → 200 {ok:true, weekly_digest:true}; GET confirms persistence; PUT {weekly_digest:false} → resets. Final state: demo weekly_digest=false (pristine).\n3) POST /api/analysis/email-digest (demo) → 200 {ok:true} (real Resend send from Harmony Wellness Group <noreply@harmonywellnessgroup.com.au>). Called ONCE.\n4) POST /api/auth/register with ONE throwaway (qa+iter84-<uuid>@example.com, pw testpass123) → 200 {token, user.email==...}. Welcome email best-effort (not asserted).\n5) Regression 200: /api/analysis/season-recap (default + ?year=2024), milestone-wall (3 categories, 30 rows, earned≤total), weekly-digest, streak, milestones.\n6) /api/coach/speak?coach_id=alberto with demo bearer → 200 audio/wav >1KB, valid RIFF/WAVE. Unauthed → 401.\n\nFrontend (demo, direct localStorage token — same reliable path as iter 83):\n7) /fitness Weekly Digest card: 'Email me' (digest-email) + 'Share' (digest-share) present. Tap 'Email me' → digest-email-msg shows 'Sent — check your inbox 📬'.\n8) /fitness Season Recap card: season-prev + season-next present; season-next aria-disabled=true at 2026 (current year). Tap season-prev → header switches to '2025 Season' with empty-season copy 'No rides logged in 2025 yet. Pick another season, or get out and ride to fill this one in.' season-share also present.\n9) /settings 'EMAIL' card (email-prefs) exists with tg-emailWeekly toggle and send-digest-now button. Tap of send-digest-now was intentionally skipped in playwright to avoid a 2nd real Resend send; testID + presence verified only.\n10) /settings coach cards: preview-alberto label 'Hear a sample' → tap fires GET /api/coach/speak → 200 audio/wav → label toggles to 'Stop'. preview-adriana also present. No crash / no red screen.\n11) Home / (demo): home-notifications renders; milestone-nudge NOT rendered (demo has total_rides=2, ~9 km — not within a few of the first milestone at 10 rides / 100 km, so hidden — acceptable per spec). Home screen renders without errors.\n12) /milestones regression: 30 badges present, '0 of 30 milestones earned' summary bar renders.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter84_email_prefs_digest_resend.py",
+    "/app/test_reports/pytest/iter84.xml",
+    "/app/test_reports/screens/i84_fitness.jpeg",
+    "/app/test_reports/screens/i84_home.jpeg",
+    "/app/test_reports/screens/i84_settings.jpeg",
+    "/app/test_reports/screens/i84_milestones.jpeg"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/analysis.py is now ~925 lines — season-recap, milestone-wall, climb-detail, streak, email-prefs, email-digest and the weekly-digest background loop all live in one module. Consider splitting the email + weekly-digest-loop section (roughly lines 834–927) into services/weekly_digest.py so analysis.py stays a pure read-model. Not blocking.",
+    "emailer.send_email logs .text[:200] on HTTPStatusError — fine for QA visibility, but be aware that Resend error bodies can include the destination address. Consider redacting recipient in prod logs. Not blocking.",
+    "routes/analysis.py POST /email-digest raises 502 on Resend failure — good — but weekly_digest_loop swallows send failures silently. Consider updating email_prefs.last_failure_week for observability so ops can spot stuck riders. Not blocking."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter84_email_prefs_digest_resend.py (new — 12 tests)"
+  ],
+  "success_rate": {
+    "backend": "100% (12/12 pytest — email-prefs GET/PUT round-trip incl. reset, real Resend digest send, throwaway register, season-recap x2, milestone-wall, weekly-digest, streak, milestones, coach/speak audio/wav + 401)",
+    "frontend": "100% — digest-email + digest-share + season-prev + season-next (disabled at current year) + season-share + milestone-wall-link on /fitness; digest-email-msg fires; email-prefs card + tg-emailWeekly + send-digest-now + preview-alberto + preview-adriana on /settings; preview-alberto invokes /api/coach/speak 200 audio/wav and toggles to Stop; /milestones shows 30 badges; home renders without red screen"
+  },
+  "seed_data_creation": "One real Resend email sent to demo@roujaune.app (weekly digest) — spec explicitly allowed ONCE. One throwaway auth user registered (qa+iter84-<uuid>@example.com) — best-effort welcome may or may not have fired. Demo settings.email_prefs.weekly_digest left as false (pristine).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iter 84 features all pass on demo. Reusable pytest: test_iter84_email_prefs_digest_resend.py. Notes for next round:\n- Real Resend is live via RESEND_API_KEY + EMAIL_FROM_ADDRESS=noreply@harmonywellnessgroup.com.au. /api/analysis/email-digest and /api/auth/register both trigger real sends — keep to ONE call per session and use a single throwaway address to avoid bounces.\n- Demo user's email_prefs.weekly_digest is false at end of run — keep it that way.\n- milestone-nudge only renders on Home when the rider is within a few rides/km of the next milestone. Demo (2 rides, 9 km) is not near threshold-10 → banner hidden (spec-conformant). To force the banner: bump demo total_rides to 8+ or total_km to ~85+.\n- season-next is aria-disabled=true at the current year (2026); season-prev navigates back and correctly shows an empty-season message for years with no rides.\n- UI login via /login modal still not reliable in playwright; use direct localStorage.setItem('roujaune_token', <access_token>) (same as iter 83) — this works for /fitness, /settings, /milestones and home.",
+  "rca_of_issue": "N/A — feature-completion round; every endpoint and screen requested passes."
+}

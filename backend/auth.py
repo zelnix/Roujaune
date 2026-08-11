@@ -507,6 +507,13 @@ async def register(req: RegisterReq, request: Request):
         await _send_verification(doc, request)  # best-effort; soft verification
     except Exception:
         pass
+    try:
+        await emailer.send_email(  # best-effort welcome email
+            doc["email"], "Welcome to ROUJAUNE",
+            emailer.welcome_email_html((doc.get("name") or "there").split(" ")[0]),
+        )
+    except Exception:
+        pass
     token = await _create_session(uid)
     return {"token": token, "user": _public_user(doc)}
 
