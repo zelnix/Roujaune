@@ -818,3 +818,9 @@ STILL PENDING (awaiting approval): Phase 3 (Home banners consolidation, dup CTAs
 - Send Digest Test: on-demand digest email now a clearly-labelled '[Preview]' with banner; buttons relabelled 'Send me a test now' / 'Send test'.
 - Milestone Share Card: earned milestone badges on /milestones are shareable via ShareCardModal.
 - Admin grant: roger.parenzee@gmail.com (user_f4b48fb94eff) given ANNUAL premium (plan yearly, product premium_yearly, premium_until 2027-08-11) via direct billing upsert (source admin_grant). Verified is_premium=True.
+
+## Round 11 (COMPLETE — iter 89 PASS)
+- Admin premium: POST /api/admin/riders/{id}/premium {action grant|revoke, plan yearly|monthly|gift_month}; user detail returns billing{premium,plan,plan_label,...}. Audit-logged. (For HWG console.)
+- Plan Badge: profile shows 'Premium · Annual/Monthly' pill (premium-badge) via useEntitlement.
+- Ride experience button: dropped biking icon; now shows current experience (meta.label/shortLabel) + chevron.
+- Demo premium grant used for badge test then REVOKED (pristine).

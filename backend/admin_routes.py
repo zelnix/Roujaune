@@ -148,7 +148,63 @@ async def get_user(user_id: str):
         "benchmark_profile": bench,
         "latest_benchmark": latest_result,
         "plan": plan,
+        "billing": await _billing_status(user_id),
     }
+
+
+def _plan_label(plan: Optional[str]) -> str:
+    return {"yearly": "Annual", "monthly": "Monthly"}.get(plan or "", "Premium")
+
+
+async def _billing_status(user_id: str) -> dict:
+    b = await _db.billing.find_one({"user_id": user_id}, {"_id": 0}) or {}
+    until = b.get("premium_until")
+    premium = False
+    if until:
+        try:
+            premium = datetime.datetime.fromisoformat(until) > datetime.datetime.now(datetime.timezone.utc)
+        except Exception:
+            premium = False
+    return {"premium": premium, "plan": b.get("plan"), "plan_label": _plan_label(b.get("plan")) if premium else None,
+            "product_id": b.get("product_id"), "premium_until": until, "source": b.get("source")}
+
+
+class PremiumGrant(BaseModel):
+    action: str = "grant"           # grant | revoke
+    plan: Optional[str] = "yearly"  # yearly | monthly | gift_month (grant only)
+
+
+@admin_router.post("/riders/{user_id}/premium")
+async def set_rider_premium(user_id: str, body: PremiumGrant):
+    """Grant, gift (a free month) or revoke a rider's Premium plan from the console."""
+    if not await _db.users.find_one({"user_id": user_id}):
+        raise HTTPException(status_code=404, detail="Rider not found")
+    now = datetime.datetime.now(datetime.timezone.utc)
+    if body.action == "revoke":
+        await _db.billing.update_one({"user_id": user_id}, {"$set": {
+            "user_id": user_id, "premium_until": now.isoformat(), "plan": None,
+            "product_id": None, "source": "admin_revoke", "updated_at": now.isoformat(),
+        }}, upsert=True)
+        await _audit("rider.premium.revoke", user_id, {})
+    elif body.action == "grant":
+        plan = body.plan or "yearly"
+        days = {"yearly": 365, "monthly": 31, "gift_month": 30}.get(plan)
+        if not days:
+            raise HTTPException(status_code=422, detail="plan must be yearly | monthly | gift_month")
+        product = {"yearly": "premium_yearly", "monthly": "premium_monthly", "gift_month": "premium_monthly"}[plan]
+        source = "admin_gift" if plan == "gift_month" else "admin_grant"
+        exp = now + datetime.timedelta(days=days)
+        await _db.billing.update_one({"user_id": user_id}, {"$set": {
+            "user_id": user_id, "premium_until": exp.isoformat(),
+            "plan": "monthly" if plan == "gift_month" else plan,
+            "product_id": product, "platform": source, "source": source,
+            "updated_at": now.isoformat(),
+        }}, upsert=True)
+        await _audit(f"rider.premium.{'gift' if plan == 'gift_month' else 'grant'}", user_id,
+                     {"plan": plan, "expires": exp.isoformat()})
+    else:
+        raise HTTPException(status_code=422, detail="action must be grant | revoke")
+    return {"ok": True, "billing": await _billing_status(user_id)}
 
 
 class UserPatch(BaseModel):

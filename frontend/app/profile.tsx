@@ -13,6 +13,7 @@ import { useCoach } from "@/src/lib/coach-persona";
 import { useRiderProfile, useRiderAchievements, RiderProfile } from "@/src/lib/rider-profile";
 import { LEVEL_META, CAPABILITY_TO_LEVEL } from "@/src/lib/workout-catalog";
 import { useAuth } from "@/src/lib/auth-context";
+import { useEntitlement } from "@/src/lib/entitlement";
 import { useRouter } from "expo-router";
 
 const riderImg = require("../assets/images/hero_cyclist_b2.jpg");
@@ -45,6 +46,7 @@ export default function ProfileScreen() {
   const persona = useCoach();
   const { profile, avatar, loaded: profileLoaded, update, setAvatar } = useRiderProfile();
   const { user, signOut, deleteAccount } = useAuth();
+  const ent = useEntitlement();
   const router = useRouter();
   const achievements = useRiderAchievements() ?? ACHIEVEMENTS;
   const { width } = useWindowDimensions();
@@ -137,6 +139,12 @@ export default function ProfileScreen() {
                 </View>
               ) : null}
               <View style={s.badgeRow}>
+                {ent.premium ? (
+                  <View style={s.premiumBadge} testID="premium-badge">
+                    <Ionicons name="star" size={11} color="#241B00" />
+                    <Text style={s.premiumText}>Premium · {ent.plan === "yearly" ? "Annual" : ent.plan === "monthly" ? "Monthly" : "Member"}</Text>
+                  </View>
+                ) : null}
                 <View style={[s.tierBadge, { backgroundColor: capColor }]}>
                   <Ionicons name="podium-outline" size={11} color="#241B00" />
                   <Text style={s.tierText}>{capLabel}</Text>
@@ -406,6 +414,8 @@ const s = StyleSheet.create({
   badgeRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" },
   tierBadge: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: CC.yellow, borderRadius: 999, paddingVertical: 5, paddingHorizontal: 11 },
   tierText: { color: "#241B00", fontSize: 12, fontWeight: "800" },
+  premiumBadge: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: CC.yellow, borderRadius: 999, paddingVertical: 5, paddingHorizontal: 11 },
+  premiumText: { color: "#241B00", fontSize: 12, fontWeight: "900" },
   coachChip: { flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: CC.border, borderRadius: 999, paddingVertical: 4, paddingHorizontal: 8 },
   coachChipImg: { width: 20, height: 20, borderRadius: 10 },
   coachChipText: { color: CC.white, fontSize: 12, fontWeight: "600" },

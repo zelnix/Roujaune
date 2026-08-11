@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, Modal, Pressable, ScrollView, Platform } from "react-native";
-import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { colors, radius, spacing } from "../../theme";
 import { TODAY_MODES, TodayModeMeta, useTodayMode } from "../../lib/today-mode";
@@ -23,12 +23,11 @@ export function TodayModeButton({ compact = false }: { compact?: boolean }) {
         accessibilityLabel={`Ride experience: ${meta.label}. Change activity`}
         style={({ pressed }: any) => [styles.selected, pressed && styles.selectedPressed]}
       >
-        <View style={styles.iconBubble}>
-          <FontAwesome5 name="biking" size={compact ? 17 : 15} color={colors.yellow} />
+        <Text style={styles.eyebrow}>EXPERIENCE</Text>
+        <View style={styles.selRow}>
+          <Text style={styles.selLabel} numberOfLines={2}>{compact ? meta.shortLabel : meta.label}</Text>
+          <Ionicons name="chevron-down" size={12} color={colors.bg} />
         </View>
-        {!compact && (
-          <Text style={styles.selLabel} numberOfLines={2}>Ride Experience</Text>
-        )}
       </Pressable>
 
       <TodayModeMenu
@@ -119,6 +118,7 @@ const styles = StyleSheet.create({
   },
   selectedPressed: { transform: [{ translateY: 2 }], borderBottomWidth: 1, opacity: 0.96 },
   iconBubble: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg },
+  selRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
   selLabel: { color: colors.bg, fontSize: 11, fontWeight: "900", textAlign: "center", lineHeight: 14 },
   chevCompact: { marginTop: 1 },
 

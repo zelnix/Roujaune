@@ -1,0 +1,27 @@
+{
+  "summary": "FRONTEND-only verification for the 'Premium · Annual' badge + ride-experience button (icon-less, shows current experience). All three review criteria PASS. Logged in as demo@roujaune.app/demo9900 via the email path; on the home screen the sidebar rail's today-mode-button rendered the current experience name ('Training' initially) with NO bike icon (0 svgs / 0 imgs inside — the only glyph is chevron-down \\uf232). Tapping it opened the RIDING EXPERIENCE menu; selecting today-mode-option-scenic-cycling closed the menu and the button label updated to 'Take a scenic ride'. Selection persisted across a /profile → / round-trip and I successfully toggled back to Training after the test. On /profile the premium-badge is visible and reads 'Premium · Annual' (star glyph + text). Home and /profile both render cleanly (no red screen, no runtime pageerror). The pre-login 401 console noise on /api/billing/* etc. is expected (unauthenticated bootstrap) — post-login the app is stable.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/profile", "issues": ["Weight/Age render as 'NaN kg' and 'undefined' for the demo account (profile fields missing). Pre-existing, unrelated to this review, but worth flagging."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "As agreed in the review request, revoke the demo account's temporary yearly premium grant now that the badge has been verified."
+  ],
+  "critical_code_review_comments": [
+    "TodayModeButton.tsx correctly drops the leading icon bubble and shows meta.label / meta.shortLabel with only a chevron — matches the spec.",
+    "profile.tsx premium-badge is gated on ent.premium and shows plan mapping yearly→Annual, monthly→Monthly, else Member — clean."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped per request)", "frontend": "100%"},
+  "seed_data_creation": "None. Demo account was already granted yearly premium by the main agent for this test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login path is: click 'Sign in with email' first to reveal the email/password form (testIDs email-input / password-input), then submit. The ride-experience selector lives in the LEFT rail as a yellow pill under the wordmark (testID today-mode-button); menu options use testID today-mode-option-<id>. Ionicons render as unicode glyphs (chevron-down=\\uf232, star=\\uf595) inside Text — do not mistake those for the old bike icon; check for <svg>/<img> children instead.",
+  "rca_of_issue": "n/a — this iteration was a verification pass, not a bug fix. All acceptance criteria (premium-badge visible with 'Annual', experience button shows current label without bike icon, menu selection updates label and closes, no regression on home/profile) were met."
+}
