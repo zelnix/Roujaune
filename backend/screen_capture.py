@@ -24,10 +24,18 @@ import io
 import json
 import logging
 import os
+import subprocess
+import sys
 import uuid
 import zipfile
 from pathlib import Path
 from typing import Optional
+
+# Playwright's default browser cache (/pw-browsers) is reset to the base image on
+# every backend restart, wiping the Chromium build this Playwright version needs.
+# Point at a path under /app (which persists) and set this BEFORE Playwright loads.
+PW_BROWSERS_DIR = "/app/backend/.pw-browsers"
+os.environ["PLAYWRIGHT_BROWSERS_PATH"] = PW_BROWSERS_DIR
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from PIL import Image, ImageDraw, ImageFont
@@ -74,6 +82,18 @@ SCREENS = [
     {"key": "calendar", "path": "/calendar", "title": "Calendar", "caption": "Plan your week around your life"},
     {"key": "profile", "path": "/profile", "title": "Profile", "caption": "Your rider identity"},
     {"key": "wellness", "path": "/wellness", "title": "Wellness", "caption": "Train hard, recover smart"},
+    {"key": "climbs", "path": "/climbs", "title": "Climbs", "caption": "Every climb you've conquered"},
+    {"key": "compare", "path": "/compare", "title": "Compare Rides", "caption": "Compare any two rides side by side"},
+    {"key": "community", "path": "/community", "title": "Community", "caption": "Ride with the ROUJAUNE community"},
+    {"key": "milestones", "path": "/milestones", "title": "Milestones", "caption": "Unlock every milestone"},
+    {"key": "activities", "path": "/activities", "title": "Ride History", "caption": "Your complete ride history"},
+    {"key": "connections", "path": "/connections", "title": "Connections", "caption": "Connect your trainer and sensors"},
+    {"key": "routes", "path": "/routes", "title": "Routes", "caption": "Discover new routes to ride"},
+    {"key": "settings", "path": "/settings", "title": "Settings", "caption": "Make ROUJAUNE yours"},
+    {"key": "upgrade", "path": "/upgrade", "title": "Premium", "caption": "Unlock ROUJAUNE Premium"},
+    {"key": "rider_customise", "path": "/rider-customise", "title": "Customise Rider", "caption": "Customise your rider"},
+    {"key": "wheel_calibration", "path": "/wheel-calibration", "title": "Calibration", "caption": "Dial in your setup"},
+    {"key": "help", "path": "/help", "title": "Help", "caption": "Help whenever you need it"},
 ]
 _SCREEN_BY_KEY = {s["key"]: s for s in SCREENS}
 
@@ -252,6 +272,23 @@ async def _finish_job(job_id: str, error: Optional[str] = None) -> None:
 # --------------------------------------------------------------------------- #
 #  Playwright capture engine                                                   #
 # --------------------------------------------------------------------------- #
+def _ensure_chromium() -> None:
+    """Chromium lives in a persistent /app path but can still be absent on a
+    fresh clone/fork. Install it on demand so captures always self-heal."""
+    try:
+        base = Path(PW_BROWSERS_DIR)
+        has_shell = base.exists() and any(base.glob("chromium_headless_shell-*/chrome-linux/headless_shell"))
+        has_full = base.exists() and any(base.glob("chromium-*/chrome-linux/chrome"))
+        if has_shell or has_full:
+            return
+    except Exception:
+        pass
+    logger.info("chromium missing — installing into %s", PW_BROWSERS_DIR)
+    env = {**os.environ, "PLAYWRIGHT_BROWSERS_PATH": PW_BROWSERS_DIR}
+    subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"],
+                   env=env, check=False, capture_output=True, timeout=300)
+
+
 async def _login(page, base_url: str) -> None:
     await page.goto(base_url, wait_until="domcontentloaded")
     # Wait for the login screen (choose step) to paint.
@@ -287,6 +324,8 @@ async def _run_capture(job_id: str, keys: list[str]) -> None:
     if not base_url:
         await _finish_job(job_id, "EXPO_PUBLIC_BACKEND_URL not configured")
         return
+
+    _ensure_chromium()
 
     captured = 0
     try:

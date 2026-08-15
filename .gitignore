@@ -79,4 +79,5 @@ agenthub/agents/youtube/db
 memory/test_credentials.md
 
 # Mobile development
-android-sdk/
+android-sdk/backend/.pw-browsers/chromium-1234/chrome-linux/chrome
+backend/.pw-browsers/chromium_headless_shell-1234/chrome-linux/headless_shell
