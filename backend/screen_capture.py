@@ -94,6 +94,9 @@ SCREENS = [
     {"key": "rider_customise", "path": "/rider-customise", "title": "Customise Rider", "caption": "Customise your rider"},
     {"key": "wheel_calibration", "path": "/wheel-calibration", "title": "Calibration", "caption": "Dial in your setup"},
     {"key": "help", "path": "/help", "title": "Help", "caption": "Help whenever you need it"},
+    {"key": "virtual_route", "path": "/virtual-route", "title": "Virtual Route", "caption": "Your virtual road, powered by your effort", "settle_ms": 5000},
+    {"key": "live_workout", "path": "/workout?workoutId=threshold-climb", "title": "Live Workout", "caption": "Every interval, guided in real time", "settle_ms": 5000},
+    {"key": "summary", "path": "/summary", "title": "Ride Summary", "caption": "Break down every ride"},
 ]
 _SCREEN_BY_KEY = {s["key"]: s for s in SCREENS}
 
@@ -313,7 +316,7 @@ async def _capture_screen(page, base_url: str, screen: dict) -> bytes:
         )
     except Exception:
         pass
-    await page.wait_for_timeout(3800)
+    await page.wait_for_timeout(screen.get("settle_ms", 3800))
     return await page.screenshot(type="png", full_page=False)
 
 
