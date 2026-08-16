@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "100157698823",
+    "project_id": "roujaune-a1ffe",
+    "storage_bucket": "roujaune-a1ffe.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:100157698823:android:0514891c30d6d5a6454ba2",
+        "android_client_info": {
+          "package_name": "com.hwg.roujaune"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAkHWfenM_tU4pot-cXsJy4GWGR5o4Qm5I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

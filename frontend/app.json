@@ -51,7 +51,8 @@
         "android.permission.health.WRITE_HEART_RATE"
       ],
       "package": "com.hwg.roujaune",
-      "versionCode": 1
+      "versionCode": 1,
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
