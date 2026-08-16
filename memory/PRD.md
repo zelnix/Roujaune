@@ -841,3 +841,14 @@ STILL PENDING (awaiting approval): Phase 3 (Home banners consolidation, dup CTAs
   4. Removed `android.googleServicesFile: "./google-services.json"` from frontend/app.json — file was missing and blocked Android builds. User (option 2b) chose to deploy WITHOUT Android push for now; iOS unaffected; expo-notifications plugin retained; can re-add google-services.json later to restore Android push.
 - Re-ran deployment_agent: status warn (no blockers). Only remaining item is an expected WARN that push won't deliver on Android until Firebase/APNs config is added — this is the accepted tradeoff.
 - Note: ESLint "cannot resolve @/src/components/virtual-route/RiveRider" is a false positive (RiveRider.native.tsx + RiveRider.web.tsx exist; Metro resolves). Other lint items cosmetic (unescaped apostrophes) — non-blocking.
+
+## Production seeding — content + demo login + store assets (2026-08 fork)
+- Deploying pushes CODE not DATA (preview & prod have separate Mongo DBs). Added bundled startup seed so a fresh production DB auto-populates on boot.
+- New `backend/seed_prod.py` + `backend/seed_data/` (content_seed.json.gz ~35MB gzip, demo_seed.json). Exported via `backend/scripts/export_prod_seed.py`. Registered in server.py startup after scenic seeding: `seed_prod.seed_production_data(db)`.
+- Seeds (idempotent, upsert by natural key — never duplicates, never clobbers real-user data):
+  - Global content: scenic_routes (22 — was only 4 bundled in code; the other 18 were admin-console-added and would otherwise be MISSING in prod), scenic_poi (6), screen_captures (25), app_meta store_listing.
+  - Demo login demo@roujaune.app/demo9900 (onboarded, email_verified, plan build-and-climb, password_hash) + its rider_profile, rider_prefs, ride_history (2), cycling_activities (2), calendar_weeks (1) so the demo isn't empty (useful for Apple/Google review).
+- NOT seeded (start clean for real users): all other preview users/sessions, other users' rides/profiles/benchmarks/checkins/billing/etc.
+- Auto-seeded already by existing code (no action): plans, training_plans, workout_catalog, coach defs, 4 bundled scenic routes.
+- Verified on a throwaway fresh DB: all counts correct, demo login works (hash+onboarded), screenshot base64 intact, idempotent on 2nd run; real preview DB not duplicated (users still 32) after backend restart. Seed files confirmed NOT git-ignored (included in deploy).
+- NOTE: screen captures cannot be regenerated in production (Playwright needs the Expo WEB app; prod serves mobile/EAS only) — hence they must be seeded.

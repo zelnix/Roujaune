@@ -478,6 +478,11 @@ async def _seed_plans_on_startup():
     except Exception:
         logging.exception("scenic route seeding failed")
     try:
+        import seed_prod
+        await seed_prod.seed_production_data(db)
+    except Exception:
+        logging.exception("production content/demo seeding failed")
+    try:
         # training_plans is a PER-USER collection; a single-field unique index on
         # `id` breaks multi-rider use (two riders can't each have "couch-to-road")
         # and caused DuplicateKeyErrors that fell back to the demo plan. Enforce a
