@@ -12,6 +12,7 @@
       "supportsTablet": true,
       "usesAppleSignIn": true,
       "bundleIdentifier": "com.hwg.roujaune",
+      "buildNumber": "1",
       "entitlements": {
         "com.apple.developer.healthkit": true
       },
@@ -49,7 +50,8 @@
         "android.permission.health.READ_HEART_RATE",
         "android.permission.health.WRITE_HEART_RATE"
       ],
-      "package": "com.hwg.roujaune"
+      "package": "com.hwg.roujaune",
+      "versionCode": 1
     },
     "web": {
       "bundler": "metro",
@@ -111,7 +113,8 @@
           "healthUpdatePermission": "Roujaune saves your completed rides to Apple Health."
         }
       ],
-      "react-native-health-connect"
+      "react-native-health-connect",
+      "expo-mail-composer"
     ],
     "experiments": {
       "typedRoutes": true

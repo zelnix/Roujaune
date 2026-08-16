@@ -852,3 +852,11 @@ STILL PENDING (awaiting approval): Phase 3 (Home banners consolidation, dup CTAs
 - Auto-seeded already by existing code (no action): plans, training_plans, workout_catalog, coach defs, 4 bundled scenic routes.
 - Verified on a throwaway fresh DB: all counts correct, demo login works (hash+onboarded), screenshot base64 intact, idempotent on 2nd run; real preview DB not duplicated (users still 32) after backend restart. Seed files confirmed NOT git-ignored (included in deploy).
 - NOTE: screen captures cannot be regenerated in production (Playwright needs the Expo WEB app; prod serves mobile/EAS only) — hence they must be seeded.
+
+## About & Support screen (2026-08 fork)
+- New `frontend/app/about.tsx` (route `/about`), linked from Profile via "About & Support" button (testID about-app).
+- Shows diagnostics in 3 cards: App (name, version, build number, Expo SDK, environment preview/prod, runtime, API URL), Device (platform, OS+version, model, brand, type, physical-vs-simulator — via expo-device), Account (name, email, user_id, sign-in provider, email verified, plan, FTP).
+- Support actions: "Email support" → expo-mail-composer (native) with subject + prefilled body (diagnostics + recent logs) and a diagnostics .txt attachment (written via expo-file-system/legacy); web/no-mail-app falls back to mailto: (logs capped to last 40 lines) or copy. "Copy diagnostics" → expo-clipboard (full diagnostics + logs). Support address support@roujaune.cc (matches help.tsx).
+- Recent logs: new `frontend/src/lib/logbuffer.ts` — a 200-entry ring buffer patching console.log/info/warn/error; installed at module scope in app/_layout.tsx (installLogBuffer()). getRecentLogs() feeds the support email/copy.
+- Added `buildNumber:"1"` (ios) + `versionCode:1` (android) to app.json so the Build row shows a real value on native (shows "—" on web, expected). Installed expo-mail-composer + expo-clipboard via `yarn expo install`.
+- Verified: profile→about nav works, all sections render with demo data, copy runs without crash. NOTE: native mail composer + file attachment can only be fully tested on a real device/build (web uses mailto fallback).

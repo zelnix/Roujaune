@@ -14,11 +14,15 @@ import { registerForPush } from "@/src/lib/push";
 import { loadCatalog } from "@/src/lib/catalog";
 import { colors } from "@/src/theme";
 import { installA11yTextPatch } from "@/src/lib/text-scale";
+import { installLogBuffer } from "@/src/lib/logbuffer";
 import { useA11y } from "@/src/lib/a11y";
 
 // Install the global Text/TextInput accessibility patch (Large Text + High
 // Contrast) once, before any screen renders.
 installA11yTextPatch();
+
+// Capture recent console output for the About & Support screen's diagnostics.
+installLogBuffer();
 
 // Disable logbox errors etc so that users can see the app
 // and agent works as expected.

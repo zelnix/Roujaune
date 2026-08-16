@@ -164,6 +164,10 @@ export default function ProfileScreen() {
                 <Ionicons name="swap-horizontal" size={15} color={CC.white} />
                 <Text style={s.editText}>Change plan</Text>
               </Pressable>
+              <Pressable testID="about-app" onPress={() => router.push("/about")} style={({ hovered }: any) => [s.editBtn, hovered && s.hover]}>
+                <Ionicons name="information-circle-outline" size={15} color={CC.white} />
+                <Text style={s.editText}>About & Support</Text>
+              </Pressable>
               <Pressable testID="sign-out" onPress={signOut} style={({ hovered }: any) => [s.signOutBtn, hovered && s.hover]}>
                 <Ionicons name="log-out-outline" size={15} color={CC.red ?? "#E01E2B"} />
                 <Text style={s.signOutText}>Sign out</Text>
