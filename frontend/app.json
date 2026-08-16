@@ -92,6 +92,9 @@
           "ios": {
             "useFrameworks": "static",
             "deploymentTarget": "15.1"
+          },
+          "android": {
+            "minSdkVersion": 26
           }
         }
       ],
@@ -119,7 +122,9 @@
       "expo-mail-composer",
       [
         "@react-native-google-signin/google-signin",
-        { "iosUrlScheme": "com.googleusercontent.apps.100157698823-0cc8mq63uan5cenfgqeoo049ushvqlk0" }
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.100157698823-0cc8mq63uan5cenfgqeoo049ushvqlk0"
+        }
       ]
     ],
     "experiments": {
