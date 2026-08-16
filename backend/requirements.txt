@@ -30,3 +30,4 @@ gpxpy==1.6.2
 
 playwright==1.62.0
 pillow==12.3.0
+httpx==0.28.1

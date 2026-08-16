@@ -832,3 +832,12 @@ STILL PENDING (awaiting approval): Phase 3 (Home banners consolidation, dup CTAs
 - Verified: testing agent iter90 13/13 PASS (auth matrix 401/401/403/200, 10 screens, list excludes raw/framed, store-listing GET/partial-PUT, variant PNG + 422/404, ZIP export). Full 10-screen capture + LLM copy confirmed working end-to-end (framed images visually verified).
 - `playwright==1.62.0` + `pillow==12.3.0` added to backend requirements.
 - PAUSED (user-approved) minor tasks still parked: Grant confirmation email, gifted-premium expiry reminder, profile NaN/undefined defaults.
+
+## Deployment readiness fixes (2026-08 fork)
+- Ran deployment_agent health check: 4 blockers found and fixed.
+  1. Added `httpx==0.28.1` to backend/requirements.txt (auth.py imports httpx; was missing → would ModuleNotFoundError on startup).
+  2. Quoted `EMAIL_FROM_NAME="Harmony Wellness Group"` in backend/.env (was unquoted value with spaces).
+  3. Quoted `APP_DESC="..."` in backend/.env (was unquoted value with spaces).
+  4. Removed `android.googleServicesFile: "./google-services.json"` from frontend/app.json — file was missing and blocked Android builds. User (option 2b) chose to deploy WITHOUT Android push for now; iOS unaffected; expo-notifications plugin retained; can re-add google-services.json later to restore Android push.
+- Re-ran deployment_agent: status warn (no blockers). Only remaining item is an expected WARN that push won't deliver on Android until Firebase/APNs config is added — this is the accepted tradeoff.
+- Note: ESLint "cannot resolve @/src/components/virtual-route/RiveRider" is a false positive (RiveRider.native.tsx + RiveRider.web.tsx exist; Metro resolves). Other lint items cosmetic (unescaped apostrophes) — non-blocking.
