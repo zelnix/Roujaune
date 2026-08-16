@@ -14,7 +14,7 @@ import { useEntitlement } from "@/src/lib/entitlement";
 import { useSettings } from "@/src/lib/settings";
 import { getRecentLogs } from "@/src/lib/logbuffer";
 
-const SUPPORT_EMAIL = "support@roujaune.cc";
+const SUPPORT_EMAIL = "support@harmonywellnessgroup.com.au";
 
 const DEVICE_TYPE: Record<number, string> = {
   0: "Unknown", 1: "Phone", 2: "Tablet", 3: "Desktop", 4: "TV",

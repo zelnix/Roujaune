@@ -83,9 +83,9 @@ export default function HelpScreen() {
 
           <Card testID="contact">
             <SectionTitle label="CONTACT SUPPORT" color={CC.rouge} />
-            <Pressable testID="contact-email" onPress={() => Linking.openURL("mailto:support@roujaune.cc").catch(() => {})} style={s.contactRow}>
+            <Pressable testID="contact-email" onPress={() => Linking.openURL("mailto:support@harmonywellnessgroup.com.au").catch(() => {})} style={s.contactRow}>
               <Ionicons name="mail-outline" size={17} color={CC.white} />
-              <Text style={s.contactText}>support@roujaune.cc</Text>
+              <Text style={s.contactText}>support@harmonywellnessgroup.com.au</Text>
             </Pressable>
             <View style={s.divider} />
             <View style={s.contactRow}>
