@@ -17,6 +17,7 @@ build; the free-ride gating below is fully enforceable regardless of platform.
 from __future__ import annotations
 
 import datetime
+import math
 import os
 from typing import Optional, Literal
 
@@ -30,6 +31,7 @@ router = APIRouter(prefix="/billing", tags=["billing"])
 
 FREE_RIDE_LIMIT = 3
 FREE_RIDE_MINUTES = 30
+EXPIRY_REMINDER_DAYS = 4   # nudge a non-renewing (gifted/granted) rider this many days before expiry
 PRODUCTS = {
     "premium_monthly": {"period": "monthly", "display_price": "$9.99", "label": "Monthly"},
     "premium_yearly": {"period": "yearly", "display_price": "$79.99", "label": "Yearly"},
@@ -65,11 +67,22 @@ def _status_payload(doc: dict) -> dict:
     premium = _is_premium(doc)
     used = int(doc.get("free_rides_used", 0) or 0)
     exp = _parse_dt(doc.get("premium_until"))
+    source = doc.get("source")
+    days_left: Optional[int] = None
+    expiring_soon = False
+    if premium and exp:
+        days_left = max(0, math.ceil((exp - _now()).total_seconds() / 86400))
+        # Only nudge for admin-granted/gifted access (store subs auto-renew).
+        non_renewing = isinstance(source, str) and source.startswith("admin_")
+        expiring_soon = non_renewing and days_left <= EXPIRY_REMINDER_DAYS
     return {
         "premium": premium,
         "plan": doc.get("plan") if premium else None,
         "product_id": doc.get("product_id") if premium else None,
         "expires_at": exp.isoformat() if exp else None,
+        "source": source if premium else None,
+        "days_left": days_left,
+        "expiring_soon": expiring_soon,
         "free_rides_used": used,
         "free_rides_limit": FREE_RIDE_LIMIT,
         "free_rides_remaining": max(0, FREE_RIDE_LIMIT - used),

@@ -81,7 +81,14 @@ export function useRiderProfile() {
         const res = await fetch(`${base()}/api/rider/profile`);
         if (res.ok) {
           const d = await res.json();
-          _snap = { name: d.name, weight_kg: d.weight_kg, age: d.age, gender: d.gender, city: d.city ?? "", region: d.region ?? "", country: d.country ?? "", capability: d.capability ?? "intermediate" };
+          _snap = {
+            name: d.name ?? DEFAULT.name,
+            weight_kg: typeof d.weight_kg === "number" && !isNaN(d.weight_kg) ? d.weight_kg : DEFAULT.weight_kg,
+            age: typeof d.age === "number" && !isNaN(d.age) ? d.age : DEFAULT.age,
+            gender: d.gender ?? DEFAULT.gender,
+            city: d.city ?? "", region: d.region ?? "", country: d.country ?? "",
+            capability: d.capability ?? "intermediate",
+          };
           AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(_snap)).catch(() => {});
           // Avatar: backend is the source of truth across devices. An explicit
           // empty string means "no avatar" and should clear a stale local one.

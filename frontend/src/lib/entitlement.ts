@@ -16,6 +16,9 @@ export type Entitlement = {
   plan: string | null;
   productId: string | null;
   expiresAt: string | null;
+  source: string | null;
+  daysLeft: number | null;
+  expiringSoon: boolean;
   freeRidesUsed: number;
   freeRidesLimit: number;
   freeRidesRemaining: number;
@@ -29,6 +32,7 @@ export type ProductInfo = {
 
 const DEFAULT: Entitlement = {
   premium: false, plan: null, productId: null, expiresAt: null,
+  source: null, daysLeft: null, expiringSoon: false,
   freeRidesUsed: 0, freeRidesLimit: 3, freeRidesRemaining: 3,
   freeRideMinutes: 30, canStartRide: true,
 };
@@ -46,6 +50,9 @@ function _map(j: any): Entitlement {
     plan: j.plan ?? null,
     productId: j.product_id ?? null,
     expiresAt: j.expires_at ?? null,
+    source: j.source ?? null,
+    daysLeft: typeof j.days_left === "number" ? j.days_left : null,
+    expiringSoon: !!j.expiring_soon,
     freeRidesUsed: j.free_rides_used ?? 0,
     freeRidesLimit: j.free_rides_limit ?? 3,
     freeRidesRemaining: j.free_rides_remaining ?? 3,

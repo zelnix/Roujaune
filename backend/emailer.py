@@ -232,3 +232,30 @@ def milestone_email_html(name: str, items: list[dict]) -> str:
           "milestone is already in sight.</p>"
     )
     return _shell("A new milestone! 🏆", body)
+
+
+
+def grant_email_html(name: str, plan_label: str, expires_human: str | None, gifted: bool) -> str:
+    lead = (
+        "A month of ROUJAUNE Premium is on us — enjoy it, on the house."
+        if gifted else
+        "Your ROUJAUNE Premium is now active. Thank you for riding with us."
+    )
+    expiry_line = (
+        f"<p style='margin-top:4px;'>Your access runs until <b style='color:#F3F1EA;'>{expires_human}</b>.</p>"
+        if expires_human else ""
+    )
+    body = (
+        f"<p>Hi {name},</p>"
+        f"<p style='font-size:17px;'>✨ <b style='color:#F3F1EA;'>{plan_label} Premium is active</b></p>"
+        f"<p>{lead}</p>"
+        f"{expiry_line}"
+        "<p style='margin-top:16px;color:#F3F1EA;'>What's unlocked:</p>"
+        "<ul style='margin:6px 0 0;padding-left:18px;color:#C9CAC7;'>"
+        "<li style='margin-bottom:6px;'>Unlimited scenic rides — no free-ride cap.</li>"
+        "<li style='margin-bottom:6px;'>Your AI coach, personalised plans and full analysis.</li>"
+        "<li>Every climb, milestone and streak, tracked and celebrated.</li>"
+        "</ul>"
+        "<p style='margin-top:20px;'>Open the app and start your next ride. See you out there.</p>"
+    )
+    return _shell("Your Premium is active 🎉", body)

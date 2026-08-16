@@ -12,6 +12,7 @@ import { RebenchmarkNudgeBanner } from "./RebenchmarkNudgeBanner";
 import { VerifyEmailBanner } from "./VerifyEmailBanner";
 import { MissedWorkoutBanner } from "./MissedWorkoutBanner";
 import { MilestoneNudgeBanner, useMilestoneNudge } from "./MilestoneNudgeBanner";
+import { PremiumExpiryBanner, usePremiumExpiry } from "./PremiumExpiryBanner";
 
 function daysUntil(dateStr: string): number {
   const d = new Date(dateStr + "T00:00:00");
@@ -24,7 +25,7 @@ function daysUntil(dateStr: string): number {
  * One prioritised notification area for Home. Replaces the previously stacked
  * banners: it shows only the single highest-priority notice, with a "+N more"
  * control to reveal the rest — keeping today's workout above the fold.
- * Priority: verify email > re-benchmark required > missed workouts > benchmark due > plan updated.
+ * Priority: premium expiring > verify email > re-benchmark required > missed workouts > benchmark due > plan updated.
  */
 export function HomeNotificationArea() {
   const [expanded, setExpanded] = React.useState(false);
@@ -35,6 +36,7 @@ export function HomeNotificationArea() {
   const { review } = useBenchmarkPlanReview();
   const { nudge } = useBenchmarkNudge();
   const milestoneNudge = useMilestoneNudge();
+  const premiumExpiry = usePremiumExpiry();
 
   const verifyActive = !!user && user.provider === "password" && !user.email_verified;
   const upcomingTests = (week.active ? (week.days || []) : [])
@@ -52,6 +54,7 @@ export function HomeNotificationArea() {
     testSoon ? "test" : hasReview ? "review" : "test";
 
   const items: { key: string; node: React.ReactNode }[] = [];
+  if (premiumExpiry.show) items.push({ key: "premium-expiry", node: <PremiumExpiryBanner /> });
   if (verifyActive) items.push({ key: "verify", node: <VerifyEmailBanner /> });
   if (nudge.required) items.push({ key: "rebenchmark", node: <RebenchmarkNudgeBanner nudge={nudge} /> });
   if (missedActive) items.push({ key: "missed", node: <MissedWorkoutBanner data={missed} /> });

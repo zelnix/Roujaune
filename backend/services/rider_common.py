@@ -19,7 +19,10 @@ async def _rider_doc() -> dict:
         doc = dict(RIDER_DEFAULT)
         await udb.rider_profile.insert_one(dict(doc))
     doc.pop("_id", None)
-    doc.setdefault("capability", "intermediate")
+    # Backfill sensible defaults so incomplete profiles never surface NaN/undefined.
+    for k, v in RIDER_DEFAULT.items():
+        if doc.get(k) is None:
+            doc[k] = v
     return doc
 
 

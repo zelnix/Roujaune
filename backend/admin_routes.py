@@ -174,6 +174,26 @@ class PremiumGrant(BaseModel):
     plan: Optional[str] = "yearly"  # yearly | monthly | gift_month (grant only)
 
 
+async def _send_grant_email(user_id: str, plan: str, exp: datetime.datetime) -> None:
+    """Best-effort 'your Premium is active' email after an admin grant/gift.
+    Never raises — a mail failure must not fail the grant."""
+    try:
+        import emailer
+        u = await _db.users.find_one({"user_id": user_id}, {"_id": 0, "email": 1, "name": 1}) or {}
+        email = (u.get("email") or "").strip()
+        if not email:
+            return
+        name = (u.get("name") or "").split(" ")[0].strip() or "rider"
+        gifted = plan == "gift_month"
+        plan_label = {"yearly": "Annual", "monthly": "Monthly", "gift_month": "Gift"}.get(plan, "Premium")
+        expires_human = exp.strftime("%-d %B %Y")
+        html = emailer.grant_email_html(name, plan_label, expires_human, gifted)
+        subject = "Your ROUJAUNE Premium is active 🎉" if not gifted else "A month of ROUJAUNE Premium — on us 🎁"
+        await emailer.send_email(email, subject, html)
+    except Exception:
+        pass
+
+
 @admin_router.post("/riders/{user_id}/premium")
 async def set_rider_premium(user_id: str, body: PremiumGrant):
     """Grant, gift (a free month) or revoke a rider's Premium plan from the console."""
@@ -202,6 +222,7 @@ async def set_rider_premium(user_id: str, body: PremiumGrant):
         }}, upsert=True)
         await _audit(f"rider.premium.{'gift' if plan == 'gift_month' else 'grant'}", user_id,
                      {"plan": plan, "expires": exp.isoformat()})
+        await _send_grant_email(user_id, plan, exp)
     else:
         raise HTTPException(status_code=422, detail="action must be grant | revoke")
     return {"ok": True, "billing": await _billing_status(user_id)}
