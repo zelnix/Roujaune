@@ -35,6 +35,18 @@ APPLE_KEYS_URL = "https://appleid.apple.com/auth/keys"
 APPLE_ISSUER = "https://appleid.apple.com"
 APPLE_AUDIENCE = "com.hwg.roujaune"  # iOS bundle id (app.json)
 EMERGENT_SESSION_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data"
+# Native Google Sign-In: verify the idToken directly against Google.
+GOOGLE_KEYS_URL = "https://www.googleapis.com/oauth2/v3/certs"
+GOOGLE_ISSUERS = ("https://accounts.google.com", "accounts.google.com")
+# Accepted idToken audiences (OAuth client IDs). Configurable via env; defaults
+# to the iOS client id from GoogleService-Info.plist. Add the Web/server client
+# id (and Android client id) here for Android support.
+GOOGLE_CLIENT_IDS = [
+    c.strip() for c in os.environ.get(
+        "GOOGLE_CLIENT_IDS",
+        "100157698823-0cc8mq63uan5cenfgqeoo049ushvqlk0.apps.googleusercontent.com",
+    ).split(",") if c.strip()
+]
 SESSION_TTL_DAYS = 7
 
 # Emails that should always be granted the admin role (comma-separated in env).
@@ -489,7 +501,8 @@ class LoginReq(BaseModel):
 
 
 class GoogleReq(BaseModel):
-    session_id: str
+    session_id: str | None = None   # Emergent web flow
+    id_token: str | None = None     # native Google Sign-In
 
 
 class AppleReq(BaseModel):
@@ -551,12 +564,34 @@ async def login(req: LoginReq):
 
 @auth_router.post("/google")
 async def google(req: GoogleReq):
-    async with httpx.AsyncClient(timeout=15) as client:
-        r = await client.get(EMERGENT_SESSION_URL, headers={"X-Session-ID": req.session_id})
-    if r.status_code != 200:
-        raise HTTPException(status_code=401, detail="Google sign-in failed")
-    data = r.json()
-    user = await _upsert_oauth_user(data.get("email", ""), data.get("name", ""), data.get("picture", ""), "google")
+    if req.id_token:
+        # Native Google Sign-In: verify the idToken directly against Google.
+        try:
+            jwk_client = jwt.PyJWKClient(GOOGLE_KEYS_URL)
+            signing_key = jwk_client.get_signing_key_from_jwt(req.id_token)
+            claims = jwt.decode(
+                req.id_token, signing_key.key, algorithms=["RS256"],
+                audience=GOOGLE_CLIENT_IDS,
+            )
+            if claims.get("iss") not in GOOGLE_ISSUERS:
+                raise ValueError("bad issuer")
+        except Exception:
+            raise HTTPException(status_code=401, detail="Google sign-in failed")
+        email = claims.get("email", "")
+        name = claims.get("name", "")
+        picture = claims.get("picture", "")
+    elif req.session_id:
+        # Emergent-managed web flow (used on web preview).
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.get(EMERGENT_SESSION_URL, headers={"X-Session-ID": req.session_id})
+        if r.status_code != 200:
+            raise HTTPException(status_code=401, detail="Google sign-in failed")
+        data = r.json()
+        email, name, picture = data.get("email", ""), data.get("name", ""), data.get("picture", "")
+    else:
+        raise HTTPException(status_code=400, detail="Missing id_token or session_id")
+
+    user = await _upsert_oauth_user(email, name, picture, "google")
     if user.get("suspended"):
         raise HTTPException(status_code=403, detail="This account has been suspended. Please contact support.")
     token = await _create_session(user["user_id"])

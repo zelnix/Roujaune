@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useCallback, useEffect, useState } from "react";
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
 import { getToken, setToken, loadToken, installFetchAuth } from "./session";
 import { refreshCoachFromServer, resetCoach } from "./coach-persona";
@@ -15,6 +14,12 @@ import { resetModeInterest } from "./mode-interest";
 
 const API = (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
 const AUTH_BASE = "https://auth.emergentagent.com";
+
+// Google native sign-in OAuth client IDs (public identifiers — safe to ship).
+// iOS client from GoogleService-Info.plist; Web/server client (required for
+// Android + idToken audience) supplied via env when available.
+const GOOGLE_IOS_CLIENT_ID = "100157698823-0cc8mq63uan5cenfgqeoo049ushvqlk0.apps.googleusercontent.com";
+const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? "";
 
 export type AuthUser = {
   user_id: string;
@@ -157,17 +162,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInGoogle = useCallback(async () => {
     if (Platform.OS === "web") {
+      // Web preview keeps the Emergent-managed browser flow (native picker is
+      // unavailable on web). The session_id return is handled on app mount.
       const redirect = window.location.origin + "/";
       window.location.href = `${AUTH_BASE}/?redirect=${encodeURIComponent(redirect)}`;
       return;
     }
-    const redirect = Linking.createURL("");
-    const result = await WebBrowser.openAuthSessionAsync(`${AUTH_BASE}/?redirect=${encodeURIComponent(redirect)}`, redirect);
-    if (result.type === "success" && result.url) {
-      const sid = readSessionIdFromUrl(result.url);
-      if (sid) await exchangeGoogle(sid);
+    // Native Google account picker (iOS/Android). Returns an idToken that the
+    // backend verifies against Google directly (mirrors Apple sign-in).
+    const { GoogleSignin, statusCodes } = await import("@react-native-google-signin/google-signin");
+    GoogleSignin.configure({
+      iosClientId: GOOGLE_IOS_CLIENT_ID,
+      ...(GOOGLE_WEB_CLIENT_ID ? { webClientId: GOOGLE_WEB_CLIENT_ID } : {}),
+      offlineAccess: false,
+    });
+    try {
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const res: any = await GoogleSignin.signIn();
+      const idToken = res?.data?.idToken ?? res?.idToken;
+      if (!idToken) throw new Error("Google sign-in did not return a token");
+      const d = await post("/api/auth/google", { id_token: idToken });
+      await setToken(d.token);
+      setUser(d.user);
+    } catch (e: any) {
+      if (e?.code === statusCodes?.SIGN_IN_CANCELLED) return; // user cancelled — silent
+      throw e;
     }
-  }, [exchangeGoogle]);
+  }, []);
 
   const signInApple = useCallback(async () => {
     if (Platform.OS !== "ios") throw new Error("Apple sign-in is available on iOS builds");
