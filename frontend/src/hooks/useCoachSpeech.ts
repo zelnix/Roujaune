@@ -2,12 +2,10 @@ import { Platform } from "react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from "expo-audio";
 import * as Speech from "expo-speech";
-import Constants from "expo-constants";
 import { CoachId } from "../lib/coach-persona";
 import { getToken } from "../lib/session";
 
-const API = ((process.env.EXPO_PUBLIC_BACKEND_URL
-  || (Constants.expoConfig?.extra as any)?.backendUrl || "") as string).replace(/\/$/, "") + "/api";
+const API = ((process.env.EXPO_PUBLIC_BACKEND_URL || "") as string).replace(/\/$/, "") + "/api";
 
 // Let coach audio play even when the iOS ringer switch is silenced.
 setAudioModeAsync({ playsInSilentMode: true }).catch(() => { /* noop */ });

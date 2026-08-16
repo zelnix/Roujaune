@@ -1,9 +1,6 @@
 /** Aggregate analysis API: PMC (Fitness/Fatigue/Form) + Form Forecast, weekly
  * digest, all-time power records, and GPS segment (climb) comparison. */
-import Constants from "expo-constants";
-
-const API = (process.env.EXPO_PUBLIC_BACKEND_URL
-  || (Constants.expoConfig?.extra as any)?.backendUrl || "") + "/api";
+const API = (process.env.EXPO_PUBLIC_BACKEND_URL || "") + "/api";
 
 export type PmcPoint = { date: string; ctl: number; atl: number; tsb: number; tss: number; projected?: boolean };
 export type Pmc = {

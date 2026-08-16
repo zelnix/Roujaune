@@ -8,11 +8,8 @@
  * enforced server-side and survives reinstall.
  */
 import React from "react";
-import Constants from "expo-constants";
 
-const API = (process.env.EXPO_PUBLIC_BACKEND_URL
-  || (Constants.expoConfig?.extra as any)?.backendUrl
-  || "") + "/api";
+const API = (process.env.EXPO_PUBLIC_BACKEND_URL || "") + "/api";
 
 export type Entitlement = {
   premium: boolean;

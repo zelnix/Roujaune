@@ -1,9 +1,7 @@
 /** Ride ingestion + analysis API (upload .fit/.gpx/.tcx, list, detail, FTP). */
 import { Platform } from "react-native";
-import Constants from "expo-constants";
 
-const API = (process.env.EXPO_PUBLIC_BACKEND_URL
-  || (Constants.expoConfig?.extra as any)?.backendUrl || "") + "/api";
+const API = (process.env.EXPO_PUBLIC_BACKEND_URL || "") + "/api";
 
 export type RideListItem = {
   id: string; created_at?: string; name: string;

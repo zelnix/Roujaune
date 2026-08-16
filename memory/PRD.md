@@ -875,3 +875,8 @@ STILL PENDING (awaiting approval): Phase 3 (Home banners consolidation, dup CTAs
 - Verified: backend bad id_token→401, missing both→400, health 200; web app bundles+loads with lib added (dynamic import), login renders.
 - OUTSTANDING (needs user): (1) Web/server OAuth client ID (Google Cloud Console, Firebase project roujaune-a1ffe) → set EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID (frontend) + append to GOOGLE_CLIENT_IDS (backend) — REQUIRED for Android + robust idToken audience. (2) Android: register the build's signing SHA-1 in Firebase (add Android app), re-download google-services.json. iOS ready now.
 - NOTE: native Google picker only works on a real iOS/Android build — NOT Expo Go or web preview.
+
+## Deployment health — PASS (2026-08 fork, round 3)
+- deployment_agent status=PASS, findings=[]. All checks green (env_files_malformed=false, expo_backend_reachable=true, expo_release_build_ok=true, expo_push_configured=true, test_credentials_ok=true, compilation_passed=true).
+- Fixed 3 blockers: (1) frontend/.env line 6 had EXPO_PACKAGER_PROXY_URL merged with EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID (accidental append without newline) — split into two lines, restored protected proxy URL; (2) removed `Constants.expoConfig.extra.backendUrl` fallback (+ unused Constants import) from 5 files (activities.ts, analysis.ts, entitlement.ts, useCoachSpeech.ts, useStore.native.ts) — API base now only from EXPO_PUBLIC_BACKEND_URL; (3) test_credentials.md updated: greenlantern marked PREVIEW-ONLY (not seeded in prod), demo@roujaune.app documented as the seeded QA/review account.
+- Remaining lint: pre-existing intentional lazy require() in activities.ts + useStore.native.ts (warnings only).

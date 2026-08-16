@@ -13,12 +13,10 @@
  */
 import React from "react";
 import { Platform } from "react-native";
-import Constants from "expo-constants";
 import { fetchProducts as fetchBackendProducts, refreshEntitlement, ProductInfo } from "@/src/lib/entitlement";
 import type { StoreProduct, UseStore } from "./useStore";
 
-const API = (process.env.EXPO_PUBLIC_BACKEND_URL
-  || (Constants.expoConfig?.extra as any)?.backendUrl || "") + "/api";
+const API = (process.env.EXPO_PUBLIC_BACKEND_URL || "") + "/api";
 const SKUS = ["premium_monthly", "premium_yearly"];
 
 function loadIap(): any | null {
