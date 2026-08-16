@@ -13,6 +13,7 @@
       "usesAppleSignIn": true,
       "bundleIdentifier": "com.hwg.roujaune",
       "buildNumber": "1",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "entitlements": {
         "com.apple.developer.healthkit": true
       },
