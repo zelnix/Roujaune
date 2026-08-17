@@ -932,3 +932,6 @@ User asked for ANT+ FE-C and Bluetooth Smart (FTMS). Delivered:
 - **Auto-wiring**: workout.tsx — in ERG mode with a controllable trainer, auto-holds each interval's targetW (autoErg default on). scenic-ride.tsx — auto "terrain": simulates rolling grade around the route's AVERAGE gradient (elevation_m/distance) every 8s while riding (autoTerrain default on); manual override via panel.
 - **ANT+ FE-C**: NOT possible on iOS (no ANT radio) and needs ANT hardware + a native module on Android — no cross-platform Expo module exists. Added honest src/lib/ble/antfec.ts scaffold (ANT_FEC_SUPPORTED=false, getAntFecController() stub mirroring FTMS control surface for a future native bridge) + a platform note surfaced on the Connections DEVICES card (testID ant-fec-note).
 Verified in preview: Trainer Control panel opens from scenic ride showing the FTMS "connect a trainer" state (correct — no FTMS hardware in web). NOTE: FTMS reading + control only work on a real native build with an actual FTMS trainer.
+
+## ANT+ FE-C removed (2026-06 fork)
+Per user request, removed the ANT+ FE-C scaffold entirely: deleted src/lib/ble/antfec.ts, removed the ANT+ note + styles + import from app/connections.tsx. FTMS (Bluetooth) trainer support is unaffected. No ANT references remain.
