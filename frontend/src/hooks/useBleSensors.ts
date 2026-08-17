@@ -3,9 +3,12 @@ import { PermissionsAndroid, Platform } from "react-native";
 import {
   UUID,
   b64ToBytes,
+  bytesToB64,
   parseHeartRate,
   parseCyclingPower,
   parseCsc,
+  parseIndoorBikeData,
+  FTMSControl,
   cadenceFromCrank,
   speedFromWheel,
   type CrankSample,
@@ -15,6 +18,7 @@ import {
 export type BleDevice = { id: string; name: string };
 export type BleReadings = { power: number | null; cadence: number | null; hr: number | null; speed: number | null; wheelRevs: number | null; ts: number };
 export type PermState = "unknown" | "granted" | "denied" | "blocked";
+export type ControlMode = "erg" | "resistance" | "sim" | null;
 
 // Lazily load the native module so the app keeps working in Expo Go / web,
 // where the BLE native module is not linked.
@@ -31,7 +35,7 @@ function loadBle(): any {
   return BleModule;
 }
 
-const RELEVANT_SERVICES = [UUID.heartRate, UUID.cyclingPower, UUID.csc];
+const RELEVANT_SERVICES = [UUID.heartRate, UUID.cyclingPower, UUID.csc, UUID.fitnessMachine];
 
 /**
  * Connects to standard Bluetooth LE cycling sensors (Cycling Power 0x1818,
@@ -49,6 +53,12 @@ export function useBleSensors(wheelCircumferenceMm: number = 2105) {
   const [readings, setReadings] = useState<BleReadings>({ power: null, cadence: null, hr: null, speed: null, wheelRevs: null, ts: 0 });
   const [permissionStatus, setPermissionStatus] = useState<PermState>("unknown");
   const [error, setError] = useState<string | null>(null);
+  // FTMS smart-trainer control (ERG / resistance / grade). Available only when a
+  // connected trainer exposes the Fitness Machine Control Point and grants control.
+  const [hasTrainerControl, setHasTrainerControl] = useState(false);
+  const [controlMode, setControlMode] = useState<ControlMode>(null);
+  const [controlValue, setControlValue] = useState<number>(0);
+  const controlRef = useRef<{ device: any; service: string; char: string } | null>(null);
 
   // Per-device crank / wheel state so a standalone cadence sensor and a power
   // meter (or a separate speed sensor) never trample each other's samples.
@@ -191,6 +201,18 @@ export function useBleSensors(wheelCircumferenceMm: number = 2105) {
           return next;
         });
       }
+    } else if (cu === UUID.indoorBikeData) {
+      const ib = parseIndoorBikeData(bytes);
+      if (ib) {
+        setReadings((r) => ({
+          ...r,
+          power: ib.power != null ? ib.power : r.power,
+          cadence: ib.cadence != null ? ib.cadence : r.cadence,
+          speed: ib.speed != null ? ib.speed : r.speed,
+          hr: ib.hr != null ? ib.hr : r.hr,
+          ts: Date.now(),
+        }));
+      }
     }
   }, []);
 
@@ -202,6 +224,44 @@ export function useBleSensors(wheelCircumferenceMm: number = 2105) {
     subs.current.push(sub);
   }, [handleValue]);
 
+  // Write a raw FTMS control-point command (op-code + params) with response.
+  const writeControlRaw = useCallback(async (cmd: number[]): Promise<boolean> => {
+    const c = controlRef.current;
+    if (!c) return false;
+    try {
+      await c.device.writeCharacteristicWithResponseForService(c.service, c.char, bytesToB64(cmd));
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  /** ERG mode: hold the trainer at a fixed target power (watts). */
+  const setErgWatts = useCallback(async (watts: number): Promise<boolean> => {
+    const ok = await writeControlRaw(FTMSControl.setTargetPower(watts));
+    if (ok) { setControlMode("erg"); setControlValue(Math.round(watts)); }
+    return ok;
+  }, [writeControlRaw]);
+
+  /** Fixed resistance level (device-specific units). */
+  const setResistance = useCallback(async (level: number): Promise<boolean> => {
+    const ok = await writeControlRaw(FTMSControl.setResistance(level));
+    if (ok) { setControlMode("resistance"); setControlValue(Math.round(level)); }
+    return ok;
+  }, [writeControlRaw]);
+
+  /** Simulation mode: set road gradient (%) so the trainer emulates the climb. */
+  const setSimGrade = useCallback(async (gradePct: number): Promise<boolean> => {
+    const ok = await writeControlRaw(FTMSControl.setSimGrade(gradePct));
+    if (ok) { setControlMode("sim"); setControlValue(Math.round(gradePct * 10) / 10); }
+    return ok;
+  }, [writeControlRaw]);
+
+  const resetTrainer = useCallback(async (): Promise<void> => {
+    await writeControlRaw(FTMSControl.reset());
+    setControlMode(null); setControlValue(0);
+  }, [writeControlRaw]);
+
   const connect = useCallback(async (id: string) => {
     const manager = managerRef.current;
     if (!manager) return;
@@ -212,35 +272,60 @@ export function useBleSensors(wheelCircumferenceMm: number = 2105) {
       const services = await device.services();
       for (const svc of services) {
         const su = svc.uuid.toLowerCase();
-        if (![UUID.heartRate, UUID.cyclingPower, UUID.csc].includes(su)) continue;
+        if (![UUID.heartRate, UUID.cyclingPower, UUID.csc, UUID.fitnessMachine].includes(su)) continue;
         const chars = await svc.characteristics();
         for (const ch of chars) {
           const cu = ch.uuid.toLowerCase();
-          if ([UUID.heartRateMeasurement, UUID.cyclingPowerMeasurement, UUID.cscMeasurement].includes(cu)) {
+          if ([UUID.heartRateMeasurement, UUID.cyclingPowerMeasurement, UUID.cscMeasurement, UUID.indoorBikeData].includes(cu)) {
             monitor(device, svc.uuid, ch.uuid);
           }
+          if (cu === UUID.fitnessMachineControlPoint) {
+            controlRef.current = { device, service: svc.uuid, char: ch.uuid };
+          }
         }
+      }
+      // If the trainer exposes an FTMS control point, request control + start so
+      // ERG / resistance / grade commands are accepted.
+      if (controlRef.current) {
+        try {
+          await writeControlRaw(FTMSControl.requestControl());
+          await writeControlRaw(FTMSControl.start());
+          setHasTrainerControl(true);
+        } catch { /* control not granted — reading still works */ }
       }
       device.onDisconnected(() => {
         delete crankState.current[id];
         delete wheelState.current[id];
+        if (controlRef.current?.device?.id === id) {
+          controlRef.current = null;
+          setHasTrainerControl(false);
+          setControlMode(null);
+        }
         setConnected((prev) => prev.filter((d) => d.id !== id));
       });
       setConnected((prev) => (prev.some((d) => d.id === id) ? prev : [...prev, { id, name: device.name || "Sensor" }]));
     } catch (e: any) {
       setError(e?.message ?? "Connection failed");
     }
-  }, [monitor, stopScan]);
+  }, [monitor, stopScan, writeControlRaw]);
 
   const disconnect = useCallback(async (id: string) => {
     try { await managerRef.current?.cancelDeviceConnection(id); } catch { /* noop */ }
     delete crankState.current[id];
     delete wheelState.current[id];
+    if (controlRef.current?.device?.id === id) {
+      controlRef.current = null;
+      setHasTrainerControl(false);
+      setControlMode(null);
+    }
     setConnected((prev) => prev.filter((d) => d.id !== id));
   }, []);
 
   return {
     supported, poweredOn, scanning, devices, connected, readings, permissionStatus,
     error, requestPermission, startScan, stopScan, connect, disconnect,
+    // FTMS trainer control
+    hasTrainerControl, controlMode, controlValue,
+    setErgWatts, setResistance, setSimGrade, resetTrainer,
   };
 }

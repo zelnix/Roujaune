@@ -7,6 +7,7 @@ import { useSettings } from "@/src/lib/settings";
 import { HealthSyncCard } from "@/src/components/HealthSyncCard";
 import { useBleSensors } from "@/src/hooks/useBleSensors";
 import { BleSensorsPanel } from "@/src/components/BleSensorsPanel";
+import { ANT_FEC_PLATFORM_NOTE } from "@/src/lib/ble/antfec";
 import {
   useConnections, useImportedActivities, Provider, startConnect, syncNow, disconnect,
   deleteImported, updateConnSettings, statusChip, relTime, rideTypeLabel,
@@ -175,6 +176,10 @@ export default function ConnectionsScreen() {
             );
           })}
         </View>
+        <View style={s.antNote} testID="ant-fec-note">
+          <Ionicons name="radio-outline" size={14} color={CC.dim} />
+          <Text style={s.antNoteText}>ANT+ FE-C: {ANT_FEC_PLATFORM_NOTE}</Text>
+        </View>
       </Card>
 
       <HealthSyncCard showToast={showToast} />
@@ -254,6 +259,8 @@ const s = StyleSheet.create({
   devBtnText: { color: CC.white, fontSize: 12.5, fontWeight: "700" },
 
   blurb: { color: CC.dim, fontSize: 12.5, lineHeight: 18, marginTop: 2 },
+  antNote: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: CC.borderSoft },
+  antNoteText: { color: CC.dim, fontSize: 11.5, lineHeight: 17, flex: 1 },
 
   provCard: { backgroundColor: "rgba(255,255,255,0.02)", borderRadius: 12, borderWidth: 1, borderColor: CC.borderSoft, padding: 16 },
   provHead: { flexDirection: "row", alignItems: "center", gap: 12 },

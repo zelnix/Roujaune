@@ -23,6 +23,7 @@ import { DiscoveryPrompt, SaveToast } from "@/src/components/scenic/DiscoveryPro
 import { useEntitlement, consumeRide, refreshEntitlement } from "@/src/lib/entitlement";
 import { PaywallModal } from "@/src/components/PaywallModal";
 import { StreamingSourceSheet } from "@/src/components/streaming/StreamingSourceSheet";
+import { TrainerControlPanel } from "@/src/components/streaming/TrainerControlPanel";
 
 /** Immersive live scenic-ride experience — a full-bleed POV video with a
  *  cinematic, fully hideable HUD (tap the scene to show/hide). */
@@ -43,6 +44,9 @@ export default function ScenicRideScreen() {
   // YouTube video. External apps (Netflix/Prime/…) launch out via the sheet.
   const [customVideoId, setCustomVideoId] = React.useState<string | null>(null);
   const [streamOpen, setStreamOpen] = React.useState(false);
+  // FTMS smart-trainer control: auto-drive road gradient from the route's terrain.
+  const [trainerOpen, setTrainerOpen] = React.useState(false);
+  const [autoTerrain, setAutoTerrain] = React.useState(true);
   const [elapsed, setElapsed] = React.useState(r0 ? r0.elapsedSec : 0);
   const [vpos, setVpos] = React.useState(0); // real video currentTime (sec)
   const [vdur, setVdur] = React.useState(0); // real video duration (sec)
@@ -184,6 +188,29 @@ export default function ScenicRideScreen() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elapsed, ent.premium, freeSecs, route, paywall, completed]);
+
+  // ---- FTMS auto-terrain: drive trainer gradient from the route's climb ----
+  // Scenic routes carry only total elevation + distance, so we simulate gentle
+  // rolling terrain around the route's AVERAGE gradient as the ride progresses.
+  const avgGrade = React.useMemo(() => {
+    const dist = (route?.distance_km ?? 0) * 1000;
+    const elev = route?.elevation_m ?? 0;
+    if (dist <= 0) return 0;
+    return Math.max(0, Math.min(8, (elev / dist) * 100));
+  }, [route]);
+  const pctRef = React.useRef(0);
+  React.useEffect(() => { pctRef.current = pct; }, [pct]);
+  React.useEffect(() => {
+    if (!ble.hasTrainerControl || !autoTerrain || !playing) return;
+    const send = () => {
+      const roll = Math.sin(pctRef.current * Math.PI * 6) * 1.5; // gentle rollers
+      ble.setSimGrade(Math.max(0, Math.round((avgGrade + roll) * 10) / 10));
+    };
+    send();
+    const t = setInterval(send, 8000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ble.hasTrainerControl, autoTerrain, playing, avgGrade]);
 
   const closePaywall = React.useCallback(async () => {
     const e = await refreshEntitlement();
@@ -572,6 +599,9 @@ export default function ScenicRideScreen() {
         <Pressable style={s.utilBtn} onPress={() => setStreamOpen(true)} testID="scenic-source" accessibilityRole="button" accessibilityLabel="Choose ride screen source">
           <Ionicons name="tv-outline" size={20} color={customVideoId ? colors.yellow : "#fff"} />
         </Pressable>
+        <Pressable style={s.utilBtn} onPress={() => setTrainerOpen(true)} testID="scenic-trainer" accessibilityRole="button" accessibilityLabel="Trainer control">
+          <Ionicons name="speedometer-outline" size={20} color={ble.hasTrainerControl ? colors.yellow : "#fff"} />
+        </Pressable>
         <Pressable style={s.utilBtn} onPress={() => {
           const allShown = hud && show.location && show.comingUp && show.companion && show.metrics;
           if (allShown) { setHud(false); }
@@ -634,6 +664,22 @@ export default function ScenicRideScreen() {
         onClose={() => setStreamOpen(false)}
         onPickRoute={() => setCustomVideoId(null)}
         onPickYouTube={(id) => { setCustomVideoId(id); setPlaying(true); }}
+      />
+
+      {/* FTMS smart-trainer control — ERG / resistance / gradient (+ auto terrain) */}
+      <TrainerControlPanel
+        visible={trainerOpen}
+        onClose={() => setTrainerOpen(false)}
+        hasControl={ble.hasTrainerControl}
+        mode={ble.controlMode}
+        power={ble.readings.power}
+        auto={autoTerrain}
+        onToggleAuto={setAutoTerrain}
+        onErg={ble.setErgWatts}
+        onResistance={ble.setResistance}
+        onGrade={ble.setSimGrade}
+        onReset={ble.resetTrainer}
+        context="scenic"
       />
     </View>
   );

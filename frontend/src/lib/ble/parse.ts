@@ -9,6 +9,12 @@ export const UUID = {
   cyclingPowerMeasurement: "00002a63-0000-1000-8000-00805f9b34fb",
   csc: "00001816-0000-1000-8000-00805f9b34fb",
   cscMeasurement: "00002a5b-0000-1000-8000-00805f9b34fb",
+  // Fitness Machine Service (FTMS) — smart trainer read + control.
+  fitnessMachine: "00001826-0000-1000-8000-00805f9b34fb",
+  indoorBikeData: "00002ad2-0000-1000-8000-00805f9b34fb",
+  fitnessMachineControlPoint: "00002ad9-0000-1000-8000-00805f9b34fb",
+  fitnessMachineStatus: "00002ada-0000-1000-8000-00805f9b34fb",
+  fitnessMachineFeature: "00002acc-0000-1000-8000-00805f9b34fb",
 };
 
 const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -29,6 +35,26 @@ export function b64ToBytes(b64: string): Uint8Array {
     }
   }
   return Uint8Array.from(out);
+}
+
+/** Encode bytes → base64 (ble-plx writes characteristic values as base64). */
+export function bytesToB64(bytes: number[] | Uint8Array): string {
+  const arr = Array.from(bytes);
+  let out = "";
+  let i = 0;
+  for (; i + 2 < arr.length; i += 3) {
+    const n = (arr[i] << 16) | (arr[i + 1] << 8) | arr[i + 2];
+    out += B64[(n >> 18) & 63] + B64[(n >> 12) & 63] + B64[(n >> 6) & 63] + B64[n & 63];
+  }
+  const rem = arr.length - i;
+  if (rem === 1) {
+    const n = arr[i] << 16;
+    out += B64[(n >> 18) & 63] + B64[(n >> 12) & 63] + "==";
+  } else if (rem === 2) {
+    const n = (arr[i] << 16) | (arr[i + 1] << 8);
+    out += B64[(n >> 18) & 63] + B64[(n >> 12) & 63] + B64[(n >> 6) & 63] + "=";
+  }
+  return out;
 }
 
 /** Heart Rate Measurement (0x2A37) → bpm. */
@@ -135,3 +161,57 @@ export function speedFromWheel(prev: WheelSample, curr: WheelSample, circumferen
   const kmh = (metres / seconds) * 3.6;
   return kmh >= 0 && kmh < 150 ? Math.round(kmh * 10) / 10 : null;
 }
+
+
+export type IndoorBike = { speed?: number; cadence?: number; power?: number; hr?: number };
+
+/**
+ * FTMS Indoor Bike Data (0x2AD2) → instantaneous speed / cadence / power / HR.
+ * Fields are laid out per the 16-bit flags header; we walk the offset in the
+ * exact field order defined by the Fitness Machine spec.
+ */
+export function parseIndoorBikeData(bytes: Uint8Array): IndoorBike | null {
+  if (bytes.length < 2) return null;
+  const flags = bytes[0] | (bytes[1] << 8);
+  let off = 2;
+  const u16 = () => { const v = bytes[off] | (bytes[off + 1] << 8); off += 2; return v; };
+  const s16 = () => { let v = u16(); if (v > 0x7fff) v -= 0x10000; return v; };
+  const res: IndoorBike = {};
+  // bit0 == 0 → Instantaneous Speed present (0.01 km/h).
+  if ((flags & 0x0001) === 0 && bytes.length >= off + 2) res.speed = Math.round(u16() * 0.01 * 10) / 10;
+  if (flags & 0x0002) off += 2;                                    // Average Speed
+  if (flags & 0x0004 && bytes.length >= off + 2) res.cadence = Math.round(u16() * 0.5); // Instantaneous Cadence (0.5 rpm)
+  if (flags & 0x0008) off += 2;                                    // Average Cadence
+  if (flags & 0x0010) off += 3;                                    // Total Distance (uint24)
+  if (flags & 0x0020) off += 2;                                    // Resistance Level
+  if (flags & 0x0040 && bytes.length >= off + 2) res.power = s16(); // Instantaneous Power (W)
+  if (flags & 0x0080) off += 2;                                    // Average Power
+  if (flags & 0x0100) off += 5;                                    // Expended Energy (2+2+1)
+  if (flags & 0x0200 && bytes.length >= off + 1) { res.hr = bytes[off]; off += 1; } // Heart Rate (bpm)
+  return res;
+}
+
+/**
+ * FTMS Fitness Machine Control Point (0x2AD9) command builders. Each returns the
+ * raw op-code + parameter bytes to write (with response) to the control point.
+ */
+export const FTMSControl = {
+  requestControl: (): number[] => [0x00],
+  reset: (): number[] => [0x01],
+  // Set Target Resistance Level (0x04) — device-specific level (uint8).
+  setResistance: (level: number): number[] => [0x04, Math.max(0, Math.min(200, Math.round(level))) & 0xff],
+  // Set Target Power / ERG (0x05) — target power in watts (sint16 LE).
+  setTargetPower: (watts: number): number[] => {
+    const w = Math.max(0, Math.min(2000, Math.round(watts)));
+    return [0x05, w & 0xff, (w >> 8) & 0xff];
+  },
+  start: (): number[] => [0x07],
+  stop: (): number[] => [0x08, 0x01],
+  // Set Indoor Bike Simulation Parameters (0x11): wind(0.001 m/s), grade(0.01 %),
+  // Crr(0.0001), Cw(0.01). We fix wind=0 and typical Crr/Cw so grade drives feel.
+  setSimGrade: (gradePct: number): number[] => {
+    const g100 = Math.round(Math.max(-40, Math.min(40, gradePct)) * 100);
+    const g = g100 < 0 ? g100 + 0x10000 : g100;
+    return [0x11, 0x00, 0x00, g & 0xff, (g >> 8) & 0xff, 40, 51];
+  },
+};

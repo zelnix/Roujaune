@@ -34,6 +34,7 @@ import {
 import { useWorkoutAudio } from "@/src/hooks/useWorkoutAudio";
 import { useBleSensors } from "@/src/hooks/useBleSensors";
 import { BleSensorsPanel } from "@/src/components/BleSensorsPanel";
+import { TrainerControlPanel } from "@/src/components/streaming/TrainerControlPanel";
 import { fetchCoachCue, fetchExtendPlan, ExtendPlan } from "@/src/lib/coach";
 import { useCoach } from "@/src/lib/coach-persona";
 
@@ -74,6 +75,7 @@ const CONTROLS = [
   { key: "camera", label: "Camera Selection", icon: "camera" as const },
   { key: "mute", label: "Mute Coach", icon: "volume-mute" as const },
   { key: "reconnect", label: "Trainer Reconnect", icon: "bluetooth" as const },
+  { key: "trainer", label: "Trainer Control", icon: "speedometer" as const },
   { key: "lock", label: "Touch Lock", icon: "lock-closed" as const },
 ];
 
@@ -141,6 +143,8 @@ export default function LiveWorkout() {
   const [showMusic, setShowMusic] = React.useState(false);
   const [showCast, setShowCast] = React.useState(false);
   const [showBle, setShowBle] = React.useState(false);
+  const [showTrainer, setShowTrainer] = React.useState(false);
+  const [autoErg, setAutoErg] = React.useState(true);
   const [endPrompt, setEndPrompt] = React.useState(false);
   const [completePrompt, setCompletePrompt] = React.useState(false);
   const [extendAdvice, setExtendAdvice] = React.useState<string | null>(null);
@@ -254,6 +258,12 @@ export default function LiveWorkout() {
       if (ergModeRef.current) sendTarget(targetW);
     }
   }, [connectionState, targetW, sendInit, sendTarget]);
+
+  // Real FTMS trainer: in ERG mode, auto-hold the current interval's target watts.
+  React.useEffect(() => {
+    if (ble.hasTrainerControl && autoErg && ergMode) ble.setErgWatts(targetW);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetW, ble.hasTrainerControl, autoErg, ergMode]);
 
   const showToast = React.useCallback((text: string) => setToast({ id: Date.now(), text }), []);
 
@@ -395,6 +405,9 @@ export default function LiveWorkout() {
       case "reconnect":
         simulateDropout();
         showToast("Reconnecting trainer…");
+        break;
+      case "trainer":
+        setShowTrainer(true);
         break;
       case "lock":
         setLocked(true);
@@ -1017,6 +1030,21 @@ export default function LiveWorkout() {
           units={settings.units}
         />
       )}
+
+      <TrainerControlPanel
+        visible={showTrainer}
+        onClose={() => setShowTrainer(false)}
+        hasControl={ble.hasTrainerControl}
+        mode={ble.controlMode}
+        power={ble.readings.power}
+        auto={autoErg}
+        onToggleAuto={setAutoErg}
+        onErg={ble.setErgWatts}
+        onResistance={ble.setResistance}
+        onGrade={ble.setSimGrade}
+        onReset={ble.resetTrainer}
+        context="workout"
+      />
 
       {completePrompt && (
         <CompletePrompt
