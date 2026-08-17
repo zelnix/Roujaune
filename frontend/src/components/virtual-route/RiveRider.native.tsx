@@ -9,6 +9,7 @@ import {
 } from "@/src/lib/rider-animation";
 import {
   RIVE_MODE,
+  RIVE_ENABLED,
   RIVE_STATE_MACHINE,
   RIVE_VIEW_MODEL_INSTANCE,
   RIVE_BIKE_PROPERTY,
@@ -57,7 +58,9 @@ export type RiveRiderProps = {
 export function RiveRider(props: RiveRiderProps) {
   const { sprite, riderType, bikeType, clothingStyle, style } = props;
   const ref = React.useRef<RiveRef>(null);
-  const [failed, setFailed] = React.useState(false);
+  // Start "failed" (→ sprite fallback) whenever Rive is disabled, so the native
+  // <Rive> component is never mounted against the placeholder .riv asset.
+  const [failed, setFailed] = React.useState(!RIVE_ENABLED);
   const prototype = RIVE_MODE === "prototype";
 
   const inputsRef = React.useRef(props);

@@ -935,3 +935,9 @@ Verified in preview: Trainer Control panel opens from scenic ride showing the FT
 
 ## ANT+ FE-C removed (2026-06 fork)
 Per user request, removed the ANT+ FE-C scaffold entirely: deleted src/lib/ble/antfec.ts, removed the ANT+ note + styles + import from app/connections.tsx. FTMS (Bluetooth) trainer support is unaffected. No ANT references remain.
+
+## P0 FIX: Production Android crash on "Start Workout" — Rive placeholder asset (2026-06 fork)
+Symptom: instant app close (no JS error) the moment "Start Workout" is tapped, on 3 Android PRODUCTION devices; NEVER in preview (Expo Go has no rive-react-native native module).
+Root cause: assets/rive/roujaune-riders.riv is a 223-byte PLACEHOLDER. RIVE_MODE="production" made RiveRider.native mount <Rive> against real artboard/state-machine/view-model names ("CyclingController"/"Simulation_Default") that don't exist in the placeholder → rive-react-native throws a FATAL native exception on Android (onError does NOT catch it) → instant process kill. Workout screen reaches it via VirtualRidePlayer → scene.tsx → RiveRider.
+Fix: added RIVE_ENABLED=false master switch in src/lib/rive-profile.ts; RiveRider.native.tsx now starts in the `failed` state when !RIVE_ENABLED so the native <Rive> is NEVER mounted — it renders the existing sprite fallback (rider.sprite) instead. Covers workout, virtual-route and rider-customise. Flip RIVE_ENABLED to true only once a REAL, verified .riv (with matching artboards) is bundled.
+Verify: lint clean; web preview unaffected (uses RiveRider.web). Native crash cannot recur (Rive not mounted). USER must redeploy + regenerate the Android build for the fix to reach production.

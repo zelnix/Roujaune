@@ -11,6 +11,14 @@ export type RiveMode = "production" | "prototype";
 // Switch to "prototype" only for a temporary test asset. Do NOT ship as-is.
 export const RIVE_MODE: RiveMode = "production";
 
+// Master switch for mounting the native <Rive> component. The bundled
+// `roujaune-riders.riv` is still a placeholder — loading it (or an artboard /
+// state machine that doesn't exist yet) throws a FATAL native exception on
+// Android that instantly kills the app (onError does not catch it). Keep this
+// OFF so ride screens render the sprite-based rider fallback until a real,
+// verified .riv is shipped. Flip to `true` once the production asset is in.
+export const RIVE_ENABLED = false;
+
 export const RIVE_STATE_MACHINE = "CyclingController";        // production
 export const RIVE_VIEW_MODEL_INSTANCE = "Simulation_Default"; // production default instance
 
