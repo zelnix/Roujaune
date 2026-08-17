@@ -32,9 +32,7 @@ function ProviderRow({ p, onChanged, showToast }: { p: Provider; onChanged: () =
     try {
       const r: any = await startConnect(p.id);
       if (r?.setup_required) {
-        const steps = p.id === "google_fit"
-          ? "To enable: create an OAuth client in Google Cloud Console, enable the Fitness API, then add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to the backend and register this app's redirect URL."
-          : "To enable: get approved in the Garmin Developer Program, then add GARMIN_CLIENT_ID and GARMIN_CLIENT_SECRET to the backend and register this app's redirect URL.";
+        const steps = "To enable: create an OAuth client in Google Cloud Console, enable the Fitness API, then add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to the backend and register this app's redirect URL.";
         Alert.alert(`Connect ${p.name}`, `${r.message}\n\n${steps}`);
       } else if (r?.connected) {
         showToast(`${p.name} connected — imported ${r.sync?.imported ?? 0} rides`);

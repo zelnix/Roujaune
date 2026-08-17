@@ -465,7 +465,6 @@ export function ChartsRow({ stats, width, vertical = false }: { stats: SummarySt
 /* ======================= SYNC & EXPORT ======================= */
 const SYNC_ICON: Record<string, { icon: React.ReactNode }> = {
   strava: { icon: <MaterialCommunityIcons name="bike-fast" size={18} color="#FC4C02" /> },
-  garmin: { icon: <MaterialCommunityIcons name="watch-variant" size={18} color="#0AA0DE" /> },
   apple: { icon: <Ionicons name="heart" size={18} color="#FF2D55" /> },
   wellness: { icon: <MaterialCommunityIcons name="flower-tulip" size={18} color="#B983FF" /> },
 };

@@ -115,7 +115,7 @@ export const readiness = {
   score: "78%",
   status: "Good",
   note: "Recovery signals support today's planned intensity.",
-  source: "Garmin",
+  source: "Apple Health",
   synced: "12 min ago",
 };
 

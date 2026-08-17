@@ -268,7 +268,7 @@ CALENDAR_WEEK = {
             "date": "2025-05-12", "day_name": "MON", "day_num": "12 MAY", "focus": "Endurance Base",
             "cycling": {"id": "c1", "type": "cycling", "title": "Endurance Ride", "duration": "1h 30m", "zone": "Z2", "tss": "65 TSS", "status": "completed", "color": "green", "created_by": "Alberto"},
             "fb50": {"id": "f1", "type": "fb50", "title": "Lower Body Strength", "duration": "20 min", "status": "completed", "category": "FB50"},
-            "readiness": {"score": 82, "status": "Good", "source": "Garmin Connect", "metrics": [
+            "readiness": {"score": 82, "status": "Good", "source": "Apple Health", "metrics": [
                 {"key": "energy", "label": "Energy", "value": 82, "display": "High"},
                 {"key": "soreness", "label": "Soreness", "value": 78, "display": "Low"},
                 {"key": "stress", "label": "Stress", "value": 80, "display": "Low"},
@@ -278,7 +278,7 @@ CALENDAR_WEEK = {
             "date": "2025-05-13", "day_name": "TUE", "day_num": "13 MAY", "focus": "Threshold Power",
             "cycling": {"id": "c2", "type": "cycling", "title": "Threshold Climb", "duration": "1h 00m", "zone": "Z4", "tss": "92 TSS", "status": "today", "color": "rouge", "target_power": 251, "created_by": "Alberto", "profile": [0.5, 0.7, 0.6, 0.85, 0.7, 0.95, 0.75, 0.9, 0.65, 0.88, 0.7, 0.5, 0.6, 0.8]},
             "fb50": {"id": "f2", "type": "fb50", "title": "Mobility Flow", "duration": "15 min", "status": "scheduled", "category": "FB50"},
-            "readiness": {"score": 76, "status": "Good", "source": "Garmin Connect", "metrics": [
+            "readiness": {"score": 76, "status": "Good", "source": "Apple Health", "metrics": [
                 {"key": "energy", "label": "Energy", "value": 74, "display": "Good"},
                 {"key": "soreness", "label": "Soreness", "value": 72, "display": "Low"},
                 {"key": "stress", "label": "Stress", "value": 62, "display": "Moderate"},
@@ -298,7 +298,7 @@ CALENDAR_WEEK = {
             "date": "2025-05-15", "day_name": "THU", "day_num": "15 MAY", "focus": "Sweet Spot Power",
             "cycling": {"id": "c4", "type": "cycling", "title": "Sweet Spot", "duration": "1h 20m", "zone": "Z3", "tss": "75 TSS", "status": "planned", "color": "amber", "created_by": "Alberto"},
             "fb50": {"id": "f4", "type": "fb50", "title": "Hip Mobility", "duration": "15 min", "status": "planned", "category": "FB50"},
-            "readiness": {"score": 78, "status": "Good", "source": "Garmin Connect", "metrics": [
+            "readiness": {"score": 78, "status": "Good", "source": "Apple Health", "metrics": [
                 {"key": "energy", "label": "Energy", "value": 76, "display": "Good"},
                 {"key": "soreness", "label": "Soreness", "value": 75, "display": "Low"},
                 {"key": "stress", "label": "Stress", "value": 80, "display": "Low"},
@@ -308,7 +308,7 @@ CALENDAR_WEEK = {
             "date": "2025-05-16", "day_name": "FRI", "day_num": "16 MAY", "focus": "Endurance Base",
             "cycling": {"id": "c5", "type": "cycling", "title": "Endurance Ride", "duration": "1h 45m", "zone": "Z2", "tss": "70 TSS", "status": "planned", "color": "green", "created_by": "Alberto"},
             "fb50": {"id": "f5", "type": "fb50", "title": "Upper Body Strength", "duration": "20 min", "status": "planned", "category": "FB50"},
-            "readiness": {"score": 72, "status": "Good", "source": "Garmin Connect", "metrics": [
+            "readiness": {"score": 72, "status": "Good", "source": "Apple Health", "metrics": [
                 {"key": "energy", "label": "Energy", "value": 70, "display": "Good"},
                 {"key": "soreness", "label": "Soreness", "value": 64, "display": "Moderate"},
                 {"key": "stress", "label": "Stress", "value": 76, "display": "Low"},
@@ -328,7 +328,7 @@ CALENDAR_WEEK = {
             "date": "2025-05-18", "day_name": "SUN", "day_num": "18 MAY", "focus": "Recovery",
             "cycling": {"id": "c7", "type": "cycling", "title": "Rest Day", "subtitle": "Wellness Focus", "duration": "", "zone": "", "tss": "", "status": "rest", "color": "purple", "created_by": "Alberto"},
             "fb50": {"id": "f7", "type": "fb50", "title": "Active Recovery Walk", "duration": "30 min", "status": "planned", "category": "Recovery"},
-            "readiness": {"score": 84, "status": "Good", "source": "Garmin Connect", "metrics": [
+            "readiness": {"score": 84, "status": "Good", "source": "Apple Health", "metrics": [
                 {"key": "energy", "label": "Energy", "value": 85, "display": "High"},
                 {"key": "soreness", "label": "Soreness", "value": 82, "display": "Low"},
                 {"key": "stress", "label": "Stress", "value": 84, "display": "Low"},
@@ -574,7 +574,7 @@ PROGRESS_DATA = {
 WELLNESS_DATA = {
     "headline": "Well recovered.",
     "subhead": "Your body is ready for a strong week.",
-    "readiness": {"score": 82, "status": "Good", "source": "Garmin Connect"},
+    "readiness": {"score": 82, "status": "Good", "source": "Apple Health"},
     "vitals": [
         {"key": "sleep", "label": "Sleep", "value": "7h 45m", "sub": "Good quality", "pct": 86, "icon": "moon-outline", "color": "purple"},
         {"key": "hrv", "label": "HRV", "value": "68 ms", "sub": "Balanced", "pct": 78, "icon": "pulse-outline", "color": "blue"},
@@ -600,7 +600,6 @@ CONNECTIONS_DATA = {
     ],
     "services": [
         {"id": "strava", "name": "Strava", "detail": "Auto-sync activities", "connected": True, "icon": "logo-buffer", "color": "orange"},
-        {"id": "garmin", "name": "Garmin Connect", "detail": "Readiness & sleep", "connected": True, "icon": "watch-outline", "color": "blue"},
         {"id": "apple", "name": "Apple Health", "detail": "HRV, resting HR", "connected": True, "icon": "heart-circle-outline", "color": "rouge"},
         {"id": "googlefit", "name": "Google Fit", "detail": "Steps, heart points & activity", "connected": False, "icon": "fitness-outline", "color": "green"},
         {"id": "samsung", "name": "Samsung Health", "detail": "Heart rate, sleep & steps", "connected": False, "icon": "watch-outline", "color": "blue"},

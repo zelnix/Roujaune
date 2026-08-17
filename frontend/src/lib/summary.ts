@@ -91,7 +91,6 @@ export const summaryContent = {
   },
   sync: [
     { key: "strava", label: "Strava", status: "Synced", icon: "logo-strava" },
-    { key: "garmin", label: "Garmin Connect", status: "Synced", icon: "sync-circle" },
     { key: "apple", label: "Apple Health", status: "Synced", icon: "heart" },
   ],
 };

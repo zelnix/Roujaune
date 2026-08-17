@@ -895,3 +895,12 @@ IMPORTANT technical reality to discuss with user before building:
 - YouTube: fully doable in-app — expand current curated video_id embed to let the rider pick/paste their own YouTube URL/video/playlist.
 - Requires a native EAS build (background BLE/telemetry + PiP/split-screen) — will NOT work in Expo Go/web preview.
 Proposed scope when resumed: (1) Streaming Source picker in ride setup; (2) deep-link launchers + "enable PiP" guidance per service; (3) keep ride tracking alive while PiP video plays; (4) in-app custom YouTube source.
+
+## Removed Garmin Connect connection (2026-06 fork)
+User requested removal of the Garmin Connect connection. Changes:
+- backend/providers/__init__.py: removed `from . import garmin` import → Garmin provider no longer registered (registry now: google_fit, apple_health, health_connect). garmin.py kept as unused module (still referenced by dev tests only).
+- frontend/app/connections.tsx: simplified the setup-required Alert to the Google Fit message only (Garmin branch removed).
+- frontend/src/lib/summary.ts + src/components/summary.tsx: removed the "Garmin Connect" item from the ride-summary Sync list + its SYNC_ICON entry.
+- backend/routes/plan.py: readiness `source: "Garmin Connect"` → "Apple Health" (calendar demo week + WELLNESS_DATA); removed Garmin entry from (unused) CONNECTIONS_DATA.services.
+- frontend/src/data.ts: readiness `source: "Garmin"` → "Apple Health".
+Verified: /api/connections returns [google_fit, apple_health, health_connect] (no garmin); backend imports clean; no user-facing garmin refs remain in frontend.
