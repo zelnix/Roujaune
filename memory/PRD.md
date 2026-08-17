@@ -904,3 +904,12 @@ User requested removal of the Garmin Connect connection. Changes:
 - backend/routes/plan.py: readiness `source: "Garmin Connect"` → "Apple Health" (calendar demo week + WELLNESS_DATA); removed Garmin entry from (unused) CONNECTIONS_DATA.services.
 - frontend/src/data.ts: readiness `source: "Garmin"` → "Apple Health".
 Verified: /api/connections returns [google_fit, apple_health, health_connect] (no garmin); backend imports clean; no user-facing garmin refs remain in frontend.
+
+## Fix: Connections screen trainer/HR "Connect" now opens real BLE scan (2026-06 fork)
+User report: connecting a Smart Trainer / Heart Rate Monitor on the Connections screen didn't search for a device — it just flipped to "connected". Root cause: the DEVICES & SENSORS cards toggled the settings.hasTrainer/hasWearable booleans instead of opening the real Bluetooth pairing UI.
+Fix (frontend/app/connections.tsx): both cards now open the existing BleSensorsPanel (same engine used in ride screens: useBleSensors → scan → select → connect → live power/cadence/HR). Card status reflects live BLE readings; on successful pair we persist hasTrainer/hasWearable=true so ride screens show telemetry. In web preview/Expo Go the panel honestly shows "needs a native build" (BLE not linked). Verified via screenshot: both cards show Connect → panel scans (native-build notice in preview); Garmin absent.
+
+## FIXED: App icon blank in Samsung One UI taskbar — added adaptive monochrome layer
+User: standalone Android build on Samsung tablet, "nothing shows at all" in the bottom taskbar. app.json config verified CORRECT: icon=./assets/images/icon.png (1024 RGB, yellow logo on black), android.adaptiveIcon.foregroundImage=./assets/images/adaptive-icon.png (1024 RGBA, logo centered, content bbox ~62%×51% — within Android safe zone), backgroundColor #000000. Config is standard/valid — needs on-device screenshot + confirm whether icon is blank on home screen/app drawer too (build staleness) vs only the One UI taskbar (launcher quirk) before changing anything.
+
+Root cause confirmed: icon shows fine in app drawer/home but blank ONLY in Samsung One UI taskbar/recents = the known Samsung "themed icons" bug where apps WITHOUT an adaptive `monochrome` layer render blank there. Fix: generated ./assets/images/adaptive-icon-monochrome.png (white silhouette from the foreground's alpha) and added android.adaptiveIcon.monochromeImage in app.json. Icon changes apply only in a NEW standalone build — user must Publish/rebuild to see it. backgroundColor kept #000000.

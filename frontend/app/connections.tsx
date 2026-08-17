@@ -5,6 +5,8 @@ import { AppScaffold, Card, SectionTitle, Toggle } from "@/src/components/app-sc
 import { CC } from "@/src/components/calendar";
 import { useSettings } from "@/src/lib/settings";
 import { HealthSyncCard } from "@/src/components/HealthSyncCard";
+import { useBleSensors } from "@/src/hooks/useBleSensors";
+import { BleSensorsPanel } from "@/src/components/BleSensorsPanel";
 import {
   useConnections, useImportedActivities, Provider, startConnect, syncNow, disconnect,
   deleteImported, updateConnSettings, statusChip, relTime, rideTypeLabel,
@@ -119,16 +121,39 @@ export default function ConnectionsScreen() {
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(null), 2200); };
   const refresh = () => { reload(); reloadRides(); };
 
+  // Real Bluetooth LE pairing (same engine used during rides): scan → select → connect.
+  const ble = useBleSensors(settings.wheelCircumference);
+  const [showBle, setShowBle] = React.useState(false);
+  // A power/cadence/speed sensor is a "trainer"; a heart-rate sensor is a "wearable".
+  const bleTrainer = ble.connected.length > 0 && (ble.readings.power != null || ble.readings.cadence != null || ble.readings.speed != null);
+  const bleWearable = ble.connected.length > 0 && ble.readings.hr != null;
+  // Remember the rider owns this hardware so ride screens show live telemetry.
+  React.useEffect(() => { if (bleTrainer && !settings.hasTrainer) setSetting("hasTrainer", true); }, [bleTrainer]); // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => { if (bleWearable && !settings.hasWearable) setSetting("hasWearable", true); }, [bleWearable]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const devices = [
-    { id: "trainer", key: "hasTrainer" as const, name: "Smart Trainer", type: "Power · Cadence · Speed · ERG", icon: "bicycle", connected: settings.hasTrainer, detail: settings.hasTrainer ? "Feeding live power & cadence" : "Not connected" },
-    { id: "wearable", key: "hasWearable" as const, name: "Heart Rate Monitor", type: "Heart rate", icon: "heart", connected: settings.hasWearable, detail: settings.hasWearable ? "Feeding live heart rate" : "Not connected" },
+    {
+      id: "trainer", name: "Smart Trainer", type: "Power · Cadence · Speed", icon: "bicycle",
+      connected: bleTrainer || settings.hasTrainer, live: bleTrainer,
+      detail: bleTrainer
+        ? `Live · ${ble.readings.power != null ? `${ble.readings.power} W` : "—"}${ble.readings.cadence != null ? ` · ${ble.readings.cadence} rpm` : ""}`
+        : settings.hasTrainer ? "Paired — tap Connect to pair a device" : "Not connected",
+    },
+    {
+      id: "wearable", name: "Heart Rate Monitor", type: "Heart rate", icon: "heart",
+      connected: bleWearable || settings.hasWearable, live: bleWearable,
+      detail: bleWearable
+        ? `Live · ${ble.readings.hr != null ? `${ble.readings.hr} bpm` : "—"}`
+        : settings.hasWearable ? "Paired — tap Connect to pair a device" : "Not connected",
+    },
   ];
 
   return (
     <AppScaffold active="connections" title="Connections" subtitle="Your devices, sensors and outdoor ride syncing.">
       <Card testID="devices">
         <SectionTitle label="DEVICES & SENSORS" />
-        <View style={s.devGrid}>
+        <Text style={s.blurb}>Pair your smart trainer and heart-rate sensor over Bluetooth. Tap Connect to scan and choose your device. Bluetooth pairing needs an installed iOS/Android build — it can&apos;t scan in the web preview.</Text>
+        <View style={[s.devGrid, { marginTop: 12 }]}>
           {devices.map((dev) => {
             const on = dev.connected;
             return (
@@ -137,14 +162,14 @@ export default function ConnectionsScreen() {
                   <View style={[s.devIcon, { borderColor: on ? "rgba(85,200,80,0.4)" : CC.borderSoft }]}>
                     <Ionicons name={dev.icon as any} size={18} color={on ? CC.green : CC.dim} />
                   </View>
-                  <View style={[s.dot, { backgroundColor: on ? CC.green : "rgba(255,255,255,0.2)" }]} />
+                  <View style={[s.dot, { backgroundColor: dev.live ? CC.green : on ? "rgba(85,200,80,0.5)" : "rgba(255,255,255,0.2)" }]} />
                 </View>
                 <Text style={s.devName}>{dev.name}</Text>
                 <Text style={s.devType}>{dev.type}</Text>
                 <Text style={[s.devDetail, { color: on ? CC.green : CC.dim }]}>{dev.detail}</Text>
-                <Pressable testID={`device-btn-${dev.id}`} onPress={() => setSetting(dev.key, !on)} style={({ hovered }: any) => [s.devBtn, on && s.devBtnOn, hovered && s.hover]}>
-                  <Ionicons name={on ? "close-circle-outline" : "bluetooth"} size={14} color={on ? CC.white : "#04210F"} />
-                  <Text style={[s.devBtnText, !on && { color: "#04210F" }]}>{on ? "Disconnect" : "Connect"}</Text>
+                <Pressable testID={`device-btn-${dev.id}`} onPress={() => setShowBle(true)} style={({ hovered }: any) => [s.devBtn, on && s.devBtnOn, hovered && s.hover]}>
+                  <Ionicons name="bluetooth" size={14} color={on ? CC.white : "#04210F"} />
+                  <Text style={[s.devBtnText, !on && { color: "#04210F" }]}>{dev.live ? "Manage" : "Connect"}</Text>
                 </Pressable>
               </View>
             );
@@ -186,6 +211,25 @@ export default function ConnectionsScreen() {
           ))
         )}
       </Card>
+
+      {showBle && (
+        <BleSensorsPanel
+          supported={ble.supported}
+          poweredOn={ble.poweredOn}
+          scanning={ble.scanning}
+          devices={ble.devices}
+          connected={ble.connected}
+          readings={ble.readings}
+          permissionStatus={ble.permissionStatus}
+          error={ble.error}
+          onScan={ble.startScan}
+          onStopScan={ble.stopScan}
+          onConnect={ble.connect}
+          onDisconnect={ble.disconnect}
+          onClose={() => setShowBle(false)}
+          units={settings.units}
+        />
+      )}
 
       {toast ? (
         <View style={[s.toast, { pointerEvents: "none" }]}><Text style={s.toastText}>{toast}</Text></View>
