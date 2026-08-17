@@ -5,7 +5,7 @@ import {
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { colors, radius, spacing } from "@/src/theme";
-import { STREAMING_SERVICES, parseYouTubeId, launchStreaming, pipTip, StreamingService } from "@/src/lib/streaming";
+import { STREAMING_SERVICES, parseYouTubeId, launchStreaming, pipTip, StreamingService, loadYouTubeRecents, addYouTubeRecent, YouTubeRecent } from "@/src/lib/streaming";
 
 type Props = {
   visible: boolean;
@@ -22,14 +22,24 @@ export function StreamingSourceSheet({ visible, source, onClose, onPickRoute, on
   const [url, setUrl] = React.useState("");
   const [err, setErr] = React.useState<string | null>(null);
   const [expandYT, setExpandYT] = React.useState(source === "youtube");
+  const [recents, setRecents] = React.useState<YouTubeRecent[]>([]);
 
-  React.useEffect(() => { if (visible) { setExpandYT(source === "youtube"); setErr(null); } }, [visible, source]);
+  React.useEffect(() => {
+    if (visible) { setExpandYT(source === "youtube"); setErr(null); loadYouTubeRecents().then(setRecents); }
+  }, [visible, source]);
 
   const submitYouTube = () => {
     const id = parseYouTubeId(url);
     if (!id) { setErr("Paste a valid YouTube link (or video ID)."); return; }
     setErr(null);
+    addYouTubeRecent(id, url.trim()).then(setRecents);
     onPickYouTube(id);
+    onClose();
+  };
+
+  const pickRecent = (r: YouTubeRecent) => {
+    addYouTubeRecent(r.id, r.url).then(setRecents);
+    onPickYouTube(r.id);
     onClose();
   };
 
@@ -111,6 +121,19 @@ export function StreamingSourceSheet({ visible, source, onClose, onPickRoute, on
                   <Ionicons name="play" size={16} color="#04210F" />
                   <Text style={sx.playText}>Play this video</Text>
                 </Pressable>
+                {recents.length > 0 && (
+                  <View style={sx.recentsWrap} testID="yt-recents">
+                    <Text style={sx.recentsLabel}>RECENT</Text>
+                    <View style={sx.recentsRow}>
+                      {recents.map((r) => (
+                        <Pressable key={r.id} style={sx.recentChip} onPress={() => pickRecent(r)} testID={`yt-recent-${r.id}`}>
+                          <Ionicons name="play-circle" size={14} color={colors.yellow} />
+                          <Text style={sx.recentText} numberOfLines={1}>{r.id}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                )}
               </View>
             )}
 
@@ -156,6 +179,12 @@ const sx = StyleSheet.create({
   err: { color: colors.red, fontSize: 12.5, fontWeight: "600" },
   playBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.yellow, borderRadius: radius.md, paddingVertical: 13, minHeight: 46 },
   playText: { color: "#04210F", fontSize: 14.5, fontWeight: "800" },
+
+  recentsWrap: { marginTop: 4 },
+  recentsLabel: { color: colors.textFaint, fontSize: 10.5, fontWeight: "900", letterSpacing: 1.5, marginBottom: 8 },
+  recentsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  recentChip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.cardElevated, borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingVertical: 7, paddingHorizontal: 11, maxWidth: 150 },
+  recentText: { color: colors.white, fontSize: 12.5, fontWeight: "600" },
 
   divLabel: { color: colors.textFaint, fontSize: 11, fontWeight: "900", letterSpacing: 1.5, marginTop: 8, marginBottom: 6 },
   hint: { color: colors.textDim, fontSize: 12.5, lineHeight: 18, marginBottom: 14 },

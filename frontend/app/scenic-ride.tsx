@@ -200,24 +200,26 @@ export default function ScenicRideScreen() {
   }, [route]);
   const pctRef = React.useRef(0);
   React.useEffect(() => { pctRef.current = pct; }, [pct]);
+  // Road gradient at a given distance from the route's per-km profile
+  // (falls back to the route average when no profile is available).
+  const gradeAtKm = React.useCallback((km: number) => {
+    const profile = route?.elevation_profile ?? [];
+    if (!profile.length) return avgGrade;
+    let g = profile[0].grade;
+    for (const pt of profile) { if (pt.km <= km) g = pt.grade; else break; }
+    return g;
+  }, [route, avgGrade]);
+  // Live gradient at the rider's current position (for the HUD readout).
+  const liveGrade = gradeAtKm(pct * (route?.distance_km ?? 0));
   React.useEffect(() => {
     if (!ble.hasTrainerControl || !autoTerrain || !playing) return;
     const dist = route?.distance_km ?? 0;
-    const profile = route?.elevation_profile ?? [];
-    // Grade at the rider's current position from the real per-km profile
-    // (falls back to the route average if no profile is available).
-    const gradeAt = (km: number) => {
-      if (!profile.length) return avgGrade;
-      let g = profile[0].grade;
-      for (const pt of profile) { if (pt.km <= km) g = pt.grade; else break; }
-      return g;
-    };
-    const send = () => ble.setSimGrade(gradeAt(pctRef.current * dist));
+    const send = () => ble.setSimGrade(gradeAtKm(pctRef.current * dist));
     send();
     const t = setInterval(send, 5000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ble.hasTrainerControl, autoTerrain, playing, route]);
+  }, [ble.hasTrainerControl, autoTerrain, playing, route, gradeAtKm]);
 
   const closePaywall = React.useCallback(async () => {
     const e = await refreshEntitlement();
@@ -495,6 +497,17 @@ export default function ScenicRideScreen() {
               <View style={{ marginLeft: 12 }}>
                 <Text style={s.metaBig}>{remainingMin} min</Text>
                 <Text style={s.metaSub}>remaining</Text>
+              </View>
+            </View>
+            <View style={s.rowCenter} testID="live-gradient">
+              <Ionicons
+                name={liveGrade >= 0.5 ? "trending-up" : liveGrade <= -0.5 ? "trending-down" : "remove-outline"}
+                size={22}
+                color={liveGrade >= 4 ? colors.red : liveGrade >= 1 ? colors.yellow : colors.green}
+              />
+              <View style={{ marginLeft: 12 }}>
+                <Text style={s.metaBig}>{liveGrade > 0 ? "+" : ""}{liveGrade.toFixed(1)}%</Text>
+                <Text style={s.metaSub}>gradient now</Text>
               </View>
             </View>
             {sessionSaved.size > 0 && (

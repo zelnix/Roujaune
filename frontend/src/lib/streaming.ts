@@ -1,4 +1,5 @@
 import { Linking, Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 /** Extract a YouTube video ID from any common URL form (or a bare 11-char ID). */
 export function parseYouTubeId(input: string): string | null {
@@ -59,4 +60,31 @@ export function pipTip(name: string): string {
   return Platform.OS === "ios"
     ? `Start playing in ${name}, tap the Picture-in-Picture button, then swipe back here. Your ride keeps recording while the video floats on top.`
     : `Start playing in ${name}, then open split-screen with ROUJAUNE (or Picture-in-Picture). Your ride keeps recording alongside the video.`;
+}
+
+// --- Recently used "My YouTube" sources (one-tap reselection) ------------- //
+const YT_RECENTS_KEY = "roujaune.youtube.recents";
+const YT_RECENTS_MAX = 6;
+export type YouTubeRecent = { id: string; url: string; ts: number };
+
+export async function loadYouTubeRecents(): Promise<YouTubeRecent[]> {
+  try {
+    const raw = await AsyncStorage.getItem(YT_RECENTS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Add/bump a video id to the front of the recents list (deduped, capped). */
+export async function addYouTubeRecent(id: string, url: string): Promise<YouTubeRecent[]> {
+  try {
+    const cur = await loadYouTubeRecents();
+    const next = [{ id, url, ts: Date.now() }, ...cur.filter((r) => r.id !== id)].slice(0, YT_RECENTS_MAX);
+    await AsyncStorage.setItem(YT_RECENTS_KEY, JSON.stringify(next));
+    return next;
+  } catch {
+    return [];
+  }
 }
