@@ -27,6 +27,8 @@ from __future__ import annotations
 import datetime
 import re
 import uuid
+import math
+import hashlib
 import asyncio
 import httpx
 from typing import Optional
@@ -93,6 +95,44 @@ def _thumb(doc: dict) -> Optional[str]:
     return f"https://img.youtube.com/vi/{yid}/hqdefault.jpg" if yid else None
 
 
+def _elevation_profile(doc: dict) -> list[dict]:
+    """Per-position road-gradient profile so a smart trainer (FTMS) can match
+    the real terrain instead of a flat average. If the admin has stored a real
+    surveyed `elevation_profile` we use it verbatim; otherwise we synthesize a
+    stable, route-specific rolling profile (seeded by route id) whose TOTAL
+    uphill climb equals the route's actual `elevation_m` gain — so the effort
+    over the ride is authentic and repeatable, per kilometre."""
+    stored = doc.get("elevation_profile")
+    if isinstance(stored, list) and stored:
+        return stored
+    dist = float(doc.get("distance_km") or 0)
+    elev = float(doc.get("elevation_m") or 0)
+    if dist <= 0:
+        return []
+    n = max(8, min(48, round(dist)))          # ~1 sample per km
+    seg_km = dist / n
+    seed = int(hashlib.md5((doc.get("id") or "route").encode()).hexdigest()[:8], 16)
+
+    def noise(i: int) -> float:                # deterministic 0..1
+        x = math.sin(seed * 0.000131 + (i + 1) * 12.9898) * 43758.5453
+        return x - math.floor(x)
+
+    raw: list[float] = []
+    for i in range(n):
+        f = i / max(1, n - 1)
+        wave = math.sin(f * math.pi * 3 + seed % 7) * 0.6 + math.sin(f * math.pi * 7) * 0.3
+        raw.append(wave * 4 + (noise(i) - 0.4) * 5)   # ~ -6 .. +8 %
+
+    # Scale the climbing (positive grades) so total ascent matches elevation_m.
+    climb = sum(max(0.0, g) / 100.0 * seg_km * 1000 for g in raw)
+    if climb > 0 and elev > 0:
+        k = elev / climb
+        raw = [g * k if g > 0 else g for g in raw]
+
+    return [{"km": round(i * seg_km, 2), "grade": round(max(-12.0, min(15.0, g)), 1)}
+            for i, g in enumerate(raw)]
+
+
 def _public(doc: dict) -> dict:
     """Rider-facing projection of a scenic route. Includes the richer route
     metadata (waypoints/highlights, terrain, difficulty, country) so the ride
@@ -107,6 +147,7 @@ def _public(doc: dict) -> dict:
         "duration_min": doc.get("duration_min"),
         "distance_km": doc.get("distance_km"),
         "elevation_m": doc.get("elevation_m"),
+        "elevation_profile": _elevation_profile(doc),
         "tag": doc.get("tag") or "Scenic",
         "terrain": doc.get("terrain") or "",
         "difficulty": doc.get("difficulty") or "",

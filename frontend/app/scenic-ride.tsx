@@ -202,15 +202,22 @@ export default function ScenicRideScreen() {
   React.useEffect(() => { pctRef.current = pct; }, [pct]);
   React.useEffect(() => {
     if (!ble.hasTrainerControl || !autoTerrain || !playing) return;
-    const send = () => {
-      const roll = Math.sin(pctRef.current * Math.PI * 6) * 1.5; // gentle rollers
-      ble.setSimGrade(Math.max(0, Math.round((avgGrade + roll) * 10) / 10));
+    const dist = route?.distance_km ?? 0;
+    const profile = route?.elevation_profile ?? [];
+    // Grade at the rider's current position from the real per-km profile
+    // (falls back to the route average if no profile is available).
+    const gradeAt = (km: number) => {
+      if (!profile.length) return avgGrade;
+      let g = profile[0].grade;
+      for (const pt of profile) { if (pt.km <= km) g = pt.grade; else break; }
+      return g;
     };
+    const send = () => ble.setSimGrade(gradeAt(pctRef.current * dist));
     send();
-    const t = setInterval(send, 8000);
+    const t = setInterval(send, 5000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ble.hasTrainerControl, autoTerrain, playing, avgGrade]);
+  }, [ble.hasTrainerControl, autoTerrain, playing, route]);
 
   const closePaywall = React.useCallback(async () => {
     const e = await refreshEntitlement();

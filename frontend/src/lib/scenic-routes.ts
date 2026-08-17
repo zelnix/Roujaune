@@ -17,6 +17,7 @@ export type ScenicRoute = {
   duration_min?: number | null;
   distance_km?: number | null;
   elevation_m?: number | null;
+  elevation_profile?: { km: number; grade: number }[];
   tag: string;
   terrain?: string;
   difficulty?: string;

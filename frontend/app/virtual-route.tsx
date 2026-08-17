@@ -8,6 +8,7 @@ import { colors, radius, spacing, shadow } from "@/src/theme";
 import { useTelemetry } from "@/src/hooks/useTelemetry";
 import { useBleSensors } from "@/src/hooks/useBleSensors";
 import { BleSensorsPanel } from "@/src/components/BleSensorsPanel";
+import { TrainerControlPanel } from "@/src/components/streaming/TrainerControlPanel";
 import { useSettings } from "@/src/lib/settings";
 import { RouteProfile } from "@/src/components/virtual-route/RouteProfile";
 import { riderVisualFor } from "@/src/lib/virtual-riders";
@@ -67,6 +68,7 @@ export default function VirtualRouteScreen() {
   const { settings } = useSettings();
   const ble = useBleSensors(settings.wheelCircumference);
   const [showBle, setShowBle] = React.useState(false);
+  const [showTrainer, setShowTrainer] = React.useState(false);
 
   // Push real Bluetooth sensor readings into the telemetry stream (overrides sim).
   React.useEffect(() => {
@@ -149,11 +151,13 @@ export default function VirtualRouteScreen() {
   const resistanceTarget = Math.round(Math.max(55, Math.min(150, 100 + route.gradient * 7 + terrainBias)));
 
   // Auto trainer resistance follows the route gradient + terrain (progressive, clamped).
+  // A real FTMS trainer also gets the true road gradient at the rider's position.
   React.useEffect(() => {
     if (!running || !autoResistance || emergency) return;
     sendErg(resistanceTarget);
+    if (ble.hasTrainerControl) ble.setSimGrade(route.gradient);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running, autoResistance, emergency, resistanceTarget]);
+  }, [running, autoResistance, emergency, resistanceTarget, route.gradient, ble.hasTrainerControl]);
 
   const sensorsOn = telemetry.source === "trainer" || ble.connected.length > 0;
   const hrOn = telemetry.hr > 0;
@@ -356,6 +360,11 @@ export default function VirtualRouteScreen() {
                 <Text style={s.pairText}>{ble.connected.length > 0 ? `${ble.connected.length} sensor${ble.connected.length > 1 ? "s" : ""} connected` : "Pair Bluetooth sensors"}</Text>
               </Pressable>
 
+              <Pressable onPress={() => setShowTrainer(true)} testID="vr-trainer-control" style={s.pairBtn} accessibilityRole="button" accessibilityLabel="Trainer control">
+                <Ionicons name="speedometer-outline" size={16} color={ble.hasTrainerControl ? colors.yellow : colors.white} />
+                <Text style={s.pairText}>{ble.hasTrainerControl ? "Trainer control · connected" : "Trainer control (ERG / gradient)"}</Text>
+              </Pressable>
+
               <Pressable onPress={startRide} testID="start-ride" style={s.startBtn} accessibilityRole="button" accessibilityLabel="Start ride">
                 <Ionicons name="play" size={20} color={colors.bg} />
                 <Text style={s.startText}>START RIDE</Text>
@@ -427,6 +436,21 @@ export default function VirtualRouteScreen() {
           units={settings.units}
         />
       )}
+
+      <TrainerControlPanel
+        visible={showTrainer}
+        onClose={() => setShowTrainer(false)}
+        hasControl={ble.hasTrainerControl}
+        mode={ble.controlMode}
+        power={ble.readings.power}
+        auto={autoResistance}
+        onToggleAuto={setAutoResistance}
+        onErg={ble.setErgWatts}
+        onResistance={ble.setResistance}
+        onGrade={ble.setSimGrade}
+        onReset={ble.resetTrainer}
+        context="scenic"
+      />
     </View>
   );
 }
