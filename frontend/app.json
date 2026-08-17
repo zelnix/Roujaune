@@ -28,7 +28,17 @@
         "NSBluetoothAlwaysUsageDescription": "Connect your trainer and heart-rate sensor",
         "NSLocationWhenInUseUsageDescription": "Show local weather for today's ride",
         "NSHealthShareUsageDescription": "Import your cycling rides",
-        "NSHealthUpdateUsageDescription": "Save your rides to Health"
+        "NSHealthUpdateUsageDescription": "Save your rides to Health",
+        "LSApplicationQueriesSchemes": [
+          "nflx",
+          "primevideo",
+          "aiv",
+          "disneyplus",
+          "videos",
+          "com.apple.tv",
+          "youtube",
+          "vnd.youtube"
+        ]
       }
     },
     "android": {

@@ -22,6 +22,7 @@ import { LeaveRideDialog } from "@/src/components/scenic/LeaveRideDialog";
 import { DiscoveryPrompt, SaveToast } from "@/src/components/scenic/DiscoveryPrompt";
 import { useEntitlement, consumeRide, refreshEntitlement } from "@/src/lib/entitlement";
 import { PaywallModal } from "@/src/components/PaywallModal";
+import { StreamingSourceSheet } from "@/src/components/streaming/StreamingSourceSheet";
 
 /** Immersive live scenic-ride experience — a full-bleed POV video with a
  *  cinematic, fully hideable HUD (tap the scene to show/hide). */
@@ -38,6 +39,10 @@ export default function ScenicRideScreen() {
   const r0 = resumeRef.current && routeId && resumeRef.current.routeId === routeId ? resumeRef.current : null;
 
   const [playing, setPlaying] = React.useState(true);
+  // Ride-screen source: the curated route video (default) or the rider's own
+  // YouTube video. External apps (Netflix/Prime/…) launch out via the sheet.
+  const [customVideoId, setCustomVideoId] = React.useState<string | null>(null);
+  const [streamOpen, setStreamOpen] = React.useState(false);
   const [elapsed, setElapsed] = React.useState(r0 ? r0.elapsedSec : 0);
   const [vpos, setVpos] = React.useState(0); // real video currentTime (sec)
   const [vdur, setVdur] = React.useState(0); // real video duration (sec)
@@ -403,7 +408,7 @@ export default function ScenicRideScreen() {
           may be blocked in Expo Go / mobile WebViews). */}
       <View style={s.videoWrap} pointerEvents={videoStarted ? "none" : "auto"}>
         <View style={{ width: cover.w, height: cover.h, marginLeft: (width - cover.w) / 2, marginTop: (height - cover.h) / 2 }}>
-          <YouTubePlayer height={cover.h} width={cover.w} playing={playing} videoId={route.youtube_id} startSeconds={Math.floor(startPos)} onStateChange={onVideoState} onProgress={onVideoProgress} />
+          <YouTubePlayer height={cover.h} width={cover.w} playing={playing} videoId={customVideoId || route.youtube_id} startSeconds={customVideoId ? 0 : Math.floor(startPos)} onStateChange={onVideoState} onProgress={onVideoProgress} />
         </View>
       </View>
 
@@ -564,6 +569,9 @@ export default function ScenicRideScreen() {
 
       {/* Persistent utility cluster (always tappable, even when HUD hidden) */}
       <View style={s.utility} pointerEvents="box-none">
+        <Pressable style={s.utilBtn} onPress={() => setStreamOpen(true)} testID="scenic-source" accessibilityRole="button" accessibilityLabel="Choose ride screen source">
+          <Ionicons name="tv-outline" size={20} color={customVideoId ? colors.yellow : "#fff"} />
+        </Pressable>
         <Pressable style={s.utilBtn} onPress={() => {
           const allShown = hud && show.location && show.comingUp && show.companion && show.metrics;
           if (allShown) { setHud(false); }
@@ -618,6 +626,15 @@ export default function ScenicRideScreen() {
 
       {/* Subscription paywall — shown when free-ride allowance is exhausted */}
       <PaywallModal visible={!!paywall} onClose={closePaywall} reason={paywall || undefined} />
+
+      {/* Ride-screen source picker: route video / own YouTube / streaming apps */}
+      <StreamingSourceSheet
+        visible={streamOpen}
+        source={customVideoId ? "youtube" : "route"}
+        onClose={() => setStreamOpen(false)}
+        onPickRoute={() => setCustomVideoId(null)}
+        onPickYouTube={(id) => { setCustomVideoId(id); setPlaying(true); }}
+      />
     </View>
   );
 }
