@@ -21,6 +21,8 @@ export default function ScenicDestinationsScreen() {
   const { routes, loading } = useScenicRoutes();
   const [query, setQuery] = React.useState("");
   const [region, setRegion] = React.useState("All");
+  const [dist, setDist] = React.useState("All");
+  const [climb, setClimb] = React.useState("All");
 
   const open = (id: string) => router.push(`/scenic-ride?route=${id}` as any);
   const leave = () => { if (router.canGoBack()) router.back(); else router.replace("/"); };
@@ -32,8 +34,24 @@ export default function ScenicDestinationsScreen() {
   ];
 
   const q = query.trim().toLowerCase();
+  const inDist = (km?: number | null) => {
+    const d = km ?? 0;
+    if (dist === "Under 20 km") return d > 0 && d < 20;
+    if (dist === "20–40 km") return d >= 20 && d < 40;
+    if (dist === "40 km+") return d >= 40;
+    return true;
+  };
+  const inClimb = (m?: number | null) => {
+    const e = m ?? 0;
+    if (climb === "Flat") return e < 200;
+    if (climb === "Rolling") return e >= 200 && e < 600;
+    if (climb === "Climby") return e >= 600;
+    return true;
+  };
   const results = (routes ?? []).filter((r) => {
     if (region !== "All" && r.region !== region) return false;
+    if (!inDist(r.distance_km)) return false;
+    if (!inClimb(r.elevation_m)) return false;
     if (!q) return true;
     return (
       r.name.toLowerCase().includes(q) ||
@@ -42,6 +60,7 @@ export default function ScenicDestinationsScreen() {
       (r.tag || "").toLowerCase().includes(q)
     );
   });
+  const resetAll = () => { setQuery(""); setRegion("All"); setDist("All"); setClimb("All"); };
 
   // Responsive columns: phones 1, tablets 2–3.
   const cols = width >= 1000 ? 3 : width >= 640 ? 2 : 1;
@@ -117,13 +136,58 @@ export default function ScenicDestinationsScreen() {
           </View>
         )}
 
+        {/* Distance & climb filters */}
+        <View style={styles.filterBand}>
+          <View style={styles.metaRow}>
+            <View style={styles.metaLabelWrap}>
+              <Ionicons name="resize-outline" size={13} color={colors.textDim} />
+              <Text style={styles.metaLabel}>Distance</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.metaChips} testID="destinations-distance-filter">
+              {["All", "Under 20 km", "20–40 km", "40 km+"].map((r) => {
+                const sel = dist === r;
+                return (
+                  <Pressable key={r} testID={`destinations-distance-${r}`} onPress={() => setDist(r)}
+                    accessibilityRole="button" accessibilityState={{ selected: sel }}
+                    style={[styles.smChip, sel && styles.chipSel]}>
+                    <Text style={[styles.smChipText, sel && styles.chipTextSel]}>{r}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+          <View style={styles.metaRow}>
+            <View style={styles.metaLabelWrap}>
+              <Ionicons name="trending-up" size={13} color={colors.textDim} />
+              <Text style={styles.metaLabel}>Climb</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.metaChips} testID="destinations-climb-filter">
+              {[
+                { k: "All", h: "" },
+                { k: "Flat", h: "<200 m" },
+                { k: "Rolling", h: "200–600 m" },
+                { k: "Climby", h: "600 m+" },
+              ].map(({ k, h }) => {
+                const sel = climb === k;
+                return (
+                  <Pressable key={k} testID={`destinations-climb-${k}`} onPress={() => setClimb(k)}
+                    accessibilityRole="button" accessibilityState={{ selected: sel }}
+                    style={[styles.smChip, sel && styles.chipSel]}>
+                    <Text style={[styles.smChipText, sel && styles.chipTextSel]}>{k}{h ? ` · ${h}` : ""}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+
         {loading ? (
           <View style={styles.center}><ActivityIndicator color={colors.yellow} /><Text style={styles.centerText}>Loading destinations…</Text></View>
         ) : results.length === 0 ? (
           <View style={styles.center} testID="destinations-empty">
             <Ionicons name="search-outline" size={34} color={colors.textFaint} />
-            <Text style={styles.centerText}>No rides match “{query}”.</Text>
-            <Pressable onPress={() => { setQuery(""); setRegion("All"); }} style={styles.resetBtn} accessibilityRole="button">
+            <Text style={styles.centerText}>No rides match your filters.</Text>
+            <Pressable onPress={resetAll} style={styles.resetBtn} accessibilityRole="button">
               <Text style={styles.resetText}>Clear filters</Text>
             </Pressable>
           </View>
@@ -160,6 +224,13 @@ const styles = StyleSheet.create({
   chipSel: { backgroundColor: colors.yellow, borderColor: colors.yellow },
   chipText: { color: colors.white, fontSize: 13, fontWeight: "700" },
   chipTextSel: { color: colors.bg, fontWeight: "800" },
+
+  metaRow: { flexDirection: "row", alignItems: "center", paddingLeft: spacing.lg, paddingVertical: 4 },
+  metaLabelWrap: { flexDirection: "row", alignItems: "center", gap: 4, width: 78 },
+  metaLabel: { color: colors.textDim, fontSize: 11.5, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.3 },
+  metaChips: { flexDirection: "row", gap: 8, paddingRight: spacing.lg },
+  smChip: { backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 7, minHeight: 36, justifyContent: "center" },
+  smChipText: { color: colors.white, fontSize: 12.5, fontWeight: "700" },
 
   results: { flex: 1 },
   scroll: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },

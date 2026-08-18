@@ -68,18 +68,40 @@ async function persist(list: SavedPlaylist[]): Promise<void> {
   try { await AsyncStorage.setItem(KEY, JSON.stringify(list)); } catch { /* ignore */ }
 }
 
+/** Fetch a Spotify playlist's real title via the public oEmbed endpoint (no key). */
+export async function fetchSpotifyTitle(url: string): Promise<string | null> {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5000);
+    const res = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}&format=json`, { signal: ctrl.signal });
+    clearTimeout(t);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const title = (data?.title ?? "").toString().trim();
+    return title || null;
+  } catch {
+    return null;
+  }
+}
+
 /** Add a pasted playlist link. Returns the updated list, or null if the link
- *  isn't a recognised Spotify/Apple Music playlist. */
+ *  isn't a recognised Spotify/Apple Music playlist. Fetches the real Spotify
+ *  playlist name via oEmbed when possible. */
 export async function addPlaylist(raw: string, list: SavedPlaylist[]): Promise<SavedPlaylist[] | null> {
   const url = raw.trim();
   const provider = detectProvider(url);
   if (!provider) return null;
   if (list.some((p) => p.url === url)) return list;
+  let title = labelFor(provider, url);
+  if (provider === "spotify") {
+    const real = await fetchSpotifyTitle(url);
+    if (real) title = real;
+  }
   const pl: SavedPlaylist = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     provider,
     url,
-    title: labelFor(provider, url),
+    title,
   };
   const next = [pl, ...list].slice(0, 20);
   await persist(next);
