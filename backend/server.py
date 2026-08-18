@@ -487,6 +487,13 @@ async def _seed_plans_on_startup():
     except Exception:
         logging.exception("production content/demo seeding failed")
     try:
+        # Runs AFTER seed_prod so routes inserted by the content seed also get
+        # their missing distance/elevation filled (backfill is idempotent).
+        await scenic_routes.backfill_route_metrics()
+        logger.info("Scenic route metrics backfilled")
+    except Exception:
+        logging.exception("scenic route metrics backfill failed")
+    try:
         import storage as _storage
         await run_in_threadpool(_storage.init_storage)
         logger.info("Object storage initialised")

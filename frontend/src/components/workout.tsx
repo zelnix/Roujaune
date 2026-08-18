@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, Switch, Platform } from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView, Switch, Platform, TextInput } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -8,6 +8,7 @@ import { colors, radius, spacing, shadow, textShadow } from "../theme";
 import { Touchable, SectionLabel } from "./ui";
 import { posterFor } from "../lib/youtube";
 import { CoachId, COACHES } from "../lib/coach-persona";
+import { SavedPlaylist, loadPlaylists, addPlaylist, removePlaylist, openPlaylist } from "../lib/music-playlists";
 import type { RouteOption } from "../data";
 import type { Settings } from "../lib/settings";
 
@@ -880,6 +881,8 @@ export function MusicPanel({ musicOn, toggleMusic, volume, setVolume, voiceOn, t
           </View>
         ) : null}
 
+        <PlaylistSection />
+
         <View style={[styles.spRow, !musicOn && { opacity: 0.4 }]}>
           <View style={styles.spIcon}><Ionicons name="volume-high" size={18} color={colors.yellow} /></View>
           <Text style={[styles.spLabel, { flex: 1 }]}>Volume</Text>
@@ -925,8 +928,70 @@ export function MusicPanel({ musicOn, toggleMusic, volume, setVolume, voiceOn, t
   );
 }
 
-export function MusicButton({ musicOn, onPress }: { musicOn: boolean; onPress: () => void }) {
+/* ===================== SPOTIFY / APPLE MUSIC PLAYLISTS ===================== */
+function PlaylistSection() {
+  const [list, setList] = React.useState<SavedPlaylist[]>([]);
+  const [url, setUrl] = React.useState("");
+  const [err, setErr] = React.useState<string | null>(null);
+
+  React.useEffect(() => { loadPlaylists().then(setList); }, []);
+
+  const onAdd = async () => {
+    const next = await addPlaylist(url, list);
+    if (!next) { setErr("Paste a Spotify or Apple Music playlist link."); return; }
+    setErr(null);
+    setUrl("");
+    setList(next);
+  };
+  const onRemove = async (id: string) => setList(await removePlaylist(id, list));
+
   return (
+    <View style={styles.plBlock} testID="playlist-section">
+      <Text style={styles.coachPickHint}>Your music · Spotify or Apple Music</Text>
+      <Text style={styles.plHint}>Play your own playlist in the background while you ride.</Text>
+
+      <View style={styles.plInputRow}>
+        <TextInput
+          testID="playlist-input"
+          value={url}
+          onChangeText={(t) => { setUrl(t); if (err) setErr(null); }}
+          placeholder="Paste playlist link…"
+          placeholderTextColor={colors.textDim}
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={styles.plInput}
+          onSubmitEditing={onAdd}
+          returnKeyType="done"
+        />
+        <Pressable testID="playlist-add" onPress={onAdd} style={styles.plAddBtn} accessibilityRole="button" accessibilityLabel="Add playlist">
+          <Ionicons name="add" size={20} color={colors.bg} />
+        </Pressable>
+      </View>
+      {err ? <Text style={styles.plErr}>{err}</Text> : null}
+
+      {list.map((pl) => (
+        <View key={pl.id} style={styles.plRow} testID={`playlist-row-${pl.id}`}>
+          <View style={[styles.spIcon, pl.provider === "spotify" ? styles.plIconSpotify : styles.plIconApple]}>
+            <Ionicons name={pl.provider === "spotify" ? "logo-spotify" : "musical-notes"} size={18} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.spLabel} numberOfLines={1}>{pl.title}</Text>
+            <Text style={styles.spSub}>{pl.provider === "spotify" ? "Spotify" : "Apple Music"}</Text>
+          </View>
+          <Pressable testID={`playlist-play-${pl.id}`} onPress={() => openPlaylist(pl)} style={styles.plPlayBtn} hitSlop={6} accessibilityRole="button" accessibilityLabel={`Play ${pl.title}`}>
+            <Ionicons name="play" size={15} color={colors.bg} />
+            <Text style={styles.plPlayText}>Play</Text>
+          </Pressable>
+          <Pressable testID={`playlist-remove-${pl.id}`} onPress={() => onRemove(pl.id)} style={styles.plRemoveBtn} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Remove ${pl.title}`}>
+            <Ionicons name="trash-outline" size={17} color={colors.textDim} />
+          </Pressable>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+export function MusicButton({ musicOn, onPress }: { musicOn: boolean; onPress: () => void }) {  return (
     <Pressable style={[styles.mediaPill, musicOn ? styles.mediaPillOn : styles.mediaPillOff]} onPress={onPress} testID="music-button" hitSlop={8} accessibilityRole="button" accessibilityLabel="Music and audio settings">
       <Ionicons name={musicOn ? "volume-high" : "volume-mute"} size={22} color={musicOn ? colors.bg : colors.textDim} />
       <Text style={[styles.mediaPillLabel, { color: musicOn ? colors.bg : colors.textDim }]}>Audio</Text>
@@ -1155,6 +1220,18 @@ const styles = StyleSheet.create({
   hudRoutes: { position: "absolute", top: 12, right: 58 },
   skipTrackBtn: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.08)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingVertical: 7, paddingHorizontal: 12 },
   skipTrackText: { color: "#fff", fontSize: 12.5, fontWeight: "700" },
+  plBlock: { marginTop: 6, marginBottom: 4 },
+  plHint: { color: colors.textDim, fontSize: 12, lineHeight: 17, marginTop: -4, marginBottom: 10 },
+  plInputRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  plInput: { flex: 1, height: 44, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 12, color: colors.white, fontSize: 13.5, backgroundColor: "rgba(255,255,255,0.03)" },
+  plAddBtn: { width: 44, height: 44, borderRadius: radius.md, backgroundColor: colors.yellow, alignItems: "center", justifyContent: "center" },
+  plErr: { color: colors.red, fontSize: 12, marginTop: 6 },
+  plRow: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 10 },
+  plIconSpotify: { backgroundColor: "#1DB954" },
+  plIconApple: { backgroundColor: "#FA243C" },
+  plPlayBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.yellow, borderRadius: radius.pill, paddingVertical: 7, paddingHorizontal: 12 },
+  plPlayText: { color: colors.bg, fontSize: 12.5, fontWeight: "800" },
+  plRemoveBtn: { padding: 4 },
   rpOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.72)", alignItems: "center", justifyContent: "center", zIndex: 60 },
   rpPanel: { width: 760, maxWidth: "92%", maxHeight: "88%", backgroundColor: colors.cardElevated, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, ...shadow.card },
   rpHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: spacing.sm },

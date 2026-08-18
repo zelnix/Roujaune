@@ -848,4 +848,5 @@ async def backfill_route_metrics() -> None:
                 update["updated_at"] = now
                 await db.scenic_routes.update_one({"id": rid}, {"$set": update})
     except Exception:
-        pass
+        import logging
+        logging.exception("backfill_route_metrics failed")
