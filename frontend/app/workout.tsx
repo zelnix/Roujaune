@@ -19,6 +19,8 @@ import { fetchZoneBias, ZoneBias } from "@/src/lib/targets";
 import { usePlan } from "@/src/lib/plan";
 import { WORKOUT_TYPES } from "@/src/lib/workouts";
 import { VirtualRidePlayer } from "@/src/components/virtual-route/VirtualRidePlayer";
+import YouTubePlayer from "@/src/components/YouTubePlayer";
+import { StreamingSourceSheet } from "@/src/components/streaming/StreamingSourceSheet";
 import { VIRTUAL_ROUTES, getVRoute } from "@/src/lib/vroutes";
 import { vrouteIdForType, deriveVirtualRide } from "@/src/lib/workout-vroute";
 import { prTracker, prToastMessages } from "@/src/lib/pr-tracker";
@@ -113,7 +115,7 @@ const TYPE_GRADE: Record<string, number> = { climbing: 7.2, threshold: 4, endura
 
 
 export default function LiveWorkout() {
-  const { height } = useWindowDimensions();
+  const { width: winW, height } = useWindowDimensions();
   const router = useRouter();
   const params = useLocalSearchParams<{ title?: string; workoutId?: string }>();
   // The workout the rider launched from the catalog (falls back to the default).
@@ -144,6 +146,8 @@ export default function LiveWorkout() {
   const [showCast, setShowCast] = React.useState(false);
   const [showBle, setShowBle] = React.useState(false);
   const [showTrainer, setShowTrainer] = React.useState(false);
+  const [showStream, setShowStream] = React.useState(false);
+  const [customVideoId, setCustomVideoId] = React.useState<string | null>(null);
   const [autoErg, setAutoErg] = React.useState(true);
   const [endPrompt, setEndPrompt] = React.useState(false);
   const [completePrompt, setCompletePrompt] = React.useState(false);
@@ -824,6 +828,13 @@ export default function LiveWorkout() {
                     <Ionicons name="contract-outline" size={22} color={colors.textDim} />
                     <Text style={styles.fsMinimisedText}>Virtual ride is fullscreen — tap to return</Text>
                   </Pressable>
+                ) : customVideoId ? (
+                  <YouTubePlayer
+                    videoId={customVideoId}
+                    width={centerW}
+                    height={videoRenderH}
+                    playing={!paused}
+                  />
                 ) : (
                   <VirtualRidePlayer
                     mode="embedded"
@@ -843,6 +854,13 @@ export default function LiveWorkout() {
                     routeBadge={routeBadge}
                     style={tablet ? styles.flex1 : { height: videoRenderH }}
                   />
+                )}
+                {!expanded && (
+                  <Pressable style={styles.sourceBtn} onPress={() => setShowStream(true)} testID="workout-source"
+                    accessibilityRole="button" accessibilityLabel="Choose ride screen source">
+                    <Ionicons name={customVideoId ? "logo-youtube" : "tv-outline"} size={13} color={colors.white} />
+                    <Text style={styles.sourceBtnText}>{customVideoId ? "YouTube" : "Ride screen"}</Text>
+                  </Pressable>
                 )}
               </View>
             </View>
@@ -942,31 +960,41 @@ export default function LiveWorkout() {
 
       {expanded && (
         <View style={styles.immersive} testID="immersive-overlay">
-          <VirtualRidePlayer
-            mode="fullscreen"
-            vroute={vroute}
-            routeState={vState}
-            appearance={appearance}
-            metrics={vMetrics}
-            paused={paused}
-            connected={trainerOn || wearableOn || settings.demoMode}
-            simulation={!trainerOn}
-            hrOn={wearableOn}
-            load={vResistance}
-            compact={compact}
-            reducedMotion={reducedMotion}
-            onToggleReducedMotion={() => setReducedMotion((r) => !r)}
-            cue={liveCue}
-            stepLabel={activeSeg?.segment.label}
-            stepTimeLeft={timeLeftLabel ?? undefined}
-            stages={workoutStages}
-            onExitFullscreen={() => setExpanded(false)}
-            onPauseToggle={onPauseToggle}
-            onPreset={(w) => { sendTarget(w); showToast(`Target ${w} W`); logControl(`Target → ${w} W`); }}
-            ergOn={ergMode}
-            onErgToggle={() => setErgMode((m) => { const next = !m; showToast(next ? "ERG mode ON" : "ERG mode OFF"); logControl(next ? "ERG mode ON" : "ERG mode OFF"); return next; })}
-            onReconnect={() => { simulateDropout(); showToast("Reconnecting trainer…"); }}
-          />
+          {customVideoId ? (
+            <>
+              <YouTubePlayer videoId={customVideoId} width={winW} height={height} playing={!paused} />
+              <Pressable style={styles.fsExit} onPress={() => setExpanded(false)} testID="vr-exit-fullscreen"
+                accessibilityRole="button" accessibilityLabel="Exit fullscreen">
+                <Ionicons name="contract-outline" size={22} color={colors.white} />
+              </Pressable>
+            </>
+          ) : (
+            <VirtualRidePlayer
+              mode="fullscreen"
+              vroute={vroute}
+              routeState={vState}
+              appearance={appearance}
+              metrics={vMetrics}
+              paused={paused}
+              connected={trainerOn || wearableOn || settings.demoMode}
+              simulation={!trainerOn}
+              hrOn={wearableOn}
+              load={vResistance}
+              compact={compact}
+              reducedMotion={reducedMotion}
+              onToggleReducedMotion={() => setReducedMotion((r) => !r)}
+              cue={liveCue}
+              stepLabel={activeSeg?.segment.label}
+              stepTimeLeft={timeLeftLabel ?? undefined}
+              stages={workoutStages}
+              onExitFullscreen={() => setExpanded(false)}
+              onPauseToggle={onPauseToggle}
+              onPreset={(w) => { sendTarget(w); showToast(`Target ${w} W`); logControl(`Target → ${w} W`); }}
+              ergOn={ergMode}
+              onErgToggle={() => setErgMode((m) => { const next = !m; showToast(next ? "ERG mode ON" : "ERG mode OFF"); logControl(next ? "ERG mode ON" : "ERG mode OFF"); return next; })}
+              onReconnect={() => { simulateDropout(); showToast("Reconnecting trainer…"); }}
+            />
+          )}
         </View>
       )}
 
@@ -987,6 +1015,16 @@ export default function LiveWorkout() {
       {showSettings && (
         <SettingsPanel settings={settings} setSetting={setSetting} onClose={() => setShowSettings(false)} />
       )}
+
+      <StreamingSourceSheet
+        visible={showStream}
+        source={customVideoId ? "youtube" : "route"}
+        onClose={() => setShowStream(false)}
+        onPickRoute={() => setCustomVideoId(null)}
+        onPickYouTube={(id) => { setCustomVideoId(id); setPaused(false); }}
+        routeLabel="Virtual ride (avatar)"
+        routeDesc="Your rider on the virtual route, with live ERG resistance."
+      />
 
       {showMusic && (
         <MusicPanel
@@ -1090,7 +1128,10 @@ const styles = StyleSheet.create({
   tabletContent: { flexGrow: 1, padding: spacing.md, gap: spacing.md },
   flex1: { flex: 1 },
   videoSlot: { minHeight: 150 },
-  immersive: { ...StyleSheet.absoluteFillObject, backgroundColor: "#000", zIndex: 50 },
+  sourceBtn: { position: "absolute", top: 8, right: 8, flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 6 },
+  sourceBtnText: { color: colors.white, fontSize: 11.5, fontWeight: "800" },
+  fsExit: { position: "absolute", top: 20, right: 20, width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", zIndex: 51 },
+  immersive: { ...StyleSheet.absoluteFillObject, backgroundColor: "#000", zIndex: 50, alignItems: "center", justifyContent: "center" },
   lockOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.82)", alignItems: "center", justifyContent: "center", gap: 14, zIndex: 60 },
   lockTitle: { color: colors.white, fontSize: 18, fontWeight: "800" },
   lockBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.yellow, borderRadius: radius.pill, paddingHorizontal: 20, paddingVertical: 12 },

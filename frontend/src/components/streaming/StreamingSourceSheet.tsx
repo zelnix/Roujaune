@@ -14,12 +14,14 @@ type Props = {
   onClose: () => void;
   onPickRoute: () => void;
   onPickYouTube: (videoId: string) => void;
+  routeLabel?: string;
+  routeDesc?: string;
 };
 
 /** Bottom sheet to choose what plays behind a live ride: the scenic route
  *  video (default), the rider's own YouTube video (played in-app), or launch
  *  their own streaming app (Netflix / Prime / Disney+ / Apple TV) via PiP. */
-export function StreamingSourceSheet({ visible, source, onClose, onPickRoute, onPickYouTube }: Props) {
+export function StreamingSourceSheet({ visible, source, onClose, onPickRoute, onPickYouTube, routeLabel = "Scenic route video", routeDesc = "The curated ride footage with points of interest." }: Props) {
   const [url, setUrl] = React.useState("");
   const [err, setErr] = React.useState<string | null>(null);
   const [expandYT, setExpandYT] = React.useState(source === "youtube");
@@ -80,8 +82,8 @@ export function StreamingSourceSheet({ visible, source, onClose, onPickRoute, on
                 <Ionicons name="image" size={20} color={colors.yellow} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={sx.optName}>Scenic route video</Text>
-                <Text style={sx.optDesc}>The curated ride footage with points of interest.</Text>
+                <Text style={sx.optName}>{routeLabel}</Text>
+                <Text style={sx.optDesc}>{routeDesc}</Text>
               </View>
               <Ionicons name={source === "route" ? "radio-button-on" : "radio-button-off"} size={20} color={source === "route" ? colors.yellow : colors.textFaint} />
             </Pressable>
