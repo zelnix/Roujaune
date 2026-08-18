@@ -17,6 +17,7 @@ import { useBleSensors } from "@/src/hooks/useBleSensors";
 import { RouteMapPoint } from "@/src/components/RideRouteMap";
 import { recapCaption } from "@/src/lib/scenic-recap";
 import { SERIF, clock, GradientText, Ring, Waveform, Metric, Seg, NavItem, MusicControl } from "@/src/components/scenic/hud-widgets";
+import { ElevationChart } from "@/src/components/scenic/ElevationChart";
 import { RideCompleteOverlay } from "@/src/components/scenic/RideCompleteOverlay";
 import { LeaveRideDialog } from "@/src/components/scenic/LeaveRideDialog";
 import { DiscoveryPrompt, SaveToast } from "@/src/components/scenic/DiscoveryPrompt";
@@ -510,6 +511,12 @@ export default function ScenicRideScreen() {
                 <Text style={s.metaSub}>gradient now</Text>
               </View>
             </View>
+            {(route.elevation_profile?.length ?? 0) > 1 && (
+              <View style={s.elevWrap} testID="elevation-chart">
+                <Text style={s.elevLabel}>CLIMB PROFILE</Text>
+                <ElevationChart profile={route.elevation_profile!} distanceKm={route.distance_km ?? 0} pct={pct} />
+              </View>
+            )}
             {sessionSaved.size > 0 && (
               <View style={s.savedChip}>
                 <Ionicons name="bookmark" size={14} color={colors.yellow} />
@@ -731,6 +738,8 @@ const s = StyleSheet.create({
   ringPct: { color: colors.white, fontSize: 12, fontWeight: "800" },
   metaBig: { color: colors.white, fontSize: 22, fontWeight: "800" },
   metaSub: { color: colors.textDim, fontSize: 12.5, fontWeight: "600", marginTop: 1 },
+  elevWrap: { marginTop: 4 },
+  elevLabel: { color: colors.textFaint, fontSize: 10.5, fontWeight: "900", letterSpacing: 1.5, marginBottom: 6 },
 
   center2: { position: "absolute", top: 70, alignSelf: "center", alignItems: "center", width: "100%" },
   country: { color: colors.white, fontSize: 13, fontWeight: "800", letterSpacing: 3, marginLeft: 6 },

@@ -4,8 +4,9 @@ import {
   KeyboardAvoidingView, Platform, Alert,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { colors, radius, spacing } from "@/src/theme";
-import { STREAMING_SERVICES, parseYouTubeId, launchStreaming, pipTip, StreamingService, loadYouTubeRecents, addYouTubeRecent, YouTubeRecent } from "@/src/lib/streaming";
+import { STREAMING_SERVICES, parseYouTubeId, launchStreaming, pipTip, StreamingService, loadYouTubeRecents, addYouTubeRecent, YouTubeRecent, youtubeThumb } from "@/src/lib/streaming";
 
 type Props = {
   visible: boolean;
@@ -124,11 +125,12 @@ export function StreamingSourceSheet({ visible, source, onClose, onPickRoute, on
                 {recents.length > 0 && (
                   <View style={sx.recentsWrap} testID="yt-recents">
                     <Text style={sx.recentsLabel}>RECENT</Text>
-                    <View style={sx.recentsRow}>
+                    <View style={sx.recentsCol}>
                       {recents.map((r) => (
-                        <Pressable key={r.id} style={sx.recentChip} onPress={() => pickRecent(r)} testID={`yt-recent-${r.id}`}>
-                          <Ionicons name="play-circle" size={14} color={colors.yellow} />
-                          <Text style={sx.recentText} numberOfLines={1}>{r.id}</Text>
+                        <Pressable key={r.id} style={sx.recentRow} onPress={() => pickRecent(r)} testID={`yt-recent-${r.id}`}>
+                          <Image source={{ uri: youtubeThumb(r.id) }} style={sx.recentThumb} contentFit="cover" />
+                          <Text style={sx.recentTitle} numberOfLines={2}>{r.title || r.id}</Text>
+                          <Ionicons name="play-circle" size={20} color={colors.yellow} />
                         </Pressable>
                       ))}
                     </View>
@@ -182,9 +184,10 @@ const sx = StyleSheet.create({
 
   recentsWrap: { marginTop: 4 },
   recentsLabel: { color: colors.textFaint, fontSize: 10.5, fontWeight: "900", letterSpacing: 1.5, marginBottom: 8 },
-  recentsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  recentChip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.cardElevated, borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingVertical: 7, paddingHorizontal: 11, maxWidth: 150 },
-  recentText: { color: colors.white, fontSize: 12.5, fontWeight: "600" },
+  recentsCol: { gap: 8 },
+  recentRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.cardElevated, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 8 },
+  recentThumb: { width: 56, height: 32, borderRadius: 6, backgroundColor: colors.bg },
+  recentTitle: { flex: 1, color: colors.white, fontSize: 13, fontWeight: "600" },
 
   divLabel: { color: colors.textFaint, fontSize: 11, fontWeight: "900", letterSpacing: 1.5, marginTop: 8, marginBottom: 6 },
   hint: { color: colors.textDim, fontSize: 12.5, lineHeight: 18, marginBottom: 14 },

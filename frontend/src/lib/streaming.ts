@@ -65,7 +65,24 @@ export function pipTip(name: string): string {
 // --- Recently used "My YouTube" sources (one-tap reselection) ------------- //
 const YT_RECENTS_KEY = "roujaune.youtube.recents";
 const YT_RECENTS_MAX = 6;
-export type YouTubeRecent = { id: string; url: string; ts: number };
+export type YouTubeRecent = { id: string; url: string; ts: number; title?: string };
+
+/** Public YouTube thumbnail for a video id (no API key needed). */
+export function youtubeThumb(id: string): string {
+  return `https://img.youtube.com/vi/${id}/mqdefault.jpg`;
+}
+
+/** Fetch a video's real title via YouTube's public oEmbed endpoint (no key). */
+export async function fetchYouTubeTitle(id: string): Promise<string | null> {
+  try {
+    const res = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${id}&format=json`);
+    if (!res.ok) return null;
+    const j = await res.json();
+    return typeof j?.title === "string" ? j.title : null;
+  } catch {
+    return null;
+  }
+}
 
 export async function loadYouTubeRecents(): Promise<YouTubeRecent[]> {
   try {
@@ -77,11 +94,13 @@ export async function loadYouTubeRecents(): Promise<YouTubeRecent[]> {
   }
 }
 
-/** Add/bump a video id to the front of the recents list (deduped, capped). */
-export async function addYouTubeRecent(id: string, url: string): Promise<YouTubeRecent[]> {
+/** Add/bump a video to the front of recents (deduped, capped). Resolves the
+ *  real title via oEmbed when not supplied. */
+export async function addYouTubeRecent(id: string, url: string, title?: string): Promise<YouTubeRecent[]> {
   try {
     const cur = await loadYouTubeRecents();
-    const next = [{ id, url, ts: Date.now() }, ...cur.filter((r) => r.id !== id)].slice(0, YT_RECENTS_MAX);
+    const resolved = title ?? cur.find((r) => r.id === id)?.title ?? (await fetchYouTubeTitle(id)) ?? undefined;
+    const next = [{ id, url, ts: Date.now(), title: resolved }, ...cur.filter((r) => r.id !== id)].slice(0, YT_RECENTS_MAX);
     await AsyncStorage.setItem(YT_RECENTS_KEY, JSON.stringify(next));
     return next;
   } catch {
