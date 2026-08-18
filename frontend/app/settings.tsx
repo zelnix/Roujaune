@@ -334,11 +334,11 @@ export default function SettingsScreen() {
       <Card testID="about">
         <SectionTitle label="ABOUT" color={CC.rouge} />
         {[
-          { icon: "shield-checkmark-outline", label: "Privacy & Data" },
-          { icon: "document-text-outline", label: "Terms of Service" },
-          { icon: "help-circle-outline", label: "Help & Support" },
+          { icon: "shield-checkmark-outline", label: "Privacy & Data", route: "/about" },
+          { icon: "document-text-outline", label: "Terms of Service", route: "/about" },
+          { icon: "help-circle-outline", label: "Help & Support", route: "/about" },
         ].map((r, i, arr) => (
-          <Pressable key={r.label} testID={`about-${i}`} style={({ hovered }: any) => [s.aboutRow, i < arr.length - 1 && s.divider, hovered && { backgroundColor: "rgba(255,255,255,0.03)" }]}>
+          <Pressable key={r.label} testID={`about-${i}`} onPress={() => router.push(r.route as any)} style={({ hovered }: any) => [s.aboutRow, i < arr.length - 1 && s.divider, hovered && { backgroundColor: "rgba(255,255,255,0.03)" }]}>
             <Ionicons name={r.icon as any} size={18} color={CC.dim} />
             <Text style={s.aboutText}>{r.label}</Text>
             <Ionicons name="chevron-forward" size={15} color={CC.dim} />

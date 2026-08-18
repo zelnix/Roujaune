@@ -1,0 +1,39 @@
+{
+  "summary": "Verified the new in-app 'Rate & feedback' feature end-to-end. Backend: 10/10 pytest cases pass (POST /api/feedback happy path + validation 422s + 401; POST /api/feedback/screenshot PNG+JPEG happy path + text/plain 400 + 401; GET /api/admin/feedback rider 403 + admin 200 with newly-submitted marker id present, response strips Mongo _id). Frontend: logged in as demo@roujaune.app on the landscape ~1024x1000 web preview, opened /settings, tapped the ABOUT card 'Help & Support' row (testID about-2) → navigated to /about. On the About & Support screen, the 'Rate & feedback' card (about-feedback) is present; tapping feedback-star-4 painted stars 1..4 in ROUJAUNE yellow rgb(255,194,10) and left star 5 in the muted outline color, typing into feedback-message accepted the text, feedback-attach button is present as required, and tapping feedback-submit produced the success card testID feedback-thanks with copy 'Thanks for the feedback!'. Emergent Object Storage returned real paths starting with 'roujaune/uploads/...' — not mocked.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter91_feedback.py",
+    "/app/test_reports/pytest/iter91.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/feedback.py: Pydantic Field(ge=1, le=5) correctly rejects rating=0 and rating=7 with 422 without extra handler code.",
+    "routes/feedback.py: `_ALLOWED_IMAGE` gate returns 400 for non-image content-types (verified with text/plain). PNG and JPEG both accepted, and the response path is scoped by user_id: roujaune/uploads/{user_id}/{uuid}.{ext} — good tenancy isolation.",
+    "routes/feedback.py: admin router mounted at /api/admin with `dependencies=[Depends(auth.require_admin)]` — rider tokens correctly get 403, service token 200. Mongo _id excluded via {'_id': 0} projection.",
+    "storage.py init succeeds at startup (log line 'Object storage initialised' present) and put_object retries once on 503 by re-initing the key — resilient.",
+    "about.tsx: fetch() calls to /api/feedback and /api/feedback/screenshot don't manually attach the Bearer token but the app's global fetch wrapper does (auto-attach) — confirmed via successful end-to-end submission with 200 in preview.",
+    "about.tsx uploadScreenshot() correctly branches for web (blob append) vs native (uri/name/type object) — appropriate for Expo web preview vs Expo Go.",
+    "about.tsx submit path swallows screenshot upload failure (screenshot_path=null) and still submits feedback — matches product intent ('optional screenshot')."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter91_feedback.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (10/10)",
+    "frontend": "100% (all 6 UI checks green: about-2 → /about nav, about-feedback card, feedback-star-4 fills 4 yellow, feedback-message input, feedback-attach present, feedback-submit → feedback-thanks)"
+  },
+  "seed_data_creation": "Two feedback docs written to the `feedback` collection during the pytest run (rating=5 message='great TEST_iter91...' and rating=4 message='TEST_iter91_marker great app'), plus one from the UI submission (rating=4 message='TEST_ui91 love the app...'). Two small screenshot objects (one 2x2 PNG, one minimal JPEG) written to Emergent Object Storage under roujaune/uploads/{demo user_id}/. Not cleaned up (no delete endpoint) — safe to leave; all prefixed with TEST_ for easy filtering.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "New endpoints: POST /api/feedback (rider auth, Pydantic rating 1..5), POST /api/feedback/screenshot (rider auth, multipart image/{png|jpg|jpeg|webp|heic}, returns {path: 'roujaune/uploads/{user_id}/{uuid}.ext'}), GET /api/admin/feedback (admin-only). Frontend flow: /settings → about-2 (Help & Support row) → /about → about-feedback card with testIDs feedback-star-{1..5}, feedback-message, feedback-attach, feedback-submit, feedback-thanks, feedback-again. Rider password login on web works — click 'Sign in with email' first to reveal the input[type=email]/input[type=password] fields. Reusable pytest lives at /app/backend/tests/test_iter91_feedback.py.",
+  "rca_of_issue": "n/a — new-feature verification, no bugs found."
+}

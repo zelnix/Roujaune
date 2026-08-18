@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Query, Body, Depends
+from fastapi.concurrency import run_in_threadpool
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -388,7 +389,10 @@ from routes import activities as activities_routes  # noqa: E402
 api_router.include_router(activities_routes.router)
 from routes import analysis as analysis_routes  # noqa: E402
 api_router.include_router(analysis_routes.router)
+from routes import feedback as feedback_routes  # noqa: E402
+api_router.include_router(feedback_routes.router)
 app.include_router(api_router)
+app.include_router(feedback_routes.admin_router)
 app.include_router(push.router)
 app.include_router(admin_routes.admin_router)
 app.include_router(screen_capture.capture_router)
@@ -482,6 +486,12 @@ async def _seed_plans_on_startup():
         await seed_prod.seed_production_data(db)
     except Exception:
         logging.exception("production content/demo seeding failed")
+    try:
+        import storage as _storage
+        await run_in_threadpool(_storage.init_storage)
+        logger.info("Object storage initialised")
+    except Exception:
+        logging.exception("object storage init failed (uploads may retry lazily)")
     try:
         # training_plans is a PER-USER collection; a single-field unique index on
         # `id` breaks multi-rider use (two riders can't each have "couch-to-road")
