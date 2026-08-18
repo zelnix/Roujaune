@@ -796,10 +796,56 @@ async def seed_scenic_routes() -> None:
     """Insert the sample scenic catalog once, only if empty."""
     try:
         if await db.scenic_routes.count_documents({}) > 0:
+            await backfill_route_metrics()
             return
         now = _now()
         docs = [{**s, "thumbnail_url": None, "status": "published",
                  "created_at": now, "updated_at": now} for s in _SEED]
         await db.scenic_routes.insert_many(docs)
+    except Exception:
+        pass
+
+
+# Realistic real-world distance (km) and total ascent (m) for routes that were
+# published without them — so every ride shows a truthful climb profile.
+# `force_elev` corrects routes whose stored elevation was a summit altitude
+# rather than the ascent gained on the ride.
+_METRICS_BACKFILL = {
+    "tyrol-three-lakes":         {"distance_km": 24.0, "elevation_m": 250},
+    "adige-valley-to-garda":     {"distance_km": 55.0, "elevation_m": 120},
+    "walchensee-loop":           {"distance_km": 28.0, "elevation_m": 380},
+    "dolomites-cortina-calalzo": {"distance_km": 30.0, "elevation_m": 150},
+    "hells-gate-safari":         {"distance_km": 22.0, "elevation_m": 130},
+    "isarco-river-path":         {"elevation_m": 80},   # distance already 12.6
+    "brixen-vineyards-loop":     {"distance_km": 26.0, "elevation_m": 320},
+    "adige-bozen-lavis":         {"distance_km": 40.0, "elevation_m": 90},
+    "bavarian-roman-roads":      {"distance_km": 28.0, "elevation_m": 180},
+    "isar-autumn":               {"distance_km": 34.0, "elevation_m": 110},
+    "fedaia-dam-descent":        {"distance_km": 13.0, "elevation_m": 70,  "force_elev": True},
+    "passo-fedaia-climb":        {"distance_km": 14.0, "elevation_m": 620, "force_elev": True},
+    "ledro-to-garda-ponale":     {"distance_km": 10.0, "elevation_m": 90},
+    "garda-sunrise-promenade":   {"distance_km": 14.0, "elevation_m": 40},
+    "brixen-to-kiens-pustertal": {"distance_km": 34.0, "elevation_m": 350},
+}
+
+
+async def backfill_route_metrics() -> None:
+    """Fill in missing distance/elevation on published scenic routes so the
+    climb-profile chart renders for every ride. Idempotent — only writes the
+    fields that are still missing (plus explicit elevation corrections)."""
+    try:
+        now = _now()
+        for rid, vals in _METRICS_BACKFILL.items():
+            doc = await db.scenic_routes.find_one({"id": rid}, {"distance_km": 1, "elevation_m": 1})
+            if not doc:
+                continue
+            update: dict = {}
+            if "distance_km" in vals and not doc.get("distance_km"):
+                update["distance_km"] = vals["distance_km"]
+            if "elevation_m" in vals and (not doc.get("elevation_m") or vals.get("force_elev")):
+                update["elevation_m"] = vals["elevation_m"]
+            if update:
+                update["updated_at"] = now
+                await db.scenic_routes.update_one({"id": rid}, {"$set": update})
     except Exception:
         pass
