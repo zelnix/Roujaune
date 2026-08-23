@@ -3,7 +3,7 @@ import os
 import requests
 import pytest
 
-BASE = "https://roujaune-train.preview.emergentagent.com"
+BASE = "https://scenic-trainer.preview.emergentagent.com"
 DEMO_EMAIL = "demo@roujaune.app"
 DEMO_PW = "demo9900"
 

@@ -13,7 +13,7 @@ It marks clearly what **EXISTS today** vs what must be **BUILT** before the cons
 
 | Item | Preview (current) | Production (to provision) |
 |---|---|---|
-| API base | `https://roujaune-train.preview.emergentagent.com/api` | Stable HWG production URL (TBD) |
+| API base | `https://scenic-trainer.preview.emergentagent.com/api` | Stable HWG production URL (TBD) |
 | Backend | FastAPI on `0.0.0.0:8001`, ingress routes `/api/*` | Same, managed host |
 | Database | MongoDB `localhost:27017`, db `test_database` (pod-local) | Managed MongoDB (e.g. Atlas) |
 | CORS | `allow_origins=["*"]` (F-12) | Allow-list the console origin(s) only |

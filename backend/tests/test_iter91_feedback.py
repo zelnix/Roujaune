@@ -13,7 +13,7 @@ import zlib
 import pytest
 import requests
 
-BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL") or "https://roujaune-train.preview.emergentagent.com"
+BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL") or "https://scenic-trainer.preview.emergentagent.com"
 BASE_URL = BASE_URL.rstrip("/")
 
 RIDER_EMAIL = "demo@roujaune.app"

@@ -93,7 +93,7 @@
   "seed_data_creation": "None (READ-ONLY audit).",
   "retest_needed": false,
   "should_main_agent_self_test": true,
-  "context_for_next_testing_agent": "Login via https://roujaune-train.preview.emergentagent.com/login (greenlantern@roujaune.app / rideon9900). Coach state persists per-account — always reset coach back to Alberto after any Adriana test. Journeys walked: 1 Onboarding (reachable at /onboarding read-only); 2 Today (banners + hero); 3 /checkin readiness (subtitle bug); 4 /workouts + /calendar; 5 /benchmark (plan-review leak); 6 /plan (gate + calendar); 7 /progress; 8 /wellness (medical framing); 9 /help + /settings. Screens saved in /app/test_reports/screens/. Nav testIDs are railnav-<key>, NOT nav-<key>. Home first-item label is 'Today' not 'Home'.",
+  "context_for_next_testing_agent": "Login via https://scenic-trainer.preview.emergentagent.com/login (greenlantern@roujaune.app / rideon9900). Coach state persists per-account — always reset coach back to Alberto after any Adriana test. Journeys walked: 1 Onboarding (reachable at /onboarding read-only); 2 Today (banners + hero); 3 /checkin readiness (subtitle bug); 4 /workouts + /calendar; 5 /benchmark (plan-review leak); 6 /plan (gate + calendar); 7 /progress; 8 /wellness (medical framing); 9 /help + /settings. Screens saved in /app/test_reports/screens/. Nav testIDs are railnav-<key>, NOT nav-<key>. Home first-item label is 'Today' not 'Home'.",
 
   "executive_summary": {
     "overall_ux_rating": "7/10",

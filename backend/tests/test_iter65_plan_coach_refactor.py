@@ -10,7 +10,7 @@ import requests
 
 BASE_URL = (os.environ.get("EXPO_BACKEND_URL")
             or os.environ.get("EXPO_PUBLIC_BACKEND_URL")
-            or "https://roujaune-train.preview.emergentagent.com").rstrip("/")
+            or "https://scenic-trainer.preview.emergentagent.com").rstrip("/")
 
 RIDER_EMAIL = "greenlantern@roujaune.app"
 RIDER_PASS = "rideon9900"

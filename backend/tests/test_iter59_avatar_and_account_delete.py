@@ -11,7 +11,7 @@ import base64
 import pytest
 import requests
 
-BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL") or os.environ.get("EXPO_BACKEND_URL") or "https://roujaune-train.preview.emergentagent.com"
+BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL") or os.environ.get("EXPO_BACKEND_URL") or "https://scenic-trainer.preview.emergentagent.com"
 BASE_URL = BASE_URL.rstrip("/")
 
 GL_EMAIL = "greenlantern@roujaune.app"

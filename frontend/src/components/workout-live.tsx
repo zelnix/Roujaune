@@ -115,7 +115,67 @@ export function MetricCard({
   );
 }
 
-// ---- Connections panel ----------------------------------------------------
+// ---- Sensor health strip --------------------------------------------------
+// A compact horizontal strip listing every paired BLE sensor with its battery
+// and signal strength at a glance. Only shown when real sensors are connected.
+export type SensorHealth = { id: string; name: string; kind: "hr" | "trainer" | "sensor"; battery: number | null; signal: number | null; reconnecting?: boolean };
+
+function signalMeta(signal: number | null) {
+  if (signal == null) return { color: colors.green, bars: 3, label: "" };
+  if (signal >= -70) return { color: colors.green, bars: 3, label: "Strong" };
+  if (signal >= -82) return { color: colors.yellow, bars: 2, label: "Fair" };
+  return { color: colors.red, bars: 1, label: "Weak" };
+}
+
+function SignalBars({ signal }: { signal: number | null }) {
+  const { color, bars } = signalMeta(signal);
+  return (
+    <View style={sh.bars}>
+      {[0, 1, 2].map((i) => (
+        <View key={i} style={[sh.bar, { height: 5 + i * 3, backgroundColor: i < bars ? color : colors.textFaint + "66" }]} />
+      ))}
+    </View>
+  );
+}
+
+export function SensorHealthRow({ sensors }: { sensors: SensorHealth[] }) {
+  if (!sensors.length) return null;
+  return (
+    <View style={sh.strip} testID="sensor-health-row">
+      <Ionicons name="pulse" size={14} color={colors.yellow} style={{ marginRight: 2 }} />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={sh.scroll}>
+        {sensors.map((s) => {
+          const icon = s.kind === "hr" ? "heart" : s.kind === "trainer" ? "bicycle" : "hardware-chip-outline";
+          const batColor = s.battery == null ? colors.textDim : s.battery <= 15 ? colors.red : s.battery <= 30 ? colors.yellow : colors.green;
+          const batIcon = s.battery == null ? null : s.battery >= 66 ? "battery-full" : s.battery >= 25 ? "battery-half" : "battery-dead";
+          const sig = signalMeta(s.signal);
+          return (
+            <View key={s.id} style={sh.chip} testID={`sensor-health-${s.id}`}>
+              <Ionicons name={icon as any} size={14} color={s.reconnecting ? colors.yellow : colors.white} />
+              <Text style={sh.name} numberOfLines={1}>{s.name || "Sensor"}</Text>
+              {s.reconnecting ? (
+                <Text style={sh.reconnect}>reconnecting…</Text>
+              ) : (
+                <>
+                  <SignalBars signal={s.signal} />
+                  {s.signal != null ? <Text style={[sh.sigLabel, { color: sig.color }]}>{sig.label}</Text> : null}
+                  {batIcon ? (
+                    <View style={sh.batWrap}>
+                      <Ionicons name={batIcon as any} size={13} color={batColor} style={sh.batIcon} />
+                      <Text style={[sh.bat, { color: batColor }]}>{s.battery}%</Text>
+                    </View>
+                  ) : null}
+                </>
+              )}
+            </View>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
+
 function ConnRow({ icon, label, ok, okText }: { icon: any; label: string; ok: boolean; okText: string }) {
   return (
     <View style={cn.row}>
@@ -572,6 +632,20 @@ const m = StyleSheet.create({
   value: { fontSize: 40, fontWeight: "900", fontVariant: ["tabular-nums"], lineHeight: 44 },
   unit: { color: colors.textDim, fontSize: 14, fontWeight: "700", marginBottom: 7 },
   sub: { color: colors.textDim, fontSize: 12.5, fontWeight: "700", marginTop: 4, letterSpacing: 0.3 },
+});
+
+const sh = StyleSheet.create({
+  strip: { flexDirection: "row", alignItems: "center", gap: 8, ...card, paddingVertical: 8, paddingHorizontal: 12 },
+  scroll: { flexDirection: "row", alignItems: "center", gap: 8, paddingRight: 4 },
+  chip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: colors.borderSoft, borderRadius: radius.pill, paddingVertical: 5, paddingHorizontal: 10 },
+  name: { color: colors.white, fontSize: 11.5, fontWeight: "800", maxWidth: 110, letterSpacing: 0.2 },
+  reconnect: { color: colors.yellow, fontSize: 10.5, fontWeight: "800", fontStyle: "italic" },
+  bars: { flexDirection: "row", alignItems: "flex-end", gap: 1.5, height: 11 },
+  bar: { width: 3, borderRadius: 1 },
+  sigLabel: { fontSize: 9.5, fontWeight: "800", letterSpacing: 0.3, textTransform: "uppercase" },
+  batWrap: { flexDirection: "row", alignItems: "center", gap: 2, marginLeft: 2 },
+  batIcon: { transform: [{ rotate: "90deg" }] },
+  bat: { fontSize: 10.5, fontWeight: "800", fontVariant: ["tabular-nums"] },
 });
 
 const cn = StyleSheet.create({

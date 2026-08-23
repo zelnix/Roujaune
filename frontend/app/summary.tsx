@@ -49,7 +49,7 @@ function Toast({ message }: { message: { id: number; text: string } | null }) {
   }, [message, anim]);
   if (!message) return null;
   return (
-    <Animated.View testID="toast" style={[styles.toast, shadow.glow, { pointerEvents: "none", opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] }]}>
+    <Animated.View testID="toast" style={[styles.toast, shadow.glow, { opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] }]}>
       <Ionicons name="checkmark-circle" size={18} color={colors.yellow} />
       <Text style={styles.toastText}>{message.text}</Text>
     </Animated.View>
@@ -217,6 +217,7 @@ function RightColumn({ score, phone, route }: { score: number; phone: boolean; r
 // Each bar's length is proportional to that km's time (longer = slower); the
 // fastest km is flagged green and the slowest red.
 function KmSplitsCard({ splits }: { splits: KmSplit[] }) {
+  const [openKm, setOpenKm] = React.useState<number | null>(null);
   if (!splits.length) return null;
   const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
   const maxT = Math.max(...splits.map((s) => s.timeSec));
@@ -225,26 +226,57 @@ function KmSplitsCard({ splits }: { splits: KmSplit[] }) {
       <View style={styles.lapHeadRow}>
         <Ionicons name="speedometer-outline" size={15} color={colors.yellow} />
         <Text style={styles.lapTitle}>Kilometre Splits</Text>
-        <Text style={styles.lapHint}>Your pace, km by km</Text>
+        <Text style={styles.lapHint}>Tap a km for power & heart rate</Text>
       </View>
       {splits.map((s) => {
         const tone = s.fastest ? colors.green : s.slowest ? colors.red : colors.yellow;
         const w = maxT > 0 ? Math.max(8, (s.timeSec / maxT) * 100) : 0;
+        const open = openKm === s.km;
         return (
-          <View key={s.km} style={styles.splitRow} testID={`km-split-${s.km}`}>
-            <Text style={styles.splitKm}>KM {s.km}</Text>
-            <View style={styles.splitBarTrack}>
-              <View style={[styles.splitBarFill, { width: `${w}%`, backgroundColor: tone + "cc" }]} />
-            </View>
-            <Text style={styles.splitTime}>{mmss(s.timeSec)}</Text>
-            <Text style={styles.splitSpeed}>{s.avgSpeedKmh} km/h</Text>
-            {s.fastest ? (
-              <Ionicons name="flash" size={13} color={colors.green} />
-            ) : s.slowest ? (
-              <Ionicons name="trending-down" size={13} color={colors.red} />
-            ) : (
-              <View style={styles.splitIconSpacer} />
-            )}
+          <View key={s.km}>
+            <Pressable
+              style={({ hovered }: any) => [styles.splitRow, hovered && styles.splitRowHover]}
+              testID={`km-split-${s.km}`}
+              onPress={() => setOpenKm((cur) => (cur === s.km ? null : s.km))}
+              accessibilityRole="button"
+              accessibilityLabel={`Kilometre ${s.km} split. ${open ? "Hide" : "Show"} power and heart rate`}
+            >
+              <Text style={styles.splitKm}>KM {s.km}</Text>
+              <View style={styles.splitBarTrack}>
+                <View style={[styles.splitBarFill, { width: `${w}%`, backgroundColor: tone + "cc" }]} />
+              </View>
+              <Text style={styles.splitTime}>{mmss(s.timeSec)}</Text>
+              <Text style={styles.splitSpeed}>{s.avgSpeedKmh} km/h</Text>
+              {s.fastest ? (
+                <Ionicons name="flash" size={13} color={colors.green} />
+              ) : s.slowest ? (
+                <Ionicons name="trending-down" size={13} color={colors.red} />
+              ) : (
+                <View style={styles.splitIconSpacer} />
+              )}
+              <Ionicons name={open ? "chevron-up" : "chevron-down"} size={14} color={colors.textFaint} style={{ marginLeft: 2 }} />
+            </Pressable>
+            {open ? (
+              <View style={styles.splitDetail} testID={`km-split-detail-${s.km}`}>
+                <View style={styles.splitDetailItem}>
+                  <Ionicons name="flash" size={14} color={colors.yellow} />
+                  <Text style={styles.splitDetailLabel}>Power</Text>
+                  <Text style={styles.splitDetailVal}>{s.avgPower > 0 ? `${s.avgPower} W` : "—"}</Text>
+                </View>
+                <View style={styles.splitDetailDivider} />
+                <View style={styles.splitDetailItem}>
+                  <Ionicons name="heart" size={14} color={colors.red} />
+                  <Text style={styles.splitDetailLabel}>Heart Rate</Text>
+                  <Text style={styles.splitDetailVal}>{s.avgHr > 0 ? `${s.avgHr} bpm` : "—"}</Text>
+                </View>
+                <View style={styles.splitDetailDivider} />
+                <View style={styles.splitDetailItem}>
+                  <Ionicons name="speedometer-outline" size={14} color="#5AC8FA" />
+                  <Text style={styles.splitDetailLabel}>Avg Speed</Text>
+                  <Text style={styles.splitDetailVal}>{s.avgSpeedKmh} km/h</Text>
+                </View>
+              </View>
+            ) : null}
           </View>
         );
       })}
@@ -469,7 +501,7 @@ const styles = StyleSheet.create({
   rightWrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
   rightWrapItemWide: { width: "100%" },
   rightWrapItem: { flex: 1, flexBasis: 0, minWidth: 220 },
-  toast: { position: "absolute", bottom: 90, alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(20,18,16,0.96)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 18, paddingVertical: 11 },
+  toast: { position: "absolute", bottom: 90, alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(20,18,16,0.96)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 18, paddingVertical: 11, pointerEvents: "none" },
   toastText: { color: colors.white, fontWeight: "700", fontSize: 14 },
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(4,4,6,0.82)", alignItems: "center", justifyContent: "center", padding: spacing.md, zIndex: 40 },
   analysisCard: { width: "100%", maxWidth: 980, flex: 1, maxHeight: "100%", backgroundColor: colors.cardElevated, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, overflow: "hidden", padding: spacing.lg, ...shadow.card },
@@ -480,6 +512,12 @@ const styles = StyleSheet.create({
   lapCard: { backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md },
   splitCard: { backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md },
   splitRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 5 },
+  splitRowHover: { backgroundColor: "rgba(255,255,255,0.03)", borderRadius: radius.sm },
+  splitDetail: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.04)", borderRadius: radius.sm, paddingVertical: 10, paddingHorizontal: 12, marginTop: 2, marginBottom: 4, marginLeft: 58 },
+  splitDetailItem: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
+  splitDetailLabel: { color: colors.textDim, fontSize: 11, fontWeight: "700", flex: 1 },
+  splitDetailVal: { color: colors.white, fontSize: 13, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  splitDetailDivider: { width: 1, alignSelf: "stretch", backgroundColor: colors.borderSoft, marginHorizontal: 10 },
   splitKm: { width: 48, color: colors.textDim, fontSize: 12, fontWeight: "800", letterSpacing: 0.5 },
   splitBarTrack: { flex: 1, height: 12, borderRadius: 6, backgroundColor: "rgba(255,255,255,0.08)", overflow: "hidden" },
   splitBarFill: { height: "100%", borderRadius: 6 },

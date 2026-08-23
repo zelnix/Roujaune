@@ -30,7 +30,7 @@ import {
   SettingsPanel, MusicPanel, CastPanel, RouteMapCard,
 } from "@/src/components/workout";
 import {
-  MetricCard, SessionCard, CoachBanner, TerrainCard, BrandCard, StepTimeline, StepDetailModal, LiveControlBar, AdjustmentsStrip,
+  MetricCard, SessionCard, CoachBanner, TerrainCard, BrandCard, StepTimeline, StepDetailModal, LiveControlBar, AdjustmentsStrip, SensorHealthRow, SensorHealth,
 } from "@/src/components/workout-live";
 import { useWorkoutAudio } from "@/src/hooks/useWorkoutAudio";
 import { useBleSensors } from "@/src/hooks/useBleSensors";
@@ -534,6 +534,39 @@ export default function LiveWorkout() {
       }
     }
   }, [ble.battery, ble.connected, showToast]);
+
+  // Announce brief sensor drop-outs: "Reconnecting {name}…" when a paired
+  // sensor starts reconnecting, then "{name} reconnected" once it's back.
+  const wasReconnectingRef = React.useRef<Set<string>>(new Set());
+  const sensorNameRef = React.useRef<Record<string, string>>({});
+  React.useEffect(() => {
+    ble.connected.forEach((d) => { sensorNameRef.current[d.id] = d.name || "Sensor"; });
+    const now = new Set(ble.reconnecting);
+    const prev = wasReconnectingRef.current;
+    now.forEach((id) => {
+      if (!prev.has(id)) showToast(`Reconnecting ${sensorNameRef.current[id] || "sensor"}…`);
+    });
+    prev.forEach((id) => {
+      if (!now.has(id) && ble.connected.some((d) => d.id === id)) {
+        showToast(`${sensorNameRef.current[id] || "Sensor"} reconnected`);
+      }
+    });
+    wasReconnectingRef.current = now;
+  }, [ble.reconnecting, ble.connected, showToast]);
+
+  // Compact per-sensor health list (battery + signal) for the strip, built from
+  // the actually connected BLE devices. Empty in demo mode / with no sensors.
+  const sensorHealth: SensorHealth[] = React.useMemo(() => {
+    if (settings.demoMode) return [];
+    return ble.connected.map((d) => ({
+      id: d.id,
+      name: d.name || "Sensor",
+      kind: d.id === hrDevice?.id ? "hr" : d.id === trainerDevice?.id ? "trainer" : "sensor",
+      battery: ble.battery[d.id] ?? null,
+      signal: ble.rssi[d.id] ?? null,
+      reconnecting: ble.reconnecting.includes(d.id),
+    }));
+  }, [ble.connected, ble.battery, ble.rssi, ble.reconnecting, hrDevice, trainerDevice, settings.demoMode]);
   // Keep the extend-advice context (workout type + wearable state) current.
   React.useEffect(() => {
     extendMetaRef.current = { type_id: selected?.typeId ?? "endurance", wearable_on: wearableOn };
@@ -892,6 +925,8 @@ export default function LiveWorkout() {
           <RouteMapCard title={routeInfo.title} progress={progress} riddenKm={riddenKm} totalKm={routeInfo.km} timeBased={!trainerOn} fill />
         </View>
       </View>
+
+      <SensorHealthRow sensors={sensorHealth} />
 
       <StepTimeline steps={stepList} activeIndex={activeSeg?.index ?? -1} remaining={timeLeftLabel} stepProgress={activeSeg ? activeSeg.elapsedInSeg / Math.max(1, activeSeg.segment.durationSec) : 0} onStepPress={(i) => setStepDetail(i)} />
 

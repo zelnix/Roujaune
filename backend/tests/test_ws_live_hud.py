@@ -13,7 +13,7 @@ from websockets.sync.client import connect
 
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "").rstrip("/")
 if not BASE_URL:
-    BASE_URL = "https://roujaune-train.preview.emergentagent.com"
+    BASE_URL = "https://scenic-trainer.preview.emergentagent.com"
 WS_URL = BASE_URL.replace("https://", "wss://").replace("http://", "ws://") + "/api/ws/telemetry"
 
 
