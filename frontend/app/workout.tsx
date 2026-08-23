@@ -160,14 +160,14 @@ export default function LiveWorkout() {
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
   const [cueIdx] = React.useState(0);
 
-  const { telemetry, connectionState, sendErg, sendTarget, sendInit, sendSensor, pause, resume, simulateDropout } = useTelemetry();
+  const { settings, setSetting, loaded } = useSettings();
+  const { telemetry, connectionState, sendErg, sendTarget, sendInit, sendSensor, pause, resume, simulateDropout } = useTelemetry(settings.demoMode);
   // Subscription gating — free tier is limited to N rides of ≤M minutes.
   const ent = useEntitlement();
   const [paywall, setPaywall] = React.useState<string | null>(null);
   const rideKeyRef = React.useRef(`workout-${selected?.id || "ride"}-${Date.now()}`);
   const gatedRef = React.useRef(false);
   const freeSecs = ent.freeRideMinutes * 60;
-  const { settings, setSetting, loaded } = useSettings();
   const ble = useBleSensors(settings.wheelCircumference);
   const { plan } = usePlan();
 
@@ -336,7 +336,9 @@ export default function LiveWorkout() {
   const energyRef = React.useRef(0);
   const lastEnergyElapsedRef = React.useRef<number | null>(null);
   React.useEffect(() => {
-    if (telemetry.source === "trainer") {
+    // Record measured/simulated telemetry (sensor or demo) — never the
+    // "disconnected" live placeholder — so the summary aggregates real work.
+    if (telemetry.source === "sensor" || telemetry.source === "estimated" || telemetry.source === "trainer") {
       const prev = lastEnergyElapsedRef.current;
       lastEnergyElapsedRef.current = telemetry.elapsed;
       const dt = prev == null ? 0 : telemetry.elapsed - prev;
@@ -516,13 +518,14 @@ export default function LiveWorkout() {
 
   const vroute = getVRoute(vRouteId);
 
-  // Live data is only shown for connected devices. "Demo mode" simulates both so
-  // the rider can preview the connected experience. A connected BLE power/cadence
-  // sensor counts as a trainer; a BLE heart-rate strap counts as a wearable.
+  // A ride is LIVE by default. Real values come only from a connected Bluetooth
+  // device; "Demo mode" (opt-in) simulates a trainer + wearable so the app can be
+  // previewed without hardware. A BLE power/cadence sensor counts as a trainer;
+  // a BLE heart-rate strap counts as a wearable.
   const bleTrainer = ble.connected.length > 0 && (ble.readings.power != null || ble.readings.cadence != null);
   const bleWearable = ble.connected.length > 0 && ble.readings.hr != null;
-  const trainerOn = settings.hasTrainer || settings.demoMode || bleTrainer;
-  const wearableOn = settings.hasWearable || settings.demoMode || bleWearable;
+  const trainerOn = settings.demoMode || bleTrainer;
+  const wearableOn = settings.demoMode || bleWearable;
   // Keep the extend-advice context (workout type + wearable state) current.
   React.useEffect(() => {
     extendMetaRef.current = { type_id: selected?.typeId ?? "endurance", wearable_on: wearableOn };
@@ -761,7 +764,6 @@ export default function LiveWorkout() {
   const remainingSec = Math.max(0, totalSec - telemetry.elapsed);
   const finishAt = new Date(Date.now() + remainingSec * 1000);
   const estFinish = `${String(finishAt.getHours()).padStart(2, "0")}:${String(finishAt.getMinutes()).padStart(2, "0")}`;
-  const isLive = !settings.demoMode && (trainerOn || wearableOn);
   // Time-based ride: no live sensors connected → show duration metrics (elapsed,
   // interval remaining, calories, workout step) instead of blank telemetry cards.
   const timeBased = !trainerOn && !wearableOn;
@@ -829,12 +831,26 @@ export default function LiveWorkout() {
                     <Text style={styles.fsMinimisedText}>Virtual ride is fullscreen — tap to return</Text>
                   </Pressable>
                 ) : customVideoId ? (
-                  <YouTubePlayer
-                    videoId={customVideoId}
-                    width={centerW}
-                    height={videoRenderH}
-                    playing={!paused}
-                  />
+                  <View style={tablet ? styles.flex1 : { height: videoRenderH }}>
+                    <YouTubePlayer
+                      videoId={customVideoId}
+                      width={centerW}
+                      height={videoRenderH}
+                      playing={!paused}
+                    />
+                    <View style={styles.ytControls} pointerEvents="box-none">
+                      <Pressable style={styles.ytSourceBtn} onPress={() => setShowStream(true)} testID="workout-source"
+                        accessibilityRole="button" accessibilityLabel="Choose what to watch">
+                        <Ionicons name="logo-youtube" size={17} color={colors.white} />
+                        <Text style={styles.ytSourceText}>Watch</Text>
+                        <Ionicons name="chevron-down" size={15} color="rgba(255,255,255,0.65)" />
+                      </Pressable>
+                      <Pressable style={styles.ytIconBtn} onPress={() => setExpanded(true)} testID="workout-yt-fullscreen"
+                        accessibilityRole="button" accessibilityLabel="Enter fullscreen">
+                        <Ionicons name="expand-outline" size={28} color={colors.white} />
+                      </Pressable>
+                    </View>
+                  </View>
                 ) : (
                   <VirtualRidePlayer
                     mode="embedded"
@@ -851,16 +867,12 @@ export default function LiveWorkout() {
                     onToggleReducedMotion={() => setReducedMotion((r) => !r)}
                     onFullscreen={() => setExpanded(true)}
                     onOpenRoutes={() => setShowRoutes(true)}
+                    onOpenSource={() => setShowStream(true)}
+                    sourceLabel="Watch"
+                    sourceIcon="tv-outline"
                     routeBadge={routeBadge}
                     style={tablet ? styles.flex1 : { height: videoRenderH }}
                   />
-                )}
-                {!expanded && (
-                  <Pressable style={styles.sourceBtn} onPress={() => setShowStream(true)} testID="workout-source"
-                    accessibilityRole="button" accessibilityLabel="Choose ride screen source">
-                    <Ionicons name={customVideoId ? "logo-youtube" : "tv-outline"} size={13} color={colors.white} />
-                    <Text style={styles.sourceBtnText}>{customVideoId ? "YouTube" : "Ride screen"}</Text>
-                  </Pressable>
                 )}
               </View>
             </View>
@@ -889,8 +901,8 @@ export default function LiveWorkout() {
         paused={paused}
         erg={erg}
         audioOn={musicOn}
-        live={isLive}
-        onLive={() => setSetting("demoMode", !settings.demoMode)}
+        live={!settings.demoMode}
+        onLive={() => { const next = !settings.demoMode; setSetting("demoMode", next); showToast(next ? "Demo data on — showing a simulated ride" : "Live ride — showing your connected sensors"); }}
         onAudio={() => setShowMusic(true)}
         onMirror={() => setShowCast(true)}
         onErg={onErg}
@@ -1128,8 +1140,10 @@ const styles = StyleSheet.create({
   tabletContent: { flexGrow: 1, padding: spacing.md, gap: spacing.md },
   flex1: { flex: 1 },
   videoSlot: { minHeight: 150 },
-  sourceBtn: { position: "absolute", top: 8, right: 8, flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 6 },
-  sourceBtnText: { color: colors.white, fontSize: 11.5, fontWeight: "800" },
+  ytControls: { position: "absolute", top: 10, right: 10, flexDirection: "row", alignItems: "center", gap: 10 },
+  ytSourceBtn: { flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: "rgba(0,0,0,0.6)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", borderRadius: radius.pill, paddingHorizontal: 16, paddingVertical: 13 },
+  ytSourceText: { color: colors.white, fontSize: 14.5, fontWeight: "800" },
+  ytIconBtn: { width: 65, height: 65, borderRadius: 33, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)" },
   fsExit: { position: "absolute", top: 20, right: 20, width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", zIndex: 51 },
   immersive: { ...StyleSheet.absoluteFillObject, backgroundColor: "#000", zIndex: 50, alignItems: "center", justifyContent: "center" },
   lockOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.82)", alignItems: "center", justifyContent: "center", gap: 14, zIndex: 60 },

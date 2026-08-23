@@ -5,6 +5,8 @@ import { useRouter } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { captureRef } from "react-native-view-shot";
+import * as Sharing from "expo-sharing";
 
 import { colors, radius, spacing, shadow } from "@/src/theme";
 import { useSummary, useCoachDebrief, useIntervals } from "@/src/lib/summary";
@@ -52,6 +54,23 @@ export default function WorkoutComplete() {
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
   const [mainW, setMainW] = React.useState(600);
   const showToast = React.useCallback((text: string) => setToast({ id: Date.now(), text }), []);
+  const cardRef = React.useRef<View>(null);
+
+  // Capture the summary card exactly as shown and open the native share sheet
+  // with it as an image ("ride card"). Native only — web preview can't share.
+  const shareRideCard = React.useCallback(async () => {
+    try {
+      if (Platform.OS === "web") { showToast("Sharing a ride card works on the app"); return; }
+      const uri = await captureRef(cardRef, { format: "png", quality: 0.95 });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, { mimeType: "image/png", dialogTitle: "Share your Roujaune ride" });
+      } else {
+        showToast("Sharing isn't available on this device");
+      }
+    } catch {
+      showToast("Couldn't create the ride card");
+    }
+  }, [showToast]);
 
   const onMainLayout = (e: LayoutChangeEvent) => setMainW(e.nativeEvent.layout.width);
 
@@ -82,7 +101,7 @@ export default function WorkoutComplete() {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#050506" }}>
       <StatusBar hidden />
       <SafeAreaView style={styles.backdrop} edges={["top", "bottom", "left", "right"]}>
-        <View style={[styles.modalCard, { padding: pad }]} testID="summary-modal">
+        <View ref={cardRef} collapsable={false} style={[styles.modalCard, { padding: pad }]} testID="summary-modal">
           <View style={styles.modalHead}>
             <SummaryHeader brandWidth={navW} phone={phone} onToast={showToast} />
             <Pressable testID="summary-close" onPress={onClose} style={styles.closeBtn} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close summary">
@@ -129,7 +148,7 @@ export default function WorkoutComplete() {
               saved={saved}
               onView={() => setShowAnalysis(true)}
               onSave={() => router.replace("/")}
-              onShare={() => showToast("Preparing shareable ride card")}
+              onShare={shareRideCard}
             />
           </View>
         </View>

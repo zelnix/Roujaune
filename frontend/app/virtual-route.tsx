@@ -64,7 +64,7 @@ export default function VirtualRouteScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const compact = width < 820;
-  const { telemetry, connectionState, stale, sendErg, sendTarget, sendSensor, simulateDropout, pause, resume } = useTelemetry();
+  const { telemetry, connectionState, stale, sendErg, sendTarget, sendSensor, simulateDropout, pause, resume } = useTelemetry(settings.demoMode);
   const { settings } = useSettings();
   const ble = useBleSensors(settings.wheelCircumference);
   const [showBle, setShowBle] = React.useState(false);
@@ -159,7 +159,7 @@ export default function VirtualRouteScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, autoResistance, emergency, resistanceTarget, route.gradient, ble.hasTrainerControl]);
 
-  const sensorsOn = telemetry.source === "trainer" || ble.connected.length > 0;
+  const sensorsOn = settings.demoMode || ble.connected.length > 0;
   const hrOn = telemetry.hr > 0;
   const scene: SceneTelemetry = {
     power: sm.power, cadence: sm.cadence, speed: sm.speed, hr: hrOn ? sm.hr : 0,
@@ -469,7 +469,7 @@ function deriveConnection(state: string, stale: boolean, sensorsOn: boolean): { 
   if (state === "reconnecting") return { label: "Signal lost — reconnecting", tone: colors.yellow };
   if (state === "disconnected") return { label: "Device disconnected", tone: colors.red };
   if (stale) return { label: "Signal temporarily lost", tone: colors.yellow };
-  if (!sensorsOn) return { label: "Simulated ride mode", tone: "#5AC8FA" };
+  if (!sensorsOn) return { label: "Not connected — connect a sensor or turn on Demo", tone: "#5AC8FA" };
   return { label: "Connected", tone: colors.green };
 }
 

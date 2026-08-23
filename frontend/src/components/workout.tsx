@@ -808,8 +808,7 @@ export function SettingsPanel({ settings, setSetting, onClose }: {
   settings: Settings; setSetting: <K extends keyof Settings>(k: K, v: Settings[K]) => void; onClose: () => void;
 }) {
   const rows: { key: keyof Settings; icon: keyof typeof Ionicons.glyphMap; label: string; sub: string }[] = [
-    { key: "hasTrainer", icon: "bluetooth", label: "Smart trainer connected", sub: "Power, cadence & speed" },
-    { key: "hasWearable", icon: "watch-outline", label: "Wearable connected", sub: "Heart rate & readiness" },
+    { key: "demoMode", icon: "flask-outline", label: "Demo mode", sub: "Simulate a ride without hardware — Live by default" },
     { key: "hudEnabled", icon: "eye", label: "Show on-screen HUD", sub: "Live-data overlay in full screen" },
     { key: "seatedMode", icon: "body-outline", label: "Seated mode", sub: "Stay in the saddle — cues avoid standing efforts" },
   ];

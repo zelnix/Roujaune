@@ -215,12 +215,11 @@ export default function SettingsScreen() {
 
       <Card testID="equipment-prefs">
         <SectionTitle label="EQUIPMENT & RIDE" color={CC.rouge} />
-        <PrefToggle label="Smart trainer" sub="Control resistance (ERG) from your workouts" on={settings.hasTrainer} onToggle={() => setSetting("hasTrainer", !settings.hasTrainer)} testID="tg-hasTrainer" divider />
-        <PrefToggle label="Heart-rate / wearable" sub="Show live heart rate and recovery data" on={settings.hasWearable} onToggle={() => setSetting("hasWearable", !settings.hasWearable)} testID="tg-hasWearable" divider />
+        <PrefRow icon="bluetooth" label="Bluetooth sensors" sub="Connect your trainer, power, cadence & heart-rate straps during a ride" onPress={() => router.push("/workout")} testID="row-ble-sensors" divider />
         <PrefToggle label="Live HUD overlay" sub="On-screen metrics during rides" on={settings.hudEnabled} onToggle={() => setSetting("hudEnabled", !settings.hudEnabled)} testID="tg-hudEnabled" divider />
         <PrefToggle label="Seated mode" sub={`${persona.name} avoids standing-effort cues`} on={settings.seatedMode} onToggle={() => setSetting("seatedMode", !settings.seatedMode)} testID="tg-seatedMode" divider />
-        <PrefToggle label="Demo mode" sub="Simulate sensor data without hardware" on={settings.demoMode} onToggle={() => setSetting("demoMode", !settings.demoMode)} testID="tg-demoMode" />
-        <Text style={s.coachHint}>These stay in sync with the pre-ride setup and your Connections — one source of truth, saved to your account.</Text>
+        <PrefToggle label="Demo mode" sub="Simulate sensor data without hardware — rides are Live by default" on={settings.demoMode} onToggle={() => setSetting("demoMode", !settings.demoMode)} testID="tg-demoMode" />
+        <Text style={s.coachHint}>Rides are Live by default and show only real sensor data. Turn on Demo to preview a simulated ride without hardware.</Text>
       </Card>
 
       <Card testID="wheel-speed">
@@ -356,6 +355,16 @@ function PrefToggle({ label, sub, on, onToggle, testID, divider }: { label: stri
       <View style={{ flex: 1 }}><Text style={s.prefTitle}>{label}</Text><Text style={s.prefSub}>{sub}</Text></View>
       <Toggle testID={testID} on={on} onToggle={onToggle} />
     </View>
+  );
+}
+
+function PrefRow({ icon, label, sub, onPress, testID, divider }: { icon: keyof typeof Ionicons.glyphMap; label: string; sub: string; onPress: () => void; testID: string; divider?: boolean }) {
+  return (
+    <Pressable testID={testID} onPress={onPress} style={({ hovered }: any) => [s.prefRow, divider && s.divider, hovered && { opacity: 0.9 }]} accessibilityRole="button">
+      <Ionicons name={icon} size={20} color={CC.dim} style={{ marginRight: 12 }} />
+      <View style={{ flex: 1 }}><Text style={s.prefTitle}>{label}</Text><Text style={s.prefSub}>{sub}</Text></View>
+      <Ionicons name="chevron-forward" size={16} color={CC.dim} />
+    </Pressable>
   );
 }
 

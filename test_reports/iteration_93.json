@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 93 — validated the ROUJAUNE cycling app changes: workout Watch/video/fullscreen controls no longer overlap and are larger, LIVE-by-default behaviour with no fabricated sensor numbers, Demo toggle switches to simulated data, Settings shows the new Bluetooth sensors row + Demo mode toggle (no Smart trainer / Heart-rate toggles), Summary Share button is active and non-crashing on web. Backend telemetry WS contract passes for all three modes (live/sensor/demo).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter93_telemetry_ws.py",
+    "/app/test_reports/pytest/iter93.xml",
+    "/app/test_reports/screens/i93_workout_live.jpeg",
+    "/app/test_reports/screens/i93_workout_demo.jpeg",
+    "/app/test_reports/screens/i93_settings.jpeg",
+    "/app/test_reports/screens/i93_summary.jpeg",
+    "/app/test_reports/screens/i93_summary_after_share.jpeg"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "TrainerSim state is clean: LIVE mode zeros power/hr/cadence/speed and reports source='disconnected'; sensor pushes override and flip source to 'sensor' for 4s freshness window; DEMO fabricates plausible values with source='estimated'. All three behaviours are exercised by test_iter93_telemetry_ws.py.",
+    "VirtualRidePlayer embedded top row uses fixed 65x65 circular icons for camera/fullscreen and a right-aligned Watch source pill (paddingHorizontal:16, py:13) with proper flex spacer — no overlap detected at 1400x820 (bounding-box check: source x=849/w=123, view x=982/w=65, fs x=1057/w=65 — all disjoint).",
+    "Summary shareRideCard falls back to a toast on web (Platform.OS === 'web') so tapping does not crash on the preview build; native path uses captureRef + Sharing.shareAsync.",
+    "useTelemetry sends {type:'mode',mode:live|demo} on connect and whenever the demo prop flips, matching what the backend TrainerSim expects."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter93_telemetry_ws.py (new)"
+  ],
+  "success_rate": {"backend": "100% (3/3 telemetry WS tests)", "frontend": "100% (workout controls, LIVE default, demo toggle, settings, share button all pass)"},
+  "seed_data_creation": "None — used the already-seeded demo@roujaune.app rider.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend WS test lives at /app/backend/tests/test_iter93_telemetry_ws.py — reuse it for any future changes to the /api/ws/telemetry contract. On /workout via web preview, bc-live may occasionally read 'DEMO' on load if a previous session left demoMode=true in async-storage — clear localStorage or toggle via the Settings tg-demoMode row to reset to LIVE.",
+  "rca_of_issue": "N/A — no bugs found. All six review items behave as specified."
+}

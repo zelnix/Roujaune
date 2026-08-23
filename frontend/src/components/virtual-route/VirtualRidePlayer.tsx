@@ -55,6 +55,10 @@ export type VirtualRidePlayerProps = {
   onExitFullscreen?: () => void;
   onPauseToggle?: () => void;
   onOpenRoutes?: () => void;
+  /** Opens the "Ride screen" source picker (scenic route vs YouTube). */
+  onOpenSource?: () => void;
+  sourceLabel?: string;
+  sourceIcon?: keyof typeof Ionicons.glyphMap;
   onPreset?: (watts: number) => void;
   ergOn?: boolean;
   onErgToggle?: () => void;
@@ -80,7 +84,7 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
   const {
     mode, vroute, routeState, appearance = DEFAULT_APPEARANCE, metrics, paused, simulation,
     hrOn, load = 100, reducedMotion, onToggleReducedMotion, cue, stepLabel, stepTimeLeft, compact, style, routeBadge, stages,
-    onFullscreen, onExitFullscreen, onPauseToggle, onOpenRoutes, onPreset, ergOn, onErgToggle, onReconnect,
+    onFullscreen, onExitFullscreen, onPauseToggle, onOpenRoutes, onOpenSource, sourceLabel, sourceIcon, onPreset, ergOn, onErgToggle, onReconnect,
     exitLabel = "Exit", exitIcon = "contract", onSensors, sensorsOn, onEmergency, connLabel, connTone,
   } = props;
 
@@ -144,11 +148,18 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
             {onOpenRoutes && <Ionicons name="chevron-down" size={13} color={colors.textFaint} />}
           </Pressable>
           <View style={{ flex: 1 }} />
+          {onOpenSource && (
+            <Pressable onPress={onOpenSource} style={st.embedSourcePill} testID="vr-embed-source" accessibilityRole="button" accessibilityLabel="Choose what to watch">
+              <Ionicons name={sourceIcon ?? "tv-outline"} size={17} color={colors.white} />
+              <Text style={st.embedSourceText}>{sourceLabel ?? "Watch"}</Text>
+              <Ionicons name="chevron-down" size={15} color={colors.textFaint} />
+            </Pressable>
+          )}
           <Pressable onPress={onToggleReducedMotion} style={[st.embedIcon, reducedMotion && st.embedIconOn]} testID="vr-embed-view" accessibilityRole="button" accessibilityLabel="Toggle camera / motion">
-            <Ionicons name={reducedMotion ? "eye-off-outline" : "videocam-outline"} size={22} color={reducedMotion ? colors.bg : colors.white} />
+            <Ionicons name={reducedMotion ? "eye-off-outline" : "videocam-outline"} size={28} color={reducedMotion ? colors.bg : colors.white} />
           </Pressable>
           <Pressable onPress={onFullscreen} style={st.embedIcon} testID="vr-embed-fullscreen" accessibilityRole="button" accessibilityLabel="Enter fullscreen virtual ride">
-            <Ionicons name="expand-outline" size={22} color={colors.white} />
+            <Ionicons name="expand-outline" size={28} color={colors.white} />
           </Pressable>
         </View>
 
@@ -311,10 +322,12 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
 
 const st = StyleSheet.create({
   embedWrap: { flex: 1, borderRadius: radius.lg, overflow: "hidden", backgroundColor: "#05060a", position: "relative" },
-  embedTopRow: { position: "absolute", top: 10, left: 10, right: 10, flexDirection: "row", alignItems: "center", gap: 8 },
-  routeNamePill: { flexDirection: "row", alignItems: "center", gap: 6, maxWidth: "62%", backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 7 },
-  routeNameText: { color: colors.white, fontSize: 13, fontWeight: "800" },
-  embedIcon: { width: 52, height: 52, borderRadius: 26, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: colors.border },
+  embedTopRow: { position: "absolute", top: 10, left: 10, right: 10, flexDirection: "row", alignItems: "center", gap: 10 },
+  routeNamePill: { flexDirection: "row", alignItems: "center", gap: 6, maxWidth: "50%", backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 15, paddingVertical: 9 },
+  routeNameText: { color: colors.white, fontSize: 14, fontWeight: "800" },
+  embedSourcePill: { flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: "rgba(0,0,0,0.6)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 16, paddingVertical: 13 },
+  embedSourceText: { color: colors.white, fontSize: 14.5, fontWeight: "800" },
+  embedIcon: { width: 65, height: 65, borderRadius: 33, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: colors.border },
   embedIconOn: { backgroundColor: colors.yellow, borderColor: colors.yellow },
   embedBottomRow: { position: "absolute", left: 10, bottom: 10, flexDirection: "row", alignItems: "center", gap: 8 },
   gradePill: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(0,0,0,0.6)", borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6 },

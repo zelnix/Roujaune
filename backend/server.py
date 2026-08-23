@@ -90,6 +90,7 @@ class TrainerSim:
     def __init__(self):
         self.erg = 100
         self.paused = False
+        self.mode = "live"  # "live" = only real sensor data; "demo" = simulate
         self.dropout_until = 0.0
         self.elapsed = 1477.0  # 00:24:37
         self.distance = 24.6
@@ -113,13 +114,24 @@ class TrainerSim:
     def step(self, dt: float):
         if self.paused:
             return
-        target_power = self.base_target * (self.erg / 100.0)
-        self.power = max(0.0, target_power + random.uniform(-8, 8))
-        self.cadence = max(0.0, 88.0 + random.uniform(-4, 4))
-        target_hr = 118 + (self.power - 150) * 0.34
-        self.hr += (target_hr - self.hr) * 0.15 + random.uniform(-1.5, 1.5)
-        self.hr = max(90.0, min(185.0, self.hr))
-        # Real sensor data (BLE) overrides simulated values while it is fresh.
+        if self.mode == "demo":
+            # Demo mode fabricates a plausible ride so the app can be previewed
+            # without any hardware connected.
+            target_power = self.base_target * (self.erg / 100.0)
+            self.power = max(0.0, target_power + random.uniform(-8, 8))
+            self.cadence = max(0.0, 88.0 + random.uniform(-4, 4))
+            target_hr = 118 + (self.power - 150) * 0.34
+            self.hr += (target_hr - self.hr) * 0.15 + random.uniform(-1.5, 1.5)
+            self.hr = max(90.0, min(185.0, self.hr))
+            # simplified physics: speed rises with power, falls with gradient
+            self.speed = max(0.0, 12 + (self.power - 180) / 14 - self.gradient * 0.4 + random.uniform(-0.4, 0.4))
+        else:
+            # LIVE mode: never fabricate. Only real sensor readings count.
+            self.power = 0.0
+            self.cadence = 0.0
+            self.hr = 0.0
+            self.speed = 0.0
+        # Real sensor data (BLE) overrides while it is fresh (both modes).
         if self.sensor_fresh:
             if self.sensor_power is not None:
                 self.power = float(self.sensor_power)
@@ -127,15 +139,18 @@ class TrainerSim:
                 self.cadence = float(self.sensor_cadence)
             if self.sensor_hr is not None:
                 self.hr = float(self.sensor_hr)
-        # simplified physics: speed rises with power, falls with gradient
-        self.speed = max(0.0, 12 + (self.power - 180) / 14 - self.gradient * 0.4 + random.uniform(-0.4, 0.4))
-        # A dedicated speed / wheel sensor overrides the estimated speed.
-        if self.sensor_fresh and self.sensor_speed is not None:
-            self.speed = float(self.sensor_speed)
+            if self.sensor_speed is not None:
+                self.speed = float(self.sensor_speed)
         self.elapsed += dt
         self.distance += self.speed * dt / 3600.0
 
     def sample(self) -> dict:
+        if self.sensor_fresh:
+            source = "sensor"          # measured from a real BLE device
+        elif self.mode == "demo":
+            source = "estimated"       # simulated preview data
+        else:
+            source = "disconnected"    # live ride, no sensor data yet
         return {
             "elapsed": int(self.elapsed),
             "power": round(self.power),
@@ -146,7 +161,7 @@ class TrainerSim:
             "gradient": self.gradient,
             "erg": self.erg,
             "paused": self.paused,
-            "source": "sensor" if self.sensor_fresh else "trainer",  # measured, not estimated
+            "source": source,
         }
 
 
@@ -169,6 +184,10 @@ async def telemetry_ws(websocket: WebSocket):
                 t = msg.get("type")
                 if t == "erg":
                     sim.erg = max(50, min(150, int(msg.get("intensity", sim.erg))))
+                elif t == "mode":
+                    m = msg.get("mode")
+                    if m in ("live", "demo"):
+                        sim.mode = m
                 elif t == "target":
                     sim.base_target = max(0.0, float(msg.get("watts", sim.base_target)))
                 elif t == "init":
