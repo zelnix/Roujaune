@@ -802,7 +802,7 @@ export default function LiveWorkout() {
 
           <View style={[styles.innerRow, tablet && styles.flex1]}>
             <View style={[styles.leftCol, { width: leftW }]}>
-              <SessionCard elapsed={fmt(telemetry.elapsed)} estFinish={estFinish} riddenKm={riddenKm} totalKm={routeInfo.km} />
+              <SessionCard elapsed={fmt(telemetry.elapsed)} estFinish={estFinish} riddenKm={riddenKm} totalKm={routeInfo.km} speedKmh={trainerOn ? telemetry.speed : 0} />
             </View>
             <View style={styles.centerCol} onLayout={onCenterLayout}>
               <CoachBanner name={persona.name} message={liveCue} avatar={persona.image} />

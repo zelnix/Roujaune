@@ -149,7 +149,10 @@ function DistanceRing({ progress }: { progress: number }) {
   );
 }
 
-export function SessionCard({ elapsed, estFinish, riddenKm, totalKm }: { elapsed: string; estFinish: string; riddenKm: number; totalKm: number }) {
+export function SessionCard({ elapsed, estFinish, riddenKm, totalKm, speedKmh }: { elapsed: string; estFinish: string; riddenKm: number; totalKm: number; speedKmh: number }) {
+  const remaining = Math.max(0, totalKm - riddenKm);
+  const etaMin = speedKmh > 0.5 && remaining > 0 ? Math.round((remaining / speedKmh) * 60) : null;
+  const etaText = remaining <= 0 ? "Arrived" : etaMin != null ? `arriving ~${etaMin} min` : "arriving —";
   return (
     <View style={sc.panel} testID="session-card">
       <View style={sc.header}><Ionicons name="stopwatch-outline" size={15} color={colors.yellow} /><Text style={sc.title}>SESSION</Text></View>
@@ -168,7 +171,10 @@ export function SessionCard({ elapsed, estFinish, riddenKm, totalKm }: { elapsed
           <Text style={sc.label}>DISTANCE</Text>
           <Text style={sc.value} testID="session-distance">{riddenKm.toFixed(1)}<Text style={sc.unit}> / {totalKm.toFixed(1)} km</Text></Text>
         </View>
-        <DistanceRing progress={totalKm > 0 ? riddenKm / totalKm : 0} />
+        <View style={sc.ringWrap}>
+          <DistanceRing progress={totalKm > 0 ? riddenKm / totalKm : 0} />
+          <Text style={sc.eta} testID="session-eta" numberOfLines={1}>{etaText}</Text>
+        </View>
       </View>
     </View>
   );
@@ -623,6 +629,8 @@ const sc = StyleSheet.create({
   divider: { height: 1, backgroundColor: colors.borderSoft, marginVertical: 4 },
   distRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 6 },
   distText: { flex: 1 },
+  ringWrap: { alignItems: "center", gap: 4 },
+  eta: { color: colors.textDim, fontSize: 10.5, fontWeight: "700", letterSpacing: 0.2 },
   ringPct: { color: colors.yellow, fontSize: 11, fontWeight: "800", fontVariant: ["tabular-nums"] },
 });
 
