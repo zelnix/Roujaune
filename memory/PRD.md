@@ -1010,3 +1010,11 @@ User wanted an in-app rating + feedback capture (fb50-style) opened from Setting
 ## Now countdown + tappable Now/Next detail (2026-06 fork)
 - Now countdown: StepTimeline NOW cell shows live time-left (remaining prop = timeLeftLabel from workout.tsx) as big yellow value + "LEFT" label (testID now-countdown), separated by a left divider. Styles nnCountdown/nnCountValue/nnCountLabel added to `st`.
 - Tappable Now/Next: NOW and NEXT cells are now Pressables (testID now-next-now / now-next-next) calling onStepPress(cur.index)/onStepPress(nxt.index) -> opens existing StepDetailModal (stepDetail state in workout.tsx). NEXT disabled when no next step. Verified: NOW shows 7:05 LEFT and tap opens STEP 1/13 Warm-up detail.
+
+## Pause stops audio + workout layout rework (2026-06 fork)
+- Pause stops audio: useWorkoutAudio(paused) now takes the workout paused flag. apply() gates music on (musicOn && !paused); a dedicated effect on `paused` stops Speech (Speech.stop, speaking.current=false) and pauses the player; advanceTrack respects paused. Wired in workout.tsx: useWorkoutAudio(paused). Verified: Pause/Resume toggles with no console errors.
+- Layout rework (workout.tsx + workout-live.tsx):
+  - Removed the top-right "Threshold Climb" WorkoutCard from rightCol (right column = Terrain + RouteMap only). Removed now-unused planName/phaseLabel/weekLabel/dayLabel/dayInfo, usePlan import, planDayNumber import.
+  - New SessionCard component (testID session-card) replaces ConnectionsPanel in leftCol: shows ELAPSED (session-elapsed), EST. FINISH (session-estfinish), DISTANCE riddenKm/totalKm km (session-distance). Styles `sc`.
+  - MetricCard gained optional `connected?: boolean` -> renders a "● LIVE / Off" dot+text (m.conn/connDot/connText, testID metric-conn-<label>). HR uses wearableOn; Speed/Cadence/Power use trainerOn. Connection status thus moved from the removed ConnectionsPanel onto the top metric cards.
+  - StepTimeline header no longer renders ELAPSED/EST FINISH (props elapsed/estFinish removed from signature; only `progress` kept for pct). ConnectionsPanel/WorkoutCard remain defined but unused (no other importers).

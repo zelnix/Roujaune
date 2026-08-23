@@ -14,9 +14,8 @@ import { PaywallModal } from "@/src/components/PaywallModal";
 import { getFavoriteRoute, setFavoriteRoute } from "@/src/lib/prefs";
 import { useSettings } from "@/src/lib/settings";
 import { currentWorkout } from "@/src/data";
-import { getWorkout, buildSegments, currentSegment, mmss, targetWatts, planDayNumber, extensionSegment } from "@/src/lib/workout-catalog";
+import { getWorkout, buildSegments, currentSegment, mmss, targetWatts, extensionSegment } from "@/src/lib/workout-catalog";
 import { fetchZoneBias, ZoneBias } from "@/src/lib/targets";
-import { usePlan } from "@/src/lib/plan";
 import { WORKOUT_TYPES } from "@/src/lib/workouts";
 import { VirtualRidePlayer } from "@/src/components/virtual-route/VirtualRidePlayer";
 import YouTubePlayer from "@/src/components/YouTubePlayer";
@@ -31,7 +30,7 @@ import {
   SettingsPanel, MusicPanel, CastPanel, RouteMapCard,
 } from "@/src/components/workout";
 import {
-  MetricCard, ConnectionsPanel, CoachBanner, TerrainCard, WorkoutCard, BrandCard, StepTimeline, StepDetailModal, LiveControlBar, AdjustmentsStrip,
+  MetricCard, SessionCard, CoachBanner, TerrainCard, BrandCard, StepTimeline, StepDetailModal, LiveControlBar, AdjustmentsStrip,
 } from "@/src/components/workout-live";
 import { useWorkoutAudio } from "@/src/hooks/useWorkoutAudio";
 import { useBleSensors } from "@/src/hooks/useBleSensors";
@@ -169,20 +168,6 @@ export default function LiveWorkout() {
   const gatedRef = React.useRef(false);
   const freeSecs = ent.freeRideMinutes * 60;
   const ble = useBleSensors(settings.wheelCircumference);
-  const { plan } = usePlan();
-
-  // Plan context for the Workout card: plan name + current phase + week, with
-  // the day shown as today's weekday (best-effort for catalog-launched rides).
-  const planName = plan?.title ?? "Training Plan";
-  const phaseLabel = plan?.phase?.name ? (/phase/i.test(plan.phase.name) ? plan.phase.name : `${plan.phase.name} Phase`) : undefined;
-  const weekLabel = (() => {
-    const w = plan?.progress?.weeks; // e.g. "3 / 12"
-    const cur = w ? parseInt(String(w).split("/")[0].trim(), 10) : (plan as any)?.youAreHere;
-    return cur && !Number.isNaN(cur) ? `Week ${cur}` : undefined;
-  })();
-  const dayInfo = params.workoutId ? planDayNumber(String(params.workoutId)) : null;
-  const dayLabel = dayInfo ? `Day ${dayInfo.day}` : undefined;
-
   // ERG intensity: optimistic local value so +/- feels instant, then reconciles
   // with the trainer sim once taps settle (~1.5s of no local changes).
   const [erg, setErg] = React.useState(telemetry.erg);
@@ -350,7 +335,7 @@ export default function LiveWorkout() {
     }
   }, [telemetry]);
 
-  const { musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, speak, voiceOptions, voiceId, selectVoice, coach, chooseCoach, coachName, trackName, nextTrack } = useWorkoutAudio();
+  const { musicOn, toggleMusic, volume, setVolume, voiceOn, toggleVoice, speak, voiceOptions, voiceId, selectVoice, coach, chooseCoach, coachName, trackName, nextTrack } = useWorkoutAudio(paused);
   const persona = useCoach();
 
   // Keep the latest telemetry in a ref so cue timers read live values without
@@ -807,17 +792,17 @@ export default function LiveWorkout() {
               </>
             ) : (
               <>
-                <MetricCard icon="heart" label="Heart Rate" value={wearableOn ? String(telemetry.hr) : "—"} unit="bpm" status={wearableOn ? `ZONE ${hrZone(telemetry.hr)}` : undefined} statusTone="neutral" accent={colors.red} />
-                <MetricCard icon="speedometer" label="Speed" value={trainerOn ? String(Math.round(telemetry.speed)) : "—"} unit="km/h" accent="#5AC8FA" />
-                <MetricCard icon="sync" label="Cadence" value={trainerOn ? String(telemetry.cadence) : "—"} unit="rpm" status={cadStatus} statusTone={cadInRange ? "good" : "warn"} sub={`TARGET ${CAD_LOW}–${CAD_HIGH}`} accent={colors.green} />
-                <MetricCard icon="flash" label="Power" value={trainerOn ? String(powerVal) : "—"} unit="W" status={powerStatus} statusTone={powerTone} sub={`TARGET ${Math.max(0, targetW - 8)}–${targetW + 8} W`} accent={colors.yellow} />
+                <MetricCard icon="heart" label="Heart Rate" value={wearableOn ? String(telemetry.hr) : "—"} unit="bpm" status={wearableOn ? `ZONE ${hrZone(telemetry.hr)}` : undefined} statusTone="neutral" accent={colors.red} connected={wearableOn} />
+                <MetricCard icon="speedometer" label="Speed" value={trainerOn ? String(Math.round(telemetry.speed)) : "—"} unit="km/h" accent="#5AC8FA" connected={trainerOn} />
+                <MetricCard icon="sync" label="Cadence" value={trainerOn ? String(telemetry.cadence) : "—"} unit="rpm" status={cadStatus} statusTone={cadInRange ? "good" : "warn"} sub={`TARGET ${CAD_LOW}–${CAD_HIGH}`} accent={colors.green} connected={trainerOn} />
+                <MetricCard icon="flash" label="Power" value={trainerOn ? String(powerVal) : "—"} unit="W" status={powerStatus} statusTone={powerTone} sub={`TARGET ${Math.max(0, targetW - 8)}–${targetW + 8} W`} accent={colors.yellow} connected={trainerOn} />
               </>
             )}
           </View>
 
           <View style={[styles.innerRow, tablet && styles.flex1]}>
             <View style={[styles.leftCol, { width: leftW }]}>
-              <ConnectionsPanel trainerOn={trainerOn} wearableOn={wearableOn} powerOn={trainerOn} hrOn={wearableOn} cadenceOn={trainerOn} />
+              <SessionCard elapsed={fmt(telemetry.elapsed)} estFinish={estFinish} riddenKm={riddenKm} totalKm={routeInfo.km} />
             </View>
             <View style={styles.centerCol} onLayout={onCenterLayout}>
               <CoachBanner name={persona.name} message={liveCue} avatar={persona.image} />
@@ -880,20 +865,12 @@ export default function LiveWorkout() {
         </View>
 
         <View style={[styles.rightCol, { width: rightW }]}>
-          <WorkoutCard
-            planName={planName}
-            phase={phaseLabel}
-            week={weekLabel}
-            day={dayLabel}
-            workoutName={workoutTitle}
-            description={selected?.description}
-          />
           <TerrainCard grade={terrain.grade} elevGain={terrain.elev} distanceLeft={Math.max(0, terrain.km - riddenKm)} progress={progress} isClimb={terrain.isClimb} />
           <RouteMapCard title={routeInfo.title} progress={progress} riddenKm={riddenKm} totalKm={routeInfo.km} timeBased={!trainerOn} fill />
         </View>
       </View>
 
-      <StepTimeline title={workoutTitle} steps={stepList} activeIndex={activeSeg?.index ?? -1} remaining={timeLeftLabel} stepProgress={activeSeg ? activeSeg.elapsedInSeg / Math.max(1, activeSeg.segment.durationSec) : 0} onStepPress={(i) => setStepDetail(i)} elapsed={fmt(telemetry.elapsed)} progress={progress} estFinish={estFinish} />
+      <StepTimeline title={workoutTitle} steps={stepList} activeIndex={activeSeg?.index ?? -1} remaining={timeLeftLabel} stepProgress={activeSeg ? activeSeg.elapsedInSeg / Math.max(1, activeSeg.segment.durationSec) : 0} onStepPress={(i) => setStepDetail(i)} progress={progress} />
 
       <AdjustmentsStrip entries={controlLog} />
 

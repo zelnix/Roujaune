@@ -65,14 +65,20 @@ export function AdjustmentsStrip({ entries }: { entries: { id: number; t: string
 
 // ---- Metric card ----------------------------------------------------------
 export function MetricCard({
-  icon, label, value, unit, status, statusTone = "neutral", sub, accent = colors.yellow,
+  icon, label, value, unit, status, statusTone = "neutral", sub, accent = colors.yellow, connected,
 }: {
-  icon: any; label: string; value: string; unit?: string; status?: string; statusTone?: Tone; sub?: string; accent?: string;
+  icon: any; label: string; value: string; unit?: string; status?: string; statusTone?: Tone; sub?: string; accent?: string; connected?: boolean;
 }) {
   return (
     <View style={m.card} testID={`metric-${label.toLowerCase().replace(/\s+/g, "-")}`}>
       <View style={m.head}>
         <Ionicons name={icon} size={16} color={accent} />
+        {connected !== undefined ? (
+          <View style={m.conn} testID={`metric-conn-${label.toLowerCase().replace(/\s+/g, "-")}`}>
+            <View style={[m.connDot, { backgroundColor: connected ? colors.green : "transparent", borderColor: connected ? colors.green : colors.textFaint }]} />
+            <Text style={[m.connText, { color: connected ? colors.green : colors.textFaint }]}>{connected ? "Live" : "Off"}</Text>
+          </View>
+        ) : null}
         <Text style={m.label}>{label}</Text>
         {status ? (
           <View style={[m.pill, { borderColor: toneColor(statusTone), backgroundColor: toneColor(statusTone) + "22" }]}>
@@ -118,6 +124,29 @@ export function ConnectionsPanel({ trainerOn, wearableOn, powerOn, hrOn, cadence
       <View style={[cn.footer, { borderColor: allOn ? colors.green + "55" : colors.border, backgroundColor: allOn ? colors.green + "18" : "rgba(255,255,255,0.03)" }]}>
         <Ionicons name={allOn ? "shield-checkmark" : "information-circle-outline"} size={14} color={allOn ? colors.green : colors.textDim} />
         <Text style={[cn.footerText, { color: allOn ? colors.green : colors.textDim }]}>{allOn ? "All ride data active" : "Some data inactive"}</Text>
+      </View>
+    </View>
+  );
+}
+
+// ---- Session card (Elapsed / Est. finish / Distance) ----------------------
+export function SessionCard({ elapsed, estFinish, riddenKm, totalKm }: { elapsed: string; estFinish: string; riddenKm: number; totalKm: number }) {
+  return (
+    <View style={sc.panel} testID="session-card">
+      <View style={sc.header}><Ionicons name="stopwatch-outline" size={15} color={colors.yellow} /><Text style={sc.title}>SESSION</Text></View>
+      <View style={sc.stat}>
+        <Text style={sc.label}>ELAPSED</Text>
+        <Text style={sc.value} testID="session-elapsed">{elapsed}</Text>
+      </View>
+      <View style={sc.divider} />
+      <View style={sc.stat}>
+        <Text style={sc.label}>EST. FINISH</Text>
+        <Text style={sc.value} testID="session-estfinish">{estFinish}</Text>
+      </View>
+      <View style={sc.divider} />
+      <View style={sc.stat}>
+        <Text style={sc.label}>DISTANCE</Text>
+        <Text style={sc.value} testID="session-distance">{riddenKm.toFixed(1)}<Text style={sc.unit}> / {totalKm.toFixed(1)} km</Text></Text>
       </View>
     </View>
   );
@@ -237,10 +266,10 @@ function ProfileSeg({ step, status, width, fill, onPress }: { step: TimelineStep
 }
 
 export function StepTimeline({
-  title, steps, activeIndex, remaining, stepProgress = 0, onStepPress, elapsed, progress, estFinish,
+  title, steps, activeIndex, remaining, stepProgress = 0, onStepPress, progress,
 }: {
   title: string; steps: TimelineStep[]; activeIndex: number; remaining?: string; stepProgress?: number; onStepPress: (index: number) => void;
-  elapsed?: string; progress?: number; estFinish?: string;
+  progress?: number;
 }) {
   const MIN = 150;
   const total = steps.reduce((a, s) => a + Math.max(1, s.durationSec), 0) || 1;
@@ -277,15 +306,6 @@ export function StepTimeline({
             <Text style={st.lapsLabel}>REMAINING</Text>
             {steps.length ? <Text style={st.lapsStep}>STEP {Math.min(activeIndex + 1, steps.length)} / {steps.length}</Text> : null}
           </View>
-        </View>
-
-        <View style={st.timingRight} testID="timeline-timing">
-          {elapsed ? (
-            <View style={st.timeStat}><Text style={st.timeLabel}>ELAPSED</Text><Text style={st.timeValue}>{elapsed}</Text></View>
-          ) : null}
-          {estFinish ? (
-            <View style={st.timeStat}><Text style={st.timeLabel}>EST. FINISH</Text><Text style={st.timeValue}>{estFinish}</Text></View>
-          ) : null}
         </View>
       </View>
 
@@ -543,6 +563,9 @@ const aj = StyleSheet.create({
 const m = StyleSheet.create({
   card: { ...card, flex: 1, paddingHorizontal: 16, paddingVertical: 14, minWidth: 150 },
   head: { flexDirection: "row", alignItems: "center", gap: 7 },
+  conn: { flexDirection: "row", alignItems: "center", gap: 4 },
+  connDot: { width: 8, height: 8, borderRadius: 4, borderWidth: 1.5 },
+  connText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.5, textTransform: "uppercase" },
   label: { color: colors.textDim, fontSize: 11.5, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase", flex: 1 },
   pill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, borderWidth: 1 },
   pillText: { fontSize: 11, fontWeight: "800", letterSpacing: 0.5 },
@@ -565,6 +588,17 @@ const cn = StyleSheet.create({
   divider: { height: 1, backgroundColor: colors.borderSoft, marginVertical: 6 },
   footer: { flexDirection: "row", alignItems: "center", gap: 7, borderWidth: 1, borderRadius: radius.md, paddingVertical: 9, paddingHorizontal: 11, marginTop: 10 },
   footerText: { fontSize: 11.5, fontWeight: "700" },
+});
+
+const sc = StyleSheet.create({
+  panel: { ...card, padding: 16, gap: 2 },
+  header: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 10 },
+  title: { color: colors.white, fontSize: 12.5, fontWeight: "800", letterSpacing: 1 },
+  stat: { paddingVertical: 6 },
+  label: { color: colors.textFaint, fontSize: 10, fontWeight: "800", letterSpacing: 1, marginBottom: 3 },
+  value: { color: colors.white, fontSize: 26, fontWeight: "900", fontVariant: ["tabular-nums"], letterSpacing: 0.5 },
+  unit: { color: colors.textDim, fontSize: 14, fontWeight: "700" },
+  divider: { height: 1, backgroundColor: colors.borderSoft, marginVertical: 4 },
 });
 
 const cb = StyleSheet.create({

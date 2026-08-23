@@ -111,7 +111,7 @@ const PITCH = COACH_PITCH;
 /** Cycling music + the coach's spoken cues.
  * Music softens (ducks) while a cue is spoken, then returns to full volume.
  * Alberto speaks as a male voice with a mild Spanish accent (reading English). */
-export function useWorkoutAudio() {
+export function useWorkoutAudio(paused = false) {
   // Random rotation state: a shuffled order + a pointer into it. `trackIdx` is
   // the current track (surfaced for the UI's "now playing" label if needed).
   const orderRef = useRef<number[]>(shuffledOrder(MUSIC_TRACKS.length));
@@ -208,13 +208,14 @@ export function useWorkoutAudio() {
 
   const apply = useCallback(() => {
     try {
-      player.volume = musicOn ? volume * (speaking.current ? DUCK : 1) : 0;
-      if (musicOn) player.play();
+      const active = musicOn && !paused;
+      player.volume = active ? volume * (speaking.current ? DUCK : 1) : 0;
+      if (active) player.play();
       else player.pause();
     } catch {
       /* player not ready yet */
     }
-  }, [player, musicOn, volume]);
+  }, [player, musicOn, volume, paused]);
 
   const status = useAudioPlayerStatus(player);
 
@@ -235,10 +236,10 @@ export function useWorkoutAudio() {
     try {
       player.replace({ uri: MUSIC_TRACKS[idx].uri });
       player.loop = false;
-      player.volume = musicOn ? volume * (speaking.current ? DUCK : 1) : 0;
-      if (musicOn) player.play();
+      player.volume = musicOn && !paused ? volume * (speaking.current ? DUCK : 1) : 0;
+      if (musicOn && !paused) player.play();
     } catch { /* player not ready */ }
-  }, [player, musicOn, volume]);
+  }, [player, musicOn, volume, paused]);
 
   // When the current track finishes, roll to the next random one.
   const finishedRef = useRef(false);
@@ -254,6 +255,17 @@ export function useWorkoutAudio() {
   // Start / update playback as soon as the track is loaded (fixes music not
   // playing until the volume was nudged).
   useEffect(() => { if (status?.isLoaded) apply(); }, [status?.isLoaded, apply]);
+
+  // Pausing the workout silences everything immediately: stop the coach's
+  // speech and pause the music. Resuming re-applies music (handled by `apply`).
+  useEffect(() => {
+    if (paused) {
+      speaking.current = false;
+      try { Speech.stop(); player.pause(); } catch { /* noop */ }
+    } else {
+      apply();
+    }
+  }, [paused]);
 
   useEffect(() => {
     return () => { try { Speech.stop(); player.pause(); } catch { /* noop */ } };
