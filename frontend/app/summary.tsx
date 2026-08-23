@@ -10,7 +10,7 @@ import { captureRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 
 import { colors, radius, spacing, shadow } from "@/src/theme";
-import { useSummary, useCoachDebrief, useIntervals } from "@/src/lib/summary";
+import { useSummary, useCoachDebrief, useIntervals, useKmSplits, KmSplit } from "@/src/lib/summary";
 import { autoPushCompletedRide } from "@/src/lib/health";
 import { useCoach } from "@/src/lib/coach-persona";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
@@ -68,6 +68,7 @@ export default function WorkoutComplete() {
   const { stats, route, needsManual, saved, submitManual, recordedElapsed, adjustments } = useSummary();
   const { debrief, loading: debriefLoading } = useCoachDebrief(stats, route);
   const { intervals, overall: intervalOverall, hasData: intervalHasData, ftp: intervalFtp } = useIntervals();
+  const kmSplits = useKmSplits();
   const persona = useCoach();
   const [showChat, setShowChat] = React.useState(false);
   const [showAnalysis, setShowAnalysis] = React.useState(false);
@@ -153,6 +154,7 @@ export default function WorkoutComplete() {
                 <ComplianceCard stats={stats} compact={phone} />
                 <IntervalTargetsCard intervals={intervals} overall={intervalOverall} hasData={intervalHasData} compact={phone} />
                 <ChartsRow stats={stats} width={mainW} vertical={phone} />
+                <KmSplitsCard splits={kmSplits} />
                 {phone && <RightColumn score={78} phone route={route} />}
                 <SyncExportRow onToast={showToast} compact={phone} />
               </View>
@@ -207,6 +209,45 @@ function RightColumn({ score, phone, route }: { score: number; phone: boolean; r
       <View style={phone && styles.rightWrapItemWide}><RouteSummaryCard route={route} /></View>
       <View style={phone && styles.rightWrapItem}><AchievementsCard /></View>
       <View style={phone && styles.rightWrapItem}><RecoveryCard score={score} /></View>
+    </View>
+  );
+}
+
+// Per-kilometre split times so riders can review their pacing at a glance.
+// Each bar's length is proportional to that km's time (longer = slower); the
+// fastest km is flagged green and the slowest red.
+function KmSplitsCard({ splits }: { splits: KmSplit[] }) {
+  if (!splits.length) return null;
+  const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
+  const maxT = Math.max(...splits.map((s) => s.timeSec));
+  return (
+    <View style={styles.splitCard} testID="km-splits-card">
+      <View style={styles.lapHeadRow}>
+        <Ionicons name="speedometer-outline" size={15} color={colors.yellow} />
+        <Text style={styles.lapTitle}>Kilometre Splits</Text>
+        <Text style={styles.lapHint}>Your pace, km by km</Text>
+      </View>
+      {splits.map((s) => {
+        const tone = s.fastest ? colors.green : s.slowest ? colors.red : colors.yellow;
+        const w = maxT > 0 ? Math.max(8, (s.timeSec / maxT) * 100) : 0;
+        return (
+          <View key={s.km} style={styles.splitRow} testID={`km-split-${s.km}`}>
+            <Text style={styles.splitKm}>KM {s.km}</Text>
+            <View style={styles.splitBarTrack}>
+              <View style={[styles.splitBarFill, { width: `${w}%`, backgroundColor: tone + "cc" }]} />
+            </View>
+            <Text style={styles.splitTime}>{mmss(s.timeSec)}</Text>
+            <Text style={styles.splitSpeed}>{s.avgSpeedKmh} km/h</Text>
+            {s.fastest ? (
+              <Ionicons name="flash" size={13} color={colors.green} />
+            ) : s.slowest ? (
+              <Ionicons name="trending-down" size={13} color={colors.red} />
+            ) : (
+              <View style={styles.splitIconSpacer} />
+            )}
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -437,6 +478,14 @@ const styles = StyleSheet.create({
   analysisTitle: { color: colors.white, fontSize: 20, fontWeight: "900" },
   analysisScroll: { paddingBottom: spacing.md, gap: spacing.md },
   lapCard: { backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md },
+  splitCard: { backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md },
+  splitRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 5 },
+  splitKm: { width: 48, color: colors.textDim, fontSize: 12, fontWeight: "800", letterSpacing: 0.5 },
+  splitBarTrack: { flex: 1, height: 12, borderRadius: 6, backgroundColor: "rgba(255,255,255,0.08)", overflow: "hidden" },
+  splitBarFill: { height: "100%", borderRadius: 6 },
+  splitTime: { width: 50, textAlign: "right", color: colors.white, fontSize: 13, fontWeight: "800", fontVariant: ["tabular-nums"] },
+  splitSpeed: { width: 66, textAlign: "right", color: colors.textDim, fontSize: 11.5, fontWeight: "700", fontVariant: ["tabular-nums"] },
+  splitIconSpacer: { width: 13 },
   lapHeadRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
   lapTitle: { color: colors.white, fontSize: 15, fontWeight: "800" },
   lapHint: { color: colors.textFaint, fontSize: 11, fontWeight: "600", marginLeft: 4 },

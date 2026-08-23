@@ -294,9 +294,9 @@ function ProfileSeg({ step, status, width, fill, onPress }: { step: TimelineStep
 }
 
 export function StepTimeline({
-  title, steps, activeIndex, remaining, stepProgress = 0, onStepPress, progress,
+  steps, activeIndex, remaining, stepProgress = 0, onStepPress, progress,
 }: {
-  title: string; steps: TimelineStep[]; activeIndex: number; remaining?: string; stepProgress?: number; onStepPress: (index: number) => void;
+  steps: TimelineStep[]; activeIndex: number; remaining?: string; stepProgress?: number; onStepPress: (index: number) => void;
   progress?: number;
 }) {
   const MIN = 150;
@@ -321,22 +321,6 @@ export function StepTimeline({
   }, [activeIndex, chartW]);
   return (
     <View style={st.wrap} testID="interval-timeline">
-      <View style={st.head}>
-        <View style={st.titleWrap}>
-          <Ionicons name="stats-chart" size={15} color={colors.yellow} />
-          <Text style={st.title} numberOfLines={1}>{title}</Text>
-        </View>
-
-        <View style={st.laps} testID="laps-timer">
-          <Ionicons name="time-outline" size={22} color={colors.yellow} />
-          <Text style={st.lapsTime}>{remaining ?? "--:--"}</Text>
-          <View style={st.lapsMeta}>
-            <Text style={st.lapsLabel}>REMAINING</Text>
-            {steps.length ? <Text style={st.lapsStep}>STEP {Math.min(activeIndex + 1, steps.length)} / {steps.length}</Text> : null}
-          </View>
-        </View>
-      </View>
-
       {pct != null ? (
         <View style={st.progressRow}>
           <View style={st.progressTrack}><View style={[st.progressFill, { width: `${pct}%` }]} /></View>
@@ -362,6 +346,9 @@ export function StepTimeline({
                   <Text style={st.nnCountLabel}>LEFT</Text>
                 </View>
               ) : null}
+              <View style={st.nnProgressTrack} pointerEvents="none">
+                <View style={[st.nnProgressFill, { width: `${Math.round(Math.max(0, Math.min(1, stepProgress)) * 100)}%` }]} />
+              </View>
             </Pressable>
             <Ionicons name="arrow-forward" size={22} color={colors.textDim} style={st.nnArrow} />
             <Pressable style={[st.nnCell, st.nnNext]} onPress={() => nxt && onStepPress(nxt.index)} disabled={!nxt} testID="now-next-next" accessibilityRole="button" accessibilityLabel={nxt ? `Next stage ${nxt.label}. Tap for details` : "Last stage"}>
@@ -683,7 +670,7 @@ const st = StyleSheet.create({
   progressFill: { height: "100%", backgroundColor: colors.yellow, borderRadius: 4 },
   progressPct: { color: colors.yellow, fontSize: 11, fontWeight: "800", minWidth: 34, textAlign: "right" },
   nowNext: { flexDirection: "row", alignItems: "stretch", gap: 8 },
-  nnCell: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 14, paddingVertical: 10, minHeight: 58 },
+  nnCell: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 14, paddingVertical: 10, minHeight: 58, overflow: "hidden" },
   nnNow: { backgroundColor: colors.yellow + "16", borderColor: colors.yellow + "44" },
   nnNext: { backgroundColor: "rgba(255,255,255,0.04)", borderColor: colors.border },
   nnArrow: { alignSelf: "center" },
@@ -698,6 +685,8 @@ const st = StyleSheet.create({
   nnCountdown: { alignItems: "flex-end", marginLeft: 6, paddingLeft: 12, borderLeftWidth: 1, borderLeftColor: colors.yellow + "33" },
   nnCountValue: { color: colors.yellow, fontSize: 22, fontWeight: "900", fontVariant: ["tabular-nums"], letterSpacing: 0.5 },
   nnCountLabel: { color: colors.yellow, fontSize: 9, fontWeight: "800", letterSpacing: 1.5, marginTop: -1 },
+  nnProgressTrack: { position: "absolute", left: 0, right: 0, bottom: 0, height: 4, backgroundColor: "rgba(255,255,255,0.10)" },
+  nnProgressFill: { height: "100%", backgroundColor: colors.yellow },
   chart: { flexDirection: "row", alignItems: "flex-end", height: 140, gap: 0 },
   seg: { height: "100%", justifyContent: "flex-end", paddingHorizontal: 2 },
   segBar: { width: "100%", borderRadius: 7, borderWidth: 1, overflow: "hidden", justifyContent: "flex-end" },

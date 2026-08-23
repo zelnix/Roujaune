@@ -168,6 +168,58 @@ export function useIntervals(): IntervalResult {
   return useMemo(() => computeIntervals(), []);
 }
 
+// ---- Per-kilometre splits -------------------------------------------------
+export type KmSplit = { km: number; timeSec: number; avgPower: number; avgHr: number; avgSpeedKmh: number; fastest?: boolean; slowest?: boolean };
+
+/** Reconstruct per-kilometre split times by integrating recorded speed over
+ * the ride. Samples are ~evenly spaced in time (dt = elapsed / n), so we bucket
+ * each sample into the kilometre it falls in and sum its dt. Only complete
+ * kilometres are returned; the fastest/slowest are flagged for pacing review. */
+export function computeKmSplits(): KmSplit[] {
+  const rec = rideRecorder.snapshot();
+  const samples = rec.samples;
+  const n = samples.length;
+  const duration = rec.elapsed || 0;
+  if (n < 5 || duration <= 0) return [];
+  const dt = duration / n;
+  let cum = 0; // cumulative km
+  const buckets: { t: number; p: number; h: number; hc: number; sp: number; c: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    const s = samples[i];
+    const kmIdx = Math.floor(cum);
+    if (!buckets[kmIdx]) buckets[kmIdx] = { t: 0, p: 0, h: 0, hc: 0, sp: 0, c: 0 };
+    const b = buckets[kmIdx];
+    b.t += dt; b.p += s.power; b.sp += s.speed; b.c += 1;
+    if (s.hr > 0) { b.h += s.hr; b.hc += 1; }
+    cum += (s.speed * dt) / 3600; // km/h * s / 3600 = km
+  }
+  const fullKms = Math.floor(cum + 1e-6);
+  if (fullKms < 1) return [];
+  const splits: KmSplit[] = [];
+  for (let k = 0; k < fullKms && k < buckets.length; k++) {
+    const b = buckets[k];
+    if (!b || b.c === 0) continue;
+    splits.push({
+      km: k + 1,
+      timeSec: b.t,
+      avgPower: Math.round(b.p / b.c),
+      avgHr: b.hc ? Math.round(b.h / b.hc) : 0,
+      avgSpeedKmh: +(b.sp / b.c).toFixed(1),
+    });
+  }
+  if (splits.length > 1) {
+    const times = splits.map((s) => s.timeSec);
+    const min = Math.min(...times), max = Math.max(...times);
+    splits.forEach((s) => { s.fastest = s.timeSec === min; s.slowest = s.timeSec === max && max !== min; });
+  }
+  return splits;
+}
+
+/** Memoised per-kilometre splits for the summary screen. */
+export function useKmSplits(): KmSplit[] {
+  return useMemo(() => computeKmSplits(), []);
+}
+
 /** Fetch computed ride aggregates from the backend, falling back to the
  * polished reference dataset on any error or when no ride was recorded. */
 export function useSummary() {
