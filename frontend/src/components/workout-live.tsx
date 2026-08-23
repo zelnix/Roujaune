@@ -218,7 +218,7 @@ export type TimelineStep = {
 export type StepStatus = "done" | "current" | "future";
 
 function ProfileSeg({ step, status, width, fill, onPress }: { step: TimelineStep; status: StepStatus; width: number; fill: number; onPress: () => void }) {
-  const h = 74 + Math.max(0, Math.min(1, step.intensity)) * 58;
+  const h = Math.max(110, 82 + Math.max(0, Math.min(1, step.intensity)) * 52);
   const base = status === "future" ? "rgba(255,255,255,0.12)" : status === "done" ? colors.yellow + "44" : step.color + "33";
   const fillPct = status === "done" ? 100 : status === "current" ? Math.max(0, Math.min(1, fill)) * 100 : 0;
   const dim = status === "future";
@@ -227,8 +227,8 @@ function ProfileSeg({ step, status, width, fill, onPress }: { step: TimelineStep
       <View style={[st.segBar, { height: h, backgroundColor: base, borderColor: status === "current" ? colors.yellow : "rgba(255,255,255,0.10)" }]}>
         {fillPct > 0 ? <View style={[st.segFill, { width: `${fillPct}%` }]} /> : null}
         <View style={[st.segLabel, { pointerEvents: "none" }]}>
-          <Text style={[st.segName, dim && { color: colors.textDim }]} numberOfLines={1}>{step.index + 1}. {step.label}</Text>
-          {step.desc ? <Text style={[st.segDesc, dim && { color: colors.textFaint }]} numberOfLines={1}>{step.desc}</Text> : null}
+          <Text style={[st.segName, dim && { color: colors.textDim }]} numberOfLines={2}>{step.index + 1}. {step.label}</Text>
+          {step.desc ? <Text style={[st.segDesc, dim && { color: colors.textFaint }]} numberOfLines={2}>{step.desc}</Text> : null}
           <Text style={[st.segMeta, dim && { color: colors.textFaint }]} numberOfLines={1}>{step.duration}{step.watts > 0 ? ` · ${step.watts} W` : ""}</Text>
         </View>
       </View>
@@ -295,6 +295,41 @@ export function StepTimeline({
           <Text style={st.progressPct}>{pct}%</Text>
         </View>
       ) : null}
+
+      {steps.length ? (() => {
+        const cur = steps[Math.max(0, Math.min(activeIndex, steps.length - 1))];
+        const nxt = activeIndex + 1 < steps.length ? steps[activeIndex + 1] : null;
+        return (
+          <View style={st.nowNext} testID="now-next-strip">
+            <View style={[st.nnCell, st.nnNow]}>
+              <View style={st.nnTagNow}><Text style={st.nnTagNowText}>NOW</Text></View>
+              <View style={[st.nnDot, { backgroundColor: cur.color }]} />
+              <View style={st.nnBody}>
+                <Text style={st.nnName} numberOfLines={1}>{cur.index + 1}. {cur.label}</Text>
+                <Text style={st.nnMeta} numberOfLines={1}>{cur.zoneLabel}{cur.watts > 0 ? ` · ${cur.watts} W` : ""}</Text>
+              </View>
+            </View>
+            <Ionicons name="arrow-forward" size={22} color={colors.textDim} style={st.nnArrow} />
+            <View style={[st.nnCell, st.nnNext]}>
+              <View style={st.nnTagNext}><Text style={st.nnTagNextText}>NEXT</Text></View>
+              {nxt ? (
+                <>
+                  <View style={[st.nnDot, { backgroundColor: nxt.color }]} />
+                  <View style={st.nnBody}>
+                    <Text style={st.nnName} numberOfLines={1}>{nxt.index + 1}. {nxt.label}</Text>
+                    <Text style={st.nnMeta} numberOfLines={1}>{nxt.duration}{nxt.watts > 0 ? ` · ${nxt.watts} W` : ""}</Text>
+                  </View>
+                </>
+              ) : (
+                <View style={st.nnBody}>
+                  <Text style={st.nnName} numberOfLines={1}>Finish</Text>
+                  <Text style={st.nnMeta} numberOfLines={1}>Last step — bring it home</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        );
+      })() : null}
 
       <View onLayout={(e) => setChartW(Math.round(e.nativeEvent.layout.width))}>
         <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} scrollEnabled={scrollable}>
@@ -574,6 +609,19 @@ const st = StyleSheet.create({
   progressTrack: { flex: 1, height: 7, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.1)", overflow: "hidden" },
   progressFill: { height: "100%", backgroundColor: colors.yellow, borderRadius: 4 },
   progressPct: { color: colors.yellow, fontSize: 11, fontWeight: "800", minWidth: 34, textAlign: "right" },
+  nowNext: { flexDirection: "row", alignItems: "stretch", gap: 8 },
+  nnCell: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 14, paddingVertical: 10, minHeight: 58 },
+  nnNow: { backgroundColor: colors.yellow + "16", borderColor: colors.yellow + "44" },
+  nnNext: { backgroundColor: "rgba(255,255,255,0.04)", borderColor: colors.border },
+  nnArrow: { alignSelf: "center" },
+  nnDot: { width: 12, height: 12, borderRadius: 6 },
+  nnBody: { flex: 1 },
+  nnTagNow: { backgroundColor: colors.yellow, borderRadius: radius.sm, paddingHorizontal: 8, paddingVertical: 4 },
+  nnTagNowText: { color: colors.bg, fontSize: 11, fontWeight: "900", letterSpacing: 1 },
+  nnTagNext: { backgroundColor: "rgba(255,255,255,0.08)", borderRadius: radius.sm, paddingHorizontal: 8, paddingVertical: 4 },
+  nnTagNextText: { color: colors.textDim, fontSize: 11, fontWeight: "900", letterSpacing: 1 },
+  nnName: { color: colors.white, fontSize: 16, fontWeight: "800" },
+  nnMeta: { color: colors.textDim, fontSize: 12.5, fontWeight: "700", marginTop: 2 },
   chart: { flexDirection: "row", alignItems: "flex-end", height: 140, gap: 0 },
   seg: { height: "100%", justifyContent: "flex-end", paddingHorizontal: 2 },
   segBar: { width: "100%", borderRadius: 7, borderWidth: 1, overflow: "hidden", justifyContent: "flex-end" },

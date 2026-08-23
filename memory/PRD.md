@@ -1002,3 +1002,7 @@ User wanted an in-app rating + feedback capture (fb50-style) opened from Setting
 
 ## Bigger/more readable ride stages (2026-06 fork)
 - workout-live.tsx StepTimeline/ProfileSeg made larger for readability: min bar width MIN 104->150; bar height h 40+intensity*52 -> 74+intensity*58 (range 74-132); chart height 104->140; seg padH 1->2; segBar radius 5->7; segLabel padH 6->9 padV 5->8 gap 1->3. Font bumps: segName 10.5->13.5, segDesc 9->11.5 (lineHeight 15), segMeta 9.5->12. Labels stay numberOfLines=1 to avoid clipping on shorter bars. Verified on /workout (Threshold Climb, steps legible).
+
+## Full stage text wrap + Now & Next strip (2026-06 fork)
+- Full stage text: workout-live.tsx ProfileSeg segName/segDesc now numberOfLines=2 (wrap, no "…"). Bar height h = max(110, 82 + intensity*52) so wrapped 2-line name+desc+meta never clips (segBar overflow hidden retained for fill). chart height 140 covers max 134.
+- Now & Next strip: StepTimeline renders a glanceable strip (testID now-next-strip) after the progress row — NOW cell (yellow tag + zone-colour dot + "n. Label" + zoneLabel · target W, current step clamped via Math.max(0,min(activeIndex,len-1))) → arrow → NEXT cell (grey tag + next step label + duration · W, or "Finish / Last step — bring it home" when none). Styles added to `st` (nowNext/nnCell/nnNow/nnNext/nnArrow/nnDot/nnBody/nnTag*/nnName/nnMeta). Verified on /workout (Threshold Climb).
