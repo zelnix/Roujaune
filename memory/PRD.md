@@ -1006,3 +1006,7 @@ User wanted an in-app rating + feedback capture (fb50-style) opened from Setting
 ## Full stage text wrap + Now & Next strip (2026-06 fork)
 - Full stage text: workout-live.tsx ProfileSeg segName/segDesc now numberOfLines=2 (wrap, no "…"). Bar height h = max(110, 82 + intensity*52) so wrapped 2-line name+desc+meta never clips (segBar overflow hidden retained for fill). chart height 140 covers max 134.
 - Now & Next strip: StepTimeline renders a glanceable strip (testID now-next-strip) after the progress row — NOW cell (yellow tag + zone-colour dot + "n. Label" + zoneLabel · target W, current step clamped via Math.max(0,min(activeIndex,len-1))) → arrow → NEXT cell (grey tag + next step label + duration · W, or "Finish / Last step — bring it home" when none). Styles added to `st` (nowNext/nnCell/nnNow/nnNext/nnArrow/nnDot/nnBody/nnTag*/nnName/nnMeta). Verified on /workout (Threshold Climb).
+
+## Now countdown + tappable Now/Next detail (2026-06 fork)
+- Now countdown: StepTimeline NOW cell shows live time-left (remaining prop = timeLeftLabel from workout.tsx) as big yellow value + "LEFT" label (testID now-countdown), separated by a left divider. Styles nnCountdown/nnCountValue/nnCountLabel added to `st`.
+- Tappable Now/Next: NOW and NEXT cells are now Pressables (testID now-next-now / now-next-next) calling onStepPress(cur.index)/onStepPress(nxt.index) -> opens existing StepDetailModal (stepDetail state in workout.tsx). NEXT disabled when no next step. Verified: NOW shows 7:05 LEFT and tap opens STEP 1/13 Warm-up detail.

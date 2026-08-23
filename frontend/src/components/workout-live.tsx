@@ -301,16 +301,22 @@ export function StepTimeline({
         const nxt = activeIndex + 1 < steps.length ? steps[activeIndex + 1] : null;
         return (
           <View style={st.nowNext} testID="now-next-strip">
-            <View style={[st.nnCell, st.nnNow]}>
+            <Pressable style={[st.nnCell, st.nnNow]} onPress={() => onStepPress(cur.index)} testID="now-next-now" accessibilityRole="button" accessibilityLabel={`Current stage ${cur.label}. Tap for details`}>
               <View style={st.nnTagNow}><Text style={st.nnTagNowText}>NOW</Text></View>
               <View style={[st.nnDot, { backgroundColor: cur.color }]} />
               <View style={st.nnBody}>
                 <Text style={st.nnName} numberOfLines={1}>{cur.index + 1}. {cur.label}</Text>
                 <Text style={st.nnMeta} numberOfLines={1}>{cur.zoneLabel}{cur.watts > 0 ? ` · ${cur.watts} W` : ""}</Text>
               </View>
-            </View>
+              {remaining ? (
+                <View style={st.nnCountdown}>
+                  <Text style={st.nnCountValue} testID="now-countdown">{remaining}</Text>
+                  <Text style={st.nnCountLabel}>LEFT</Text>
+                </View>
+              ) : null}
+            </Pressable>
             <Ionicons name="arrow-forward" size={22} color={colors.textDim} style={st.nnArrow} />
-            <View style={[st.nnCell, st.nnNext]}>
+            <Pressable style={[st.nnCell, st.nnNext]} onPress={() => nxt && onStepPress(nxt.index)} disabled={!nxt} testID="now-next-next" accessibilityRole="button" accessibilityLabel={nxt ? `Next stage ${nxt.label}. Tap for details` : "Last stage"}>
               <View style={st.nnTagNext}><Text style={st.nnTagNextText}>NEXT</Text></View>
               {nxt ? (
                 <>
@@ -326,7 +332,7 @@ export function StepTimeline({
                   <Text style={st.nnMeta} numberOfLines={1}>Last step — bring it home</Text>
                 </View>
               )}
-            </View>
+            </Pressable>
           </View>
         );
       })() : null}
@@ -622,6 +628,9 @@ const st = StyleSheet.create({
   nnTagNextText: { color: colors.textDim, fontSize: 11, fontWeight: "900", letterSpacing: 1 },
   nnName: { color: colors.white, fontSize: 16, fontWeight: "800" },
   nnMeta: { color: colors.textDim, fontSize: 12.5, fontWeight: "700", marginTop: 2 },
+  nnCountdown: { alignItems: "flex-end", marginLeft: 6, paddingLeft: 12, borderLeftWidth: 1, borderLeftColor: colors.yellow + "33" },
+  nnCountValue: { color: colors.yellow, fontSize: 22, fontWeight: "900", fontVariant: ["tabular-nums"], letterSpacing: 0.5 },
+  nnCountLabel: { color: colors.yellow, fontSize: 9, fontWeight: "800", letterSpacing: 1.5, marginTop: -1 },
   chart: { flexDirection: "row", alignItems: "flex-end", height: 140, gap: 0 },
   seg: { height: "100%", justifyContent: "flex-end", paddingHorizontal: 2 },
   segBar: { width: "100%", borderRadius: 7, borderWidth: 1, overflow: "hidden", justifyContent: "flex-end" },
