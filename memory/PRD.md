@@ -1034,3 +1034,8 @@ User wanted an in-app rating + feedback capture (fb50-style) opened from Setting
 ## Session card cleanup + device name on metric cards (2026-06 fork)
 - Removed the DistanceRing % label and the "arriving ~X min" ETA line from SessionCard; ring graphic (progress arc) kept, no number. Dropped speedKmh prop (and workout.tsx pass) + sc.ringWrap/eta/ringPct styles.
 - MetricCard now shows the CONNECTED DEVICE NAME instead of "Live": new deviceName prop -> badge text = deviceName||"Connected" when connected, else "Off". connText maxWidth 96 + numberOfLines 1. workout.tsx computes hrName/trainerName from ble.connected (name heuristics; "Demo" in demo mode, "HR Sensor"/"Trainer" fallbacks) and passes deviceName to the HR (hrName) and Speed/Cadence/Power (trainerName) cards. Verified: HR badge shows "DEMO" in demo; no eta; no errors.
+
+## Tap-to-pair + battery on metric cards; removed distance ring + timeline progress bar (2026-06 fork)
+- MetricCard device label is now tappable (onDevicePress -> setShowBle(true) opens Bluetooth sensors panel; verified panel opens) and shows a battery icon+% next to the device name when the connected sensor reports battery (ble.battery[deviceId]); disconnected label reads "Pair". workout.tsx computes hrBattery/trainerBattery from ble.battery and passes onDevicePress+battery to the four metric cards.
+- Removed DistanceRing from SessionCard (deleted component, Circle import, distRow/distText styles) — DISTANCE is now a plain stat.
+- Removed the overall horizontal progress bar (st.progressRow) above the NOW/NEXT strip in StepTimeline; dropped the now-unused `progress` prop (+ pct) and the workout.tsx pass. Verified: distance-ring absent, progress bar gone, no errors.

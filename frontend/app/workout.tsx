@@ -517,6 +517,8 @@ export default function LiveWorkout() {
   const trainerDevice = ble.connected.find((d) => /kickr|trainer|tacx|wahoo|saris|elite|neo|flux|power|bike|hammer|suito|assioma|stages|quarq/i.test(d.name)) ?? ble.connected.find((d) => d.id !== hrDevice?.id) ?? ble.connected[0];
   const hrName = settings.demoMode ? "Demo" : (hrDevice?.name ?? (bleWearable ? "HR Sensor" : undefined));
   const trainerName = settings.demoMode ? "Demo" : (trainerDevice?.name ?? (bleTrainer ? "Trainer" : undefined));
+  const hrBattery = hrDevice ? ble.battery[hrDevice.id] ?? null : null;
+  const trainerBattery = trainerDevice ? ble.battery[trainerDevice.id] ?? null : null;
   // Keep the extend-advice context (workout type + wearable state) current.
   React.useEffect(() => {
     extendMetaRef.current = { type_id: selected?.typeId ?? "endurance", wearable_on: wearableOn };
@@ -798,10 +800,10 @@ export default function LiveWorkout() {
               </>
             ) : (
               <>
-                <MetricCard icon="heart" label="Heart Rate" value={wearableOn ? String(telemetry.hr) : "—"} unit="bpm" status={wearableOn ? `ZONE ${hrZone(telemetry.hr)}` : undefined} statusTone="neutral" accent={colors.red} connected={wearableOn} deviceName={hrName} />
-                <MetricCard icon="speedometer" label="Speed" value={trainerOn ? String(Math.round(telemetry.speed)) : "—"} unit="km/h" accent="#5AC8FA" connected={trainerOn} deviceName={trainerName} />
-                <MetricCard icon="sync" label="Cadence" value={trainerOn ? String(telemetry.cadence) : "—"} unit="rpm" status={cadStatus} statusTone={cadInRange ? "good" : "warn"} sub={`TARGET ${CAD_LOW}–${CAD_HIGH}`} accent={colors.green} connected={trainerOn} deviceName={trainerName} />
-                <MetricCard icon="flash" label="Power" value={trainerOn ? String(powerVal) : "—"} unit="W" status={powerStatus} statusTone={powerTone} sub={`TARGET ${Math.max(0, targetW - 8)}–${targetW + 8} W`} accent={colors.yellow} connected={trainerOn} deviceName={trainerName} />
+                <MetricCard icon="heart" label="Heart Rate" value={wearableOn ? String(telemetry.hr) : "—"} unit="bpm" status={wearableOn ? `ZONE ${hrZone(telemetry.hr)}` : undefined} statusTone="neutral" accent={colors.red} connected={wearableOn} deviceName={hrName} battery={hrBattery} onDevicePress={() => setShowBle(true)} />
+                <MetricCard icon="speedometer" label="Speed" value={trainerOn ? String(Math.round(telemetry.speed)) : "—"} unit="km/h" accent="#5AC8FA" connected={trainerOn} deviceName={trainerName} battery={trainerBattery} onDevicePress={() => setShowBle(true)} />
+                <MetricCard icon="sync" label="Cadence" value={trainerOn ? String(telemetry.cadence) : "—"} unit="rpm" status={cadStatus} statusTone={cadInRange ? "good" : "warn"} sub={`TARGET ${CAD_LOW}–${CAD_HIGH}`} accent={colors.green} connected={trainerOn} deviceName={trainerName} battery={trainerBattery} onDevicePress={() => setShowBle(true)} />
+                <MetricCard icon="flash" label="Power" value={trainerOn ? String(powerVal) : "—"} unit="W" status={powerStatus} statusTone={powerTone} sub={`TARGET ${Math.max(0, targetW - 8)}–${targetW + 8} W`} accent={colors.yellow} connected={trainerOn} deviceName={trainerName} battery={trainerBattery} onDevicePress={() => setShowBle(true)} />
               </>
             )}
           </View>
@@ -876,7 +878,7 @@ export default function LiveWorkout() {
         </View>
       </View>
 
-      <StepTimeline steps={stepList} activeIndex={activeSeg?.index ?? -1} remaining={timeLeftLabel} stepProgress={activeSeg ? activeSeg.elapsedInSeg / Math.max(1, activeSeg.segment.durationSec) : 0} onStepPress={(i) => setStepDetail(i)} progress={progress} />
+      <StepTimeline steps={stepList} activeIndex={activeSeg?.index ?? -1} remaining={timeLeftLabel} stepProgress={activeSeg ? activeSeg.elapsedInSeg / Math.max(1, activeSeg.segment.durationSec) : 0} onStepPress={(i) => setStepDetail(i)} />
 
       <AdjustmentsStrip entries={controlLog} />
 

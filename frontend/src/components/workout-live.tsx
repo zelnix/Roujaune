@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
-import Svg, { Polyline, Polygon as SvgPolygon, Circle } from "react-native-svg";
+import Svg, { Polyline, Polygon as SvgPolygon } from "react-native-svg";
 import { colors, radius, spacing, textShadow } from "@/src/theme";
 
 const WORDMARK = require("../../assets/images/auth_wordmark.png");
@@ -65,19 +65,32 @@ export function AdjustmentsStrip({ entries }: { entries: { id: number; t: string
 
 // ---- Metric card ----------------------------------------------------------
 export function MetricCard({
-  icon, label, value, unit, status, statusTone = "neutral", sub, accent = colors.yellow, connected, deviceName,
+  icon, label, value, unit, status, statusTone = "neutral", sub, accent = colors.yellow, connected, deviceName, battery, onDevicePress,
 }: {
-  icon: any; label: string; value: string; unit?: string; status?: string; statusTone?: Tone; sub?: string; accent?: string; connected?: boolean; deviceName?: string;
+  icon: any; label: string; value: string; unit?: string; status?: string; statusTone?: Tone; sub?: string; accent?: string; connected?: boolean; deviceName?: string; battery?: number | null; onDevicePress?: () => void;
 }) {
+  const batIcon = battery == null ? null : battery >= 66 ? "battery-full" : battery >= 25 ? "battery-half" : "battery-dead";
+  const batColor = battery == null ? colors.textDim : battery <= 15 ? colors.red : battery <= 30 ? colors.yellow : colors.green;
+  const ConnTag: any = onDevicePress ? Pressable : View;
   return (
     <View style={m.card} testID={`metric-${label.toLowerCase().replace(/\s+/g, "-")}`}>
       <View style={m.head}>
         <Ionicons name={icon} size={16} color={accent} />
         {connected !== undefined ? (
-          <View style={m.conn} testID={`metric-conn-${label.toLowerCase().replace(/\s+/g, "-")}`}>
+          <ConnTag
+            style={m.conn}
+            testID={`metric-conn-${label.toLowerCase().replace(/\s+/g, "-")}`}
+            {...(onDevicePress ? { onPress: onDevicePress, hitSlop: 8, accessibilityRole: "button", accessibilityLabel: connected ? `${deviceName || "Device"} connected. Tap to manage sensors` : "Tap to pair a sensor" } : {})}
+          >
             <View style={[m.connDot, { backgroundColor: connected ? colors.green : "transparent", borderColor: connected ? colors.green : colors.textFaint }]} />
-            <Text style={[m.connText, { color: connected ? colors.green : colors.textFaint }]} numberOfLines={1}>{connected ? (deviceName || "Connected") : "Off"}</Text>
-          </View>
+            <Text style={[m.connText, { color: connected ? colors.green : colors.textFaint }]} numberOfLines={1}>{connected ? (deviceName || "Connected") : "Pair"}</Text>
+            {connected && batIcon ? (
+              <>
+                <Ionicons name={batIcon} size={13} color={batColor} style={m.batIcon} />
+                <Text style={[m.connText, { color: batColor }]}>{battery}%</Text>
+              </>
+            ) : null}
+          </ConnTag>
         ) : null}
         <Text style={m.label}>{label}</Text>
         {status ? (
@@ -130,24 +143,6 @@ export function ConnectionsPanel({ trainerOn, wearableOn, powerOn, hrOn, cadence
 }
 
 // ---- Session card (Elapsed / Est. finish / Distance) ----------------------
-// A small circular progress ring showing how far into the route the rider is.
-function DistanceRing({ progress }: { progress: number }) {
-  const p = Math.max(0, Math.min(1, progress));
-  const size = 46, stroke = 5, r = (size - stroke) / 2, c = 2 * Math.PI * r;
-  return (
-    <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }} testID="distance-ring">
-      <Svg width={size} height={size} style={{ position: "absolute" }}>
-        <Circle cx={size / 2} cy={size / 2} r={r} stroke={colors.borderSoft} strokeWidth={stroke} fill="none" />
-        <Circle
-          cx={size / 2} cy={size / 2} r={r} stroke={colors.yellow} strokeWidth={stroke} fill="none"
-          strokeDasharray={`${c} ${c}`} strokeDashoffset={c * (1 - p)} strokeLinecap="round"
-          transform={`rotate(-90 ${size / 2} ${size / 2})`}
-        />
-      </Svg>
-    </View>
-  );
-}
-
 export function SessionCard({ elapsed, estFinish, riddenKm, totalKm }: { elapsed: string; estFinish: string; riddenKm: number; totalKm: number }) {
   return (
     <View style={sc.panel} testID="session-card">
@@ -162,12 +157,9 @@ export function SessionCard({ elapsed, estFinish, riddenKm, totalKm }: { elapsed
         <Text style={sc.value} testID="session-estfinish">{estFinish}</Text>
       </View>
       <View style={sc.divider} />
-      <View style={sc.distRow}>
-        <View style={sc.distText}>
-          <Text style={sc.label}>DISTANCE</Text>
-          <Text style={sc.value} testID="session-distance">{riddenKm.toFixed(1)}<Text style={sc.unit}> / {totalKm.toFixed(1)} km</Text></Text>
-        </View>
-        <DistanceRing progress={totalKm > 0 ? riddenKm / totalKm : 0} />
+      <View style={sc.stat}>
+        <Text style={sc.label}>DISTANCE</Text>
+        <Text style={sc.value} testID="session-distance">{riddenKm.toFixed(1)}<Text style={sc.unit}> / {totalKm.toFixed(1)} km</Text></Text>
       </View>
     </View>
   );
@@ -287,10 +279,9 @@ function ProfileSeg({ step, status, width, fill, onPress }: { step: TimelineStep
 }
 
 export function StepTimeline({
-  steps, activeIndex, remaining, stepProgress = 0, onStepPress, progress,
+  steps, activeIndex, remaining, stepProgress = 0, onStepPress,
 }: {
   steps: TimelineStep[]; activeIndex: number; remaining?: string; stepProgress?: number; onStepPress: (index: number) => void;
-  progress?: number;
 }) {
   const MIN = 150;
   const total = steps.reduce((a, s) => a + Math.max(1, s.durationSec), 0) || 1;
@@ -304,7 +295,6 @@ export function StepTimeline({
   const scale = sumF > 0 ? contentW / sumF : 1;
   const widths = floored.map((w) => w * scale);
   const scrollable = contentW > chartW + 1;
-  const pct = typeof progress === "number" ? Math.round(Math.max(0, Math.min(1, progress)) * 100) : null;
   React.useEffect(() => {
     if (activeIndex < 0 || !chartW) return;
     let x = 0;
@@ -314,13 +304,6 @@ export function StepTimeline({
   }, [activeIndex, chartW]);
   return (
     <View style={st.wrap} testID="interval-timeline">
-      {pct != null ? (
-        <View style={st.progressRow}>
-          <View style={st.progressTrack}><View style={[st.progressFill, { width: `${pct}%` }]} /></View>
-          <Text style={st.progressPct}>{pct}%</Text>
-        </View>
-      ) : null}
-
       {steps.length ? (() => {
         const cur = steps[Math.max(0, Math.min(activeIndex, steps.length - 1))];
         const nxt = activeIndex + 1 < steps.length ? steps[activeIndex + 1] : null;
@@ -574,6 +557,7 @@ const m = StyleSheet.create({
   conn: { flexDirection: "row", alignItems: "center", gap: 4 },
   connDot: { width: 8, height: 8, borderRadius: 4, borderWidth: 1.5 },
   connText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.3, textTransform: "uppercase", maxWidth: 96 },
+  batIcon: { marginLeft: 2, transform: [{ rotate: "90deg" }] },
   label: { color: colors.textDim, fontSize: 11.5, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase", flex: 1 },
   pill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, borderWidth: 1 },
   pillText: { fontSize: 11, fontWeight: "800", letterSpacing: 0.5 },
@@ -607,8 +591,6 @@ const sc = StyleSheet.create({
   value: { color: colors.white, fontSize: 26, fontWeight: "900", fontVariant: ["tabular-nums"], letterSpacing: 0.5 },
   unit: { color: colors.textDim, fontSize: 14, fontWeight: "700" },
   divider: { height: 1, backgroundColor: colors.borderSoft, marginVertical: 4 },
-  distRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 6 },
-  distText: { flex: 1 },
 });
 
 const cb = StyleSheet.create({
