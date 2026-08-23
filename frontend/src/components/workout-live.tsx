@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
-import Svg, { Polyline, Polygon as SvgPolygon } from "react-native-svg";
+import Svg, { Polyline, Polygon as SvgPolygon, Circle } from "react-native-svg";
 import { colors, radius, spacing, textShadow } from "@/src/theme";
 
 const WORDMARK = require("../../assets/images/auth_wordmark.png");
@@ -130,6 +130,25 @@ export function ConnectionsPanel({ trainerOn, wearableOn, powerOn, hrOn, cadence
 }
 
 // ---- Session card (Elapsed / Est. finish / Distance) ----------------------
+// A small circular progress ring showing how far into the route the rider is.
+function DistanceRing({ progress }: { progress: number }) {
+  const p = Math.max(0, Math.min(1, progress));
+  const size = 46, stroke = 5, r = (size - stroke) / 2, c = 2 * Math.PI * r;
+  return (
+    <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }} testID="distance-ring">
+      <Svg width={size} height={size} style={{ position: "absolute" }}>
+        <Circle cx={size / 2} cy={size / 2} r={r} stroke={colors.borderSoft} strokeWidth={stroke} fill="none" />
+        <Circle
+          cx={size / 2} cy={size / 2} r={r} stroke={colors.yellow} strokeWidth={stroke} fill="none"
+          strokeDasharray={`${c} ${c}`} strokeDashoffset={c * (1 - p)} strokeLinecap="round"
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </Svg>
+      <Text style={sc.ringPct}>{Math.round(p * 100)}%</Text>
+    </View>
+  );
+}
+
 export function SessionCard({ elapsed, estFinish, riddenKm, totalKm }: { elapsed: string; estFinish: string; riddenKm: number; totalKm: number }) {
   return (
     <View style={sc.panel} testID="session-card">
@@ -144,9 +163,12 @@ export function SessionCard({ elapsed, estFinish, riddenKm, totalKm }: { elapsed
         <Text style={sc.value} testID="session-estfinish">{estFinish}</Text>
       </View>
       <View style={sc.divider} />
-      <View style={sc.stat}>
-        <Text style={sc.label}>DISTANCE</Text>
-        <Text style={sc.value} testID="session-distance">{riddenKm.toFixed(1)}<Text style={sc.unit}> / {totalKm.toFixed(1)} km</Text></Text>
+      <View style={sc.distRow}>
+        <View style={sc.distText}>
+          <Text style={sc.label}>DISTANCE</Text>
+          <Text style={sc.value} testID="session-distance">{riddenKm.toFixed(1)}<Text style={sc.unit}> / {totalKm.toFixed(1)} km</Text></Text>
+        </View>
+        <DistanceRing progress={totalKm > 0 ? riddenKm / totalKm : 0} />
       </View>
     </View>
   );
@@ -599,6 +621,9 @@ const sc = StyleSheet.create({
   value: { color: colors.white, fontSize: 26, fontWeight: "900", fontVariant: ["tabular-nums"], letterSpacing: 0.5 },
   unit: { color: colors.textDim, fontSize: 14, fontWeight: "700" },
   divider: { height: 1, backgroundColor: colors.borderSoft, marginVertical: 4 },
+  distRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 6 },
+  distText: { flex: 1 },
+  ringPct: { color: colors.yellow, fontSize: 11, fontWeight: "800", fontVariant: ["tabular-nums"] },
 });
 
 const cb = StyleSheet.create({

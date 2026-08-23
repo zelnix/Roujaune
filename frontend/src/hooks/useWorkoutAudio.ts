@@ -132,6 +132,11 @@ export function useWorkoutAudio(paused = false) {
   const coachVoiceRef = useRef<Partial<Record<CoachId, { id?: string; lang: string }>>>({});
   const persona = useCoach();
   const coach = persona.id;
+  // Track paused in a ref so playback helpers can gate on it without adding it
+  // to their dependency arrays (the smooth fade is driven by the effect below).
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
+  const fadeRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Build a curated, de-duplicated list of Spanish/English voices for the
   // selector, and choose Alberto's default (a Spanish male) or the rider's
@@ -208,14 +213,32 @@ export function useWorkoutAudio(paused = false) {
 
   const apply = useCallback(() => {
     try {
-      const active = musicOn && !paused;
+      const active = musicOn && !pausedRef.current;
       player.volume = active ? volume * (speaking.current ? DUCK : 1) : 0;
       if (active) player.play();
-      else player.pause();
+      else if (!musicOn) player.pause();
     } catch {
       /* player not ready yet */
     }
-  }, [player, musicOn, volume, paused]);
+  }, [player, musicOn, volume]);
+
+  // Smoothly ramp the music volume to `target` over ~600ms, then run `after`.
+  const fadeTo = useCallback((target: number, after?: () => void) => {
+    if (fadeRef.current) { clearInterval(fadeRef.current); fadeRef.current = null; }
+    const steps = 12, dur = 600;
+    let start = 0;
+    try { start = player.volume ?? 0; } catch { /* noop */ }
+    let i = 0;
+    fadeRef.current = setInterval(() => {
+      i += 1;
+      const v = start + (target - start) * (i / steps);
+      try { player.volume = Math.max(0, Math.min(1, v)); } catch { /* noop */ }
+      if (i >= steps) {
+        if (fadeRef.current) { clearInterval(fadeRef.current); fadeRef.current = null; }
+        after?.();
+      }
+    }, dur / steps);
+  }, [player]);
 
   const status = useAudioPlayerStatus(player);
 
@@ -236,10 +259,10 @@ export function useWorkoutAudio(paused = false) {
     try {
       player.replace({ uri: MUSIC_TRACKS[idx].uri });
       player.loop = false;
-      player.volume = musicOn && !paused ? volume * (speaking.current ? DUCK : 1) : 0;
-      if (musicOn && !paused) player.play();
+      player.volume = musicOn && !pausedRef.current ? volume * (speaking.current ? DUCK : 1) : 0;
+      if (musicOn && !pausedRef.current) player.play();
     } catch { /* player not ready */ }
-  }, [player, musicOn, volume, paused]);
+  }, [player, musicOn, volume]);
 
   // When the current track finishes, roll to the next random one.
   const finishedRef = useRef(false);
@@ -258,17 +281,24 @@ export function useWorkoutAudio(paused = false) {
 
   // Pausing the workout silences everything immediately: stop the coach's
   // speech and pause the music. Resuming re-applies music (handled by `apply`).
+  // Pausing the workout eases everything out: the coach's speech stops at once
+  // and the music FADES down smoothly before the player is paused. Resuming
+  // starts the music and fades it back up for a gentle return.
   useEffect(() => {
     if (paused) {
       speaking.current = false;
-      try { Speech.stop(); player.pause(); } catch { /* noop */ }
-    } else {
-      apply();
+      try { Speech.stop(); } catch { /* noop */ }
+      if (musicOn) fadeTo(0, () => { try { player.pause(); } catch { /* noop */ } });
+      else { try { player.pause(); } catch { /* noop */ } }
+    } else if (musicOn) {
+      try { player.volume = 0; player.play(); } catch { /* noop */ }
+      fadeTo(volume * (speaking.current ? DUCK : 1));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paused]);
 
   useEffect(() => {
-    return () => { try { Speech.stop(); player.pause(); } catch { /* noop */ } };
+    return () => { try { Speech.stop(); if (fadeRef.current) clearInterval(fadeRef.current); player.pause(); } catch { /* noop */ } };
   }, [player]);
 
   const setVolume = useCallback((v: number) => setVolumeState(Math.max(0, Math.min(1, v))), []);

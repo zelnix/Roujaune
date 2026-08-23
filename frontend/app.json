@@ -45,7 +45,7 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "monochromeImage": "./assets/images/adaptive-icon-monochrome.png",
-        "backgroundColor": "#F4B51E"
+        "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
@@ -79,7 +79,7 @@
           "image": "./assets/images/icon.png",
           "imageWidth": 320,
           "resizeMode": "contain",
-          "backgroundColor": "#F4B51E"
+          "backgroundColor": "#000000"
         }
       ],
       "expo-audio",
