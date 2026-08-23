@@ -23,5 +23,6 @@ export function useBleSensors(_wheelCircumferenceMm?: number) {
     disconnect: noop,
     battery: {} as Record<string, number>,
     reconnecting: [] as string[],
+    rssi: {} as Record<string, number>,
   };
 }

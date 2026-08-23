@@ -1039,3 +1039,9 @@ User wanted an in-app rating + feedback capture (fb50-style) opened from Setting
 - MetricCard device label is now tappable (onDevicePress -> setShowBle(true) opens Bluetooth sensors panel; verified panel opens) and shows a battery icon+% next to the device name when the connected sensor reports battery (ble.battery[deviceId]); disconnected label reads "Pair". workout.tsx computes hrBattery/trainerBattery from ble.battery and passes onDevicePress+battery to the four metric cards.
 - Removed DistanceRing from SessionCard (deleted component, Circle import, distRow/distText styles) — DISTANCE is now a plain stat.
 - Removed the overall horizontal progress bar (st.progressRow) above the NOW/NEXT strip in StepTimeline; dropped the now-unused `progress` prop (+ pct) and the workout.tsx pass. Verified: distance-ring absent, progress bar gone, no errors.
+
+## Low-battery nudge + signal-strength dot (2026-06 fork)
+- useBleSensors: added rssi state (Record<id,number>) + deviceRefs; on connect stores the device object + initial device.rssi; a 4s interval polls dev.readRSSI() for each connected device and updates rssi; cleaned up on intentional disconnect. Exposed `rssi`. Web stub returns rssi:{}.
+- Signal strength: MetricCard status dot (connDot) now coloured by signal (RSSI dBm): >=-70 green, >=-82 yellow, else red (grey when disconnected). New `signal?` prop; workout.tsx passes hrSignal/trainerSignal from ble.rssi.
+- Low battery: MetricCard battery icon/text already reds at <=15% (batColor). workout.tsx adds a one-time toast nudge ("<name> battery low (X%) — charge it soon") when a connected sensor's ble.battery drops <=15% (lowBatWarnedRef; re-arms once >20%).
+- Native-only for real values (RSSI/battery unavailable in web/demo). Verified: workout renders, no errors, demo dots green.

@@ -52,6 +52,8 @@ export function useBleSensors(wheelCircumferenceMm: number = 2105) {
   const [connected, setConnected] = useState<BleDevice[]>([]);
   const [readings, setReadings] = useState<BleReadings>({ power: null, cadence: null, hr: null, speed: null, wheelRevs: null, ts: 0 });
   const [battery, setBattery] = useState<Record<string, number>>({});
+  const [rssi, setRssi] = useState<Record<string, number>>({});
+  const deviceRefs = useRef<Record<string, any>>({});
   const [reconnecting, setReconnecting] = useState<string[]>([]);
   const [permissionStatus, setPermissionStatus] = useState<PermState>("unknown");
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +100,23 @@ export function useBleSensors(wheelCircumferenceMm: number = 2105) {
       Object.values(reconnectTimers.current).forEach((t) => { try { clearTimeout(t); } catch { /* noop */ } });
       try { manager.destroy(); } catch { /* noop */ }
     };
+  }, []);
+
+  // Poll signal strength (RSSI) of every connected device every 4s so the UI
+  // can flag a flaky/weak sensor before it drops out.
+  useEffect(() => {
+    const iv = setInterval(async () => {
+      for (const id of Object.keys(deviceRefs.current)) {
+        const dev = deviceRefs.current[id];
+        if (!dev?.readRSSI) continue;
+        try {
+          const updated = await dev.readRSSI();
+          const val = updated?.rssi ?? dev?.rssi;
+          if (val != null) setRssi((r) => ({ ...r, [id]: val }));
+        } catch { /* device busy — keep last reading */ }
+      }
+    }, 4000);
+    return () => clearInterval(iv);
   }, []);
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
@@ -340,6 +359,8 @@ export function useBleSensors(wheelCircumferenceMm: number = 2105) {
       } catch { /* control not granted — reading still works */ }
     }
     await readBattery(device, id);
+    deviceRefs.current[id] = device;
+    if (device?.rssi != null) setRssi((r) => ({ ...r, [id]: device.rssi }));
     device.onDisconnected((_err: any, dev: any) => {
       delete crankState.current[id];
       delete wheelState.current[id];
@@ -352,6 +373,8 @@ export function useBleSensors(wheelCircumferenceMm: number = 2105) {
         intentionalRef.current.delete(id);
         setConnected((prev) => prev.filter((d) => d.id !== id));
         setBattery((b) => { const n = { ...b }; delete n[id]; return n; });
+        setRssi((r) => { const n = { ...r }; delete n[id]; return n; });
+        delete deviceRefs.current[id];
       } else {
         attemptReconnect(id, dev?.name || device?.name || "Sensor");
       }
@@ -398,13 +421,15 @@ export function useBleSensors(wheelCircumferenceMm: number = 2105) {
     }
     setConnected((prev) => prev.filter((d) => d.id !== id));
     setBattery((b) => { const n = { ...b }; delete n[id]; return n; });
+    setRssi((r) => { const n = { ...r }; delete n[id]; return n; });
+    delete deviceRefs.current[id];
   }, []);
 
   return {
     supported, poweredOn, scanning, devices, connected, readings, permissionStatus,
     error, requestPermission, startScan, stopScan, connect, disconnect,
     // Auto-reconnect + battery
-    battery, reconnecting,
+    battery, reconnecting, rssi,
     // FTMS trainer control
     hasTrainerControl, controlMode, controlValue,
     setErgWatts, setResistance, setSimGrade, resetTrainer,

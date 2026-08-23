@@ -519,6 +519,21 @@ export default function LiveWorkout() {
   const trainerName = settings.demoMode ? "Demo" : (trainerDevice?.name ?? (bleTrainer ? "Trainer" : undefined));
   const hrBattery = hrDevice ? ble.battery[hrDevice.id] ?? null : null;
   const trainerBattery = trainerDevice ? ble.battery[trainerDevice.id] ?? null : null;
+  const hrSignal = hrDevice ? ble.rssi[hrDevice.id] ?? null : null;
+  const trainerSignal = trainerDevice ? ble.rssi[trainerDevice.id] ?? null : null;
+  // Nudge the rider once when any connected sensor's battery drops below ~15%.
+  const lowBatWarnedRef = React.useRef<Set<string>>(new Set());
+  React.useEffect(() => {
+    for (const d of ble.connected) {
+      const lvl = ble.battery[d.id];
+      if (lvl != null && lvl <= 15 && !lowBatWarnedRef.current.has(d.id)) {
+        lowBatWarnedRef.current.add(d.id);
+        showToast(`${d.name || "Sensor"} battery low (${lvl}%) — charge it soon`);
+      } else if (lvl != null && lvl > 20) {
+        lowBatWarnedRef.current.delete(d.id);
+      }
+    }
+  }, [ble.battery, ble.connected, showToast]);
   // Keep the extend-advice context (workout type + wearable state) current.
   React.useEffect(() => {
     extendMetaRef.current = { type_id: selected?.typeId ?? "endurance", wearable_on: wearableOn };
@@ -800,10 +815,10 @@ export default function LiveWorkout() {
               </>
             ) : (
               <>
-                <MetricCard icon="heart" label="Heart Rate" value={wearableOn ? String(telemetry.hr) : "—"} unit="bpm" status={wearableOn ? `ZONE ${hrZone(telemetry.hr)}` : undefined} statusTone="neutral" accent={colors.red} connected={wearableOn} deviceName={hrName} battery={hrBattery} onDevicePress={() => setShowBle(true)} />
-                <MetricCard icon="speedometer" label="Speed" value={trainerOn ? String(Math.round(telemetry.speed)) : "—"} unit="km/h" accent="#5AC8FA" connected={trainerOn} deviceName={trainerName} battery={trainerBattery} onDevicePress={() => setShowBle(true)} />
-                <MetricCard icon="sync" label="Cadence" value={trainerOn ? String(telemetry.cadence) : "—"} unit="rpm" status={cadStatus} statusTone={cadInRange ? "good" : "warn"} sub={`TARGET ${CAD_LOW}–${CAD_HIGH}`} accent={colors.green} connected={trainerOn} deviceName={trainerName} battery={trainerBattery} onDevicePress={() => setShowBle(true)} />
-                <MetricCard icon="flash" label="Power" value={trainerOn ? String(powerVal) : "—"} unit="W" status={powerStatus} statusTone={powerTone} sub={`TARGET ${Math.max(0, targetW - 8)}–${targetW + 8} W`} accent={colors.yellow} connected={trainerOn} deviceName={trainerName} battery={trainerBattery} onDevicePress={() => setShowBle(true)} />
+                <MetricCard icon="heart" label="Heart Rate" value={wearableOn ? String(telemetry.hr) : "—"} unit="bpm" status={wearableOn ? `ZONE ${hrZone(telemetry.hr)}` : undefined} statusTone="neutral" accent={colors.red} connected={wearableOn} deviceName={hrName} battery={hrBattery} signal={hrSignal} onDevicePress={() => setShowBle(true)} />
+                <MetricCard icon="speedometer" label="Speed" value={trainerOn ? String(Math.round(telemetry.speed)) : "—"} unit="km/h" accent="#5AC8FA" connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} />
+                <MetricCard icon="sync" label="Cadence" value={trainerOn ? String(telemetry.cadence) : "—"} unit="rpm" status={cadStatus} statusTone={cadInRange ? "good" : "warn"} sub={`TARGET ${CAD_LOW}–${CAD_HIGH}`} accent={colors.green} connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} />
+                <MetricCard icon="flash" label="Power" value={trainerOn ? String(powerVal) : "—"} unit="W" status={powerStatus} statusTone={powerTone} sub={`TARGET ${Math.max(0, targetW - 8)}–${targetW + 8} W`} accent={colors.yellow} connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} />
               </>
             )}
           </View>

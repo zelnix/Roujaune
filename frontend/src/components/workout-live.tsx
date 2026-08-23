@@ -65,12 +65,19 @@ export function AdjustmentsStrip({ entries }: { entries: { id: number; t: string
 
 // ---- Metric card ----------------------------------------------------------
 export function MetricCard({
-  icon, label, value, unit, status, statusTone = "neutral", sub, accent = colors.yellow, connected, deviceName, battery, onDevicePress,
+  icon, label, value, unit, status, statusTone = "neutral", sub, accent = colors.yellow, connected, deviceName, battery, signal, onDevicePress,
 }: {
-  icon: any; label: string; value: string; unit?: string; status?: string; statusTone?: Tone; sub?: string; accent?: string; connected?: boolean; deviceName?: string; battery?: number | null; onDevicePress?: () => void;
+  icon: any; label: string; value: string; unit?: string; status?: string; statusTone?: Tone; sub?: string; accent?: string; connected?: boolean; deviceName?: string; battery?: number | null; signal?: number | null; onDevicePress?: () => void;
 }) {
   const batIcon = battery == null ? null : battery >= 66 ? "battery-full" : battery >= 25 ? "battery-half" : "battery-dead";
   const batColor = battery == null ? colors.textDim : battery <= 15 ? colors.red : battery <= 30 ? colors.yellow : colors.green;
+  // The status dot doubles as a connection-strength indicator: green = strong,
+  // yellow = fair, red = weak (based on the sensor's RSSI in dBm).
+  const dotColor = !connected ? colors.textFaint
+    : signal == null ? colors.green
+    : signal >= -70 ? colors.green
+    : signal >= -82 ? colors.yellow
+    : colors.red;
   const ConnTag: any = onDevicePress ? Pressable : View;
   return (
     <View style={m.card} testID={`metric-${label.toLowerCase().replace(/\s+/g, "-")}`}>
@@ -82,7 +89,7 @@ export function MetricCard({
             testID={`metric-conn-${label.toLowerCase().replace(/\s+/g, "-")}`}
             {...(onDevicePress ? { onPress: onDevicePress, hitSlop: 8, accessibilityRole: "button", accessibilityLabel: connected ? `${deviceName || "Device"} connected. Tap to manage sensors` : "Tap to pair a sensor" } : {})}
           >
-            <View style={[m.connDot, { backgroundColor: connected ? colors.green : "transparent", borderColor: connected ? colors.green : colors.textFaint }]} />
+            <View style={[m.connDot, { backgroundColor: connected ? dotColor : "transparent", borderColor: connected ? dotColor : colors.textFaint }]} />
             <Text style={[m.connText, { color: connected ? colors.green : colors.textFaint }]} numberOfLines={1}>{connected ? (deviceName || "Connected") : "Pair"}</Text>
             {connected && batIcon ? (
               <>
