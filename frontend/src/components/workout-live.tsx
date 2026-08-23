@@ -138,8 +138,9 @@ function SignalBars({ signal }: { signal: number | null }) {
   );
 }
 
-export function SensorHealthRow({ sensors }: { sensors: SensorHealth[] }) {
+export function SensorHealthRow({ sensors, onSensorPress }: { sensors: SensorHealth[]; onSensorPress?: (id: string) => void }) {
   if (!sensors.length) return null;
+  const Chip: any = onSensorPress ? Pressable : View;
   return (
     <View style={sh.strip} testID="sensor-health-row">
       <Ionicons name="pulse" size={14} color={colors.yellow} style={{ marginRight: 2 }} />
@@ -149,8 +150,14 @@ export function SensorHealthRow({ sensors }: { sensors: SensorHealth[] }) {
           const batColor = s.battery == null ? colors.textDim : s.battery <= 15 ? colors.red : s.battery <= 30 ? colors.yellow : colors.green;
           const batIcon = s.battery == null ? null : s.battery >= 66 ? "battery-full" : s.battery >= 25 ? "battery-half" : "battery-dead";
           const sig = signalMeta(s.signal);
+          const weak = !s.reconnecting && s.signal != null && s.signal < -82;
           return (
-            <View key={s.id} style={sh.chip} testID={`sensor-health-${s.id}`}>
+            <Chip
+              key={s.id}
+              style={[sh.chip, weak && sh.chipWeak]}
+              testID={`sensor-health-${s.id}`}
+              {...(onSensorPress ? { onPress: () => onSensorPress(s.id), hitSlop: 6, accessibilityRole: "button", accessibilityLabel: `${s.name || "Sensor"} — tap to open sensor pairing` } : {})}
+            >
               <Ionicons name={icon as any} size={14} color={s.reconnecting ? colors.yellow : colors.white} />
               <Text style={sh.name} numberOfLines={1}>{s.name || "Sensor"}</Text>
               {s.reconnecting ? (
@@ -167,7 +174,8 @@ export function SensorHealthRow({ sensors }: { sensors: SensorHealth[] }) {
                   ) : null}
                 </>
               )}
-            </View>
+              {onSensorPress ? <Ionicons name="chevron-forward" size={12} color={colors.textFaint} /> : null}
+            </Chip>
           );
         })}
       </ScrollView>
@@ -638,6 +646,7 @@ const sh = StyleSheet.create({
   strip: { flexDirection: "row", alignItems: "center", gap: 8, ...card, paddingVertical: 8, paddingHorizontal: 12 },
   scroll: { flexDirection: "row", alignItems: "center", gap: 8, paddingRight: 4 },
   chip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: colors.borderSoft, borderRadius: radius.pill, paddingVertical: 5, paddingHorizontal: 10 },
+  chipWeak: { borderColor: colors.red + "88", backgroundColor: colors.red + "18" },
   name: { color: colors.white, fontSize: 11.5, fontWeight: "800", maxWidth: 110, letterSpacing: 0.2 },
   reconnect: { color: colors.yellow, fontSize: 10.5, fontWeight: "800", fontStyle: "italic" },
   bars: { flexDirection: "row", alignItems: "flex-end", gap: 1.5, height: 11 },

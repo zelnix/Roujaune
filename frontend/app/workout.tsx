@@ -926,7 +926,7 @@ export default function LiveWorkout() {
         </View>
       </View>
 
-      <SensorHealthRow sensors={sensorHealth} />
+      <SensorHealthRow sensors={sensorHealth} onSensorPress={() => setShowBle(true)} />
 
       <StepTimeline steps={stepList} activeIndex={activeSeg?.index ?? -1} remaining={timeLeftLabel} stepProgress={activeSeg ? activeSeg.elapsedInSeg / Math.max(1, activeSeg.segment.durationSec) : 0} onStepPress={(i) => setStepDetail(i)} />
 
