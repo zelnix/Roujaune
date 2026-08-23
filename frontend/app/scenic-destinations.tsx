@@ -23,6 +23,7 @@ export default function ScenicDestinationsScreen() {
   const [region, setRegion] = React.useState("All");
   const [dist, setDist] = React.useState("All");
   const [climb, setClimb] = React.useState("All");
+  const [sort, setSort] = React.useState("Featured");
 
   const open = (id: string) => router.push(`/scenic-ride?route=${id}` as any);
   const leave = () => { if (router.canGoBack()) router.back(); else router.replace("/"); };
@@ -60,7 +61,28 @@ export default function ScenicDestinationsScreen() {
       (r.tag || "").toLowerCase().includes(q)
     );
   });
-  const resetAll = () => { setQuery(""); setRegion("All"); setDist("All"); setClimb("All"); };
+  // Sort the filtered rides. "Featured" keeps the catalogue's natural order;
+  // routes missing a value sink to the bottom of numeric sorts.
+  const sorted = React.useMemo(() => {
+    if (sort === "Featured") return results;
+    const arr = [...results];
+    const num = (v?: number | null) => (v == null || v <= 0 ? null : v);
+    if (sort === "Shortest") {
+      arr.sort((a, b) => {
+        const av = num(a.distance_km), bv = num(b.distance_km);
+        if (av == null && bv == null) return 0;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        return av - bv;
+      });
+    } else if (sort === "Longest") {
+      arr.sort((a, b) => (num(b.distance_km) ?? -1) - (num(a.distance_km) ?? -1));
+    } else if (sort === "Most climb") {
+      arr.sort((a, b) => (num(b.elevation_m) ?? -1) - (num(a.elevation_m) ?? -1));
+    }
+    return arr;
+  }, [results, sort]);
+  const resetAll = () => { setQuery(""); setRegion("All"); setDist("All"); setClimb("All"); setSort("Featured"); };
 
   // Responsive columns: phones 1, tablets 2–3.
   const cols = width >= 1000 ? 3 : width >= 640 ? 2 : 1;
@@ -179,6 +201,24 @@ export default function ScenicDestinationsScreen() {
               })}
             </ScrollView>
           </View>
+          <View style={styles.metaRow}>
+            <View style={styles.metaLabelWrap}>
+              <Ionicons name="swap-vertical" size={13} color={colors.textDim} />
+              <Text style={styles.metaLabel}>Sort</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.metaChips} testID="destinations-sort">
+              {["Featured", "Shortest", "Longest", "Most climb"].map((r) => {
+                const sel = sort === r;
+                return (
+                  <Pressable key={r} testID={`destinations-sort-${r}`} onPress={() => setSort(r)}
+                    accessibilityRole="button" accessibilityState={{ selected: sel }}
+                    style={[styles.smChip, sel && styles.chipSel]}>
+                    <Text style={[styles.smChipText, sel && styles.chipTextSel]}>{r}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
         </View>
 
         {loading ? (
@@ -193,9 +233,9 @@ export default function ScenicDestinationsScreen() {
           </View>
         ) : (
           <ScrollView style={styles.results} contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            <Text style={styles.count}>{results.length} {results.length === 1 ? "ride" : "rides"}</Text>
+            <Text style={styles.count}>{sorted.length} {sorted.length === 1 ? "ride" : "rides"}</Text>
             <View style={[styles.grid, { gap }]}>
-              {results.map((r) => (
+              {sorted.map((r) => (
                 <DestinationCard key={r.id} route={r} width={cardW} onPress={() => open(r.id)} />
               ))}
             </View>

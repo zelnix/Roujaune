@@ -30,6 +30,7 @@ export type AuthUser = {
   assigned_plan_id?: string | null;
   onboarded?: boolean;
   email_verified?: boolean;
+  role?: string;
 };
 
 type AuthCtx = {

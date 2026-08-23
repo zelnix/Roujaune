@@ -1,5 +1,6 @@
 import React from "react";
-import { View, StyleSheet, ScrollView, Animated, useWindowDimensions, Platform, Text, LayoutChangeEvent, TextInput, Pressable } from "react-native";
+import { View, StyleSheet, ScrollView, Animated, useWindowDimensions, Platform, Text, LayoutChangeEvent, TextInput, Pressable, Share } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -18,6 +19,25 @@ import {
   ChartsRow, SyncExportRow, RouteSummaryCard, AchievementsCard, RecoveryCard, BottomActionBar,
   IntervalTargetsCard,
 } from "@/src/components/summary";
+
+// Build a shareable caption from the ride's stats + route.
+function rideCaption(stats: any, route: any): string {
+  const s = stats || {};
+  const dur = (sec: number) => {
+    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), ss = Math.floor(sec % 60);
+    return h ? `${h}:${String(m).padStart(2, "0")}:${String(ss).padStart(2, "0")}` : `${m}:${String(ss).padStart(2, "0")}`;
+  };
+  const parts: string[] = [route?.name ? `🚴 ${route.name}` : "🚴 Roujaune ride"];
+  if (s.duration_sec) parts.push(`⏱ ${dur(s.duration_sec)}`);
+  if (s.distance_km) parts.push(`📍 ${Number(s.distance_km).toFixed(1)} km`);
+  const elev = s.elevation_m ?? s.elevation_gain_m ?? route?.elevation_m;
+  if (elev) parts.push(`⛰ ${Math.round(elev)} m`);
+  if (s.avg_power) parts.push(`⚡ ${Math.round(s.avg_power)} W avg`);
+  if (s.avg_hr) parts.push(`❤️ ${Math.round(s.avg_hr)} bpm`);
+  if (s.calories) parts.push(`🔥 ${Math.round(s.calories)} kcal`);
+  return parts.join("  ") + "\n#Roujaune";
+}
+
 
 function Toast({ message }: { message: { id: number; text: string } | null }) {
   const anim = React.useRef(new Animated.Value(0)).current;
@@ -56,21 +76,28 @@ export default function WorkoutComplete() {
   const showToast = React.useCallback((text: string) => setToast({ id: Date.now(), text }), []);
   const cardRef = React.useRef<View>(null);
 
-  // Capture the summary card exactly as shown and open the native share sheet
-  // with it as an image ("ride card"). Native only — web preview can't share.
+  // Capture the summary card exactly as shown and share it as an image "ride
+  // card" with a stats + route caption. Native only — web preview can't share.
   const shareRideCard = React.useCallback(async () => {
     try {
       if (Platform.OS === "web") { showToast("Sharing a ride card works on the app"); return; }
       const uri = await captureRef(cardRef, { format: "png", quality: 0.95 });
-      if (await Sharing.isAvailableAsync()) {
+      const message = rideCaption(stats, route);
+      if (Platform.OS === "ios") {
+        // iOS share sheet includes both the image and the caption.
+        await Share.share({ url: uri, message });
+      } else if (await Sharing.isAvailableAsync()) {
+        // Android: share the image; caption is copied so it can be pasted.
+        try { await Clipboard.setStringAsync(message); } catch { /* noop */ }
         await Sharing.shareAsync(uri, { mimeType: "image/png", dialogTitle: "Share your Roujaune ride" });
+        showToast("Ride card shared — caption copied to paste");
       } else {
-        showToast("Sharing isn't available on this device");
+        await Share.share({ message: `${message}` });
       }
     } catch {
       showToast("Couldn't create the ride card");
     }
-  }, [showToast]);
+  }, [showToast, stats, route]);
 
   const onMainLayout = (e: LayoutChangeEvent) => setMainW(e.nativeEvent.layout.width);
 

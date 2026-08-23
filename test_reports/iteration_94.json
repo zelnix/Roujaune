@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 94 — validated the BLE hook refactor (auto-reconnect + battery) + live-ride share caption + admin feedback gate. All four review items pass on web. Backend: GET /api/admin/feedback returns 200 with HWG service token, 403 with rider token, 401 for missing/bogus token (4/4 pytest cases). Frontend: /workout still renders with bc-live toggling DEMO⇄LIVE and vr-embed-source/view/fullscreen non-overlapping; /connections opens the ble-panel via device-btn-trainer and shows the ble-unsupported notice; /summary action-share is present and tapping on web pops the fallback toast 'Sharing a ride card works on the app' without crashing. Native-only paths (real BLE reconnect, battery pills, native share sheet) are gated by supported=false / Platform.OS==='web' — verified via code review only.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "summary.tsx Toast", "issue": "React Native web deprecation warning: 'props.pointerEvents is deprecated. Use style.pointerEvents' emitted from the Animated.View toast on /summary. Reference: /app/frontend/app/summary.tsx:52 (pointerEvents is passed inside the style array which is fine, but the warning still fires from the underlying compiled markup — worth confirming the toast prop pipeline)."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter94_admin_feedback_gate.py",
+    "/app/test_reports/pytest/iter94.xml",
+    "/app/test_reports/screens/i94_workout.jpeg",
+    "/app/test_reports/screens/i94_connections.jpeg",
+    "/app/test_reports/screens/i94_summary_share.jpeg"
+  ],
+  "action_items": [
+    "(Optional/minor) Silence the 'props.pointerEvents is deprecated' warning surfaced by the summary Toast on web (move to style.pointerEvents only).",
+    "Auto-reconnect + battery pills + native share sheet remain UNTESTED on web (device-only). Please verify these on a native iOS/Android build before shipping."
+  ],
+  "critical_code_review_comments": [
+    "useBleSensors.ts refactor is clean: intentional-disconnect tracking (intentionalRef) prevents auto-reconnect after user-initiated disconnect; exponential backoff (800ms * 1.6^tries, capped at 8s, max 8 tries) gives up cleanly and surfaces a rider-visible error; reconnect timers and BLE subs are torn down on unmount.",
+    "readBattery() reads Battery Service 0x180F then subscribes for updates only when isNotifiable=true, falling back silently — correct for straps that only expose a one-shot read.",
+    "onDisconnected handler correctly clears crank/wheel/control state per-device before deciding to reconnect, so the FTMS control pointer never dangles on a stale device object.",
+    "BleSensorsPanel: 'reconnecting' pill uses colors.yellow with ActivityIndicator, and BatteryPill switches color at <=20% (red) / <=50% (yellow) / else green — meets contrast and matches spec. Battery pill is gated behind `bat != null`, so it will simply not render on web (where battery stays {}).",
+    "summary.tsx rideCaption(): safe against missing stats — every field is optional and joined with double-space; falls back to '🚴 Roujaune ride' when route is unnamed. On web, shareRideCard short-circuits at Platform.OS === 'web' with a toast; on iOS uses Share.share({url,message}), Android uses Sharing.shareAsync + Clipboard fallback for the caption — good behaviour differentiation.",
+    "routes/feedback.py: GET /api/admin/feedback uses admin_router with dependencies=[Depends(auth.require_admin)] which resolves the HWG_SERVICE_TOKEN service principal correctly; response strips _id via find projection {'_id':0}."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter94_admin_feedback_gate.py (new)"
+  ],
+  "success_rate": {"backend": "100% (4/4 admin feedback gate tests)", "frontend": "100% (workout controls + LIVE/DEMO toggle + connections BLE unsupported notice + summary share fallback toast)"},
+  "seed_data_creation": "None — used the seeded demo@roujaune.app rider and the existing HWG_SERVICE_TOKEN.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "New pytest: /app/backend/tests/test_iter94_admin_feedback_gate.py — reuse for any future changes to the /api/admin/feedback gate. Frontend BLE panel is reached via /connections → device-btn-trainer (also opens for device-btn-wearable). Auto-reconnect + battery pills + native share sheet are DEVICE-ONLY (react-native-ble-plx not linked in Expo web; Platform.OS==='web' branches short-circuit share and BLE). To verify those code paths on real hardware, an iOS/Android EAS build is required.",
+  "rca_of_issue": "N/A — no bugs found. The BLE hook refactor and share caption changes are safe on web (supported=false stub + Platform.OS==='web' guard) and the admin feedback endpoint gates correctly (200 service, 403 rider, 401 missing/bogus)."
+}

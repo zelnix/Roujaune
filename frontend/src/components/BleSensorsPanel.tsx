@@ -7,6 +7,7 @@ import type { BleDevice, BleReadings, PermState } from "../hooks/useBleSensors";
 export function BleSensorsPanel({
   supported, poweredOn, scanning, devices, connected, readings, permissionStatus, error,
   onScan, onStopScan, onConnect, onDisconnect, onClose, units = "metric",
+  battery = {}, reconnecting = [],
 }: {
   supported: boolean;
   poweredOn: boolean;
@@ -22,6 +23,8 @@ export function BleSensorsPanel({
   onDisconnect: (id: string) => void;
   onClose: () => void;
   units?: "metric" | "imperial";
+  battery?: Record<string, number>;
+  reconnecting?: string[];
 }) {
   const connectedIds = new Set(connected.map((d) => d.id));
   const discovered = devices.filter((d) => !connectedIds.has(d.id));
@@ -78,15 +81,27 @@ export function BleSensorsPanel({
             {connected.length > 0 && (
               <View style={{ gap: 8 }}>
                 <Text style={styles.section}>CONNECTED</Text>
-                {connected.map((d) => (
-                  <View key={d.id} style={styles.deviceRow}>
-                    <Ionicons name="bluetooth" size={16} color={colors.green} />
-                    <Text style={styles.deviceName} numberOfLines={1}>{d.name}</Text>
-                    <Pressable onPress={() => onDisconnect(d.id)} testID={`ble-disconnect-${d.id}`} style={styles.disconnect}>
-                      <Text style={styles.disconnectText}>Disconnect</Text>
-                    </Pressable>
-                  </View>
-                ))}
+                {connected.map((d) => {
+                  const isReconnecting = reconnecting.includes(d.id);
+                  const bat = battery[d.id];
+                  return (
+                    <View key={d.id} style={styles.deviceRow}>
+                      <Ionicons name="bluetooth" size={16} color={isReconnecting ? colors.yellow : colors.green} />
+                      <Text style={styles.deviceName} numberOfLines={1}>{d.name}</Text>
+                      {bat != null && <BatteryPill level={bat} />}
+                      {isReconnecting ? (
+                        <View style={styles.reconnecting}>
+                          <ActivityIndicator size="small" color={colors.yellow} />
+                          <Text style={styles.reconnectingText}>Reconnecting…</Text>
+                        </View>
+                      ) : (
+                        <Pressable onPress={() => onDisconnect(d.id)} testID={`ble-disconnect-${d.id}`} style={styles.disconnect}>
+                          <Text style={styles.disconnectText}>Disconnect</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  );
+                })}
               </View>
             )}
 
@@ -132,6 +147,18 @@ function Reading({ label, value, live }: { label: string; value: string; live: b
   );
 }
 
+function BatteryPill({ level }: { level: number }) {
+  const low = level <= 20;
+  const icon = level >= 90 ? "battery-full" : level >= 40 ? "battery-half" : level >= 10 ? "battery-half" : "battery-dead";
+  const color = low ? colors.red : level <= 50 ? colors.yellow : colors.green;
+  return (
+    <View style={[styles.batPill, { borderColor: color }]} testID="ble-battery">
+      <Ionicons name={icon as any} size={13} color={color} />
+      <Text style={[styles.batText, { color }]}>{Math.round(level)}%</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center", zIndex: 60 },
   panel: { width: 460, maxWidth: "92%", backgroundColor: colors.cardElevated, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, gap: spacing.sm, ...shadow.card },
@@ -158,6 +185,10 @@ const styles = StyleSheet.create({
   deviceName: { flex: 1, color: colors.white, fontSize: 14, fontWeight: "600" },
   disconnect: { backgroundColor: "rgba(224,30,43,0.1)", borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 5 },
   disconnectText: { color: colors.red, fontSize: 12, fontWeight: "700" },
+  reconnecting: { flexDirection: "row", alignItems: "center", gap: 6 },
+  reconnectingText: { color: colors.yellow, fontSize: 12, fontWeight: "700" },
+  batPill: { flexDirection: "row", alignItems: "center", gap: 3, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 7, paddingVertical: 3 },
+  batText: { fontSize: 11, fontWeight: "800" },
   empty: { color: colors.textDim, fontSize: 12.5, paddingVertical: 8 },
   errorText: { color: colors.red, fontSize: 12.5, marginTop: 4 },
 });

@@ -15,6 +15,8 @@ export const UUID = {
   fitnessMachineControlPoint: "00002ad9-0000-1000-8000-00805f9b34fb",
   fitnessMachineStatus: "00002ada-0000-1000-8000-00805f9b34fb",
   fitnessMachineFeature: "00002acc-0000-1000-8000-00805f9b34fb",
+  battery: "0000180f-0000-1000-8000-00805f9b34fb",
+  batteryLevel: "00002a19-0000-1000-8000-00805f9b34fb",
 };
 
 const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";

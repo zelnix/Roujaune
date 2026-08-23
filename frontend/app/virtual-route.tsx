@@ -426,6 +426,8 @@ export default function VirtualRouteScreen() {
           devices={ble.devices}
           connected={ble.connected}
           readings={ble.readings}
+          battery={ble.battery}
+          reconnecting={ble.reconnecting}
           permissionStatus={ble.permissionStatus}
           error={ble.error}
           onScan={ble.startScan}
