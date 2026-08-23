@@ -65,9 +65,9 @@ export function AdjustmentsStrip({ entries }: { entries: { id: number; t: string
 
 // ---- Metric card ----------------------------------------------------------
 export function MetricCard({
-  icon, label, value, unit, status, statusTone = "neutral", sub, accent = colors.yellow, connected,
+  icon, label, value, unit, status, statusTone = "neutral", sub, accent = colors.yellow, connected, deviceName,
 }: {
-  icon: any; label: string; value: string; unit?: string; status?: string; statusTone?: Tone; sub?: string; accent?: string; connected?: boolean;
+  icon: any; label: string; value: string; unit?: string; status?: string; statusTone?: Tone; sub?: string; accent?: string; connected?: boolean; deviceName?: string;
 }) {
   return (
     <View style={m.card} testID={`metric-${label.toLowerCase().replace(/\s+/g, "-")}`}>
@@ -76,7 +76,7 @@ export function MetricCard({
         {connected !== undefined ? (
           <View style={m.conn} testID={`metric-conn-${label.toLowerCase().replace(/\s+/g, "-")}`}>
             <View style={[m.connDot, { backgroundColor: connected ? colors.green : "transparent", borderColor: connected ? colors.green : colors.textFaint }]} />
-            <Text style={[m.connText, { color: connected ? colors.green : colors.textFaint }]}>{connected ? "Live" : "Off"}</Text>
+            <Text style={[m.connText, { color: connected ? colors.green : colors.textFaint }]} numberOfLines={1}>{connected ? (deviceName || "Connected") : "Off"}</Text>
           </View>
         ) : null}
         <Text style={m.label}>{label}</Text>
@@ -144,15 +144,11 @@ function DistanceRing({ progress }: { progress: number }) {
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
         />
       </Svg>
-      <Text style={sc.ringPct}>{Math.round(p * 100)}%</Text>
     </View>
   );
 }
 
-export function SessionCard({ elapsed, estFinish, riddenKm, totalKm, speedKmh }: { elapsed: string; estFinish: string; riddenKm: number; totalKm: number; speedKmh: number }) {
-  const remaining = Math.max(0, totalKm - riddenKm);
-  const etaMin = speedKmh > 0.5 && remaining > 0 ? Math.round((remaining / speedKmh) * 60) : null;
-  const etaText = remaining <= 0 ? "Arrived" : etaMin != null ? `arriving ~${etaMin} min` : "arriving —";
+export function SessionCard({ elapsed, estFinish, riddenKm, totalKm }: { elapsed: string; estFinish: string; riddenKm: number; totalKm: number }) {
   return (
     <View style={sc.panel} testID="session-card">
       <View style={sc.header}><Ionicons name="stopwatch-outline" size={15} color={colors.yellow} /><Text style={sc.title}>SESSION</Text></View>
@@ -171,10 +167,7 @@ export function SessionCard({ elapsed, estFinish, riddenKm, totalKm, speedKmh }:
           <Text style={sc.label}>DISTANCE</Text>
           <Text style={sc.value} testID="session-distance">{riddenKm.toFixed(1)}<Text style={sc.unit}> / {totalKm.toFixed(1)} km</Text></Text>
         </View>
-        <View style={sc.ringWrap}>
-          <DistanceRing progress={totalKm > 0 ? riddenKm / totalKm : 0} />
-          <Text style={sc.eta} testID="session-eta" numberOfLines={1}>{etaText}</Text>
-        </View>
+        <DistanceRing progress={totalKm > 0 ? riddenKm / totalKm : 0} />
       </View>
     </View>
   );
@@ -580,7 +573,7 @@ const m = StyleSheet.create({
   head: { flexDirection: "row", alignItems: "center", gap: 7 },
   conn: { flexDirection: "row", alignItems: "center", gap: 4 },
   connDot: { width: 8, height: 8, borderRadius: 4, borderWidth: 1.5 },
-  connText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.5, textTransform: "uppercase" },
+  connText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.3, textTransform: "uppercase", maxWidth: 96 },
   label: { color: colors.textDim, fontSize: 11.5, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase", flex: 1 },
   pill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, borderWidth: 1 },
   pillText: { fontSize: 11, fontWeight: "800", letterSpacing: 0.5 },
@@ -616,9 +609,6 @@ const sc = StyleSheet.create({
   divider: { height: 1, backgroundColor: colors.borderSoft, marginVertical: 4 },
   distRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 6 },
   distText: { flex: 1 },
-  ringWrap: { alignItems: "center", gap: 4 },
-  eta: { color: colors.textDim, fontSize: 10.5, fontWeight: "700", letterSpacing: 0.2 },
-  ringPct: { color: colors.yellow, fontSize: 11, fontWeight: "800", fontVariant: ["tabular-nums"] },
 });
 
 const cb = StyleSheet.create({
