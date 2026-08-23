@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, ActivityIndicator, useWindowDimensions } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Image } from "expo-image";
@@ -24,6 +25,18 @@ export default function ScenicDestinationsScreen() {
   const [dist, setDist] = React.useState("All");
   const [climb, setClimb] = React.useState("All");
   const [sort, setSort] = React.useState("Featured");
+
+  // Remember the rider's last chosen sort so Explore opens the way they like it.
+  const SORT_KEY = "scenic:sort";
+  React.useEffect(() => {
+    AsyncStorage.getItem(SORT_KEY).then((v) => {
+      if (v && ["Featured", "Shortest", "Longest", "Most climb"].includes(v)) setSort(v);
+    }).catch(() => {});
+  }, []);
+  const chooseSort = React.useCallback((v: string) => {
+    setSort(v);
+    AsyncStorage.setItem(SORT_KEY, v).catch(() => {});
+  }, []);
 
   const open = (id: string) => router.push(`/scenic-ride?route=${id}` as any);
   const leave = () => { if (router.canGoBack()) router.back(); else router.replace("/"); };
@@ -82,7 +95,7 @@ export default function ScenicDestinationsScreen() {
     }
     return arr;
   }, [results, sort]);
-  const resetAll = () => { setQuery(""); setRegion("All"); setDist("All"); setClimb("All"); setSort("Featured"); };
+  const resetAll = () => { setQuery(""); setRegion("All"); setDist("All"); setClimb("All"); chooseSort("Featured"); };
 
   // Responsive columns: phones 1, tablets 2–3.
   const cols = width >= 1000 ? 3 : width >= 640 ? 2 : 1;
@@ -210,7 +223,7 @@ export default function ScenicDestinationsScreen() {
               {["Featured", "Shortest", "Longest", "Most climb"].map((r) => {
                 const sel = sort === r;
                 return (
-                  <Pressable key={r} testID={`destinations-sort-${r}`} onPress={() => setSort(r)}
+                  <Pressable key={r} testID={`destinations-sort-${r}`} onPress={() => chooseSort(r)}
                     accessibilityRole="button" accessibilityState={{ selected: sel }}
                     style={[styles.smChip, sel && styles.chipSel]}>
                     <Text style={[styles.smChipText, sel && styles.chipTextSel]}>{r}</Text>

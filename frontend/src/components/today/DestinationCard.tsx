@@ -44,6 +44,7 @@ export function DestinationCard({ route, width, onPress }: { route: ScenicRoute;
           <View style={styles.meta}>
             {route.duration_min ? <Meta icon="time-outline" label={`${route.duration_min}m`} /> : null}
             {route.distance_km ? <Meta icon="navigate-outline" label={`${route.distance_km}km`} /> : null}
+            {route.elevation_m ? <Meta icon="trending-up" label={`${Math.round(route.elevation_m)}m`} /> : null}
             <View style={styles.tagPill}><Text style={styles.tagPillText}>{route.tag}</Text></View>
           </View>
         </View>
