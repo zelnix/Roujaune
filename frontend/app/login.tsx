@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/src/lib/auth-context";
 import { colors, radius, spacing, shadow, textShadow } from "@/src/theme";
+import { AppVersionTag } from "@/src/components/AppVersionTag";
 
 const AUTH_BG = require("../assets/images/auth_bg_sunset.png");
 const LOGO_GLYPH = require("../assets/images/auth_logo_glyph.png");
@@ -65,6 +66,7 @@ export default function LoginScreen() {
             <Image source={LOGO_GLYPH} style={styles.glyph} resizeMode="contain" />
             <Image source={WORDMARK} style={styles.wordmark} resizeMode="contain" />
             <Text style={styles.brandTag}>Your strongest ride is your own.</Text>
+            <AppVersionTag />
           </View>
 
           <View style={styles.card}>

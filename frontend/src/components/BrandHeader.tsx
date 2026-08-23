@@ -4,6 +4,7 @@ import { Image } from "expo-image";
 import { colors, textShadow } from "../theme";
 import { brand } from "../data";
 import { useCoach } from "../lib/coach-persona";
+import { AppVersionTag } from "./AppVersionTag";
 
 const wordmark = require("../../assets/images/wordmark_t.png");
 
@@ -52,7 +53,7 @@ function Wordmark3D({ scale = 1 }: { scale?: number }) {
   );
 }
 
-export function BrandHeader({ compact = false, showDescriptor = true, descriptor }: { compact?: boolean; showDescriptor?: boolean; descriptor?: string }) {
+export function BrandHeader({ compact = false, showDescriptor = true, descriptor, showVersion = false }: { compact?: boolean; showDescriptor?: boolean; descriptor?: string; showVersion?: boolean }) {
   const persona = useCoach();
   const line = descriptor ?? `Personalised cycling training with ${persona.name}.`;
   return (
@@ -60,6 +61,7 @@ export function BrandHeader({ compact = false, showDescriptor = true, descriptor
       <Wordmark3D scale={compact ? 0.72 : 1} />
       <Text style={[styles.tagline, compact && { fontSize: 24, marginTop: 6 }]}>{brand.tagline}</Text>
       {showDescriptor && <Text style={[styles.descriptor, compact && { fontSize: 13 }]}>{line}</Text>}
+      {showVersion && <AppVersionTag />}
     </View>
   );
 }

@@ -58,7 +58,7 @@ export function ExperienceHero({
       />
       <View style={styles.row}>
         <View style={{ flex: 1 }}>
-          <BrandHeader compact={compact} descriptor={descriptor} />
+          <BrandHeader compact={compact} descriptor={descriptor} showVersion />
         </View>
         <HeaderStatus />
       </View>
