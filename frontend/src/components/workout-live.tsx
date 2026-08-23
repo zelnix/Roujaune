@@ -218,7 +218,7 @@ export type TimelineStep = {
 export type StepStatus = "done" | "current" | "future";
 
 function ProfileSeg({ step, status, width, fill, onPress }: { step: TimelineStep; status: StepStatus; width: number; fill: number; onPress: () => void }) {
-  const h = 40 + Math.max(0, Math.min(1, step.intensity)) * 52;
+  const h = 74 + Math.max(0, Math.min(1, step.intensity)) * 58;
   const base = status === "future" ? "rgba(255,255,255,0.12)" : status === "done" ? colors.yellow + "44" : step.color + "33";
   const fillPct = status === "done" ? 100 : status === "current" ? Math.max(0, Math.min(1, fill)) * 100 : 0;
   const dim = status === "future";
@@ -242,7 +242,7 @@ export function StepTimeline({
   title: string; steps: TimelineStep[]; activeIndex: number; remaining?: string; stepProgress?: number; onStepPress: (index: number) => void;
   elapsed?: string; progress?: number; estFinish?: string;
 }) {
-  const MIN = 104;
+  const MIN = 150;
   const total = steps.reduce((a, s) => a + Math.max(1, s.durationSec), 0) || 1;
   const [chartW, setChartW] = React.useState(0);
   const scrollRef = React.useRef<ScrollView>(null);
@@ -574,14 +574,14 @@ const st = StyleSheet.create({
   progressTrack: { flex: 1, height: 7, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.1)", overflow: "hidden" },
   progressFill: { height: "100%", backgroundColor: colors.yellow, borderRadius: 4 },
   progressPct: { color: colors.yellow, fontSize: 11, fontWeight: "800", minWidth: 34, textAlign: "right" },
-  chart: { flexDirection: "row", alignItems: "flex-end", height: 104, gap: 0 },
-  seg: { height: "100%", justifyContent: "flex-end", paddingHorizontal: 1 },
-  segBar: { width: "100%", borderRadius: 5, borderWidth: 1, overflow: "hidden", justifyContent: "flex-end" },
+  chart: { flexDirection: "row", alignItems: "flex-end", height: 140, gap: 0 },
+  seg: { height: "100%", justifyContent: "flex-end", paddingHorizontal: 2 },
+  segBar: { width: "100%", borderRadius: 7, borderWidth: 1, overflow: "hidden", justifyContent: "flex-end" },
   segFill: { position: "absolute", left: 0, top: 0, bottom: 0, backgroundColor: colors.yellow + "3A", borderRightWidth: 2, borderRightColor: colors.yellow },
-  segLabel: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, paddingHorizontal: 6, paddingVertical: 5, justifyContent: "flex-end", gap: 1 },
-  segName: { color: colors.white, fontSize: 10.5, fontWeight: "800", ...textShadow("rgba(0,0,0,0.85)", 3) },
-  segDesc: { color: "rgba(244,240,233,0.82)", fontSize: 9, fontWeight: "600", ...textShadow("rgba(0,0,0,0.85)", 3) },
-  segMeta: { color: colors.yellow, fontSize: 9.5, fontWeight: "800", fontVariant: ["tabular-nums"], ...textShadow("rgba(0,0,0,0.85)", 3) },
+  segLabel: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, paddingHorizontal: 9, paddingVertical: 8, justifyContent: "flex-end", gap: 3 },
+  segName: { color: colors.white, fontSize: 13.5, fontWeight: "800", ...textShadow("rgba(0,0,0,0.85)", 3) },
+  segDesc: { color: "rgba(244,240,233,0.85)", fontSize: 11.5, fontWeight: "600", lineHeight: 15, ...textShadow("rgba(0,0,0,0.85)", 3) },
+  segMeta: { color: colors.yellow, fontSize: 12, fontWeight: "800", fontVariant: ["tabular-nums"], ...textShadow("rgba(0,0,0,0.85)", 3) },
 });
 
 const sd = StyleSheet.create({
