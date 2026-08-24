@@ -126,6 +126,7 @@ export default function LiveWorkout() {
   const [extraSegments, setExtraSegments] = React.useState<import("@/src/lib/workout-catalog").Segment[]>([]);
   const segments = React.useMemo(() => [...baseSegments, ...extraSegments], [baseSegments, extraSegments]);
   const compact = height < 620;
+  const narrow = height >= 620 && winW < 1000;   // small-wide screens (e.g. Z Fold): 2×2 metric grid
   const leftW = compact ? 150 : 212;
   const rightW = compact ? 170 : 236;
 
@@ -837,21 +838,21 @@ export default function LiveWorkout() {
     <>
       <View style={[styles.mainRow, tablet && styles.flex1]}>
         <View style={[styles.leftCenter, tablet && styles.flex1]}>
-          <View style={styles.metricRow}>
-            <BrandCard />
+          <View style={[styles.metricRow, narrow && styles.metricRowWrap]}>
+            {!narrow && <BrandCard />}
             {timeBased ? (
               <>
-                <MetricCard icon="stopwatch-outline" label="Elapsed" value={elapsedShort} sub={`TOTAL SESSION ${mmss(totalSec)}`} accent={colors.yellow} />
-                <MetricCard icon="timer-outline" label="Interval" value={timeLeftLabel ?? "—"} status="REMAINING" statusTone="neutral" sub="CURRENT BLOCK" accent="#5AC8FA" />
-                <MetricCard icon="flame" label="Calories" value={String(kcal)} unit="kcal" sub="ESTIMATED" accent={colors.red} />
-                <MetricCard icon="flag" label="Workout Step" value={`Step ${(activeSeg?.index ?? 0) + 1}`} unit={`of ${segments.length}`} sub="CURRENT STEP" accent={colors.green} />
+                <MetricCard icon="stopwatch-outline" label="Elapsed" value={elapsedShort} sub={`TOTAL SESSION ${mmss(totalSec)}`} accent={colors.yellow} half={narrow} />
+                <MetricCard icon="timer-outline" label="Interval" value={timeLeftLabel ?? "—"} status="REMAINING" statusTone="neutral" sub="CURRENT BLOCK" accent="#5AC8FA" half={narrow} />
+                <MetricCard icon="flame" label="Calories" value={String(kcal)} unit="kcal" sub="ESTIMATED" accent={colors.red} half={narrow} />
+                <MetricCard icon="flag" label="Workout Step" value={`Step ${(activeSeg?.index ?? 0) + 1}`} unit={`of ${segments.length}`} sub="CURRENT STEP" accent={colors.green} half={narrow} />
               </>
             ) : (
               <>
-                <MetricCard icon="heart" label="Heart Rate" value={wearableOn ? String(telemetry.hr) : "—"} unit="bpm" status={wearableOn ? `ZONE ${hrZone(telemetry.hr)}` : undefined} statusTone="neutral" accent={colors.red} connected={wearableOn} deviceName={hrName} battery={hrBattery} signal={hrSignal} onDevicePress={() => setShowBle(true)} />
-                <MetricCard icon="speedometer" label="Speed" value={trainerOn ? String(Math.round(telemetry.speed)) : "—"} unit="km/h" accent="#5AC8FA" connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} />
-                <MetricCard icon="sync" label="Cadence" value={trainerOn ? String(telemetry.cadence) : "—"} unit="rpm" status={cadStatus} statusTone={cadInRange ? "good" : "warn"} sub={`TARGET ${CAD_LOW}–${CAD_HIGH}`} accent={colors.green} connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} />
-                <MetricCard icon="flash" label="Power" value={trainerOn ? String(powerVal) : "—"} unit="W" status={powerStatus} statusTone={powerTone} sub={`TARGET ${Math.max(0, targetW - 8)}–${targetW + 8} W`} accent={colors.yellow} connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} />
+                <MetricCard icon="heart" label="Heart Rate" value={wearableOn ? String(telemetry.hr) : "—"} unit="bpm" status={wearableOn ? `ZONE ${hrZone(telemetry.hr)}` : undefined} statusTone="neutral" accent={colors.red} connected={wearableOn} deviceName={hrName} battery={hrBattery} signal={hrSignal} onDevicePress={() => setShowBle(true)} half={narrow} />
+                <MetricCard icon="speedometer" label="Speed" value={trainerOn ? String(Math.round(telemetry.speed)) : "—"} unit="km/h" accent="#5AC8FA" connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} half={narrow} />
+                <MetricCard icon="sync" label="Cadence" value={trainerOn ? String(telemetry.cadence) : "—"} unit="rpm" status={cadStatus} statusTone={cadInRange ? "good" : "warn"} sub={`TARGET ${CAD_LOW}–${CAD_HIGH}`} accent={colors.green} connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} half={narrow} />
+                <MetricCard icon="flash" label="Power" value={trainerOn ? String(powerVal) : "—"} unit="W" status={powerStatus} statusTone={powerTone} sub={`TARGET ${Math.max(0, targetW - 8)}–${targetW + 8} W`} accent={colors.yellow} connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} half={narrow} />
               </>
             )}
           </View>
@@ -1200,6 +1201,7 @@ const styles = StyleSheet.create({
   routeOptName: { color: colors.white, fontSize: 14, fontWeight: "800" },
   routeOptMeta: { color: colors.textFaint, fontSize: 12, fontWeight: "600", marginTop: 2 },
   metricRow: { flexDirection: "row", gap: spacing.md },
+  metricRowWrap: { flexWrap: "wrap", rowGap: spacing.md },
   mainRow: { flexDirection: "row", gap: spacing.md, alignItems: "stretch" },
   leftCenter: { flex: 1, gap: spacing.md },
   innerRow: { flexDirection: "row", gap: spacing.md, alignItems: "stretch" },

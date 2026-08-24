@@ -65,9 +65,9 @@ export function AdjustmentsStrip({ entries }: { entries: { id: number; t: string
 
 // ---- Metric card ----------------------------------------------------------
 export function MetricCard({
-  icon, label, value, unit, status, statusTone = "neutral", sub, accent = colors.yellow, connected, deviceName, battery, signal, onDevicePress,
+  icon, label, value, unit, status, statusTone = "neutral", sub, accent = colors.yellow, connected, deviceName, battery, signal, onDevicePress, half,
 }: {
-  icon: any; label: string; value: string; unit?: string; status?: string; statusTone?: Tone; sub?: string; accent?: string; connected?: boolean; deviceName?: string; battery?: number | null; signal?: number | null; onDevicePress?: () => void;
+  icon: any; label: string; value: string; unit?: string; status?: string; statusTone?: Tone; sub?: string; accent?: string; connected?: boolean; deviceName?: string; battery?: number | null; signal?: number | null; onDevicePress?: () => void; half?: boolean;
 }) {
   const batIcon = battery == null ? null : battery >= 66 ? "battery-full" : battery >= 25 ? "battery-half" : "battery-dead";
   const batColor = battery == null ? colors.textDim : battery <= 15 ? colors.red : battery <= 30 ? colors.yellow : colors.green;
@@ -80,7 +80,7 @@ export function MetricCard({
     : colors.red;
   const ConnTag: any = onDevicePress ? Pressable : View;
   return (
-    <View style={m.card} testID={`metric-${label.toLowerCase().replace(/\s+/g, "-")}`}>
+    <View style={[m.card, half && m.cardHalf]} testID={`metric-${label.toLowerCase().replace(/\s+/g, "-")}`}>
       <View style={m.head}>
         <Ionicons name={icon} size={16} color={accent} />
         {connected !== undefined ? (
@@ -99,7 +99,7 @@ export function MetricCard({
             ) : null}
           </ConnTag>
         ) : null}
-        <Text style={m.label}>{label}</Text>
+        <Text style={m.label} numberOfLines={1}>{label}</Text>
         {status ? (
           <View style={[m.pill, { borderColor: toneColor(statusTone), backgroundColor: toneColor(statusTone) + "22" }]}>
             <Text style={[m.pillText, { color: toneColor(statusTone) }]}>{status}</Text>
@@ -628,6 +628,7 @@ const aj = StyleSheet.create({
 
 const m = StyleSheet.create({
   card: { ...card, flex: 1, paddingHorizontal: 16, paddingVertical: 14, minWidth: 150 },
+  cardHalf: { flex: 0, flexGrow: 1, flexBasis: "47%", minWidth: 140 },
   head: { flexDirection: "row", alignItems: "center", gap: 7 },
   conn: { flexDirection: "row", alignItems: "center", gap: 4 },
   connDot: { width: 8, height: 8, borderRadius: 4, borderWidth: 1.5 },
