@@ -33,11 +33,11 @@ export function LiveHeader({ elapsed, progress, estFinish }: { elapsed: string; 
 }
 
 // ---- Brand card (metric row) ----------------------------------------------
-export function BrandCard() {
+export function BrandCard({ dense }: { dense?: boolean }) {
   return (
-    <View style={brand.card} testID="brand-card">
-      <Image source={LOGO_GLYPH} style={brand.glyph} contentFit="contain" />
-      <Image source={WORDMARK} style={brand.logo} contentFit="contain" />
+    <View style={[brand.card, dense && brand.cardDense]} testID="brand-card">
+      <Image source={LOGO_GLYPH} style={dense ? brand.glyphDense : brand.glyph} contentFit="contain" />
+      <Image source={WORDMARK} style={dense ? brand.logoDense : brand.logo} contentFit="contain" />
     </View>
   );
 }
@@ -65,9 +65,9 @@ export function AdjustmentsStrip({ entries }: { entries: { id: number; t: string
 
 // ---- Metric card ----------------------------------------------------------
 export function MetricCard({
-  icon, label, value, unit, status, statusTone = "neutral", sub, accent = colors.yellow, connected, deviceName, battery, signal, onDevicePress, half,
+  icon, label, value, unit, status, statusTone = "neutral", sub, accent = colors.yellow, connected, deviceName, battery, signal, onDevicePress, half, dense,
 }: {
-  icon: any; label: string; value: string; unit?: string; status?: string; statusTone?: Tone; sub?: string; accent?: string; connected?: boolean; deviceName?: string; battery?: number | null; signal?: number | null; onDevicePress?: () => void; half?: boolean;
+  icon: any; label: string; value: string; unit?: string; status?: string; statusTone?: Tone; sub?: string; accent?: string; connected?: boolean; deviceName?: string; battery?: number | null; signal?: number | null; onDevicePress?: () => void; half?: boolean; dense?: boolean;
 }) {
   const batIcon = battery == null ? null : battery >= 66 ? "battery-full" : battery >= 25 ? "battery-half" : "battery-dead";
   const batColor = battery == null ? colors.textDim : battery <= 15 ? colors.red : battery <= 30 ? colors.yellow : colors.green;
@@ -80,9 +80,9 @@ export function MetricCard({
     : colors.red;
   const ConnTag: any = onDevicePress ? Pressable : View;
   return (
-    <View style={[m.card, half && m.cardHalf]} testID={`metric-${label.toLowerCase().replace(/\s+/g, "-")}`}>
+    <View style={[m.card, half && m.cardHalf, dense && m.cardDense]} testID={`metric-${label.toLowerCase().replace(/\s+/g, "-")}`}>
       <View style={m.head}>
-        <Ionicons name={icon} size={16} color={accent} />
+        <Ionicons name={icon} size={dense ? 14 : 16} color={accent} />
         {connected !== undefined ? (
           <ConnTag
             style={m.conn}
@@ -90,7 +90,9 @@ export function MetricCard({
             {...(onDevicePress ? { onPress: onDevicePress, hitSlop: 8, accessibilityRole: "button", accessibilityLabel: connected ? `${deviceName || "Device"} connected. Tap to manage sensors` : "Tap to pair a sensor" } : {})}
           >
             <View style={[m.connDot, { backgroundColor: connected ? dotColor : "transparent", borderColor: connected ? dotColor : colors.textFaint }]} />
-            <Text style={[m.connText, { color: connected ? colors.green : colors.textFaint }]} numberOfLines={1}>{connected ? (deviceName || "Connected") : "Pair"}</Text>
+            {!dense ? (
+              <Text style={[m.connText, { color: connected ? colors.green : colors.textFaint }]} numberOfLines={1}>{connected ? (deviceName || "Connected") : "Pair"}</Text>
+            ) : null}
             {connected && batIcon ? (
               <>
                 <Ionicons name={batIcon} size={13} color={batColor} style={m.batIcon} />
@@ -99,18 +101,18 @@ export function MetricCard({
             ) : null}
           </ConnTag>
         ) : null}
-        <Text style={m.label} numberOfLines={1}>{label}</Text>
+        <Text style={[m.label, dense && m.labelDense]} numberOfLines={dense ? 2 : 1}>{label}</Text>
         {status ? (
-          <View style={[m.pill, { borderColor: toneColor(statusTone), backgroundColor: toneColor(statusTone) + "22" }]}>
-            <Text style={[m.pillText, { color: toneColor(statusTone) }]}>{status}</Text>
+          <View style={[m.pill, dense && m.pillDense, { borderColor: toneColor(statusTone), backgroundColor: toneColor(statusTone) + "22" }]}>
+            <Text style={[m.pillText, dense && m.pillTextDense, { color: toneColor(statusTone) }]}>{status}</Text>
           </View>
         ) : null}
       </View>
-      <View style={m.valueRow}>
-        <Text style={[m.value, { color: accent }]} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
-        {unit ? <Text style={m.unit}>{unit}</Text> : null}
+      <View style={[m.valueRow, dense && m.valueRowDense]}>
+        <Text style={[m.value, dense && m.valueDense, { color: accent }]} numberOfLines={1} adjustsFontSizeToFit>{value}</Text>
+        {unit ? <Text style={[m.unit, dense && m.unitDense]}>{unit}</Text> : null}
       </View>
-      {sub ? <Text style={m.sub}>{sub}</Text> : null}
+      {sub ? <Text style={[m.sub, dense && m.subDense]}>{sub}</Text> : null}
     </View>
   );
 }
@@ -612,8 +614,11 @@ const h = StyleSheet.create({
 
 const brand = StyleSheet.create({
   card: { ...card, flex: 1, minWidth: 120, alignItems: "center", justifyContent: "center", paddingVertical: 16, gap: 8 },
+  cardDense: { minWidth: 92, paddingVertical: 8, gap: 4 },
   glyph: { width: 44, height: 44 },
+  glyphDense: { width: 30, height: 30 },
   logo: { width: "86%", height: 40 },
+  logoDense: { width: "88%", height: 24 },
 });
 
 const aj = StyleSheet.create({
@@ -629,18 +634,26 @@ const aj = StyleSheet.create({
 const m = StyleSheet.create({
   card: { ...card, flex: 1, paddingHorizontal: 16, paddingVertical: 14, minWidth: 150 },
   cardHalf: { flex: 0, flexGrow: 1, flexBasis: "47%", minWidth: 140 },
+  cardDense: { paddingHorizontal: 12, paddingVertical: 8, minWidth: 108 },
   head: { flexDirection: "row", alignItems: "center", gap: 7 },
   conn: { flexDirection: "row", alignItems: "center", gap: 4 },
   connDot: { width: 8, height: 8, borderRadius: 4, borderWidth: 1.5 },
   connText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.3, textTransform: "uppercase", maxWidth: 96 },
   batIcon: { marginLeft: 2, transform: [{ rotate: "90deg" }] },
   label: { color: colors.textDim, fontSize: 11.5, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase", flex: 1 },
+  labelDense: { fontSize: 9.5, letterSpacing: 0.6 },
   pill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, borderWidth: 1 },
+  pillDense: { paddingHorizontal: 6, paddingVertical: 2 },
   pillText: { fontSize: 11, fontWeight: "800", letterSpacing: 0.5 },
+  pillTextDense: { fontSize: 9.5 },
   valueRow: { flexDirection: "row", alignItems: "flex-end", gap: 6, marginTop: 8 },
+  valueRowDense: { marginTop: 3, gap: 4 },
   value: { fontSize: 40, fontWeight: "900", fontVariant: ["tabular-nums"], lineHeight: 44 },
+  valueDense: { fontSize: 25, lineHeight: 28 },
   unit: { color: colors.textDim, fontSize: 14, fontWeight: "700", marginBottom: 7 },
+  unitDense: { fontSize: 11, marginBottom: 3 },
   sub: { color: colors.textDim, fontSize: 12.5, fontWeight: "700", marginTop: 4, letterSpacing: 0.3 },
+  subDense: { fontSize: 10, marginTop: 2 },
 });
 
 const sh = StyleSheet.create({

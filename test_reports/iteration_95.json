@@ -1,0 +1,27 @@
+{
+  "summary": "Frontend-only regression test of the ROUJAUNE Live Workout (/workout) dense-tablet layout on a small-wide viewport (1180x760) and dense 2x2 fallback (980x760). All requested layout fixes verified: TERRAIN card no longer overlaps the POWER tile, metric labels render full text (HEART RATE / SPEED / CADENCE / POWER), everything fits within a 760px-tall viewport without scrolling, and functional controls (DEMO toggle, Pause, Sensors, Settings) work.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "VirtualRidePlayer / workout screen", "issue": "Console warning: 'props.pointerEvents is deprecated. Use style.pointerEvents'. Non-blocking React Native Web deprecation but should be migrated to style.pointerEvents where used. Reference: /app/frontend/src/components/workout-live.tsx:278 (ElevationProfile pointerEvents='none' prop on View) and any other pointerEvents props."}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_95.json"],
+  "action_items": [
+    "Optional: migrate remaining `pointerEvents=\"none\"` props on View (e.g. ElevationProfile wrap, nnProgressTrack) to `style={{ pointerEvents: 'none' }}` to silence the RN Web deprecation warning."
+  ],
+  "critical_code_review_comments": [
+    "workout.tsx is >1200 lines — over the 700-line guideline. Consider splitting derivation logic (terrain/kcal/PR/BLE toast/coach cue) into hooks to reduce file size.",
+    "Layout math for the dense metric row relies on `leftCenter { flex:1, minWidth:0 }` + `centerCol { flex:1, minWidth:0 }`; this correctly stopped the metric row from overflowing into the right column at 1180w. Good fix."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (skipped per request)", "frontend": "100% (4/4 test areas passed)"},
+  "seed_data_creation": "None. Logged in as seeded demo@roujaune.app / demo9900.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Live Workout /workout page: tested at 1180x760 (4-across metric row) and 980x760 (dense 2x2 grid). Measured bounding boxes: @1180 metric-power.right=960px, terrain-card.left=968px → gap=8px, NO overlap. All 4 metric tiles y=16 h=79 (aligned row). scrollHeight===clientHeight===760, bc-pause bottom=733 (fully visible). Metric labels render as 'HEART RATE'/'SPEED'/'CADENCE'/'POWER'. bc-live toggled DEMO↔LIVE. bc-pause toggled Pause↔Resume. bc-bluetooth opened BLE panel. bc-settings opened Settings panel. @980 confirmed 2x2 grid (HR/Speed y=1 row, Cadence/Power y=75 row), terrain still on the right with no overlap. Screenshots: /tmp/w_workout_1180.png, /tmp/w_workout_980.png.",
+  "rca_of_issue": "Original bug: at ~small-wide viewports (e.g. Z Fold), the right-column TERRAIN card overlapped the POWER metric tile because the leftCenter/centerCol flex containers had no `minWidth:0`, so the 4-metric row's intrinsic width pushed the right column off-screen and it visually overlapped Power. Fix (verified) added `minWidth:0` on leftCenter + centerCol, narrowed rightW to 196, and added a MetricCard `dense` prop that shrinks the tile paddings/font sizes and hides the connection device-name text (green dot + battery kept) while allowing up to 2 lines for the label so labels stay readable. At 1180x760 all 4 metric tiles + brand + terrain fit on one row with an 8px gap between POWER and TERRAIN; whole screen fits in 760px with no scrolling. At 980x760 the layout correctly collapses to a 2×2 metric grid with terrain still cleanly on the right."
+}

@@ -1057,3 +1057,12 @@ User wanted an in-app rating + feedback capture (fb50-style) opened from Setting
 - **Issue**: On small-wide screens (e.g. Samsung Galaxy Z Fold unfolded, ~837×697 dp landscape) the workout metric row (BrandCard + 4 MetricCards, each minWidth 150 ≈ 768px) overflowed the ~557px available — the Power card clipped off-screen and labels char-wrapped ("HEA RT RAT E").
 - **Fix**: new `narrow = height>=620 && winW<1000` flag in app/workout.tsx. When narrow, the metric row wraps (`metricRowWrap`: flexWrap + rowGap), the decorative BrandCard is hidden, and each MetricCard gets `half` → `m.cardHalf` (flexBasis 47%, minWidth 140) yielding a clean 2×2 grid. MetricCard label now `numberOfLines={1}` (no more char-wrap). Applies to both timeBased and live metric sets.
 - Big tablets (winW≥1000) keep the 4-across row + BrandCard unchanged; phones (height<620) unaffected. Verified via screenshot at 900×740: 2×2 grid, full labels, no clipping, right column (Terrain/Route) intact.
+
+## Live Workout compaction — small-wide/tablet dense layout (2026-08 fork)
+- **Bug**: On the deployed Z Fold (small-wide, winW≈1000–1180) the right-column TERRAIN card OVERLAPPED the Power metric tile (metric row of Brand+4 cards @ minWidth 150 overflowed leftCenter into the fixed-width right column). Tiles/gaps/video-HUD also too large; content scrolled.
+- **Fix (app/workout.tsx + workout-live.tsx + VirtualRidePlayer.tsx)**:
+  - `dense` prop on MetricCard/BrandCard (passed `dense={tablet}`): value 40→25, padding 16/14→12/8, minWidth 150→108, label/unit/sub/pill all smaller; BrandCard glyph 44→30, logo h40→24. In dense the connection DEVICE-NAME text is hidden (dot + battery kept) and the label allows 2 lines — so labels stay fully readable ("HEART RATE"/"CADENCE"/"POWER") instead of truncating to "HEA…"/"C.".
+  - Gaps: metricRow/mainRow/innerRow/leftCenter/centerCol/leftCol/rightCol spacing.md→sm. `leftCenter`/`centerCol` got `minWidth:0` so flex children shrink (no overflow into right column → no Terrain overlap).
+  - Right/left columns narrower: rightW 236→196, leftW 212→184.
+  - Video HUD halved: VRP embed pills paddingV 13→6, embedIcon 65→38 (icons 28→18), routeNamePill smaller; YouTube ytSourceBtn/ytIconBtn same treatment.
+- Verified via screenshot at 1180×760: 5 tiles (Brand+HR/Speed/Cadence/Power) fit one row, labels full, Terrain/Route clean in right column, step timeline + control bar all visible (no scroll). narrow<1000 still uses the dense 2×2 grid.

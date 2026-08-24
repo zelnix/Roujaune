@@ -127,8 +127,8 @@ export default function LiveWorkout() {
   const segments = React.useMemo(() => [...baseSegments, ...extraSegments], [baseSegments, extraSegments]);
   const compact = height < 620;
   const narrow = height >= 620 && winW < 1000;   // small-wide screens (e.g. Z Fold): 2×2 metric grid
-  const leftW = compact ? 150 : 212;
-  const rightW = compact ? 170 : 236;
+  const leftW = compact ? 150 : 184;
+  const rightW = compact ? 170 : 196;
 
   const [centerW, setCenterW] = React.useState(560);
   const [videoSlotH, setVideoSlotH] = React.useState(0);
@@ -839,20 +839,20 @@ export default function LiveWorkout() {
       <View style={[styles.mainRow, tablet && styles.flex1]}>
         <View style={[styles.leftCenter, tablet && styles.flex1]}>
           <View style={[styles.metricRow, narrow && styles.metricRowWrap]}>
-            {!narrow && <BrandCard />}
+            {!narrow && <BrandCard dense={tablet} />}
             {timeBased ? (
               <>
-                <MetricCard icon="stopwatch-outline" label="Elapsed" value={elapsedShort} sub={`TOTAL SESSION ${mmss(totalSec)}`} accent={colors.yellow} half={narrow} />
-                <MetricCard icon="timer-outline" label="Interval" value={timeLeftLabel ?? "—"} status="REMAINING" statusTone="neutral" sub="CURRENT BLOCK" accent="#5AC8FA" half={narrow} />
-                <MetricCard icon="flame" label="Calories" value={String(kcal)} unit="kcal" sub="ESTIMATED" accent={colors.red} half={narrow} />
-                <MetricCard icon="flag" label="Workout Step" value={`Step ${(activeSeg?.index ?? 0) + 1}`} unit={`of ${segments.length}`} sub="CURRENT STEP" accent={colors.green} half={narrow} />
+                <MetricCard icon="stopwatch-outline" label="Elapsed" value={elapsedShort} sub={`TOTAL SESSION ${mmss(totalSec)}`} accent={colors.yellow} half={narrow} dense={tablet} />
+                <MetricCard icon="timer-outline" label="Interval" value={timeLeftLabel ?? "—"} status="REMAINING" statusTone="neutral" sub="CURRENT BLOCK" accent="#5AC8FA" half={narrow} dense={tablet} />
+                <MetricCard icon="flame" label="Calories" value={String(kcal)} unit="kcal" sub="ESTIMATED" accent={colors.red} half={narrow} dense={tablet} />
+                <MetricCard icon="flag" label="Workout Step" value={`Step ${(activeSeg?.index ?? 0) + 1}`} unit={`of ${segments.length}`} sub="CURRENT STEP" accent={colors.green} half={narrow} dense={tablet} />
               </>
             ) : (
               <>
-                <MetricCard icon="heart" label="Heart Rate" value={wearableOn ? String(telemetry.hr) : "—"} unit="bpm" status={wearableOn ? `ZONE ${hrZone(telemetry.hr)}` : undefined} statusTone="neutral" accent={colors.red} connected={wearableOn} deviceName={hrName} battery={hrBattery} signal={hrSignal} onDevicePress={() => setShowBle(true)} half={narrow} />
-                <MetricCard icon="speedometer" label="Speed" value={trainerOn ? String(Math.round(telemetry.speed)) : "—"} unit="km/h" accent="#5AC8FA" connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} half={narrow} />
-                <MetricCard icon="sync" label="Cadence" value={trainerOn ? String(telemetry.cadence) : "—"} unit="rpm" status={cadStatus} statusTone={cadInRange ? "good" : "warn"} sub={`TARGET ${CAD_LOW}–${CAD_HIGH}`} accent={colors.green} connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} half={narrow} />
-                <MetricCard icon="flash" label="Power" value={trainerOn ? String(powerVal) : "—"} unit="W" status={powerStatus} statusTone={powerTone} sub={`TARGET ${Math.max(0, targetW - 8)}–${targetW + 8} W`} accent={colors.yellow} connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} half={narrow} />
+                <MetricCard icon="heart" label="Heart Rate" value={wearableOn ? String(telemetry.hr) : "—"} unit="bpm" status={wearableOn ? `ZONE ${hrZone(telemetry.hr)}` : undefined} statusTone="neutral" accent={colors.red} connected={wearableOn} deviceName={hrName} battery={hrBattery} signal={hrSignal} onDevicePress={() => setShowBle(true)} half={narrow} dense={tablet} />
+                <MetricCard icon="speedometer" label="Speed" value={trainerOn ? String(Math.round(telemetry.speed)) : "—"} unit="km/h" accent="#5AC8FA" connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} half={narrow} dense={tablet} />
+                <MetricCard icon="sync" label="Cadence" value={trainerOn ? String(telemetry.cadence) : "—"} unit="rpm" status={cadStatus} statusTone={cadInRange ? "good" : "warn"} sub={`TARGET ${CAD_LOW}–${CAD_HIGH}`} accent={colors.green} connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} half={narrow} dense={tablet} />
+                <MetricCard icon="flash" label="Power" value={trainerOn ? String(powerVal) : "—"} unit="W" status={powerStatus} statusTone={powerTone} sub={`TARGET ${Math.max(0, targetW - 8)}–${targetW + 8} W`} accent={colors.yellow} connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} half={narrow} dense={tablet} />
               </>
             )}
           </View>
@@ -883,13 +883,13 @@ export default function LiveWorkout() {
                     <View style={styles.ytControls} pointerEvents="box-none">
                       <Pressable style={styles.ytSourceBtn} onPress={() => setShowStream(true)} testID="workout-source"
                         accessibilityRole="button" accessibilityLabel="Choose what to watch">
-                        <Ionicons name="logo-youtube" size={17} color={colors.white} />
+                        <Ionicons name="logo-youtube" size={13} color={colors.white} />
                         <Text style={styles.ytSourceText}>Watch</Text>
-                        <Ionicons name="chevron-down" size={15} color="rgba(255,255,255,0.65)" />
+                        <Ionicons name="chevron-down" size={12} color="rgba(255,255,255,0.65)" />
                       </Pressable>
                       <Pressable style={styles.ytIconBtn} onPress={() => setExpanded(true)} testID="workout-yt-fullscreen"
                         accessibilityRole="button" accessibilityLabel="Enter fullscreen">
-                        <Ionicons name="expand-outline" size={28} color={colors.white} />
+                        <Ionicons name="expand-outline" size={18} color={colors.white} />
                       </Pressable>
                     </View>
                   </View>
@@ -1178,10 +1178,10 @@ const styles = StyleSheet.create({
   tabletContent: { flexGrow: 1, padding: spacing.md, gap: spacing.md },
   flex1: { flex: 1 },
   videoSlot: { minHeight: 150 },
-  ytControls: { position: "absolute", top: 10, right: 10, flexDirection: "row", alignItems: "center", gap: 10 },
-  ytSourceBtn: { flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: "rgba(0,0,0,0.6)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", borderRadius: radius.pill, paddingHorizontal: 16, paddingVertical: 13 },
-  ytSourceText: { color: colors.white, fontSize: 14.5, fontWeight: "800" },
-  ytIconBtn: { width: 65, height: 65, borderRadius: 33, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)" },
+  ytControls: { position: "absolute", top: 8, right: 8, flexDirection: "row", alignItems: "center", gap: 7 },
+  ytSourceBtn: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(0,0,0,0.6)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 6 },
+  ytSourceText: { color: colors.white, fontSize: 11.5, fontWeight: "800" },
+  ytIconBtn: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)" },
   fsExit: { position: "absolute", top: 20, right: 20, width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", zIndex: 51 },
   immersive: { ...StyleSheet.absoluteFillObject, backgroundColor: "#000", zIndex: 50, alignItems: "center", justifyContent: "center" },
   lockOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.82)", alignItems: "center", justifyContent: "center", gap: 14, zIndex: 60 },
@@ -1200,14 +1200,14 @@ const styles = StyleSheet.create({
   routeOptThumb: { width: 84, height: 52, borderRadius: radius.sm, backgroundColor: "#0d0f14" },
   routeOptName: { color: colors.white, fontSize: 14, fontWeight: "800" },
   routeOptMeta: { color: colors.textFaint, fontSize: 12, fontWeight: "600", marginTop: 2 },
-  metricRow: { flexDirection: "row", gap: spacing.md },
-  metricRowWrap: { flexWrap: "wrap", rowGap: spacing.md },
-  mainRow: { flexDirection: "row", gap: spacing.md, alignItems: "stretch" },
-  leftCenter: { flex: 1, gap: spacing.md },
-  innerRow: { flexDirection: "row", gap: spacing.md, alignItems: "stretch" },
-  leftCol: { gap: spacing.md },
-  centerCol: { flex: 1, gap: spacing.md },
-  rightCol: { gap: spacing.md },
+  metricRow: { flexDirection: "row", gap: spacing.sm },
+  metricRowWrap: { flexWrap: "wrap", rowGap: spacing.sm },
+  mainRow: { flexDirection: "row", gap: spacing.sm, alignItems: "stretch" },
+  leftCenter: { flex: 1, minWidth: 0, gap: spacing.sm },
+  innerRow: { flexDirection: "row", gap: spacing.sm, alignItems: "stretch" },
+  leftCol: { gap: spacing.sm },
+  centerCol: { flex: 1, minWidth: 0, gap: spacing.sm },
+  rightCol: { gap: spacing.sm },
 
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center" },
   controlsPanel: { width: 560, maxWidth: "90%", backgroundColor: colors.cardElevated, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, ...shadow.card },
