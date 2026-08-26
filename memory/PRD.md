@@ -1071,3 +1071,8 @@ User wanted an in-app rating + feedback capture (fb50-style) opened from Setting
 - BrandCard (workout-live.tsx) now accepts `onPress` → rendered as Pressable; workout.tsx passes `router.replace("/")` so tapping the ROUJAUNE logo returns to the home page. Verified: tap navigates to home (Training/Today).
 - Under the logo it shows `versionLabel()` ("v1.0.0 · Build 1", reused from AppVersionTag).
 - Preview-only publish stamp: `src/lib/build-stamp.ts` exports `BUILD_STAMP` (manually refreshed each publish). Shown under the version line ONLY when `__DEV__` (i.e., the metro preview build) as "Preview · <BUILD_STAMP>" — hidden in production EAS builds. Regenerate BUILD_STAMP on future publishes to reflect latest freshness. Current value: "26 Aug 2026, 02:42 UTC".
+
+## Build stamp auto-updates on publish (2026-08 fork)
+- Added dynamic `frontend/app.config.js` that spreads `app.json`'s expo config and injects `extra.buildStamp = new Date().toISOString()` on every config evaluation (Metro start / EAS build / publish). All app.json fields preserved (verified via node eval).
+- `src/lib/build-stamp.ts` now reads `Constants.expoConfig.extra.buildStamp`, formats it as "DD Mon YYYY, HH:mm UTC" (fallback = now). BUILD_STAMP therefore self-updates each publish — no manual edits. Still shown under the workout BrandCard only when `__DEV__` (preview), hidden in production.
+- Verified: stamp refreshed on expo restart (02:46 UTC).
