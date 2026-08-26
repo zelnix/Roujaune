@@ -1081,3 +1081,6 @@ User wanted an in-app rating + feedback capture (fb50-style) opened from Setting
 - Real home sidebar is `SideNavigation` (testID side-navigation), a narrow labelled rail; app/index.tsx renders it (NOT WideSidebar, which is unused).
 - Added under the logo (testID rail-version): versionLabel() ("v1.0.0 · Build 1"), and when `__DEV__` a "PREVIEW · PUBLISHED" label + BUILD_STAMP (auto-updating publish date/time from app.config.js extra.buildStamp). Hidden in production builds. Verified render: shows "v1.0.0 · Build 1 / PREVIEW · PUBLISHED / 26 Aug 2026, 06:01 UTC" and updates each publish.
 - (WideSidebar.tsx also got the same version/stamp block earlier but that component is currently unused.)
+
+## Coach portrait clarity fix (2026-08 fork)
+- AlbertoCoachCard (home hero coach card, used in HeroRoute) portrait had a 14% white "lighten" wash + a full-width dark left→right gradient making it look milky/opaque. Removed the white wash entirely and softened the dark gradient to only the far-right ~38% (locations [0,0.62,1], 0.72 alpha) so the face stays crisp while still blending into the card body. Verified via screenshot: portrait now clear.

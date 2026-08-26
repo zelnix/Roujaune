@@ -51,12 +51,11 @@ export function AlbertoCoachCard({ width, onStart, onMessage, compact = false }:
         {ready ? (
           <Image source={persona.image} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition="top center" accessibilityLabel={`Coach ${persona.name}`} />
         ) : null}
-        {/* Subtle lightening wash so the portrait reads a touch brighter. */}
-        {ready ? (
-          <View style={[StyleSheet.absoluteFill, styles.lighten, { pointerEvents: "none" }]} />
-        ) : null}
+        {/* Soft blend only on the far-right edge so the portrait stays crisp
+            while merging into the card body. */}
         <LinearGradient
-          colors={["transparent", "rgba(10,9,8,0.9)"]}
+          colors={["transparent", "transparent", "rgba(10,9,8,0.72)"]}
+          locations={[0, 0.62, 1]}
           start={{ x: 0, y: 0.5 }}
           end={{ x: 1, y: 0.5 }}
           style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}
