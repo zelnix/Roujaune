@@ -7,6 +7,8 @@ import { CC } from "./calendar";
 import { navItems, navFooter, NavItem } from "../data";
 import { CoachPersona } from "../lib/coach-persona";
 import { usePlanBadge } from "../lib/plan-badge";
+import { versionLabel } from "./AppVersionTag";
+import { BUILD_STAMP } from "../lib/build-stamp";
 
 const logoGlyph = require("../../assets/images/logo_glyph_t.png");
 const wordmark = require("../../assets/images/wordmark_t.png");
@@ -46,6 +48,8 @@ export function WideSidebar({ active, onSelect, width = 210 }: { active: string;
         <View style={{ flex: 1 }}>
           <Image source={wordmark} style={ws.wordmark} contentFit="contain" contentPosition="left" />
           <Text style={ws.tagline}>Your strongest ride is your own.</Text>
+          <Text style={ws.version} numberOfLines={1}>{versionLabel()}</Text>
+          {__DEV__ ? <Text style={ws.stamp} numberOfLines={1}>Preview · {BUILD_STAMP}</Text> : null}
         </View>
       </View>
 
@@ -73,6 +77,8 @@ const ws = StyleSheet.create({
   glyph: { width: 40, height: 40 },
   wordmark: { width: 118, height: 20 },
   tagline: { color: CC.dim, fontSize: 8.5, marginTop: 2 },
+  version: { color: CC.dim, fontSize: 9.5, fontWeight: "700", letterSpacing: 0.3, marginTop: 4, opacity: 0.85 },
+  stamp: { color: CC.dim, fontSize: 8.5, fontWeight: "600", letterSpacing: 0.2, marginTop: 1, opacity: 0.7 },
 
   body: { flexGrow: 1, justifyContent: "flex-start", paddingBottom: 8 },
   items: { gap: 3 },

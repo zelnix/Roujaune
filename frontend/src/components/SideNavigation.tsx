@@ -9,6 +9,8 @@ import { Touchable } from "./ui";
 import { usePlanBadge } from "../lib/plan-badge";
 import { useTodayMode } from "../lib/today-mode";
 import { TodayModeButton } from "./today/TodayModeButton";
+import { versionLabel } from "./AppVersionTag";
+import { BUILD_STAMP } from "../lib/build-stamp";
 
 const logoIcon = require("../../assets/images/logo_glyph_t.png");
 
@@ -73,6 +75,16 @@ export function SideNavigation({
         <Image source={logoIcon} style={compact ? { width: 38, height: 38 } : styles.logo} contentFit="contain" />
       </View>
 
+      <View style={styles.verWrap} testID="rail-version">
+        <Text style={styles.verText} numberOfLines={2}>{versionLabel()}</Text>
+        {__DEV__ ? (
+          <>
+            <Text style={styles.stampLabel}>PREVIEW · PUBLISHED</Text>
+            <Text style={styles.stampText} numberOfLines={2}>{BUILD_STAMP}</Text>
+          </>
+        ) : null}
+      </View>
+
       <TodayModeButton compact={compact} />
 
       <ScrollView
@@ -112,6 +124,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   logo: { width: 46, height: 46 },
+  verWrap: { width: "100%", paddingHorizontal: 4, alignItems: "center", marginTop: -spacing.md, marginBottom: spacing.sm },
+  verText: { color: colors.textDim, fontSize: 8.5, fontWeight: "800", letterSpacing: 0.2, textAlign: "center" },
+  stampLabel: { color: colors.textFaint, fontSize: 6.5, fontWeight: "800", letterSpacing: 0.5, textAlign: "center", marginTop: 3, opacity: 0.9 },
+  stampText: { color: colors.textFaint, fontSize: 7.5, fontWeight: "700", textAlign: "center", marginTop: 1, opacity: 0.85 },
   scrollBody: { width: "100%", flexGrow: 1, justifyContent: "space-between", paddingBottom: spacing.sm },
   items: { width: "100%", gap: 4, paddingHorizontal: 8 },
   footer: { width: "100%", gap: 4, paddingHorizontal: 8, paddingTop: spacing.md },

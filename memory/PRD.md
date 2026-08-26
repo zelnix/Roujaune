@@ -1076,3 +1076,8 @@ User wanted an in-app rating + feedback capture (fb50-style) opened from Setting
 - Added dynamic `frontend/app.config.js` that spreads `app.json`'s expo config and injects `extra.buildStamp = new Date().toISOString()` on every config evaluation (Metro start / EAS build / publish). All app.json fields preserved (verified via node eval).
 - `src/lib/build-stamp.ts` now reads `Constants.expoConfig.extra.buildStamp`, formats it as "DD Mon YYYY, HH:mm UTC" (fallback = now). BUILD_STAMP therefore self-updates each publish — no manual edits. Still shown under the workout BrandCard only when `__DEV__` (preview), hidden in production.
 - Verified: stamp refreshed on expo restart (02:46 UTC).
+
+## Sidebar rail: version + preview publish stamp under logo (2026-08 fork)
+- Real home sidebar is `SideNavigation` (testID side-navigation), a narrow labelled rail; app/index.tsx renders it (NOT WideSidebar, which is unused).
+- Added under the logo (testID rail-version): versionLabel() ("v1.0.0 · Build 1"), and when `__DEV__` a "PREVIEW · PUBLISHED" label + BUILD_STAMP (auto-updating publish date/time from app.config.js extra.buildStamp). Hidden in production builds. Verified render: shows "v1.0.0 · Build 1 / PREVIEW · PUBLISHED / 26 Aug 2026, 06:01 UTC" and updates each publish.
+- (WideSidebar.tsx also got the same version/stamp block earlier but that component is currently unused.)
