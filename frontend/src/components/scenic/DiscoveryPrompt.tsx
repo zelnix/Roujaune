@@ -8,7 +8,7 @@ import { ScenicPoi } from "@/src/lib/scenic-routes";
 /** Effortless "save discovery" prompt shown when the rider reaches a POI. */
 export function DiscoveryPrompt({ poi, onSave, onDismiss }: { poi: ScenicPoi; onSave: () => void; onDismiss: () => void }) {
   return (
-    <View style={s.promptWrap} pointerEvents="box-none">
+    <View style={[s.promptWrap, { pointerEvents: "box-none" }]}>
       <View style={s.prompt}>
         {poi.image ? (
           <Image source={{ uri: poi.image }} style={s.promptImg} contentFit="cover" />
@@ -34,7 +34,7 @@ export function DiscoveryPrompt({ poi, onSave, onDismiss }: { poi: ScenicPoi; on
 /** Confirmation micro-toast. */
 export function SaveToast({ message }: { message: string }) {
   return (
-    <View style={s.toastWrap} pointerEvents="none">
+    <View style={[s.toastWrap, { pointerEvents: "none" }]}>
       <View style={s.toast}>
         <Ionicons name="checkmark-circle" size={16} color={colors.yellow} />
         <Text style={s.toastText}>{message}</Text>

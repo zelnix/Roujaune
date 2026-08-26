@@ -71,7 +71,7 @@ export function ElevationChart({
         <Circle cx={markX} cy={markY} r={3.5} fill={colors.white} />
       </Svg>
       {showTicks && (
-        <View style={[t.ticks, { width }]} pointerEvents="none">
+        <View style={[t.ticks, { width, pointerEvents: "none" }]}>
           {tickFracs.map((f, i) => (
             <Text key={f} style={[
               t.tick,

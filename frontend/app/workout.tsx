@@ -880,7 +880,7 @@ export default function LiveWorkout() {
                       height={videoRenderH}
                       playing={!paused}
                     />
-                    <View style={styles.ytControls} pointerEvents="box-none">
+                    <View style={[styles.ytControls, { pointerEvents: "box-none" }]}>
                       <Pressable style={styles.ytSourceBtn} onPress={() => setShowStream(true)} testID="workout-source"
                         accessibilityRole="button" accessibilityLabel="Choose what to watch">
                         <Ionicons name="logo-youtube" size={13} color={colors.white} />

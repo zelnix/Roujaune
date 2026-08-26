@@ -153,8 +153,8 @@ export function HeroRoute({
       </Modal>
 
       {/* bottom-left coaching card + optional side slot (matched height) */}
-      <View style={styles.coachArea} pointerEvents="box-none">
-        <View style={styles.coachRow} pointerEvents="box-none">
+      <View style={[styles.coachArea, { pointerEvents: "box-none" }]}>
+        <View style={[styles.coachRow, { pointerEvents: "box-none" }]}>
           <AlbertoCoachCard
             width={compact ? Math.min(360, width * 0.7) : Math.min(430, width * 0.66)}
             onStart={onStart}

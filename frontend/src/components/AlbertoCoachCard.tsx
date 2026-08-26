@@ -53,7 +53,7 @@ export function AlbertoCoachCard({ width, onStart, onMessage, compact = false }:
         ) : null}
         {/* Subtle lightening wash so the portrait reads a touch brighter. */}
         {ready ? (
-          <View style={[StyleSheet.absoluteFill, styles.lighten]} pointerEvents="none" />
+          <View style={[StyleSheet.absoluteFill, styles.lighten, { pointerEvents: "none" }]} />
         ) : null}
         <LinearGradient
           colors={["transparent", "rgba(10,9,8,0.9)"]}

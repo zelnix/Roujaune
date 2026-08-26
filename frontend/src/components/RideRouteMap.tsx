@@ -119,7 +119,7 @@ function DiscoveryBubble({ x, y, delay, photo, title }: { x: number; y: number; 
   const style = useAnimatedStyle(() => ({ opacity: v.value, transform: [{ scale: 0.4 + 0.6 * v.value }] }));
   const S = 46;
   return (
-    <Animated.View style={[st.bubble, { left: x - S / 2, top: y - S - 6, width: S }, style]} pointerEvents="none">
+    <Animated.View style={[st.bubble, { left: x - S / 2, top: y - S - 6, width: S, pointerEvents: "none" }, style]}>
       <View style={[st.bubbleImgWrap, { width: S, height: S, borderRadius: S / 2 }]}>
         {photo ? (
           <Image source={{ uri: photo }} style={{ width: "100%", height: "100%" }} contentFit="cover" />

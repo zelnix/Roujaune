@@ -399,7 +399,7 @@ export function StepTimeline({
                   <Text style={st.nnCountLabel}>LEFT</Text>
                 </View>
               ) : null}
-              <View style={st.nnProgressTrack} pointerEvents="none">
+              <View style={[st.nnProgressTrack, { pointerEvents: "none" }]}>
                 <View style={[st.nnProgressFill, { width: `${Math.round(Math.max(0, Math.min(1, stepProgress)) * 100)}%` }]} />
               </View>
             </Pressable>

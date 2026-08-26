@@ -443,22 +443,22 @@ export default function ScenicRideScreen() {
       {/* POV video — full-bleed cover. Until it starts playing we keep the
           video interactive so a tap can reach YouTube's play button (autoplay
           may be blocked in Expo Go / mobile WebViews). */}
-      <View style={s.videoWrap} pointerEvents={videoStarted ? "none" : "auto"}>
+      <View style={[s.videoWrap, { pointerEvents: videoStarted ? "none" : "auto" }]}>
         <View style={{ width: cover.w, height: cover.h, marginLeft: (width - cover.w) / 2, marginTop: (height - cover.h) / 2 }}>
           <YouTubePlayer height={cover.h} width={cover.w} playing={playing} videoId={customVideoId || route.youtube_id} startSeconds={customVideoId ? 0 : Math.floor(startPos)} onStateChange={onVideoState} onProgress={onVideoProgress} />
         </View>
       </View>
 
       {/* subtle legibility vignette */}
-      <LinearGradient pointerEvents="none" colors={["rgba(0,0,0,0.45)", "transparent", "transparent", "rgba(0,0,0,0.55)"]} style={StyleSheet.absoluteFill as any} />
+      <LinearGradient colors={["rgba(0,0,0,0.45)", "transparent", "transparent", "rgba(0,0,0,0.55)"]} style={[StyleSheet.absoluteFill as any, { pointerEvents: "none" }]} />
 
       {/* tap-catcher (below HUD) toggles the HUD — disabled until the video
           has started so the first tap goes to the player's play button. */}
-      <Pressable style={StyleSheet.absoluteFill as any} pointerEvents={videoStarted ? "auto" : "none"} onPress={() => setHud((v) => !v)} testID="hud-toggle-scene" accessibilityRole="button" accessibilityLabel={hud ? "Hide overlay" : "Show overlay"} />
+      <Pressable style={[StyleSheet.absoluteFill as any, { pointerEvents: videoStarted ? "auto" : "none" }]} onPress={() => setHud((v) => !v)} testID="hud-toggle-scene" accessibilityRole="button" accessibilityLabel={hud ? "Hide overlay" : "Show overlay"} />
 
       {/* "Tap to start" fallback — non-blocking hint pointing at the play button */}
       {showTapHint && !videoStarted && (
-        <View style={s.tapHintWrap} pointerEvents="none" testID="tap-to-start">
+        <View style={[s.tapHintWrap, { pointerEvents: "none" }]} testID="tap-to-start">
           <View style={s.tapHint}>
             <Ionicons name="play-circle" size={20} color={colors.bg} />
             <Text style={s.tapHintText}>Tap the video to begin your ride</Text>
@@ -467,9 +467,9 @@ export default function ScenicRideScreen() {
       )}
 
       {/* HUD */}
-      <Animated.View style={[StyleSheet.absoluteFill as any, { opacity: fade }]} pointerEvents={hud ? "box-none" : "none"}>
+      <Animated.View style={[StyleSheet.absoluteFill as any, { opacity: fade, pointerEvents: hud ? "box-none" : "none" }]}>
         {/* Title */}
-        <View style={s.title} pointerEvents="none">
+        <View style={[s.title, { pointerEvents: "none" }]}>
           <GradientText text="SCENIC RIDE" style={s.titleText} />
         </View>
 
@@ -527,7 +527,7 @@ export default function ScenicRideScreen() {
         )}
 
         {/* Center — destination */}
-        <View style={s.center2} pointerEvents="none">
+        <View style={[s.center2, { pointerEvents: "none" }]}>
           <View style={s.rowCenter}>
             <Ionicons name="location" size={13} color={colors.yellow} />
             <Text style={s.country}>{(route.country || route.region || "").toUpperCase()}</Text>
@@ -541,7 +541,7 @@ export default function ScenicRideScreen() {
 
         {/* Right — points of interest (tap header area to hide) */}
         {show.comingUp && upcomingPoi && (
-          <View style={s.rightPanel} pointerEvents="box-none">
+          <View style={[s.rightPanel, { pointerEvents: "box-none" }]}>
             <Pressable onPress={() => hideOne("comingUp")} testID="hide-comingup" accessibilityRole="button" accessibilityLabel="Hide points of interest" style={s.poiHead}>
               <Text style={s.comingUp}>POINTS OF INTEREST</Text>
               <Ionicons name="eye-off-outline" size={15} color={colors.textFaint} />
@@ -584,7 +584,7 @@ export default function ScenicRideScreen() {
 
         {/* Bottom metrics + audio mode (tap the metrics area to hide) */}
         {show.metrics && (
-          <View style={s.metricsBar} pointerEvents="box-none">
+          <View style={[s.metricsBar, { pointerEvents: "box-none" }]}>
             <Pressable style={s.rowCenter} onPress={() => hideOne("metrics")} testID="hide-metrics" accessibilityRole="button" accessibilityLabel="Hide metrics bar">
               <Metric icon="time-outline" value={clock(elapsed)} label="Time" />
               {hasTelemetry && (
@@ -604,7 +604,7 @@ export default function ScenicRideScreen() {
         )}
 
         {/* Bottom nav */}
-        <View style={s.nav} pointerEvents="box-none">
+        <View style={[s.nav, { pointerEvents: "box-none" }]}>
           <View style={s.navBrand}>
             <Image source={require("../assets/images/logo_glyph_t.png")} style={s.navGlyph} contentFit="contain" />
             <Image source={require("../assets/images/wordmark_t.png")} style={s.navWordmarkImg} contentFit="contain" />
@@ -622,7 +622,7 @@ export default function ScenicRideScreen() {
       </Animated.View>
 
       {/* Persistent utility cluster (always tappable, even when HUD hidden) */}
-      <View style={s.utility} pointerEvents="box-none">
+      <View style={[s.utility, { pointerEvents: "box-none" }]}>
         <Pressable style={s.utilBtn} onPress={() => setStreamOpen(true)} testID="scenic-source" accessibilityRole="button" accessibilityLabel="Choose ride screen source">
           <Ionicons name="tv-outline" size={20} color={customVideoId ? colors.yellow : "#fff"} />
         </Pressable>

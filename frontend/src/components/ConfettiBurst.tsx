@@ -36,7 +36,7 @@ export function ConfettiBurst({ width, height, count = 32, originY = 40 }: {
 }) {
   const pieces = React.useMemo(() => buildPieces(count, width, height), [count, width, height]);
   return (
-    <View style={[StyleSheet.absoluteFill, { overflow: "hidden" }]} pointerEvents="none">
+    <View style={[StyleSheet.absoluteFill, { overflow: "hidden", pointerEvents: "none" }]}>
       {pieces.map((p, i) => (
         <ConfettiPiece key={i} p={p} originY={originY} />
       ))}
