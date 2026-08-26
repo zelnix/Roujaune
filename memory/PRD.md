@@ -1066,3 +1066,8 @@ User wanted an in-app rating + feedback capture (fb50-style) opened from Setting
   - Right/left columns narrower: rightW 236→196, leftW 212→184.
   - Video HUD halved: VRP embed pills paddingV 13→6, embedIcon 65→38 (icons 28→18), routeNamePill smaller; YouTube ytSourceBtn/ytIconBtn same treatment.
 - Verified via screenshot at 1180×760: 5 tiles (Brand+HR/Speed/Cadence/Power) fit one row, labels full, Terrain/Route clean in right column, step timeline + control bar all visible (no scroll). narrow<1000 still uses the dense 2×2 grid.
+
+## Workout BrandCard: tap-to-home + version/build + preview publish stamp (2026-08 fork)
+- BrandCard (workout-live.tsx) now accepts `onPress` → rendered as Pressable; workout.tsx passes `router.replace("/")` so tapping the ROUJAUNE logo returns to the home page. Verified: tap navigates to home (Training/Today).
+- Under the logo it shows `versionLabel()` ("v1.0.0 · Build 1", reused from AppVersionTag).
+- Preview-only publish stamp: `src/lib/build-stamp.ts` exports `BUILD_STAMP` (manually refreshed each publish). Shown under the version line ONLY when `__DEV__` (i.e., the metro preview build) as "Preview · <BUILD_STAMP>" — hidden in production EAS builds. Regenerate BUILD_STAMP on future publishes to reflect latest freshness. Current value: "26 Aug 2026, 02:42 UTC".

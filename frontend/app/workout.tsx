@@ -839,7 +839,7 @@ export default function LiveWorkout() {
       <View style={[styles.mainRow, tablet && styles.flex1]}>
         <View style={[styles.leftCenter, tablet && styles.flex1]}>
           <View style={[styles.metricRow, narrow && styles.metricRowWrap]}>
-            {!narrow && <BrandCard dense={tablet} />}
+            {!narrow && <BrandCard dense={tablet} onPress={() => router.replace("/")} />}
             {timeBased ? (
               <>
                 <MetricCard icon="stopwatch-outline" label="Elapsed" value={elapsedShort} sub={`TOTAL SESSION ${mmss(totalSec)}`} accent={colors.yellow} half={narrow} dense={tablet} />

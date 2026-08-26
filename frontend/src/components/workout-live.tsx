@@ -4,6 +4,8 @@ import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Polyline, Polygon as SvgPolygon } from "react-native-svg";
 import { colors, radius, spacing, textShadow } from "@/src/theme";
+import { versionLabel } from "./AppVersionTag";
+import { BUILD_STAMP } from "@/src/lib/build-stamp";
 
 const WORDMARK = require("../../assets/images/auth_wordmark.png");
 const LOGO_GLYPH = require("../../assets/images/auth_logo_glyph.png");
@@ -33,12 +35,19 @@ export function LiveHeader({ elapsed, progress, estFinish }: { elapsed: string; 
 }
 
 // ---- Brand card (metric row) ----------------------------------------------
-export function BrandCard({ dense }: { dense?: boolean }) {
+export function BrandCard({ dense, onPress }: { dense?: boolean; onPress?: () => void }) {
+  const Wrap: any = onPress ? Pressable : View;
   return (
-    <View style={[brand.card, dense && brand.cardDense]} testID="brand-card">
+    <Wrap
+      style={[brand.card, dense && brand.cardDense]}
+      testID="brand-card"
+      {...(onPress ? { onPress, accessibilityRole: "button", accessibilityLabel: "ROUJAUNE — go to home" } : {})}
+    >
       <Image source={LOGO_GLYPH} style={dense ? brand.glyphDense : brand.glyph} contentFit="contain" />
       <Image source={WORDMARK} style={dense ? brand.logoDense : brand.logo} contentFit="contain" />
-    </View>
+      <Text style={[brand.version, dense && brand.versionDense]} numberOfLines={1}>{versionLabel()}</Text>
+      {__DEV__ ? <Text style={[brand.stamp, dense && brand.stampDense]} numberOfLines={1}>Preview · {BUILD_STAMP}</Text> : null}
+    </Wrap>
   );
 }
 
@@ -619,6 +628,10 @@ const brand = StyleSheet.create({
   glyphDense: { width: 30, height: 30 },
   logo: { width: "86%", height: 40 },
   logoDense: { width: "88%", height: 24 },
+  version: { color: colors.textFaint, fontSize: 10.5, fontWeight: "700", letterSpacing: 0.3, marginTop: 4 },
+  versionDense: { fontSize: 8.5, marginTop: 2 },
+  stamp: { color: colors.textFaint, fontSize: 9.5, fontWeight: "600", letterSpacing: 0.2, marginTop: 2, opacity: 0.8 },
+  stampDense: { fontSize: 8, marginTop: 1 },
 });
 
 const aj = StyleSheet.create({
