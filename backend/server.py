@@ -417,6 +417,14 @@ app.include_router(admin_routes.admin_router)
 app.include_router(screen_capture.capture_router)
 app.include_router(admin_cfg_router)
 app.include_router(scenic_routes.admin_router)
+
+
+@app.get("/health")
+async def health():
+    """Lightweight liveness probe for the deployment platform (200 OK)."""
+    return {"status": "ok"}
+
+
 push.init(db)
 admin_routes.init(db, on_plan_change=_on_plan_change)
 screen_capture.init(db)
