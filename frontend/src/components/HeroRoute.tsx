@@ -96,7 +96,7 @@ export function HeroRoute({
 
       {/* top-left brand */}
       <View style={styles.brandArea}>
-        <BrandHeader compact={compact} showVersion />
+        <BrandHeader compact={compact} />
       </View>
 
       {/* top-right status */}
