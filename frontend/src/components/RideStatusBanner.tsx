@@ -11,7 +11,7 @@ import { useEntitlement } from "@/src/lib/entitlement";
  *   - Premium: a quiet gold "Premium" badge.
  * Refreshes entitlement on mount so the count is always current.
  */
-export function RideStatusBanner({ style }: { style?: any }) {
+export function RideStatusBanner({ style, hidePremium }: { style?: any; hidePremium?: boolean }) {
   const router = useRouter();
   const ent = useEntitlement();
 
@@ -20,6 +20,7 @@ export function RideStatusBanner({ style }: { style?: any }) {
   if (!ent.loaded) return null;
 
   if (ent.premium) {
+    if (hidePremium) return null;
     return (
       <Pressable onPress={() => router.push("/upgrade")} style={[s.premium, style]} testID="ride-status-premium" accessibilityRole="button" accessibilityLabel="You're a Premium member">
         <Ionicons name="star" size={14} color={colors.bg} />

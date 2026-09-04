@@ -114,7 +114,7 @@ export default function Dashboard() {
 
             <WelcomeBackRibbon />
 
-            <RideStatusBanner />
+            <RideStatusBanner hidePremium />
 
             <HuCentAIIntro />
 
