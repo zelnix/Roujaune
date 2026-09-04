@@ -18,6 +18,7 @@ import {
 } from "@/src/components/calendar";
 import { unscheduleWorkout } from "@/src/lib/workout-prefs";
 import { HeaderStatus } from "@/src/components/HeaderStatus";
+import { SwapSessionSheet } from "@/src/components/SwapSessionSheet";
 
 const LABEL_W = 66;
 
@@ -56,12 +57,21 @@ export default function CalendarScreen() {
   const [showFilters, setShowFilters] = React.useState(false);
   const [review, setReview] = React.useState<null | { message: string; loading: boolean; confirm: () => void }>(null);
   const [readyDay, setReadyDay] = React.useState<number | null>(null);
+  const [swapOpen, setSwapOpen] = React.useState(false);
 
   const colCenters = React.useRef<number[]>([]);
   const showToast = React.useCallback((text: string, undo?: () => void) => setToast({ id: Date.now(), text, undo }), []);
 
   const days = React.useMemo<CalendarDay[]>(() => week?.days ?? [], [week]);
   const selDay: CalendarDay | undefined = days[selected];
+
+  const swapCyc = selDay?.cycling as any;
+  const swapPlanId = typeof swapCyc?.workout_id === "string" && swapCyc.workout_id.startsWith("custom-")
+    ? String(swapCyc.workout_id).split("-ride-")[0] : null;
+  const openSwap = React.useCallback(() => {
+    if (swapPlanId) setSwapOpen(true);
+    else showToast("Session options");
+  }, [swapPlanId, showToast]);
 
   const measureCol = (i: number) => (e: any) => {
     const { x, width: w } = e.nativeEvent.layout;
@@ -133,7 +143,7 @@ export default function CalendarScreen() {
                 <Text style={styles.subtitle}>Plan your week. Execute your day.</Text>
               </View>
             </View>
-            {selDay ? <SelectedDayPanel day={selDay} onPrev={() => setSelected((s) => (s + 6) % 7)} onMenu={() => showToast("Session options")} onViewWorkout={() => router.push(selDay?.cycling?.workout_id ? { pathname: "/training", params: { workoutId: selDay.cycling.workout_id } } : "/training")} /> : null}
+            {selDay ? <SelectedDayPanel day={selDay} onPrev={() => setSelected((s) => (s + 6) % 7)} onMenu={openSwap} onViewWorkout={() => router.push(selDay?.cycling?.workout_id ? { pathname: "/training", params: { workoutId: selDay.cycling.workout_id } } : "/training")} /> : null}
             {selDay ? <SupplementaryCompleteCard day={selDay} onToggle={onToggleSupp} /> : null}
             {week ? <WeekSummaryCard summary={week.summary} /> : null}
             <QuickActionsCard onAction={onQuickAction} />
@@ -269,7 +279,7 @@ export default function CalendarScreen() {
 
               {/* right panel */}
               <View style={styles.rightCol}>
-                {selDay ? <SelectedDayPanel day={selDay} onPrev={() => setSelected((s) => (s + 6) % 7)} onMenu={() => showToast("Session options")} onViewWorkout={() => router.push(selDay?.cycling?.workout_id ? { pathname: "/training", params: { workoutId: selDay.cycling.workout_id } } : "/training")} /> : null}
+                {selDay ? <SelectedDayPanel day={selDay} onPrev={() => setSelected((s) => (s + 6) % 7)} onMenu={openSwap} onViewWorkout={() => router.push(selDay?.cycling?.workout_id ? { pathname: "/training", params: { workoutId: selDay.cycling.workout_id } } : "/training")} /> : null}
                 {selDay ? <SupplementaryCompleteCard day={selDay} onToggle={onToggleSupp} /> : null}
                 {week ? <WeekSummaryCard summary={week.summary} /> : null}
                 <QuickActionsCard onAction={onQuickAction} />
@@ -332,6 +342,16 @@ export default function CalendarScreen() {
         </Modal>
 
         <Toast message={toast} onUndo={() => { toast?.undo?.(); setToast(null); }} />
+
+        <SwapSessionSheet
+          visible={swapOpen}
+          onClose={() => setSwapOpen(false)}
+          day={swapCyc ? { day_name: selDay?.day_name, title: swapCyc.title, zone: swapCyc.zone, duration: swapCyc.duration, tss: swapCyc.tss, workout_id: swapCyc.workout_id } : null}
+          coachName={persona.name}
+          coachGender={persona.gender}
+          planId={swapPlanId ?? undefined}
+          onSwapped={() => { reload(); showToast("Session updated by " + persona.name); }}
+        />
       </SafeAreaView>
     </GestureHandlerRootView>
   );

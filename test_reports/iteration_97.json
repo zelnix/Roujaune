@@ -1,0 +1,26 @@
+{
+  "summary": "Iter 97 — coach-created plan extensions (event_date scheduling, swap-session easier/harder/focus + custom-plan persistence, plan templates CRUD). Backend pytest: 10/10 passed via /app/backend/tests/test_iter97_event_swap_templates.py (JUnit at /app/test_reports/pytest/iter97.xml). POST /api/coach/create-plan with event_date returns a preview echoing event_date; accepting persists definition.event_date and schedules week-1 Monday so the plan's last week Monday equals the event's Monday (verified via /api/calendar/week — for a 3-week plan targeting today+21d, week 1 = today+7 aligned Monday, week 3 Monday = event Monday). POST /api/coach/swap-session: easier lowered Z4/90 to Z2/45 (load 150→60), harder raised Z2/55 to Z4/95 (load 115→170), focus stayed cycling; when plan_id starts with custom-, changes PERSIST into /api/plan workouts[] both via explicit week+day_index and via workout_id parsing (custom-...-ride-wN-dI). POST/GET/DELETE /api/coach/plan-templates all pass (POST returns {ok,id,title}, GET returns full plan payload for start-from-template, DELETE removes the doc, empty-plan POST returns 400). Frontend (1280x900 landscape, demo@roujaune.app): /plan → create-plan-btn → plan-creator modal renders with open-templates, event-toggle (off by default), plan-goal-input, weeks-{4,6,8,12}, days-{3,4,5}, plan-generate. event-toggle reveals event-date stepper with event-minus-week/minus-day/plus-day/plus-week (all functional). open-templates shows template-list. Full generate → preview → swap flow verified: 'Gran Fondo Prep' 4-week × 3-days plan generated, tap preview-day-TUE opened swap-sheet, swap-easier applied and TUE row updated in the preview to 'Recovery Spin Z1 · 40 min · 28 TSS'; save-template button turned into 'Saved' pill after tap. Plan-accept + calendar swap flow not clicked (E1 note: do NOT ride/complete workouts and restore demo). Cleanup performed: demo rider restored to build-and-climb (POST /api/rider/plan → 200), any TEST templates deleted. Initial /plan LLM generation returned a transient 502 on the first attempt (plan builder showed 'Alberto couldn't build the plan just now') but succeeded on retry — flaky LLM, not a code bug.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter97_event_swap_templates.py",
+    "/app/test_reports/pytest/iter97.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/coach.py:1277-1298 _build_custom_definition — event-date alignment uses `aligned if aligned >= default_start else default_start`. When the event is too close (aligned < default_start) the last plan-week Monday no longer equals the event Monday; the current UX assumes the coach picks an event ≥ n_weeks-1 weeks out. Consider surfacing this to the user (e.g. force weeks_count = min(weeks, weeks_available) or a warning) rather than silently starting next Monday.",
+    "routes/coach.py:1399-1472 coach_swap_session persists into the custom plan's definition but does not append an adaptation_history entry — swaps are invisible in the Adaptations tab. A one-line _record_adaptation call after a successful persist would give the rider a trail."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None persisted. Test template docs and custom-<id> plans created during tests were deleted / demo rider restored to build-and-climb.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend tests: /app/backend/tests/test_iter97_event_swap_templates.py (10 tests, ~45s, LLM-backed). Fixtures create a 2-week custom plan and swap sessions into it; cleanup restores demo to build-and-climb in test_restore_demo_plan_final. /api/plan sometimes returns tss/duration as strings ('48 TSS', '1h 15m') — tests coerce via a regex helper. Frontend testIDs confirmed: create-plan-btn, plan-creator, plan-creator-close, plan-goal-input, weeks-{4,6,8,12}, days-{3,4,5}, event-toggle, event-date, event-{minus,plus}-{week,day}, open-templates, template-list, tpl-<id>, tpl-del-<id>, plan-generate, plan-preview, plan-regenerate, plan-accept, preview-day-<DAYNAME>, save-template, swap-sheet, swap-close, swap-{easier,harder,focus}. LLM plan-create can 502 intermittently — retry once.",
+  "rca_of_issue": "N/A — all three sub-features (event scheduling, swap-session, plan templates) work end-to-end on backend and frontend."
+}

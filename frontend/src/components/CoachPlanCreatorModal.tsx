@@ -2,7 +2,8 @@ import React from "react";
 import { View, Text, StyleSheet, Modal, Pressable, ScrollView, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing } from "@/src/theme";
-import { generatePlan, acceptPlan, CreatedPlan, CreatedDay } from "@/src/lib/plan-create";
+import { generatePlan, acceptPlan, saveTemplate, listTemplates, deleteTemplate, CreatedPlan, CreatedDay, PlanTemplate } from "@/src/lib/plan-create";
+import { SwapSessionSheet } from "@/src/components/SwapSessionSheet";
 import type { CoachPersona } from "@/src/lib/coach-persona";
 
 const WEEK_OPTS = [4, 6, 8, 12];
@@ -17,20 +18,26 @@ const KIND_META: Record<string, { icon: any; color: string }> = {
   rest: { icon: "bed-outline", color: "#8A6FE0" },
 };
 
-function DayRow({ d }: { d: CreatedDay }) {
+const isoDate = (d: Date) => d.toISOString().slice(0, 10);
+const fmtDate = (d: Date) => d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+
+function DayRow({ d, onSwap }: { d: CreatedDay; onSwap?: () => void }) {
   const meta = KIND_META[d.kind] || KIND_META.rest;
   const sub = d.kind === "cycling"
     ? [d.zone, d.duration, d.tss ? `${d.tss} TSS` : ""].filter(Boolean).join(" · ")
     : d.kind === "rest" ? "Rest & recovery" : (d.duration || "");
+  const tappable = d.kind === "cycling" && !!onSwap;
+  const Wrap: any = tappable ? Pressable : View;
   return (
-    <View style={s.dayRow}>
+    <Wrap style={s.dayRow} {...(tappable ? { onPress: onSwap, testID: `preview-day-${d.day_name}` } : {})}>
       <Text style={s.dayName}>{d.day_name}</Text>
       <Ionicons name={meta.icon} size={15} color={meta.color} />
       <View style={{ flex: 1 }}>
         <Text style={s.dayTitle} numberOfLines={1}>{d.title}</Text>
         {sub ? <Text style={s.daySub} numberOfLines={1}>{sub}</Text> : null}
       </View>
-    </View>
+      {tappable ? <Ionicons name="swap-horizontal" size={15} color={colors.textFaint} /> : null}
+    </Wrap>
   );
 }
 
@@ -43,18 +50,34 @@ export function CoachPlanCreatorModal({
   const [goal, setGoal] = React.useState("");
   const [weeks, setWeeks] = React.useState(8);
   const [days, setDays] = React.useState(4);
+  const [eventOn, setEventOn] = React.useState(false);
+  const [eventDate, setEventDate] = React.useState<Date>(new Date());
   const [plan, setPlan] = React.useState<CreatedPlan | null>(null);
   const [err, setErr] = React.useState<string | null>(null);
+  const [swap, setSwap] = React.useState<{ wi: number; di: number; day: CreatedDay } | null>(null);
+  const [tplSaved, setTplSaved] = React.useState(false);
+  const [showTpls, setShowTpls] = React.useState(false);
+  const [tpls, setTpls] = React.useState<PlanTemplate[] | null>(null);
 
   React.useEffect(() => {
-    if (visible) { setStep("form"); setPlan(null); setErr(null); }
+    if (visible) { setStep("form"); setPlan(null); setErr(null); setSwap(null); setTplSaved(false); setShowTpls(false); setEventOn(false); }
   }, [visible]);
+
+  const bumpEvent = (deltaDays: number) => {
+    setEventDate((d) => { const n = new Date(d); n.setDate(n.getDate() + deltaDays); return n < new Date() ? d : n; });
+  };
+  const toggleEvent = () => {
+    setEventOn((on) => {
+      if (!on) { const d = new Date(); d.setDate(d.getDate() + weeks * 7); setEventDate(d); }
+      return !on;
+    });
+  };
 
   const doGenerate = async () => {
     setErr(null); setStep("loading");
     try {
-      const p = await generatePlan(persona.name, persona.gender, goal.trim() || "get fitter and ride stronger", weeks, days);
-      setPlan(p); setStep("preview");
+      const p = await generatePlan(persona.name, persona.gender, goal.trim() || "get fitter and ride stronger", weeks, days, eventOn ? isoDate(eventDate) : null);
+      setPlan(p); setTplSaved(false); setStep("preview");
     } catch {
       setErr(`${persona.name} couldn't build the plan just now. Please try again.`); setStep("form");
     }
@@ -72,6 +95,25 @@ export function CoachPlanCreatorModal({
     }
   };
 
+  const onSwapped = (nd: CreatedDay) => {
+    setPlan((p) => {
+      if (!p || !swap) return p;
+      const weeksCopy = p.weeks.map((w, i) => i !== swap.wi ? w : { ...w, days: w.days.map((d, j) => j === swap.di ? { ...d, ...nd } : d) });
+      return { ...p, weeks: weeksCopy };
+    });
+  };
+
+  const openTemplates = async () => {
+    setShowTpls(true); setTpls(null);
+    try { setTpls(await listTemplates()); } catch { setTpls([]); }
+  };
+  const useTemplate = (t: PlanTemplate) => { setPlan(t.plan); setShowTpls(false); setTplSaved(true); setStep("preview"); };
+  const removeTemplate = async (id: string) => { await deleteTemplate(id); setTpls((ts) => (ts || []).filter((t) => t.id !== id)); };
+  const doSaveTemplate = async () => {
+    if (!plan) return;
+    try { await saveTemplate(plan); setTplSaved(true); } catch { /* ignore */ }
+  };
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={s.overlay}>
@@ -86,19 +128,32 @@ export function CoachPlanCreatorModal({
               </Pressable>
             </View>
 
-            {step === "form" || step === "loading" ? (
+            {showTpls ? (
+              <ScrollView contentContainerStyle={s.body} testID="template-list">
+                <Pressable onPress={() => setShowTpls(false)} style={s.backRow}><Ionicons name="chevron-back" size={16} color={colors.yellow} /><Text style={s.backText}>Back</Text></Pressable>
+                <Text style={s.label}>Start from a template</Text>
+                {tpls === null ? <ActivityIndicator color={colors.yellow} style={{ marginTop: 16 }} />
+                  : tpls.length === 0 ? <Text style={s.hint}>No saved templates yet. Save one from a generated plan.</Text>
+                  : tpls.map((t) => (
+                    <View key={t.id} style={s.tplRow}>
+                      <Pressable style={{ flex: 1 }} testID={`tpl-${t.id}`} onPress={() => useTemplate(t)}>
+                        <Text style={s.tplTitle} numberOfLines={1}>{t.title}</Text>
+                        <Text style={s.tplMeta}>{t.weeks_count} weeks · {t.days_per_week} days/week</Text>
+                      </Pressable>
+                      <Pressable onPress={() => removeTemplate(t.id)} hitSlop={8} testID={`tpl-del-${t.id}`}><Ionicons name="trash-outline" size={17} color={colors.textDim} /></Pressable>
+                    </View>
+                  ))}
+              </ScrollView>
+            ) : step === "form" || step === "loading" ? (
               <ScrollView contentContainerStyle={s.body} keyboardShouldPersistTaps="handled">
+                <Pressable onPress={openTemplates} style={s.tplBtn} testID="open-templates">
+                  <Ionicons name="albums-outline" size={15} color={colors.yellow} />
+                  <Text style={s.tplBtnText}>Start from a template</Text>
+                </Pressable>
                 <Text style={s.label}>What's your goal?</Text>
-                <TextInput
-                  testID="plan-goal-input"
-                  style={s.input}
+                <TextInput testID="plan-goal-input" style={s.input}
                   placeholder="e.g. Ride my first 100km, get faster on climbs…"
-                  placeholderTextColor={colors.textFaint}
-                  value={goal}
-                  onChangeText={setGoal}
-                  multiline
-                  editable={step === "form"}
-                />
+                  placeholderTextColor={colors.textFaint} value={goal} onChangeText={setGoal} multiline editable={step === "form"} />
                 <Text style={s.label}>How many weeks?</Text>
                 <View style={s.chips}>
                   {WEEK_OPTS.map((w) => (
@@ -115,6 +170,23 @@ export function CoachPlanCreatorModal({
                     </Pressable>
                   ))}
                 </View>
+
+                <Pressable testID="event-toggle" onPress={toggleEvent} style={s.toggleRow}>
+                  <Ionicons name={eventOn ? "checkbox" : "square-outline"} size={20} color={eventOn ? colors.yellow : colors.textDim} />
+                  <Text style={s.toggleText}>I'm training for an event — peak me on the day</Text>
+                </Pressable>
+                {eventOn ? (
+                  <View style={s.dateWrap} testID="event-date">
+                    <View style={s.dateSteppers}>
+                      <Pressable testID="event-minus-week" onPress={() => bumpEvent(-7)} style={s.stepBtn}><Text style={s.stepText}>−1w</Text></Pressable>
+                      <Pressable testID="event-minus-day" onPress={() => bumpEvent(-1)} style={s.stepBtn}><Text style={s.stepText}>−1d</Text></Pressable>
+                      <Text style={s.dateText}>{fmtDate(eventDate)}</Text>
+                      <Pressable testID="event-plus-day" onPress={() => bumpEvent(1)} style={s.stepBtn}><Text style={s.stepText}>+1d</Text></Pressable>
+                      <Pressable testID="event-plus-week" onPress={() => bumpEvent(7)} style={s.stepBtn}><Text style={s.stepText}>+1w</Text></Pressable>
+                    </View>
+                  </View>
+                ) : null}
+
                 {err ? <Text style={s.err}>{err}</Text> : null}
                 <Pressable testID="plan-generate" onPress={doGenerate} disabled={step === "loading"} style={[s.primary, step === "loading" && { opacity: 0.7 }]}>
                   {step === "loading" ? <ActivityIndicator color="#050506" /> : <Ionicons name="sparkles" size={16} color="#050506" />}
@@ -124,12 +196,18 @@ export function CoachPlanCreatorModal({
               </ScrollView>
             ) : null}
 
-            {(step === "preview" || step === "saving") && plan ? (
+            {!showTpls && (step === "preview" || step === "saving") && plan ? (
               <>
                 <ScrollView contentContainerStyle={s.body} testID="plan-preview">
-                  <Text style={s.planTitle}>{plan.title}</Text>
+                  <View style={s.previewTop}>
+                    <Text style={s.planTitle}>{plan.title}</Text>
+                    <Pressable testID="save-template" onPress={doSaveTemplate} disabled={tplSaved} style={s.saveTplBtn}>
+                      <Ionicons name={tplSaved ? "checkmark-circle" : "bookmark-outline"} size={14} color={tplSaved ? colors.green : colors.yellow} />
+                      <Text style={[s.saveTplText, tplSaved && { color: colors.green }]}>{tplSaved ? "Saved" : "Save as template"}</Text>
+                    </Pressable>
+                  </View>
                   {plan.description ? <Text style={s.planDesc}>{plan.description}</Text> : null}
-                  <Text style={s.metaLine}>{plan.weeks_count} weeks · {plan.days_per_week} days/week</Text>
+                  <Text style={s.metaLine}>{plan.weeks_count} weeks · {plan.days_per_week} days/week · tap a ride to swap it</Text>
                   {plan.goals?.length ? (
                     <View style={s.goalsWrap}>
                       {plan.goals.map((g, i) => (
@@ -143,7 +221,7 @@ export function CoachPlanCreatorModal({
                   {plan.weeks.map((w, i) => (
                     <View key={i} style={s.weekBlock}>
                       <Text style={s.weekHead}>Week {i + 1} · {w.focus}</Text>
-                      {w.days.map((d, j) => <DayRow key={j} d={d} />)}
+                      {w.days.map((d, j) => <DayRow key={j} d={d} onSwap={() => setSwap({ wi: i, di: j, day: d })} />)}
                     </View>
                   ))}
                   {err ? <Text style={s.err}>{err}</Text> : null}
@@ -163,6 +241,16 @@ export function CoachPlanCreatorModal({
           </View>
         </KeyboardAvoidingView>
       </View>
+
+      <SwapSessionSheet
+        visible={!!swap}
+        onClose={() => setSwap(null)}
+        day={swap?.day ?? null}
+        coachName={persona.name}
+        coachGender={persona.gender}
+        goal={goal}
+        onSwapped={onSwapped}
+      />
     </Modal>
   );
 }
@@ -181,11 +269,28 @@ const s = StyleSheet.create({
   chipOn: { borderColor: colors.yellow, backgroundColor: colors.yellow + "22" },
   chipText: { color: colors.textDim, fontSize: 15, fontWeight: "800" },
   chipTextOn: { color: colors.yellow },
+  toggleRow: { flexDirection: "row", alignItems: "center", gap: 9, marginTop: 6 },
+  toggleText: { color: colors.white, fontSize: 13.5, fontWeight: "700", flex: 1 },
+  dateWrap: { backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: colors.borderSoft, borderRadius: radius.md, padding: 10 },
+  dateSteppers: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 6 },
+  stepBtn: { paddingVertical: 6, paddingHorizontal: 9, borderRadius: radius.sm, backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: colors.borderSoft },
+  stepText: { color: colors.yellow, fontSize: 12.5, fontWeight: "800" },
+  dateText: { color: colors.white, fontSize: 13, fontWeight: "800", flex: 1, textAlign: "center" },
   primary: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.yellow, borderRadius: radius.md, paddingVertical: 13, marginTop: 8 },
   primaryText: { color: "#050506", fontSize: 15, fontWeight: "800" },
   hint: { color: colors.textFaint, fontSize: 11.5, textAlign: "center", marginTop: 6 },
   err: { color: colors.red, fontSize: 12.5, fontWeight: "700", textAlign: "center" },
-  planTitle: { color: colors.white, fontSize: 20, fontWeight: "900" },
+  tplBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, borderWidth: 1, borderColor: colors.borderSoft, borderRadius: radius.md, paddingVertical: 10, backgroundColor: "rgba(255,255,255,0.03)" },
+  tplBtnText: { color: colors.yellow, fontSize: 13.5, fontWeight: "800" },
+  backRow: { flexDirection: "row", alignItems: "center", gap: 3 },
+  backText: { color: colors.yellow, fontSize: 14, fontWeight: "800" },
+  tplRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: colors.borderSoft, borderRadius: radius.md, padding: 12 },
+  tplTitle: { color: colors.white, fontSize: 14.5, fontWeight: "800" },
+  tplMeta: { color: colors.textDim, fontSize: 12, marginTop: 2 },
+  previewTop: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  planTitle: { color: colors.white, fontSize: 20, fontWeight: "900", flex: 1 },
+  saveTplBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingVertical: 5, paddingHorizontal: 9, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: "rgba(255,255,255,0.04)" },
+  saveTplText: { color: colors.yellow, fontSize: 11.5, fontWeight: "800" },
   planDesc: { color: colors.textDim, fontSize: 13.5, lineHeight: 19 },
   metaLine: { color: colors.yellow, fontSize: 12, fontWeight: "800", letterSpacing: 0.3 },
   goalsWrap: { gap: 6, marginTop: 2 },

@@ -1221,6 +1221,7 @@ async def coach_create_plan(body: dict):
     coach_name = str(body.get("coach_name") or "Alberto")
     coach_gender = str(body.get("coach_gender") or "male")
     goal = str(body.get("goal") or "get fitter and ride stronger").strip()[:200]
+    event_date = str(body.get("event_date") or "").strip()[:10] or None
     try:
         weeks = max(2, min(16, int(body.get("weeks") or 8)))
     except Exception:
@@ -1231,10 +1232,15 @@ async def coach_create_plan(body: dict):
         days_per_week = 4
 
     rider = await _rider_line()
+    event_line = ""
+    if event_date:
+        event_line = (f"The rider is training for an event/race on {event_date}. Build the plan to PEAK for that date — "
+                      "make the final week a lighter taper week so they arrive fresh and strong on the day. ")
     prompt = (
         f"{rider}\n"
         f"Design a personalised {weeks}-week cycling training plan for this rider. "
-        f"Their goal: \"{goal}\". They can train about {days_per_week} days per week.\n"
+        f"Their goal: \"{goal}\". They can train about {days_per_week} days per week. "
+        f"{event_line}\n"
         "Each week has exactly 7 days (Mon-Sun). Include per week: "
         f"{days_per_week} CYCLING days (progressive, varied — endurance/tempo/threshold/vo2/recovery as appropriate), "
         "1-2 STRENGTH or MOBILITY days (short home sessions), and REST days for the remainder. "
@@ -1258,6 +1264,8 @@ async def coach_create_plan(body: dict):
         data = json.loads(rawtxt[s:e + 1]) if s >= 0 and e > s else {}
         plan = _normalize_created_plan(data, weeks, days_per_week)
         plan["created_by"] = coach_name
+        if event_date:
+            plan["event_date"] = event_date
         return {"plan": plan}
     except HTTPException:
         raise
@@ -1273,7 +1281,20 @@ def _build_custom_definition(plan: dict, plan_id: str, coach_name: str) -> dict:
     n_weeks = len(weeks_in)
     today = date.today()
     dow = today.weekday()
-    next_mon = today if dow == 0 else today + timedelta(days=7 - dow)
+    default_start = today if dow == 0 else today + timedelta(days=7 - dow)
+    # If the rider is peaking for an event, back-schedule so the final week
+    # lands on the event's week; otherwise start the coming Monday.
+    next_mon = default_start
+    ev = None
+    event_iso = plan.get("event_date")
+    if event_iso:
+        try:
+            ev = date.fromisoformat(str(event_iso)[:10])
+            ev_monday = ev - timedelta(days=ev.weekday())
+            aligned = ev_monday - timedelta(days=7 * (n_weeks - 1))
+            next_mon = aligned if aligned >= default_start else default_start
+        except Exception:
+            ev = None
     def_weeks = []
     for wi, wk in enumerate(weeks_in):
         wnum = wi + 1
@@ -1312,6 +1333,7 @@ def _build_custom_definition(plan: dict, plan_id: str, coach_name: str) -> dict:
         "average_label": f"{plan.get('days_per_week', 4)} Days/Week",
         "level": "Custom", "created_by": coach_name,
         "goals": plan.get("goals", []), "phases": phases, "weeks": def_weeks,
+        "event_date": ev.isoformat() if ev else None,
         "custom": True,
     }
 
@@ -1354,3 +1376,134 @@ async def coach_accept_plan(body: dict):
     except Exception:
         pass
     return {"ok": True, "plan_id": plan_id, "title": definition["title"]}
+
+
+# ===================== Swap a session (easier / harder / change focus) =========
+import re as _re
+
+_SWAP_MODE = {
+    "easier": "Make this session EASIER — lower intensity and/or shorter, an active-recovery or endurance feel.",
+    "harder": "Make this session HARDER — more intensity and/or longer, a bigger training stimulus.",
+    "focus": "Change the FOCUS of this session to something different but complementary (e.g. climbing/tempo/vo2/recovery), similar overall load.",
+}
+
+
+def _parse_wid(wid: str):
+    """Extract (week, day_index) from a custom workout_id like custom-xxx-ride-w3-d2."""
+    m = _re.search(r"-ride-w(\d+)-d(\d+)$", str(wid or ""))
+    if not m:
+        return None, None
+    return int(m.group(1)), int(m.group(2))
+
+
+@router.post("/coach/swap-session")
+async def coach_swap_session(body: dict):
+    """Ask the coach for an alternative cycling session (easier/harder/change
+    focus). If a custom plan_id + week + day_index are given, persist the swap."""
+    key = os.environ.get("EMERGENT_LLM_KEY")
+    if not key:
+        raise HTTPException(status_code=503, detail="Coaching model not configured")
+    day = body.get("day") or {}
+    mode = str(body.get("mode") or "easier").lower()
+    if mode not in _SWAP_MODE:
+        mode = "easier"
+    coach_name = str(body.get("coach_name") or "Alberto")
+    coach_gender = str(body.get("coach_gender") or "male")
+    goal = str(body.get("goal") or "").strip()[:160]
+    focus_hint = str(body.get("focus_hint") or "").strip()[:80]
+    plan_id = body.get("plan_id")
+    week = body.get("week")
+    day_index = body.get("day_index")
+
+    cur = (f"Current session: title=\"{day.get('title', 'Ride')}\", zone={day.get('zone', 'Z2')}, "
+           f"duration_min={day.get('duration_min') or day.get('duration') or 60}, tss={day.get('tss') or 0}.")
+    prompt = (
+        f"You are adjusting ONE cycling training session in a rider's plan. {cur}\n"
+        f"{_SWAP_MODE[mode]} "
+        + (f"Rider hint for the new focus: \"{focus_hint}\". " if (mode == 'focus' and focus_hint) else "")
+        + (f"Rider's overall goal: \"{goal}\". " if goal else "")
+        + "Reply with ONLY minified JSON: {\"title\": string (<=4 words), \"zone\": \"Z1\"-\"Z5\", "
+          "\"duration_min\": number, \"tss\": number}. Keep it realistic and coherent with the rider's level."
+    )
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(api_key=key, session_id=f"{coach_name.lower()}-swap",
+                       system_message=coach_system(coach_name, coach_gender)).with_model("anthropic", "claude-sonnet-4-6")
+        reply = (await chat.send_message(UserMessage(text=prompt))) or ""
+        reply = reply.strip().strip("`")
+        s, e = reply.find("{"), reply.rfind("}")
+        data = json.loads(reply[s:e + 1]) if s >= 0 and e > s else {}
+    except Exception as e:
+        logging.exception("swap-session llm failed")
+        raise HTTPException(status_code=502, detail=f"Swap failed: {e}")
+
+    try:
+        dur_min = max(15, min(360, int(data.get("duration_min") or 60)))
+    except Exception:
+        dur_min = 60
+    try:
+        tss = max(0, int(data.get("tss") or round(dur_min * 1.0)))
+    except Exception:
+        tss = round(dur_min * 1.0)
+    new_day = {
+        "day_name": day.get("day_name"), "kind": "cycling",
+        "title": str(data.get("title") or "Ride").strip()[:50] or "Ride",
+        "zone": str(data.get("zone") or "Z2").strip()[:4],
+        "duration": _fmt_dur(dur_min), "duration_min": dur_min, "tss": tss,
+    }
+
+    # Persist into the custom plan definition when targeting an active plan.
+    if plan_id and str(plan_id).startswith("custom-"):
+        w, di = (week, day_index)
+        if w is None or di is None:
+            w, di = _parse_wid(day.get("workout_id"))
+        if w is not None and di is not None:
+            doc = await udb.training_plans.find_one({"id": plan_id})
+            definition = (doc or {}).get("definition") or {}
+            wks = definition.get("weeks") or []
+            wi = int(w) - 1
+            if 0 <= wi < len(wks) and 0 <= int(di) < len(wks[wi].get("days", [])):
+                d0 = wks[wi]["days"][int(di)]
+                d0.update({"title": new_day["title"], "zone": new_day["zone"],
+                           "duration": new_day["duration"], "tss": new_day["tss"], "kind": "cycling"})
+                new_day["workout_id"] = d0.get("workout_id")
+                await udb.training_plans.update_one(
+                    {"id": plan_id}, {"$set": {"definition": definition, "snapshot_at": now_iso()}})
+                try:
+                    await _record_adaptation(
+                        plan_id, coach_name,
+                        f"Swapped your {day.get('day_name', '')} ride to '{new_day['title']}' "
+                        f"({new_day['zone']} · {new_day['duration']}).", "Session swapped")
+                except Exception:
+                    pass
+    return {"day": new_day}
+
+
+# ===================== Plan templates ==========================================
+@router.post("/coach/plan-templates")
+async def save_plan_template(body: dict):
+    plan = body.get("plan") or {}
+    if not plan.get("weeks"):
+        raise HTTPException(status_code=400, detail="No plan to save")
+    tid = f"tpl-{uuid.uuid4().hex[:10]}"
+    doc = {
+        "id": tid, "title": str(plan.get("title") or "My Plan")[:60],
+        "weeks_count": plan.get("weeks_count") or len(plan.get("weeks", [])),
+        "days_per_week": plan.get("days_per_week"),
+        "plan": plan, "saved_at": now_iso(),
+    }
+    await udb.plan_templates.update_one({"id": tid}, {"$set": doc}, upsert=True)
+    return {"ok": True, "id": tid, "title": doc["title"]}
+
+
+@router.get("/coach/plan-templates")
+async def list_plan_templates():
+    cur = udb.plan_templates.find({}, {"_id": 0}).sort("saved_at", -1)
+    items = await cur.to_list(length=50)
+    return {"templates": items}
+
+
+@router.delete("/coach/plan-templates/{tid}")
+async def delete_plan_template(tid: str):
+    await udb.plan_templates.delete_one({"id": tid})
+    return {"ok": True}
