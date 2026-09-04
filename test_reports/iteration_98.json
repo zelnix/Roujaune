@@ -1,0 +1,31 @@
+{
+  "summary": "Iter 98 — three follow-ups on coach-created plans (close-date notice, template preview dots, swap on plan screen). Backend pytest: 4/4 passed in /app/backend/tests/test_iter98_swap_onplan.py (JUnit at /app/test_reports/pytest/iter98.xml). Frontend (1280x900 landscape, demo@roujaune.app): all three features PASS end-to-end. F1 CLOSE-DATE NOTICE: with weeks-12 selected and event-toggle on, the initial event-date defaults to ~12w out (no warning). After 8× event-minus-week the date is ~5w away and testID event-too-close appears reading exactly: 'Your event is about 5 weeks away — shorter than a 12-week plan. Alberto will start right away and fit what's possible; for a full taper try a 5-week plan or a later date.' After +10× event-plus-week the warning is hidden again. F2 TEMPLATE PREVIEW: after generating a 4-week/3-day plan and tapping save-template, reopening open-templates → template-list shows each saved template row with 7 coloured mini dots (KIND_META colours) and a 'WEEK 1' label (verified via getComputedStyle: dots ~9px round with background colour; text matched /week\\s*1/i). F3 SWAP ON PLAN SCREEN: created+accepted a 4-week custom plan; on /plan → Key Workouts tab a workout card 'workout-custom-df4186cb47-ride-w1-d1' opens the KeyWorkoutDetailModal; footer shows BOTH testID workout-detail-open ('Open in Training') AND workout-detail-swap ('Swap session'). Tapping workout-detail-swap opens SwapSessionSheet (testID swap-sheet) with the three options (swap-easier / swap-harder / swap-focus). Backend swap-session (pytest): easier lowered a Z-band ride to Z1 40min/28 TSS and the change PERSISTED in /api/plan (verified via GET after swap; before_load ~55 → after_load ≤ before_load). Adaptation entry recorded: text \"Swapped your … ride to 'Easy Spin' (Z1 · 40 min).\", trigger 'Session swapped' — iter97 review recommendation implemented. Non-custom plan_id (build-and-climb) POST /api/coach/swap-session does not mutate the persisted plan (workout ids unchanged in /api/plan). UI-gate for the Swap-session button is code-verified in plan-modals.tsx:394 (canSwap requires workout.id.startsWith('custom-')). Cleanup: demo rider restored to build-and-climb via cookie-authed POST /api/rider/plan → 200; test templates deleted from template-list (2 rows cleaned).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter98_swap_onplan.py",
+    "/app/test_reports/pytest/iter98.xml",
+    "/app/test_reports/screens/i98_templates.jpeg",
+    "/app/test_reports/screens/i98_swap_wkdetail.jpeg",
+    "/app/test_reports/screens/i98_swap_sheet.jpeg"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "CoachPlanCreatorModal.tsx:69-71 — weeksAvailable = floor(daysUntilEvent/7)+1 rounds inclusive of today; if daysUntilEvent is 0 (event today) the label reads '1 week away'. Consider `Math.max(1, Math.ceil(daysUntilEvent/7))` so 'about N weeks away' matches conventional phrasing, or explicitly render 'today / this week' when daysUntilEvent < 4.",
+    "CoachPlanCreatorModal.tsx:67 — bumpEvent() uses `n < new Date() ? d : n` to prevent stepping into the past, which is good, but on the same day the −1d/−1w path silently no-ops without user feedback. A tiny hint or disabled state on the minus buttons at min-date would be a nicer UX.",
+    "plan-modals.tsx:394 — canSwap = onSwap && workout.id.startsWith('custom-'). Consider guarding on planId prop rather than id shape so future plan sources (e.g. 'plan-<x>') don't accidentally hide the swap button.",
+    "routes/coach.py:1399-1472 coach_swap_session — swap for non-custom plans returns a swapped day but doesn't persist; response shape is identical to the persistent case. Consider echoing `{persisted: bool}` so the client can decide whether to force a plan refresh."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None persisted. During tests a custom-<id> plan was activated for demo@roujaune.app and 2 TEST templates were created; both were cleaned up (demo restored to build-and-climb via POST /api/rider/plan → 200, templates deleted via tpl-del- buttons + DELETE /api/coach/plan-templates cleanup in test_restore_demo_plan).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend tests: /app/backend/tests/test_iter98_swap_onplan.py (4 tests, ~17s, LLM-backed). Uses EXPO_PUBLIC_BACKEND_URL, demo@roujaune.app / demo9900. Response shapes: POST /api/coach/create-plan returns {plan: {...}} (unwrap via r.json()['plan']); /api/coach/create-plan expects `weeks` (not `weeks_count`); POST /api/coach/swap-session returns {day: {...}}; GET /api/plan/adaptations returns {adaptations: [...], status: '...'}. Frontend: React Native web renders Pressable as `<div>` not `<button>` — get_by_role('button') fails; use get_by_text or JS click via `document.querySelector('[data-testid=X]').click()`. Modal Pressables sometimes report 'outside of viewport' with Playwright's click; JS-click is the reliable fallback. Key Workout card testIDs are `workout-<id>` not `key-workout-*`. Swap button code-gated to workout.id.startsWith('custom-'). LLM plan generate takes ~15-40s; use 90-95s timeouts with 1 retry.",
+  "rca_of_issue": "N/A — all three sub-features work end-to-end on backend and frontend."
+}

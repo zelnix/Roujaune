@@ -383,7 +383,7 @@ export function PhaseDetailModal({ visible, onClose, phases, selectedId }: { vis
 }
 
 /* ── Key-workout detail (steps + profile) ───────────────────────────────── */
-export function KeyWorkoutDetailModal({ visible, onClose, workout, onOpen }: { visible: boolean; onClose: () => void; workout: KeyWorkout | null; onOpen?: (w: KeyWorkout) => void }) {
+export function KeyWorkoutDetailModal({ visible, onClose, workout, onOpen, onSwap }: { visible: boolean; onClose: () => void; workout: KeyWorkout | null; onOpen?: (w: KeyWorkout) => void; onSwap?: (w: KeyWorkout) => void }) {
   const segs = React.useMemo(() => {
     if (!workout?.id) return [];
     const w = getWorkout(workout.id);
@@ -391,15 +391,26 @@ export function KeyWorkoutDetailModal({ visible, onClose, workout, onOpen }: { v
   }, [workout]);
   if (!workout) return null;
   const done = !!workout.completed;
+  const canSwap = !!onSwap && typeof workout.id === "string" && workout.id.startsWith("custom-");
   return (
     <ModalShell
       visible={visible} onClose={onClose} title={workout.title}
       subtitle={workout.footer} icon={done ? "checkmark-circle" : (workout.icon as any)} iconColor={done ? C.green : workout.color} maxWidth={560}
-      footer={onOpen ? (
-        <Pressable testID="workout-detail-open" onPress={() => onOpen(workout)} style={({ hovered }: any) => [m.btnPrimary, hovered && { opacity: 0.9 }]}>
-          <Ionicons name="play" size={15} color="#241B00" />
-          <Text style={m.btnPrimaryText}>Open in Training</Text>
-        </Pressable>
+      footer={(onOpen || canSwap) ? (
+        <View style={m.footerRow}>
+          {canSwap ? (
+            <Pressable testID="workout-detail-swap" onPress={() => onSwap!(workout)} style={({ hovered }: any) => [m.btnGhost, { flex: 1, flexDirection: "row", alignItems: "center", gap: 7 }, hovered && m.btnGhostHover]}>
+              <Ionicons name="swap-horizontal" size={15} color={C.white} />
+              <Text style={m.btnGhostText}>Swap session</Text>
+            </Pressable>
+          ) : null}
+          {onOpen ? (
+            <Pressable testID="workout-detail-open" onPress={() => onOpen(workout)} style={({ hovered }: any) => [m.btnPrimary, { flex: 1.3 }, hovered && { opacity: 0.9 }]}>
+              <Ionicons name="play" size={15} color="#241B00" />
+              <Text style={m.btnPrimaryText}>Open in Training</Text>
+            </Pressable>
+          ) : null}
+        </View>
       ) : undefined}
     >
       <View style={m.woMetaRow}>

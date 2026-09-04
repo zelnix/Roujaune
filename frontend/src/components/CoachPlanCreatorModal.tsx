@@ -66,6 +66,9 @@ export function CoachPlanCreatorModal({
   const bumpEvent = (deltaDays: number) => {
     setEventDate((d) => { const n = new Date(d); n.setDate(n.getDate() + deltaDays); return n < new Date() ? d : n; });
   };
+  const daysUntilEvent = Math.round((eventDate.getTime() - Date.now()) / 86400000);
+  const weeksAvailable = Math.max(1, Math.floor(daysUntilEvent / 7) + 1);
+  const eventTooClose = eventOn && weeksAvailable < weeks;
   const toggleEvent = () => {
     setEventOn((on) => {
       if (!on) { const d = new Date(); d.setDate(d.getDate() + weeks * 7); setEventDate(d); }
@@ -139,6 +142,12 @@ export function CoachPlanCreatorModal({
                       <Pressable style={{ flex: 1 }} testID={`tpl-${t.id}`} onPress={() => useTemplate(t)}>
                         <Text style={s.tplTitle} numberOfLines={1}>{t.title}</Text>
                         <Text style={s.tplMeta}>{t.weeks_count} weeks · {t.days_per_week} days/week</Text>
+                        <View style={s.tplDots}>
+                          {(t.plan?.weeks?.[0]?.days ?? []).slice(0, 7).map((d, di) => (
+                            <View key={di} style={[s.tplDot, { backgroundColor: (KIND_META[d.kind] || KIND_META.rest).color }]} />
+                          ))}
+                          <Text style={s.tplGlance}>week 1</Text>
+                        </View>
                       </Pressable>
                       <Pressable onPress={() => removeTemplate(t.id)} hitSlop={8} testID={`tpl-del-${t.id}`}><Ionicons name="trash-outline" size={17} color={colors.textDim} /></Pressable>
                     </View>
@@ -184,6 +193,14 @@ export function CoachPlanCreatorModal({
                       <Pressable testID="event-plus-day" onPress={() => bumpEvent(1)} style={s.stepBtn}><Text style={s.stepText}>+1d</Text></Pressable>
                       <Pressable testID="event-plus-week" onPress={() => bumpEvent(7)} style={s.stepBtn}><Text style={s.stepText}>+1w</Text></Pressable>
                     </View>
+                    {eventTooClose ? (
+                      <View style={s.warnRow} testID="event-too-close">
+                        <Ionicons name="alert-circle-outline" size={15} color="#E0A93A" />
+                        <Text style={s.warnText}>
+                          Your event is about {weeksAvailable} {weeksAvailable === 1 ? "week" : "weeks"} away — shorter than a {weeks}-week plan. {persona.name} will start right away and fit what's possible; for a full taper try a {weeksAvailable}-week plan or a later date.
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
                 ) : null}
 
@@ -276,6 +293,8 @@ const s = StyleSheet.create({
   stepBtn: { paddingVertical: 6, paddingHorizontal: 9, borderRadius: radius.sm, backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: colors.borderSoft },
   stepText: { color: colors.yellow, fontSize: 12.5, fontWeight: "800" },
   dateText: { color: colors.white, fontSize: 13, fontWeight: "800", flex: 1, textAlign: "center" },
+  warnRow: { flexDirection: "row", gap: 7, marginTop: 10, backgroundColor: "rgba(224,169,58,0.1)", borderWidth: 1, borderColor: "rgba(224,169,58,0.4)", borderRadius: radius.sm, padding: 9 },
+  warnText: { color: "#E9C77A", fontSize: 11.5, lineHeight: 16, flex: 1, fontWeight: "600" },
   primary: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.yellow, borderRadius: radius.md, paddingVertical: 13, marginTop: 8 },
   primaryText: { color: "#050506", fontSize: 15, fontWeight: "800" },
   hint: { color: colors.textFaint, fontSize: 11.5, textAlign: "center", marginTop: 6 },
@@ -287,6 +306,9 @@ const s = StyleSheet.create({
   tplRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "rgba(255,255,255,0.04)", borderWidth: 1, borderColor: colors.borderSoft, borderRadius: radius.md, padding: 12 },
   tplTitle: { color: colors.white, fontSize: 14.5, fontWeight: "800" },
   tplMeta: { color: colors.textDim, fontSize: 12, marginTop: 2 },
+  tplDots: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 7 },
+  tplDot: { width: 9, height: 9, borderRadius: 4.5 },
+  tplGlance: { color: colors.textFaint, fontSize: 9.5, fontWeight: "700", marginLeft: 6, textTransform: "uppercase", letterSpacing: 0.4 },
   previewTop: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   planTitle: { color: colors.white, fontSize: 20, fontWeight: "900", flex: 1 },
   saveTplBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingVertical: 5, paddingHorizontal: 9, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.borderSoft, backgroundColor: "rgba(255,255,255,0.04)" },

@@ -27,6 +27,7 @@ import type { AchievementCardData } from "@/src/components/AchievementCard";
 import { usePhaseCelebration, usePlanCompletion } from "@/src/lib/phase-complete";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
 import { CoachPlanCreatorModal } from "@/src/components/CoachPlanCreatorModal";
+import { SwapSessionSheet } from "@/src/components/SwapSessionSheet";
 import type { EditableGoal } from "@/src/lib/plan";
 
 function Toast({ message }: { message: { id: number; text: string } | null }) {
@@ -93,6 +94,7 @@ export default function TrainingPlanScreen() {
   const [showAdaptations, setShowAdaptations] = React.useState(false);
   const [phaseDetail, setPhaseDetail] = React.useState<string | null>(null);
   const [workoutDetail, setWorkoutDetail] = React.useState<KeyWorkout | null>(null);
+  const [swapWO, setSwapWO] = React.useState<KeyWorkout | null>(null);
   const [showChat, setShowChat] = React.useState(false);
   const [showCreator, setShowCreator] = React.useState(false);
   const [chatSeed, setChatSeed] = React.useState<string | undefined>(undefined);
@@ -261,9 +263,19 @@ export default function TrainingPlanScreen() {
           onClose={() => setWorkoutDetail(null)}
           workout={workoutDetail}
           onOpen={(w) => { setWorkoutDetail(null); router.push({ pathname: "/training", params: { workoutId: w.id, title: w.title } } as any); }}
+          onSwap={(w) => { setWorkoutDetail(null); setSwapWO(w); }}
         />
         <CoachChatModal visible={showChat} onClose={() => { setShowChat(false); setChatSeed(undefined); }} persona={persona} onPlanUpdated={refreshPlan} seedMessage={chatSeed} onCreatePlan={() => { setShowChat(false); setShowCreator(true); }} />
         <CoachPlanCreatorModal visible={showCreator} onClose={() => setShowCreator(false)} persona={persona} onAccepted={(title) => { showToast(`New plan ready: ${title}`); refreshPlan(); }} />
+        <SwapSessionSheet
+          visible={!!swapWO}
+          onClose={() => setSwapWO(null)}
+          day={swapWO ? { title: swapWO.title, zone: swapWO.zone, duration: swapWO.duration, tss: swapWO.tss as any, workout_id: swapWO.id } : null}
+          coachName={persona.name}
+          coachGender={persona.gender}
+          planId={swapWO && typeof swapWO.id === "string" && swapWO.id.startsWith("custom-") ? swapWO.id.split("-ride-")[0] : undefined}
+          onSwapped={() => { refreshPlan(); showToast(`Session updated by ${persona.name}`); }}
+        />
         <PhaseCelebrationModal
           visible={!!celebration && !completion}
           celebration={celebration}
