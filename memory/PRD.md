@@ -1103,3 +1103,22 @@ User wanted an in-app rating + feedback capture (fb50-style) opened from Setting
 - **Swap On Plan Screen**: KeyWorkoutDetailModal (plan-modals.tsx) gained onSwap + a "Swap session" button (testID workout-detail-swap) shown only for custom plans (workout.id startsWith 'custom-'); app/plan.tsx wires swapWO → SwapSessionSheet → persists + refreshPlan. Also swap-session backend now records an adaptation note on persist (visible in Adaptations tab).
 - **Template Preview**: each saved-template row shows a 7-dot week-1 glance (KIND_META colours) + "WEEK 1" label.
 - Verified: testing_agent iter98 — backend 4/4 pytest + frontend all 3 PASS + regression. Demo restored to build-and-climb; test templates cleaned.
+
+## Migrated ALL LLM parts to Google Gemini 3 Flash (user's own key) (2026-09 fork)
+- Moved off the Emergent universal key to the user's own Google Gemini API key. Added GEMINI_API_KEY to backend/.env; installed google-genai==2.12.1 (requirements.txt frozen).
+- Approach: services/gemini_shim.py provides drop-in LlmChat/UserMessage mimicking emergentintegrations' surface but calling `google.genai` client with model `gemini-3-flash-preview`. `.with_model(provider,model)` is ignored (always Gemini 3 Flash). JSON mode auto-enabled when the prompt mentions "json"; thinking DISABLED (ThinkingConfig(thinking_budget=0)) — critical, else thinking tokens truncate output → JSON parse errors. max_output_tokens=8192.
+- Rewired all 4 LLM files (routes/coach.py, routes/plan.py, routes/scenic.py, services/coach_llm.py): import → services.gemini_shim; EMERGENT_LLM_KEY → GEMINI_API_KEY (all gates now check the Gemini key).
+- Verified via curl: create-plan (structured JSON), coach chat (plain text), swap-session (structured) all HTTP 200 on Gemini. Key AQ.Ab8… works.
+
+## Swap Undo / Template Rename / Auto Shorten (2026-09 fork)
+- Swap Undo: swap-session accepts `override` (explicit day, no LLM) to restore original; SwapSessionSheet.onSwapped now returns (newDay, originalDay); plan.tsx + calendar.tsx show an Undo toast that re-applies the original via override; preview shows an inline "tap to undo" banner (testID preview-undo-swap).
+- Template Rename: POST /api/coach/plan-templates/{id}/rename; inline pencil edit in the template list (testID tpl-edit-<id>).
+- Auto Shorten: one-tap "Shorten to N weeks" button (testID auto-shorten) in the close-date notice sets weeks=weeksAvailable.
+- Backend curl-verified (override persist path, rename). Frontend lint-clean.
+
+## More Ride Modes — Gravel / Mountain Bike / Running unlocked (2026-09 fork)
+- The three previously "coming-soon" modes are now FULLY FUNCTIONAL, reusing the scenic-ride infrastructure.
+- **Backend** (`routes/scenic.py`): scenic routes gained an `activity` field (cycling|gravel|mountain-bike|running; missing => cycling), returned by `_public`, settable via admin create/update. `GET /api/scenic/routes?activity=X` filters by activity (cycling also matches legacy no-activity routes). New idempotent `seed_activity_routes()` upserts 9 POV routes (3 each) by id at startup — additive, never clobbers admin edits.
+- **Frontend**: `useScenicRoutes(activity?)`; `ScenicCyclingTodayView` generalized with an `activity` prop + per-activity `FRAMING` copy; `index.tsx` renders it for scenic-cycling/gravel/mountain-bike/running (walking/rowing/climbing stay coming-soon). `today-mode.ts` flipped gravel/mtb/running to `available` and pointed their "Find/Explore" nav → `/scenic-destinations?activity=X`, Saved → `/saved-destinations`, Rides & Analysis → `/activities`. `scenic-destinations.tsx` reads `?activity=` param, filters + retitles. Rides open the existing `/scenic-ride` player and record to history as `scenic-<id>`.
+- Verified: testing agent iter99 — backend 6/6 pytest (`tests/test_iter99_activity_scenic.py`) + frontend all flows (select each mode, hero/CTA framing, open player, activity-filtered destinations, cycling + walking regression). PASS.
+- Remaining "coming-soon" modes: Walking, Rowing, Climbing (still preview-only via `/coming-soon`).

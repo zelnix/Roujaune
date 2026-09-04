@@ -143,6 +143,7 @@ def _public(doc: dict) -> dict:
         "place": doc.get("place") or "",
         "country": doc.get("country") or "",
         "region": doc.get("region") or "",
+        "activity": doc.get("activity") or "cycling",
         "youtube_id": doc.get("youtube_id"),
         "duration_min": doc.get("duration_min"),
         "distance_km": doc.get("distance_km"),
@@ -162,11 +163,24 @@ def _public(doc: dict) -> dict:
 #  Public (rider app)                                                         #
 # --------------------------------------------------------------------------- #
 @router.get("/scenic/routes")
-async def list_scenic_routes():
-    """Published scenic routes for the rider Scenic Cycling experience,
-    ordered by `sort` then creation time. Empty until an admin publishes some
-    (we never fabricate scenic routes)."""
-    cur = db.scenic_routes.find({"status": "published"}, {"_id": 0}).sort(
+async def list_scenic_routes(activity: Optional[str] = None):
+    """Published scenic routes for the rider ride experiences, ordered by `sort`
+    then creation time. Optional `?activity=` filter (cycling|gravel|
+    mountain-bike|running); routes with no stored activity count as `cycling`.
+    Empty until an admin publishes some (we never fabricate scenic routes)."""
+    filt: dict = {"status": "published"}
+    if activity:
+        act = activity.strip().lower()
+        if act == "cycling":
+            filt["$or"] = [
+                {"activity": "cycling"},
+                {"activity": {"$exists": False}},
+                {"activity": None},
+                {"activity": ""},
+            ]
+        else:
+            filt["activity"] = act
+    cur = db.scenic_routes.find(filt, {"_id": 0}).sort(
         [("sort", 1), ("created_at", 1)])
     docs = await cur.to_list(500)
     return {"routes": [_public(d) for d in docs]}
@@ -205,11 +219,11 @@ async def _generate_pois(doc: dict) -> list[dict]:
     """Ask the LLM to invent believable, timestamped points of interest for the
     route from its metadata. Falls back to highlight-derived POIs on any error."""
     import os, json, re as _re
-    key = os.environ.get("EMERGENT_LLM_KEY")
+    key = os.environ.get("GEMINI_API_KEY")
     if not key:
         return _fallback_pois(doc)
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        from services.gemini_shim import LlmChat, UserMessage
         sys = (
             "You are a knowledgeable cycling travel guide. Given a scenic cycling "
             "route, list the notable points of interest a rider passes, in order. "
@@ -391,7 +405,7 @@ async def scenic_points_of_interest(route_id: str, refresh: bool = False):
 
 def os_has_key() -> bool:
     import os
-    return bool(os.environ.get("EMERGENT_LLM_KEY"))
+    return bool(os.environ.get("GEMINI_API_KEY"))
 
 
 @router.get("/scenic/last")
@@ -610,6 +624,7 @@ class ScenicRouteIn(BaseModel):
     place: Optional[str] = ""
     country: Optional[str] = ""
     region: Optional[str] = ""
+    activity: Optional[str] = "cycling"
     youtube_id: str            # raw id OR any YouTube URL (normalised on save)
     duration_min: Optional[int] = None
     distance_km: Optional[float] = None
@@ -630,6 +645,7 @@ class ScenicRoutePatch(BaseModel):
     place: Optional[str] = None
     country: Optional[str] = None
     region: Optional[str] = None
+    activity: Optional[str] = None
     youtube_id: Optional[str] = None
     duration_min: Optional[int] = None
     distance_km: Optional[float] = None
@@ -686,6 +702,7 @@ async def admin_create_scenic(body: ScenicRouteIn):
         "place": (body.place or "").strip(),
         "country": (body.country or "").strip(),
         "region": (body.region or "").strip(),
+        "activity": (body.activity or "cycling").strip().lower(),
         "youtube_id": yid,
         "duration_min": body.duration_min,
         "distance_km": body.distance_km,
@@ -721,7 +738,7 @@ async def admin_update_scenic(route_id: str, body: ScenicRoutePatch):
         updates["youtube_id"] = yid
     if "status" in data:
         updates["status"] = _validate_status(data["status"])
-    for k in ("name", "place", "country", "region", "duration_min", "distance_km", "elevation_m",
+    for k in ("name", "place", "country", "region", "activity", "duration_min", "distance_km", "elevation_m",
               "tag", "terrain", "difficulty", "surface", "highlights",
               "thumbnail_url", "description", "sort"):
         if k in data:
@@ -797,13 +814,92 @@ async def seed_scenic_routes() -> None:
     try:
         if await db.scenic_routes.count_documents({}) > 0:
             await backfill_route_metrics()
+            await seed_activity_routes()
             return
         now = _now()
-        docs = [{**s, "thumbnail_url": None, "status": "published",
-                 "created_at": now, "updated_at": now} for s in _SEED]
+        docs = [{**s, "activity": s.get("activity", "cycling"), "thumbnail_url": None,
+                 "status": "published", "created_at": now, "updated_at": now} for s in _SEED]
         await db.scenic_routes.insert_many(docs)
+        await seed_activity_routes()
     except Exception:
         pass
+
+
+# --------------------------------------------------------------------------- #
+#  Activity ride catalogs (Gravel / Mountain Bike / Running) — POV YouTube     #
+#  rides that power the newly-unlocked ride experiences. Seeded idempotently   #
+#  by id (added even if the scenic-cycling catalog already exists) so admins   #
+#  can edit/delete them freely afterwards.                                     #
+# --------------------------------------------------------------------------- #
+_ACTIVITY_SEED = [
+    # ---- Gravel ------------------------------------------------------------
+    {"id": "gravel-tuscany-strade", "name": "Tuscan Gravel Roads", "place": "Tuscany, Italy",
+     "region": "Countryside", "activity": "gravel", "youtube_id": "d6ib9yH3cTE",
+     "duration_min": 45, "distance_km": 22, "elevation_m": 320, "tag": "White Gravel",
+     "surface": "Gravel", "difficulty": "Moderate", "sort": 0,
+     "description": "Roll the famous white 'strade bianche' through cypress-lined Tuscan hills."},
+    {"id": "gravel-forest-fireroad", "name": "Forest Fire-Road Adventure", "place": "Bavaria, Germany",
+     "region": "Countryside", "activity": "gravel", "youtube_id": "q0jLGrwk1MQ",
+     "duration_min": 40, "distance_km": 20, "elevation_m": 260, "tag": "Forest Track",
+     "surface": "Gravel & Dirt", "difficulty": "Easy", "sort": 1,
+     "description": "Hard-packed forest fire-roads winding through cool pine woodland."},
+    {"id": "gravel-lakeside-mixed", "name": "Lakeside Mixed-Surface Loop", "place": "Tyrol, Austria",
+     "region": "Lakes", "activity": "gravel", "youtube_id": "Pzx9hk1UT1Y",
+     "duration_min": 55, "distance_km": 30, "elevation_m": 410, "tag": "Mixed Surface",
+     "surface": "Gravel & Tarmac", "difficulty": "Moderate", "sort": 2,
+     "description": "A rolling mix of lakeside gravel paths and quiet alpine back-lanes."},
+
+    # ---- Mountain Bike -----------------------------------------------------
+    {"id": "mtb-alpine-singletrack", "name": "Alpine Singletrack Descent", "place": "Dolomites, Italy",
+     "region": "Alps", "activity": "mountain-bike", "youtube_id": "Pzx9hk1UT1Y",
+     "duration_min": 25, "distance_km": 9, "elevation_m": 120, "tag": "Flowy Singletrack",
+     "surface": "Trail", "difficulty": "Intermediate", "sort": 0,
+     "description": "Flowing alpine singletrack through meadows and larch forest."},
+    {"id": "mtb-forest-flow", "name": "Forest Flow Trail", "place": "Black Forest, Germany",
+     "region": "Countryside", "activity": "mountain-bike", "youtube_id": "d6ib9yH3cTE",
+     "duration_min": 30, "distance_km": 11, "elevation_m": 240, "tag": "Flow Trail",
+     "surface": "Trail", "difficulty": "Beginner", "sort": 1,
+     "description": "Bermed, rooty flow trail rolling through dense green woodland."},
+    {"id": "mtb-mountain-epic", "name": "Mountain Epic Ride", "place": "Tyrol, Austria",
+     "region": "Alps", "activity": "mountain-bike", "youtube_id": "Pzx9hk1UT1Y",
+     "duration_min": 50, "distance_km": 18, "elevation_m": 680, "tag": "Technical Climb",
+     "surface": "Trail & Rock", "difficulty": "Advanced", "sort": 2,
+     "description": "A big-mountain epic — rocky climbs rewarded with sweeping alpine descents."},
+
+    # ---- Running (scenic / treadmill) --------------------------------------
+    {"id": "run-coastal-promenade", "name": "Coastal Promenade Run", "place": "Amalfi Coast, Italy",
+     "region": "Countryside", "activity": "running", "youtube_id": "q0jLGrwk1MQ",
+     "duration_min": 30, "distance_km": 5, "elevation_m": 40, "tag": "Easy Run",
+     "surface": "Paved", "difficulty": "Easy", "sort": 0,
+     "description": "A relaxed seaside promenade run with sparkling Mediterranean views."},
+    {"id": "run-park-loop", "name": "City Park Loop", "place": "Munich, Germany",
+     "region": "Countryside", "activity": "running", "youtube_id": "d6ib9yH3cTE",
+     "duration_min": 40, "distance_km": 7, "elevation_m": 60, "tag": "Steady Run",
+     "surface": "Path", "difficulty": "Moderate", "sort": 1,
+     "description": "Steady laps of a leafy city park — shaded paths and open lawns."},
+    {"id": "run-lakeside-trail", "name": "Lakeside Trail Run", "place": "Tyrol, Austria",
+     "region": "Lakes", "activity": "running", "youtube_id": "Pzx9hk1UT1Y",
+     "duration_min": 45, "distance_km": 8, "elevation_m": 120, "tag": "Trail Run",
+     "surface": "Trail", "difficulty": "Moderate", "sort": 2,
+     "description": "A scenic lakeside trail run with gentle rolling terrain and mountain air."},
+]
+
+
+async def seed_activity_routes() -> None:
+    """Idempotently add the Gravel / MTB / Running POV catalog (upsert by id) so
+    the newly-unlocked ride experiences are demonstrable. Never overwrites an
+    admin's later edits — only inserts rows that are still missing."""
+    try:
+        now = _now()
+        for s in _ACTIVITY_SEED:
+            if await db.scenic_routes.find_one({"id": s["id"]}, {"_id": 1}):
+                continue
+            doc = {**s, "activity": s.get("activity", "cycling"), "thumbnail_url": None,
+                   "status": "published", "created_at": now, "updated_at": now}
+            await db.scenic_routes.insert_one(doc)
+    except Exception:
+        import logging
+        logging.exception("seed_activity_routes failed")
 
 
 # Realistic real-world distance (km) and total ascent (m) for routes that were

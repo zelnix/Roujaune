@@ -28,22 +28,27 @@ import { usePhaseCelebration, usePlanCompletion } from "@/src/lib/phase-complete
 import { CoachChatModal } from "@/src/components/CoachChatModal";
 import { CoachPlanCreatorModal } from "@/src/components/CoachPlanCreatorModal";
 import { SwapSessionSheet } from "@/src/components/SwapSessionSheet";
+import { swapSession } from "@/src/lib/plan-create";
 import type { EditableGoal } from "@/src/lib/plan";
 
-function Toast({ message }: { message: { id: number; text: string } | null }) {
+function Toast({ message, onUndo }: { message: { id: number; text: string; undo?: () => void } | null; onUndo?: () => void }) {
   const op = React.useRef(new Animated.Value(0)).current;
   React.useEffect(() => {
     if (!message) return;
+    op.setValue(0);
     Animated.sequence([
       Animated.timing(op, { toValue: 1, duration: 180, useNativeDriver: true }),
-      Animated.delay(1600),
+      Animated.delay(message.undo ? 4200 : 1600),
       Animated.timing(op, { toValue: 0, duration: 260, useNativeDriver: true }),
     ]).start();
   }, [message, op]);
   if (!message) return null;
   return (
-    <Animated.View style={[styles.toast, { opacity: op, pointerEvents: "none" }]}>
+    <Animated.View style={[styles.toast, { opacity: op }]}>
       <Text style={styles.toastText}>{message.text}</Text>
+      {message.undo ? (
+        <Pressable testID="toast-undo" onPress={onUndo} hitSlop={8} style={{ marginLeft: 14 }}><Text style={{ color: C.yellow, fontSize: 13, fontWeight: "800" }}>Undo</Text></Pressable>
+      ) : null}
     </Animated.View>
   );
 }
@@ -85,7 +90,7 @@ export default function TrainingPlanScreen() {
   const compact = width < 700; // phones scroll; tablets fill
 
   const [tab, setTab] = React.useState("Overview");
-  const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
+  const [toast, setToast] = React.useState<{ id: number; text: string; undo?: () => void } | null>(null);
   const [availW, setAvailW] = React.useState(0);
 
   // Action-button modals
@@ -105,7 +110,16 @@ export default function TrainingPlanScreen() {
     [plan, goalsOverride]
   );
 
-  const showToast = React.useCallback((t: string) => setToast({ id: Date.now(), text: t }), []);
+  const showToast = React.useCallback((t: string, undo?: () => void) => setToast({ id: Date.now(), text: t, undo }), []);
+  const undoSwap = React.useCallback(async (orig: any) => {
+    const wid: string | undefined = orig?.workout_id;
+    const pid = wid && wid.startsWith("custom-") ? wid.split("-ride-")[0] : undefined;
+    try {
+      await swapSession({ day: { workout_id: wid }, mode: "easier", coachName: persona.name, planId: pid, override: orig });
+      refreshPlan();
+      showToast("Reverted to the original session");
+    } catch { showToast("Couldn't undo — please try again"); }
+  }, [persona.name, refreshPlan, showToast]);
 
   // Opening the plan clears the "updated after your last ride" badge.
   React.useEffect(() => { markPlanSeen(); }, []);
@@ -243,7 +257,7 @@ export default function TrainingPlanScreen() {
             </ScrollView>
           </View>
         </PlanProvider>
-        <Toast message={toast} />
+        <Toast message={toast} onUndo={() => { toast?.undo?.(); setToast(null); }} />
         <EditGoalsModal
           visible={showGoals}
           onClose={() => setShowGoals(false)}
@@ -274,7 +288,7 @@ export default function TrainingPlanScreen() {
           coachName={persona.name}
           coachGender={persona.gender}
           planId={swapWO && typeof swapWO.id === "string" && swapWO.id.startsWith("custom-") ? swapWO.id.split("-ride-")[0] : undefined}
-          onSwapped={() => { refreshPlan(); showToast(`Session updated by ${persona.name}`); }}
+          onSwapped={(_nd, orig) => { refreshPlan(); showToast(`Session updated by ${persona.name}`, () => undoSwap(orig)); }}
         />
         <PhaseCelebrationModal
           visible={!!celebration && !completion}

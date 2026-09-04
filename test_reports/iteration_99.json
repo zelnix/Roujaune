@@ -1,0 +1,32 @@
+{
+  "summary": "Gravel/MTB/Running ride modes are now fully functional end-to-end. Backend `activity` filter on GET /api/scenic/routes works exactly to spec (3 gravel + 3 mtb + 3 running seeded, cycling filter excludes them). Frontend: today-mode-option-gravel/mountain-bike/running each SELECT the experience directly (no /coming-soon detour), Today renders the per-activity hero with correct descriptor + CTA + 3 routes, begin-scenic-journey opens /scenic-ride with the right route id. Regressions clean: scenic-cycling still shows the cycling catalog with no activity-route leaks; walking still routes to /coming-soon.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter99_activity_scenic.py",
+    "/app/test_reports/pytest/iter99.xml"
+  ],
+  "action_items": [
+    "OPTIONAL/minor: the review request mentioned `future-activity-walking` testID should be visible when selecting walking. Today walking correctly navigates to /coming-soon?mode=walking (separate route) so the FutureActivityTodayView (and its `future-activity-walking` testID) is NOT rendered there — only when experience is walking rendered inline. The functional behaviour (coming-soon preview shown) is correct; consider adding a testID like `coming-soon-walking` on /app/frontend/app/coming-soon.tsx if the intent is to assert the walking preview by testID."
+  ],
+  "critical_code_review_comments": [
+    "scenic.py list_scenic_routes cycling branch uses $or including missing/None/'' activity — correct backwards-compat for legacy rows.",
+    "seed_activity_routes is idempotent by id (find_one before insert) — safe on restart.",
+    "ScenicCyclingTodayView receives `activity` prop and drives useScenicRoutes(activity) + FRAMING lookup — clean.",
+    "scenic-destinations.tsx reads ?activity= via useLocalSearchParams and picks the correct title from titleMap — works for gravel/mtb/running/cycling."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter99_activity_scenic.py (new)"
+  ],
+  "success_rate": {"backend": "100% (6/6)", "frontend": "100% functional (all 6 flows verified)"},
+  "seed_data_creation": "None — used existing seeded demo@roujaune.app / demo9900 and the seed_activity_routes() 9 rows already inserted on backend startup.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend requires auth on /api/scenic/routes. Use demo@roujaune.app/demo9900 to obtain a token via POST /api/auth/login. Seeded activity route ids: gravel-tuscany-strade, gravel-forest-fireroad, gravel-lakeside-mixed, mtb-alpine-singletrack, mtb-forest-flow, mtb-mountain-epic, run-coastal-promenade, run-park-loop, run-lakeside-trail. Frontend flow to select an experience: click [data-testid=today-mode-button] then [data-testid=today-mode-option-<id>] via JS-click; verify URL stays on / (not /coming-soon) for available modes.",
+  "rca_of_issue": "N/A — feature added correctly, no bugs found."
+}

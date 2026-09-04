@@ -61,11 +61,11 @@ def coach_chat_system(name: str = "Alberto", gender: str = "male", style: str = 
 
 async def coach_line(coach_name: str, coach_gender: str, prompt: str) -> Optional[str]:
     """Best-effort one-sentence, in-persona explanation. Returns None on failure."""
-    key = os.environ.get("EMERGENT_LLM_KEY")
+    key = os.environ.get("GEMINI_API_KEY")
     if not key:
         return None
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        from services.gemini_shim import LlmChat, UserMessage
         chat = LlmChat(
             api_key=key,
             session_id=f"{coach_name.lower()}-plan-gate",

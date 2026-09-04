@@ -513,7 +513,7 @@ async def move_calendar_session(req: MoveSessionRequest):
 @router.post("/calendar/review")
 async def review_calendar_change(req: ReviewRequest):
     """Alberto reviews a proposed schedule change and returns supportive guidance."""
-    key = os.environ.get("EMERGENT_LLM_KEY")
+    key = os.environ.get("GEMINI_API_KEY")
     fallback = (
         f"Moving {req.session_title} to {req.to_day} looks reasonable. "
         "Keep an easy day either side so you stay fresh for your key efforts."
@@ -529,7 +529,7 @@ async def review_calendar_change(req: ReviewRequest):
         "needed. Supportive tone, first person, no lists, no emojis, no quotation marks."
     )
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        from services.gemini_shim import LlmChat, UserMessage
         chat = LlmChat(
             api_key=key,
             session_id=f"{req.coach_name.lower()}-scheduling",

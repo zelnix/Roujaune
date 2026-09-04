@@ -5,7 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { colors, radius, spacing } from "@/src/theme";
 import { useScenicRoutes, ScenicRoute } from "@/src/lib/scenic-routes";
 import { DestinationCard, regionIcon } from "@/src/components/today/DestinationCard";
@@ -18,8 +18,17 @@ const REGION_ORDER = ["Alps", "Lakes", "Safari", "Countryside"];
  *  ride that matches their mood. Opens the scenic player. */
 export default function ScenicDestinationsScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ activity?: string }>();
+  const activity = (typeof params.activity === "string" && params.activity) || "cycling";
+  const titleMap: Record<string, string> = {
+    cycling: "Explore Destinations",
+    gravel: "Find Gravel Routes",
+    "mountain-bike": "Find Trails",
+    running: "Scenic Runs",
+  };
+  const screenTitle = titleMap[activity] ?? "Explore Destinations";
   const { width } = useWindowDimensions();
-  const { routes, loading } = useScenicRoutes();
+  const { routes, loading } = useScenicRoutes(activity);
   const [query, setQuery] = React.useState("");
   const [region, setRegion] = React.useState("All");
   const [dist, setDist] = React.useState("All");
@@ -111,7 +120,7 @@ export default function ScenicDestinationsScreen() {
           <Pressable onPress={leave} testID="destinations-back" style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Back" hitSlop={10}>
             <Ionicons name="chevron-back" size={22} color={colors.white} />
           </Pressable>
-          <Text style={styles.title}>Explore Destinations</Text>
+          <Text style={styles.title}>{screenTitle}</Text>
           <Pressable
             testID="surprise-me"
             onPress={() => {

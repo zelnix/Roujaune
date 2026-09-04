@@ -13,6 +13,7 @@ export type ScenicRoute = {
   place: string;
   country?: string;
   region?: string;
+  activity?: string;
   youtube_id: string;
   duration_min?: number | null;
   distance_km?: number | null;
@@ -41,19 +42,22 @@ export function ytThumb(id: string): string {
 }
 
 /** Live published scenic-route feed. `loading` until the first response;
- *  `routes` is `[]` (never fabricated) when no admin routes exist yet. */
-export function useScenicRoutes() {
+ *  `routes` is `[]` (never fabricated) when no admin routes exist yet.
+ *  Optional `activity` filters the catalog (cycling|gravel|mountain-bike|running). */
+export function useScenicRoutes(activity?: string) {
   const [routes, setRoutes] = React.useState<ScenicRoute[] | null>(null);
   const [error, setError] = React.useState(false);
 
   React.useEffect(() => {
     let alive = true;
-    fetch(`${base()}/api/scenic/routes`)
+    setRoutes(null);
+    const q = activity ? `?activity=${encodeURIComponent(activity)}` : "";
+    fetch(`${base()}/api/scenic/routes${q}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error("failed"))))
       .then((d) => { if (alive) setRoutes(Array.isArray(d?.routes) ? d.routes : []); })
       .catch(() => { if (alive) { setRoutes([]); setError(true); } });
     return () => { alive = false; };
-  }, []);
+  }, [activity]);
 
   return { routes, loading: routes === null, error };
 }

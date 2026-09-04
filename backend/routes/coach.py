@@ -125,7 +125,7 @@ async def coach_speak(text: str = Query(..., max_length=6000), coach_id: str = Q
 @router.post("/coach/cue")
 async def coach_cue(req: CoachCueRequest):
     """Generate a live, in-persona coaching cue from the rider's telemetry."""
-    key = os.environ.get("EMERGENT_LLM_KEY")
+    key = os.environ.get("GEMINI_API_KEY")
     if not key:
         raise HTTPException(status_code=503, detail="Coaching model not configured")
 
@@ -168,7 +168,7 @@ async def coach_cue(req: CoachCueRequest):
     )
 
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        from services.gemini_shim import LlmChat, UserMessage
         chat = LlmChat(
             api_key=key,
             session_id=f"{req.coach_name.lower()}-live-coach",
@@ -237,7 +237,7 @@ async def coach_extend_advice(req: ExtendAdviceRequest):
     suggested = decision["suggested"]
     label = {"10min": "about 10 more easy minutes", "20min": "about 20 more endurance minutes", "5km": "an extra ~5 km easy"}.get(suggested or "", "a short easy spin")
 
-    key = os.environ.get("EMERGENT_LLM_KEY")
+    key = os.environ.get("GEMINI_API_KEY")
     # Rule-based fallback advice, used if the model isn't available/fails.
     if recommend == "extend":
         fallback = f"Nice work — you still look strong, so if you're keen, add {label} at an easy pace. Otherwise finishing here is perfectly good."
@@ -260,7 +260,7 @@ async def coach_extend_advice(req: ExtendAdviceRequest):
             "Reply with 1-2 short, caring sentences in your voice. No preamble."
         )
         try:
-            from emergentintegrations.llm.chat import LlmChat, UserMessage
+            from services.gemini_shim import LlmChat, UserMessage
             chat = LlmChat(
                 api_key=key,
                 session_id=f"{req.coach_name.lower()}-extend-advice",
@@ -281,7 +281,7 @@ async def coach_extend_advice(req: ExtendAdviceRequest):
 @router.post("/coach/debrief")
 async def coach_debrief(req: CoachDebriefRequest):
     """The coach's post-ride debrief: effort, zones and one tip for next time."""
-    key = os.environ.get("EMERGENT_LLM_KEY")
+    key = os.environ.get("GEMINI_API_KEY")
     if not key:
         raise HTTPException(status_code=503, detail="Coaching model not configured")
 
@@ -335,7 +335,7 @@ async def coach_debrief(req: CoachDebriefRequest):
     )
 
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        from services.gemini_shim import LlmChat, UserMessage
         chat = LlmChat(
             api_key=key,
             session_id=f"{req.coach_name.lower()}-debrief",
@@ -470,7 +470,7 @@ async def clear_coach_chat_history(coach_name: str = "Alberto"):
 async def coach_chat(req: CoachChatRequest):
     """Send a message to the selected coach and get an in-persona reply. The full
     conversation is persisted per coach so history survives across sessions."""
-    key = os.environ.get("EMERGENT_LLM_KEY")
+    key = os.environ.get("GEMINI_API_KEY")
     if not key:
         raise HTTPException(status_code=503, detail="Coaching model not configured")
     if not (req.message or "").strip():
@@ -523,7 +523,7 @@ async def coach_chat(req: CoachChatRequest):
     ) + f"Rider: {req.message.strip()}\n{req.coach_name}:"
 
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        from services.gemini_shim import LlmChat, UserMessage
         chat = LlmChat(
             api_key=key,
             session_id=cid,
@@ -557,7 +557,7 @@ async def coach_chat(req: CoachChatRequest):
 async def coach_weekly_note(coach_name: str = "Alberto", coach_gender: str = "male", refresh: bool = False):
     """The coach's short spoken recap of the rider's week + one focus for next
     week. Cached per ISO-week and coach so it's stable and cheap to revisit."""
-    key = os.environ.get("EMERGENT_LLM_KEY")
+    key = os.environ.get("GEMINI_API_KEY")
     if not key:
         raise HTTPException(status_code=503, detail="Coaching model not configured")
 
@@ -614,7 +614,7 @@ async def coach_weekly_note(coach_name: str = "Alberto", coach_gender: str = "ma
     )
 
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        from services.gemini_shim import LlmChat, UserMessage
         chat = LlmChat(
             api_key=key,
             session_id=f"{coach_name.lower()}-weekly-note",
@@ -647,7 +647,7 @@ async def coach_taper_note(coach_name: str = "Alberto", coach_gender: str = "mal
     """When the rider's projected Form won't be fresh for their event, the coach
     suggests how to ease the final week to arrive sharp. Reads the saved event +
     the rider's current fitness/form. Cached per event+coach."""
-    key = os.environ.get("EMERGENT_LLM_KEY")
+    key = os.environ.get("GEMINI_API_KEY")
     if not key:
         raise HTTPException(status_code=503, detail="Coaching model not configured")
 
@@ -680,7 +680,7 @@ async def coach_taper_note(coach_name: str = "Alberto", coach_gender: str = "mal
         f"Speak as {coach_name}, first person, no emojis, no quotation marks inside strings."
     )
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        from services.gemini_shim import LlmChat, UserMessage
         chat = LlmChat(
             api_key=key,
             session_id=f"{coach_name.lower()}-taper",
@@ -713,7 +713,7 @@ async def coach_taper_note(coach_name: str = "Alberto", coach_gender: str = "mal
 async def coach_milestone_note(coach_name: str = "Alberto", coach_gender: str = "male", refresh: bool = False):
     """A short spoken congratulations from the coach when the rider just crossed a
     big lifetime milestone. Cached per milestone+coach."""
-    key = os.environ.get("EMERGENT_LLM_KEY")
+    key = os.environ.get("GEMINI_API_KEY")
     if not key:
         raise HTTPException(status_code=503, detail="Coaching model not configured")
     from routes.analysis import milestones as _ms
@@ -738,7 +738,7 @@ async def coach_milestone_note(coach_name: str = "Alberto", coach_gender: str = 
         f"Speak as {coach_name}, first person, no emojis, no quotation marks inside the string."
     )
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        from services.gemini_shim import LlmChat, UserMessage
         chat = LlmChat(api_key=key, session_id=f"{coach_name.lower()}-milestone",
                        system_message=coach_system(coach_name, coach_gender)).with_model("anthropic", "claude-sonnet-4-6")
         reply = await chat.send_message(UserMessage(text=prompt))
@@ -923,7 +923,7 @@ async def _record_adaptation(plan_id: str, coach_name: str, text: str, trigger: 
 async def _generate_adaptation(plan: dict, coach_name: str, coach_gender: str, recent_ride: Optional[dict] = None) -> str:
     """Generate the coach's plan-adaptation insight via the LLM. When a recent
     ride is supplied, the note reacts to that just-completed session."""
-    key = os.environ.get("EMERGENT_LLM_KEY")
+    key = os.environ.get("GEMINI_API_KEY")
     if not key:
         raise RuntimeError("Coaching model not configured")
 
@@ -971,7 +971,7 @@ async def _generate_adaptation(plan: dict, coach_name: str, coach_gender: str, r
         "Reply with the note only, no preamble, greeting or heading."
     )
 
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from services.gemini_shim import LlmChat, UserMessage
     chat = LlmChat(
         api_key=key,
         session_id=f"{coach_name.lower()}-adaptation",
@@ -988,7 +988,7 @@ async def _generate_adaptation(plan: dict, coach_name: str, coach_gender: str, r
 async def coach_adaptation(req: AdaptationRequest):
     """Generate the coach's plan-adaptation insight, based on the rider's plan and
     progress. Cached per plan+coach so it only regenerates when refresh=True."""
-    if not os.environ.get("EMERGENT_LLM_KEY"):
+    if not os.environ.get("GEMINI_API_KEY"):
         raise HTTPException(status_code=503, detail="Coaching model not configured")
 
     # Resolve the rider's real active plan (never the legacy build-and-climb default).
@@ -1020,7 +1020,7 @@ async def coach_adaptation(req: AdaptationRequest):
 async def _generate_adaptation_detail(plan: dict, coach_name: str, coach_gender: str) -> dict:
     """Ask the LLM to explain HOW the current adaptation was derived, returning a
     structured breakdown (summary + reasoning factors + concrete adjustments)."""
-    key = os.environ.get("EMERGENT_LLM_KEY")
+    key = os.environ.get("GEMINI_API_KEY")
     if not key:
         raise RuntimeError("Coaching model not configured")
 
@@ -1065,7 +1065,7 @@ async def _generate_adaptation_detail(plan: dict, coach_name: str, coach_gender:
         "Warm, first person, specific, no emojis."
     )
 
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from services.gemini_shim import LlmChat, UserMessage
     chat = LlmChat(
         api_key=key,
         session_id=f"{coach_name.lower()}-adaptation-detail",
@@ -1095,7 +1095,7 @@ async def _generate_adaptation_detail(plan: dict, coach_name: str, coach_gender:
 async def coach_adaptation_detail(req: AdaptationRequest):
     """Detailed, AI-generated breakdown of HOW the coach derived the current plan
     adaptation (reasoning factors + concrete adjustments). Cached per plan+coach."""
-    if not os.environ.get("EMERGENT_LLM_KEY"):
+    if not os.environ.get("GEMINI_API_KEY"):
         raise HTTPException(status_code=503, detail="Coaching model not configured")
     req.plan_id = await _plan_id_or_active(req.plan_id)
     if not req.plan_id:
@@ -1215,7 +1215,7 @@ def _normalize_created_plan(raw: dict, weeks: int, days_per_week: int) -> dict:
 async def coach_create_plan(body: dict):
     """Ask the coach (LLM) to design a brand-new custom training plan. Returns a
     PREVIEW only — nothing is persisted until the rider accepts."""
-    key = os.environ.get("EMERGENT_LLM_KEY")
+    key = os.environ.get("GEMINI_API_KEY")
     if not key:
         raise HTTPException(status_code=503, detail="Coaching model not configured")
     coach_name = str(body.get("coach_name") or "Alberto")
@@ -1253,7 +1253,7 @@ async def coach_create_plan(body: dict):
         f"'title' names the plan for the goal. 'description' is 1-2 sentences. Give exactly {weeks} weeks."
     )
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        from services.gemini_shim import LlmChat, UserMessage
         chat = LlmChat(api_key=key, session_id=f"{coach_name.lower()}-create-plan",
                        system_message=coach_system(coach_name, coach_gender)).with_model("anthropic", "claude-sonnet-4-6")
         reply = await chat.send_message(UserMessage(text=prompt))
@@ -1399,10 +1399,8 @@ def _parse_wid(wid: str):
 @router.post("/coach/swap-session")
 async def coach_swap_session(body: dict):
     """Ask the coach for an alternative cycling session (easier/harder/change
-    focus). If a custom plan_id + week + day_index are given, persist the swap."""
-    key = os.environ.get("EMERGENT_LLM_KEY")
-    if not key:
-        raise HTTPException(status_code=503, detail="Coaching model not configured")
+    focus). If a custom plan_id + week + day_index are given, persist the swap.
+    If `override` (explicit session) is supplied, set it directly (used by Undo)."""
     day = body.get("day") or {}
     mode = str(body.get("mode") or "easier").lower()
     if mode not in _SWAP_MODE:
@@ -1414,28 +1412,37 @@ async def coach_swap_session(body: dict):
     plan_id = body.get("plan_id")
     week = body.get("week")
     day_index = body.get("day_index")
+    override = body.get("override") or None
 
-    cur = (f"Current session: title=\"{day.get('title', 'Ride')}\", zone={day.get('zone', 'Z2')}, "
-           f"duration_min={day.get('duration_min') or day.get('duration') or 60}, tss={day.get('tss') or 0}.")
-    prompt = (
-        f"You are adjusting ONE cycling training session in a rider's plan. {cur}\n"
-        f"{_SWAP_MODE[mode]} "
-        + (f"Rider hint for the new focus: \"{focus_hint}\". " if (mode == 'focus' and focus_hint) else "")
-        + (f"Rider's overall goal: \"{goal}\". " if goal else "")
-        + "Reply with ONLY minified JSON: {\"title\": string (<=4 words), \"zone\": \"Z1\"-\"Z5\", "
-          "\"duration_min\": number, \"tss\": number}. Keep it realistic and coherent with the rider's level."
-    )
-    try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        chat = LlmChat(api_key=key, session_id=f"{coach_name.lower()}-swap",
-                       system_message=coach_system(coach_name, coach_gender)).with_model("anthropic", "claude-sonnet-4-6")
-        reply = (await chat.send_message(UserMessage(text=prompt))) or ""
-        reply = reply.strip().strip("`")
-        s, e = reply.find("{"), reply.rfind("}")
-        data = json.loads(reply[s:e + 1]) if s >= 0 and e > s else {}
-    except Exception as e:
-        logging.exception("swap-session llm failed")
-        raise HTTPException(status_code=502, detail=f"Swap failed: {e}")
+    if override and (override.get("title") or override.get("zone") or override.get("duration_min")):
+        # Explicit set (e.g. Undo restoring the original session) — no LLM.
+        data = {"title": override.get("title"), "zone": override.get("zone"),
+                "duration_min": override.get("duration_min"), "tss": override.get("tss")}
+    else:
+        key = os.environ.get("GEMINI_API_KEY")
+        if not key:
+            raise HTTPException(status_code=503, detail="Coaching model not configured")
+        cur = (f"Current session: title=\"{day.get('title', 'Ride')}\", zone={day.get('zone', 'Z2')}, "
+               f"duration_min={day.get('duration_min') or day.get('duration') or 60}, tss={day.get('tss') or 0}.")
+        prompt = (
+            f"You are adjusting ONE cycling training session in a rider's plan. {cur}\n"
+            f"{_SWAP_MODE[mode]} "
+            + (f"Rider hint for the new focus: \"{focus_hint}\". " if (mode == 'focus' and focus_hint) else "")
+            + (f"Rider's overall goal: \"{goal}\". " if goal else "")
+            + "Reply with ONLY minified JSON: {\"title\": string (<=4 words), \"zone\": \"Z1\"-\"Z5\", "
+              "\"duration_min\": number, \"tss\": number}. Keep it realistic and coherent with the rider's level."
+        )
+        try:
+            from services.gemini_shim import LlmChat, UserMessage
+            chat = LlmChat(api_key=key, session_id=f"{coach_name.lower()}-swap",
+                           system_message=coach_system(coach_name, coach_gender)).with_model("anthropic", "claude-sonnet-4-6")
+            reply = (await chat.send_message(UserMessage(text=prompt))) or ""
+            reply = reply.strip().strip("`")
+            s, e = reply.find("{"), reply.rfind("}")
+            data = json.loads(reply[s:e + 1]) if s >= 0 and e > s else {}
+        except Exception as e:
+            logging.exception("swap-session llm failed")
+            raise HTTPException(status_code=502, detail=f"Swap failed: {e}")
 
     try:
         dur_min = max(15, min(360, int(data.get("duration_min") or 60)))
@@ -1507,3 +1514,17 @@ async def list_plan_templates():
 async def delete_plan_template(tid: str):
     await udb.plan_templates.delete_one({"id": tid})
     return {"ok": True}
+
+
+@router.post("/coach/plan-templates/{tid}/rename")
+async def rename_plan_template(tid: str, body: dict):
+    title = str(body.get("title") or "").strip()[:60]
+    if not title:
+        raise HTTPException(status_code=400, detail="Title required")
+    doc = await udb.plan_templates.find_one({"id": tid})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Template not found")
+    plan = doc.get("plan") or {}
+    plan["title"] = title
+    await udb.plan_templates.update_one({"id": tid}, {"$set": {"title": title, "plan": plan}})
+    return {"ok": True, "id": tid, "title": title}

@@ -19,6 +19,7 @@ import {
 import { unscheduleWorkout } from "@/src/lib/workout-prefs";
 import { HeaderStatus } from "@/src/components/HeaderStatus";
 import { SwapSessionSheet } from "@/src/components/SwapSessionSheet";
+import { swapSession } from "@/src/lib/plan-create";
 
 const LABEL_W = 66;
 
@@ -350,7 +351,15 @@ export default function CalendarScreen() {
           coachName={persona.name}
           coachGender={persona.gender}
           planId={swapPlanId ?? undefined}
-          onSwapped={() => { reload(); showToast("Session updated by " + persona.name); }}
+          onSwapped={(_nd, orig) => {
+            reload();
+            showToast("Session updated by " + persona.name, async () => {
+              const wid: string | undefined = (orig as any)?.workout_id;
+              const pid = wid && wid.startsWith("custom-") ? wid.split("-ride-")[0] : undefined;
+              try { await swapSession({ day: { workout_id: wid }, mode: "easier", coachName: persona.name, planId: pid, override: orig as any }); reload(); showToast("Reverted to the original session"); }
+              catch { showToast("Couldn't undo — please try again"); }
+            });
+          }}
         />
       </SafeAreaView>
     </GestureHandlerRootView>

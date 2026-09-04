@@ -40,6 +40,7 @@ export type SwapMode = "easier" | "harder" | "focus";
 export async function swapSession(args: {
   day: Partial<CreatedDay> & { workout_id?: string }; mode: SwapMode; coachName: string; coachGender?: string;
   goal?: string; focusHint?: string; planId?: string; week?: number; dayIndex?: number;
+  override?: Partial<CreatedDay>;
 }): Promise<CreatedDay & { workout_id?: string }> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 45000);
@@ -50,6 +51,7 @@ export async function swapSession(args: {
       body: JSON.stringify({
         day: args.day, mode: args.mode, coach_name: args.coachName, coach_gender: args.coachGender,
         goal: args.goal, focus_hint: args.focusHint, plan_id: args.planId, week: args.week, day_index: args.dayIndex,
+        override: args.override,
       }),
       signal: ctrl.signal,
     });
@@ -78,6 +80,12 @@ export async function listTemplates(): Promise<PlanTemplate[]> {
 
 export async function deleteTemplate(id: string): Promise<void> {
   await fetch(`${apiBase()}/api/coach/plan-templates/${id}`, { method: "DELETE" });
+}
+
+export async function renameTemplate(id: string, title: string): Promise<void> {
+  await fetch(`${apiBase()}/api/coach/plan-templates/${id}/rename`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title }),
+  });
 }
 
 export async function acceptPlan(plan: CreatedPlan, coachName: string): Promise<{ plan_id: string; title: string }> {

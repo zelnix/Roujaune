@@ -29,16 +29,60 @@ function regionIcon(region: string): any {
   }
 }
 
+/** Per-activity wording so the same destination-led Today surface reads
+ *  naturally for cycling, gravel, mountain biking and running. */
+type Framing = {
+  descriptor: string;
+  feelValue: string;
+  feelBadge: string;
+  primaryCta: string;
+  resumeKicker: string;
+  surprisePrefix: string;
+  journeyStyle: string;
+  fallbackDesc: (tag: string) => string;
+};
+const FRAMING: Record<string, Framing> = {
+  cycling: {
+    descriptor: "Where shall we explore today?",
+    feelValue: "Relaxed Journey", feelBadge: "Relaxed ride",
+    primaryCta: "BEGIN SCENIC JOURNEY", resumeKicker: "CONTINUE YOUR RIDE",
+    surprisePrefix: "Surprise!", journeyStyle: "Discover",
+    fallbackDesc: (t) => `A relaxed ${t.toLowerCase()} journey — ride at your own pace and soak in the scenery.`,
+  },
+  gravel: {
+    descriptor: "Where shall we go off-road today?",
+    feelValue: "Adventure", feelBadge: "Gravel adventure",
+    primaryCta: "START GRAVEL ADVENTURE", resumeKicker: "CONTINUE YOUR ADVENTURE",
+    surprisePrefix: "Adventure awaits!", journeyStyle: "Explore",
+    fallbackDesc: (t) => `A mixed-surface ${t.toLowerCase()} adventure — pick your line and enjoy the ride.`,
+  },
+  "mountain-bike": {
+    descriptor: "Which trail shall we ride today?",
+    feelValue: "Trail", feelBadge: "Trail ride",
+    primaryCta: "START TRAIL RIDE", resumeKicker: "CONTINUE YOUR TRAIL",
+    surprisePrefix: "Send it!", journeyStyle: "Explore",
+    fallbackDesc: (t) => `A ${t.toLowerCase()} trail — flow through the terrain at your own pace.`,
+  },
+  running: {
+    descriptor: "Where shall we run today?",
+    feelValue: "Scenic Run", feelBadge: "Scenic run",
+    primaryCta: "BEGIN SCENIC RUN", resumeKicker: "CONTINUE YOUR RUN",
+    surprisePrefix: "Let's run!", journeyStyle: "Explore",
+    fallbackDesc: (t) => `A scenic ${t.toLowerCase()} — settle into a rhythm and enjoy the views.`,
+  },
+};
+
 /** Calm, destination-led Today content for the Scenic Cycling experience —
  *  driven by the admin-managed scenic-route catalog (POV YouTube rides), fully
  *  separate from the training Virtual Routes. Every card opens the immersive
  *  scenic player; "Continue your journey" reflects the rider's genuine last
  *  scenic ride (hidden until they have one). */
-export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => void }) {
+export function ScenicCyclingTodayView({ onToast, activity = "cycling" }: { onToast?: (t: string) => void; activity?: string }) {
   const router = useRouter();
   const { height } = useWindowDimensions();
   const compact = height < 560;
-  const { routes, loading } = useScenicRoutes();
+  const fr = FRAMING[activity] ?? FRAMING.cycling;
+  const { routes, loading } = useScenicRoutes(activity);
   const last = useScenicLast();
   const resume = useScenicResume();
   const [region, setRegion] = React.useState<string>("All");
@@ -48,9 +92,9 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
   const surprise = React.useCallback(() => {
     if (!routes || routes.length === 0) return;
     const pick = routes[Math.floor(Math.random() * routes.length)];
-    onToast?.(`Surprise! ${pick.name}`);
+    onToast?.(`${fr.surprisePrefix} ${pick.name}`);
     open(pick.id);
-  }, [routes, onToast]);
+  }, [routes, onToast, fr]);
 
   if (loading) {
     return (
@@ -65,10 +109,10 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
   if (!routes || routes.length === 0) {
     return (
       <View style={{ gap: spacing.md }} testID="scenic-cycling-today">
-        <ExperienceHero compact={compact} source={experienceHeroBg} descriptor="Where shall we explore today?" testID="scenic-header" />
+        <ExperienceHero compact={compact} source={experienceHeroBg} descriptor={fr.descriptor} testID="scenic-header" />
         <View style={styles.empty} testID="scenic-empty">
           <View style={styles.emptyIcon}><Ionicons name="earth-outline" size={30} color={colors.yellow} /></View>
-          <Text style={styles.emptyTitle}>New scenic destinations are on the way</Text>
+          <Text style={styles.emptyTitle}>New destinations are on the way</Text>
           <Text style={styles.emptyBody}>
             We’re curating relaxed POV rides through beautiful places. Check back
             soon — your next journey will appear right here.
@@ -101,7 +145,7 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
 
   return (
     <View style={{ gap: spacing.md }} testID="scenic-cycling-today">
-      <ExperienceHero compact={compact} source={heroSource} descriptor="Where shall we explore today?" testID="scenic-header">
+      <ExperienceHero compact={compact} source={heroSource} descriptor={fr.descriptor} testID="scenic-header">
         {/* Overlaid POV showcase + prefs, sitting on the background photo */}
         <ImageBackground source={{ uri: thumbUri(hero) }} style={styles.hero} imageStyle={styles.heroImg} testID="scenic-hero">
           <View style={styles.heroScrim} />
@@ -114,19 +158,19 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
             )}
             <View style={[styles.guidedBadge, resuming && { marginLeft: "auto" as any }]}>
               <Ionicons name={resuming ? "play-circle" : "leaf"} size={11} color={colors.yellow} />
-              <Text style={styles.guidedText}>{resuming ? `RESUME · ${Math.round((resume?.pct ?? 0) * 100)}%` : "Relaxed ride"}</Text>
+              <Text style={styles.guidedText}>{resuming ? `RESUME · ${Math.round((resume?.pct ?? 0) * 100)}%` : fr.feelBadge}</Text>
             </View>
           </View>
           <View style={{ flex: 1 }} />
-          {resuming && <Text style={styles.resumeKicker}>CONTINUE YOUR RIDE</Text>}
+          {resuming && <Text style={styles.resumeKicker}>{fr.resumeKicker}</Text>}
           <Text style={styles.heroTitle}>{hero.name.toUpperCase()}</Text>
           <Text style={styles.heroCountry}>{hero.place}</Text>
           <Text style={styles.heroDesc} numberOfLines={2}>
-            {hero.description || `A relaxed ${hero.tag.toLowerCase()} journey — ride at your own pace and soak in the scenery.`}
+            {hero.description || fr.fallbackDesc(hero.tag)}
           </Text>
           <View style={styles.heroStats}>
             {mins(hero) ? <Stat icon="time-outline" label={`${mins(hero)} minutes`} /> : null}
-            <Stat icon="leaf-outline" label="Relaxed" />
+            <Stat icon="leaf-outline" label={fr.feelValue} />
             {hero.elevation_m ? <Stat icon="trending-up-outline" label={`${hero.elevation_m} m`} /> : null}
             {hero.distance_km ? <Stat icon="navigate-outline" label={`${hero.distance_km} km`} /> : null}
           </View>
@@ -139,7 +183,7 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
             <Pressable testID="begin-scenic-journey" onPress={() => open(hero.id)} accessibilityRole="button" accessibilityLabel={resuming ? `Resume ride: ${hero.name}` : `Begin scenic journey: ${hero.name}`}
               style={({ hovered }: any) => [styles.primaryCta, hovered && styles.primaryCtaHover]}>
               <Ionicons name="play" size={16} color="#fff" />
-              <Text style={styles.primaryCtaText}>{resuming ? "RESUME RIDE" : "BEGIN SCENIC JOURNEY"}</Text>
+              <Text style={styles.primaryCtaText}>{resuming ? "RESUME RIDE" : fr.primaryCta}</Text>
             </Pressable>
             <Pressable testID="surprise-me" onPress={surprise} accessibilityRole="button" accessibilityLabel="Surprise me with a random scenic ride"
               style={({ hovered }: any) => [styles.surpriseCta, hovered && styles.surpriseCtaHover]}>
@@ -152,8 +196,8 @@ export function ScenicCyclingTodayView({ onToast }: { onToast?: (t: string) => v
         {/* Preferences summary + region filters (same line as Ride feel) */}
         <View style={styles.prefs} testID="scenic-prefs">
           <Pref label="Companion" value="Alberto" icon="person-circle-outline" />
-          <Pref label="Journey style" value="Discover" icon="compass-outline" />
-          <Pref label="Ride feel" value="Relaxed Journey" icon="leaf-outline" />
+          <Pref label="Journey style" value={fr.journeyStyle} icon="compass-outline" />
+          <Pref label="Ride feel" value={fr.feelValue} icon="leaf-outline" />
           {regions.length > 1 && (
             <View style={styles.prefFilters} testID="scenic-region-filter">
               {["All", ...regions].map((r) => {

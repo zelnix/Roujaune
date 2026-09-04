@@ -14,7 +14,7 @@ export function SwapSessionSheet({
   day: (Partial<CreatedDay> & { workout_id?: string }) | null;
   coachName: string; coachGender?: string; goal?: string;
   planId?: string; week?: number; dayIndex?: number;
-  onSwapped: (newDay: CreatedDay & { workout_id?: string }) => void;
+  onSwapped: (newDay: CreatedDay & { workout_id?: string }, originalDay: (Partial<CreatedDay> & { workout_id?: string })) => void;
 }) {
   const [busy, setBusy] = React.useState<SwapMode | null>(null);
   const [err, setErr] = React.useState<string | null>(null);
@@ -26,7 +26,7 @@ export function SwapSessionSheet({
     setBusy(mode); setErr(null);
     try {
       const nd = await swapSession({ day, mode, coachName, coachGender, goal, planId, week, dayIndex });
-      onSwapped(nd);
+      onSwapped(nd, day);
       onClose();
     } catch {
       setErr("Couldn't swap that session. Please try again.");

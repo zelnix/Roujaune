@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, Modal, Pressable, ScrollView, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing } from "@/src/theme";
-import { generatePlan, acceptPlan, saveTemplate, listTemplates, deleteTemplate, CreatedPlan, CreatedDay, PlanTemplate } from "@/src/lib/plan-create";
+import { generatePlan, acceptPlan, saveTemplate, listTemplates, deleteTemplate, renameTemplate, CreatedPlan, CreatedDay, PlanTemplate } from "@/src/lib/plan-create";
 import { SwapSessionSheet } from "@/src/components/SwapSessionSheet";
 import type { CoachPersona } from "@/src/lib/coach-persona";
 
@@ -58,6 +58,8 @@ export function CoachPlanCreatorModal({
   const [tplSaved, setTplSaved] = React.useState(false);
   const [showTpls, setShowTpls] = React.useState(false);
   const [tpls, setTpls] = React.useState<PlanTemplate[] | null>(null);
+  const [lastSwap, setLastSwap] = React.useState<{ wi: number; di: number; prev: CreatedDay } | null>(null);
+  const [editTpl, setEditTpl] = React.useState<{ id: string; title: string } | null>(null);
 
   React.useEffect(() => {
     if (visible) { setStep("form"); setPlan(null); setErr(null); setSwap(null); setTplSaved(false); setShowTpls(false); setEventOn(false); }
@@ -104,14 +106,30 @@ export function CoachPlanCreatorModal({
       const weeksCopy = p.weeks.map((w, i) => i !== swap.wi ? w : { ...w, days: w.days.map((d, j) => j === swap.di ? { ...d, ...nd } : d) });
       return { ...p, weeks: weeksCopy };
     });
+    if (swap) setLastSwap({ wi: swap.wi, di: swap.di, prev: swap.day });
+  };
+  const undoPreviewSwap = () => {
+    setPlan((p) => {
+      if (!p || !lastSwap) return p;
+      const weeksCopy = p.weeks.map((w, i) => i !== lastSwap.wi ? w : { ...w, days: w.days.map((d, j) => j === lastSwap.di ? lastSwap.prev : d) });
+      return { ...p, weeks: weeksCopy };
+    });
+    setLastSwap(null);
   };
 
   const openTemplates = async () => {
     setShowTpls(true); setTpls(null);
     try { setTpls(await listTemplates()); } catch { setTpls([]); }
   };
-  const useTemplate = (t: PlanTemplate) => { setPlan(t.plan); setShowTpls(false); setTplSaved(true); setStep("preview"); };
+  const useTemplate = (t: PlanTemplate) => { setPlan(t.plan); setShowTpls(false); setTplSaved(true); setLastSwap(null); setStep("preview"); };
   const removeTemplate = async (id: string) => { await deleteTemplate(id); setTpls((ts) => (ts || []).filter((t) => t.id !== id)); };
+  const commitRename = async () => {
+    if (!editTpl) return;
+    const { id, title } = editTpl;
+    setEditTpl(null);
+    if (!title.trim()) return;
+    try { await renameTemplate(id, title.trim()); setTpls((ts) => (ts || []).map((t) => t.id === id ? { ...t, title: title.trim() } : t)); } catch { /* ignore */ }
+  };
   const doSaveTemplate = async () => {
     if (!plan) return;
     try { await saveTemplate(plan); setTplSaved(true); } catch { /* ignore */ }
@@ -139,17 +157,34 @@ export function CoachPlanCreatorModal({
                   : tpls.length === 0 ? <Text style={s.hint}>No saved templates yet. Save one from a generated plan.</Text>
                   : tpls.map((t) => (
                     <View key={t.id} style={s.tplRow}>
-                      <Pressable style={{ flex: 1 }} testID={`tpl-${t.id}`} onPress={() => useTemplate(t)}>
-                        <Text style={s.tplTitle} numberOfLines={1}>{t.title}</Text>
-                        <Text style={s.tplMeta}>{t.weeks_count} weeks · {t.days_per_week} days/week</Text>
-                        <View style={s.tplDots}>
-                          {(t.plan?.weeks?.[0]?.days ?? []).slice(0, 7).map((d, di) => (
-                            <View key={di} style={[s.tplDot, { backgroundColor: (KIND_META[d.kind] || KIND_META.rest).color }]} />
-                          ))}
-                          <Text style={s.tplGlance}>week 1</Text>
-                        </View>
-                      </Pressable>
-                      <Pressable onPress={() => removeTemplate(t.id)} hitSlop={8} testID={`tpl-del-${t.id}`}><Ionicons name="trash-outline" size={17} color={colors.textDim} /></Pressable>
+                      {editTpl?.id === t.id ? (
+                        <>
+                          <TextInput
+                            testID={`tpl-rename-input-${t.id}`}
+                            style={s.tplInput}
+                            value={editTpl.title}
+                            onChangeText={(v) => setEditTpl({ id: t.id, title: v })}
+                            autoFocus
+                            onSubmitEditing={commitRename}
+                          />
+                          <Pressable onPress={commitRename} hitSlop={8} testID={`tpl-rename-save-${t.id}`}><Ionicons name="checkmark" size={19} color={colors.green} /></Pressable>
+                        </>
+                      ) : (
+                        <>
+                          <Pressable style={{ flex: 1 }} testID={`tpl-${t.id}`} onPress={() => useTemplate(t)}>
+                            <Text style={s.tplTitle} numberOfLines={1}>{t.title}</Text>
+                            <Text style={s.tplMeta}>{t.weeks_count} weeks · {t.days_per_week} days/week</Text>
+                            <View style={s.tplDots}>
+                              {(t.plan?.weeks?.[0]?.days ?? []).slice(0, 7).map((d, di) => (
+                                <View key={di} style={[s.tplDot, { backgroundColor: (KIND_META[d.kind] || KIND_META.rest).color }]} />
+                              ))}
+                              <Text style={s.tplGlance}>week 1</Text>
+                            </View>
+                          </Pressable>
+                          <Pressable onPress={() => setEditTpl({ id: t.id, title: t.title })} hitSlop={8} testID={`tpl-edit-${t.id}`}><Ionicons name="pencil" size={16} color={colors.textDim} /></Pressable>
+                          <Pressable onPress={() => removeTemplate(t.id)} hitSlop={8} testID={`tpl-del-${t.id}`}><Ionicons name="trash-outline" size={17} color={colors.textDim} /></Pressable>
+                        </>
+                      )}
                     </View>
                   ))}
               </ScrollView>
@@ -196,9 +231,15 @@ export function CoachPlanCreatorModal({
                     {eventTooClose ? (
                       <View style={s.warnRow} testID="event-too-close">
                         <Ionicons name="alert-circle-outline" size={15} color="#E0A93A" />
-                        <Text style={s.warnText}>
-                          Your event is about {weeksAvailable} {weeksAvailable === 1 ? "week" : "weeks"} away — shorter than a {weeks}-week plan. {persona.name} will start right away and fit what's possible; for a full taper try a {weeksAvailable}-week plan or a later date.
-                        </Text>
+                        <View style={{ flex: 1, gap: 8 }}>
+                          <Text style={s.warnText}>
+                            Your event is about {weeksAvailable} {weeksAvailable === 1 ? "week" : "weeks"} away — shorter than a {weeks}-week plan. {persona.name} will start right away and fit what's possible; for a full taper try a {weeksAvailable}-week plan or a later date.
+                          </Text>
+                          <Pressable testID="auto-shorten" onPress={() => setWeeks(Math.max(2, weeksAvailable))} style={s.shortenBtn}>
+                            <Ionicons name="cut-outline" size={14} color="#050506" />
+                            <Text style={s.shortenText}>Shorten to {Math.max(2, weeksAvailable)} weeks</Text>
+                          </Pressable>
+                        </View>
                       </View>
                     ) : null}
                   </View>
@@ -225,6 +266,12 @@ export function CoachPlanCreatorModal({
                   </View>
                   {plan.description ? <Text style={s.planDesc}>{plan.description}</Text> : null}
                   <Text style={s.metaLine}>{plan.weeks_count} weeks · {plan.days_per_week} days/week · tap a ride to swap it</Text>
+                  {lastSwap ? (
+                    <Pressable testID="preview-undo-swap" onPress={undoPreviewSwap} style={s.undoBanner}>
+                      <Ionicons name="arrow-undo" size={14} color={colors.yellow} />
+                      <Text style={s.undoText}>Swapped Week {lastSwap.wi + 1} {lastSwap.prev.day_name} — tap to undo</Text>
+                    </Pressable>
+                  ) : null}
                   {plan.goals?.length ? (
                     <View style={s.goalsWrap}>
                       {plan.goals.map((g, i) => (
@@ -295,6 +342,11 @@ const s = StyleSheet.create({
   dateText: { color: colors.white, fontSize: 13, fontWeight: "800", flex: 1, textAlign: "center" },
   warnRow: { flexDirection: "row", gap: 7, marginTop: 10, backgroundColor: "rgba(224,169,58,0.1)", borderWidth: 1, borderColor: "rgba(224,169,58,0.4)", borderRadius: radius.sm, padding: 9 },
   warnText: { color: "#E9C77A", fontSize: 11.5, lineHeight: 16, flex: 1, fontWeight: "600" },
+  shortenBtn: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", gap: 6, backgroundColor: "#E0A93A", borderRadius: radius.pill, paddingVertical: 7, paddingHorizontal: 12 },
+  shortenText: { color: "#050506", fontSize: 12, fontWeight: "800" },
+  undoBanner: { flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: "rgba(245,179,1,0.12)", borderWidth: 1, borderColor: "rgba(245,179,1,0.4)", borderRadius: radius.sm, paddingVertical: 8, paddingHorizontal: 10 },
+  undoText: { color: colors.yellow, fontSize: 12, fontWeight: "800" },
+  tplInput: { flex: 1, color: colors.white, fontSize: 14.5, fontWeight: "800", backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: colors.yellow, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 8 },
   primary: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.yellow, borderRadius: radius.md, paddingVertical: 13, marginTop: 8 },
   primaryText: { color: "#050506", fontSize: 15, fontWeight: "800" },
   hint: { color: colors.textFaint, fontSize: 11.5, textAlign: "center", marginTop: 6 },

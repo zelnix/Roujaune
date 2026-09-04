@@ -161,7 +161,13 @@ export default function Dashboard() {
             </View>
             </>
             ) : experience === "scenic-cycling" ? (
-              <ScenicCyclingTodayView onToast={showToast} />
+              <ScenicCyclingTodayView onToast={showToast} activity="cycling" />
+            ) : experience === "gravel" ? (
+              <ScenicCyclingTodayView onToast={showToast} activity="gravel" />
+            ) : experience === "mountain-bike" ? (
+              <ScenicCyclingTodayView onToast={showToast} activity="mountain-bike" />
+            ) : experience === "running" ? (
+              <ScenicCyclingTodayView onToast={showToast} activity="running" />
             ) : (
               <FutureActivityTodayView mode={experience} />
             )}
