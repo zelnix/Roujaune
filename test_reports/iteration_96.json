@@ -1,0 +1,25 @@
+{
+  "summary": "Iter 96 — Coach-created custom training plans. Backend + frontend end-to-end verified. Backend pytest (4/4 passed): POST /api/coach/create-plan returns a normalised preview (title/description/goals/weeks_count/days_per_week/weeks[7]) with cycling days carrying zone/duration/tss + strength/mobility + rest days. POST /api/coach/create-plan/accept returns {ok, plan_id:'custom-...', title}, /api/plan then reflects the custom plan (id=custom-..., current_week=1, workouts[] populated) and /api/calendar/week returns week-1 dates starting next Monday with cycling(workout_id=<plan_id>-ride-...) + fb50 + rest days. Frontend (1280x860, demo@roujaune.app): from /plan the header 'Create plan' (testID create-plan-btn) opens the creator modal (testID plan-creator); goal + weeks-4 + days-3 + Generate produced a preview (testID plan-preview) in ~10-30s; Accept (testID plan-accept) closed the modal and the Training Plan screen refreshed to show the new plan title/description/4 Weeks/3 Days/Week + fresh goals. From coach chat (testID message-coach → chat-create-plan) the same creator modal opens. Demo account was restored to build-and-climb via POST /api/rider/plan after testing.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/plan Training Plan header", "issues": ["When a custom plan becomes active the header hero still shows 'Build & Climb' assets/imagery for a moment before it re-renders to the new plan (cosmetic, no functional impact)."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iter96_coach_create_plan.py", "/app/test_reports/pytest/iter96.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/coach.py:1275 — _build_custom_definition sets `next_mon = today + timedelta(days=(7 - today.weekday()) % 7 or 7)` then overrides with `if today.weekday() == 0: next_mon = today`. The `or 7` branch on Monday is unreachable but confusing; consider simplifying to a single expression.",
+    "routes/coach.py:1214-1266 — coach_create_plan is a long function; the LLM prompt construction + JSON parsing could be extracted into a helper for reuse and unit-testability."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None. Demo rider's active plan was temporarily switched to a custom-<id> plan while accepting, then restored to build-and-climb.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend test file: /app/backend/tests/test_iter96_coach_create_plan.py. Uses demo@roujaune.app / demo9900 and hits the public EXPO_PUBLIC_BACKEND_URL. It cleans up by resetting demo to build-and-climb in a module-scoped fixture teardown + explicit test_restore_demo_plan. Plan generation is LLM-backed (Anthropic via Emergent LLM key) and takes 10-30s for 4 weeks; use 60-90s timeouts. Frontend flow relies on testIDs: create-plan-btn, plan-creator, plan-creator-close, plan-goal-input, weeks-{4,6,8,12}, days-{3,4,5}, plan-generate, plan-preview, plan-accept, plan-regenerate, message-coach, chat-create-plan.",
+  "rca_of_issue": "N/A — feature works end-to-end."
+}

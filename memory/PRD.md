@@ -1084,3 +1084,10 @@ User wanted an in-app rating + feedback capture (fb50-style) opened from Setting
 
 ## Coach portrait clarity fix (2026-08 fork)
 - AlbertoCoachCard (home hero coach card, used in HeroRoute) portrait had a 14% white "lighten" wash + a full-width dark left→right gradient making it look milky/opaque. Removed the white wash entirely and softened the dark gradient to only the far-right ~38% (locations [0,0.62,1], 0.72 alpha) so the face stays crisp while still blending into the card body. Verified via screenshot: portrait now clear.
+
+## Coach-created custom training plans (2026-09 fork)
+- Feature: the AI coach designs a brand-new multi-week plan from the rider's goal + weeks + days/week (also uses their level/data), rider previews then Accepts → becomes active plan + fills the Calendar. Each week = cycling + strength/mobility (FB50) + rest days. Uses existing Claude (Emergent key).
+- Backend (routes/coach.py): POST /api/coach/create-plan (LLM → normalized preview, NOT persisted) and POST /api/coach/create-plan/accept (persists `custom-<id>` structured definition with dated weeks from next Monday, sets active, week=1, seeds first adaptation note). Helpers _normalize_created_plan + _build_custom_definition.
+- Engine: `custom-` plans now render through the same structured path as couch-to-road — routes/plan.py get_plan + /calendar/week handle `active.startswith("custom-")`; plan_engine._struct_ctx_for_rider prefix fallback `f"{plan_id}-ride-"`.
+- Frontend: src/lib/plan-create.ts (generatePlan/acceptPlan); src/components/CoachPlanCreatorModal.tsx (goal input, weeks 4/6/8/12, days 3/4/5, Generate → preview weeks/days → Accept). Entry points (BOTH): Training Plan header "Create plan" (testID create-plan-btn) + no-plan "Ask coach to build one"; coach chat "Build me a training plan" (testID chat-create-plan). CoachChatModal gained optional onCreatePlan prop.
+- Verified: testing_agent iter96 — backend 4/4 pytest + frontend E2E both entry points PASS. Demo account restored to build-and-climb.

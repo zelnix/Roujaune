@@ -1129,3 +1129,228 @@ async def coach_adaptation_detail(req: AdaptationRequest):
 
 # /plan/adaptations, /plan/goals, /plan/progress moved to routes/plan.py
 
+
+
+# ===================== Coach-created custom training plans =====================
+# The coach (LLM) designs a brand-new multi-week plan from the rider's goal,
+# weeks and days/week (grounded in their real level/data). The rider reviews a
+# preview, then Accepts to make it their active plan — which automatically
+# populates the Training Plan screen and the Calendar via the structured engine.
+
+_DAY_NAMES = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
+_SUPP_META = {
+    "strength": {"duration": "20 min"}, "mobility": {"duration": "15 min"},
+    "recovery": {"duration": "10 min"}, "balance": {"duration": "15 min"},
+}
+
+
+def _norm_kind(k: str) -> str:
+    k = (k or "").strip().lower()
+    if k in ("cycling", "ride", "bike"):
+        return "cycling"
+    if k in ("strength", "fb50", "gym"):
+        return "strength"
+    if k in ("mobility", "stretch", "yoga"):
+        return "mobility"
+    if k in ("recovery", "wellness"):
+        return "recovery"
+    if k in ("balance",):
+        return "balance"
+    return "rest"
+
+
+def _normalize_created_plan(raw: dict, weeks: int, days_per_week: int) -> dict:
+    """Coerce the LLM's plan JSON into a safe, complete preview structure:
+    exactly `weeks` weeks × 7 named days, with cycling/strength/rest kinds."""
+    title = str(raw.get("title") or "Your Custom Plan").strip()[:60]
+    description = str(raw.get("description") or "").strip()[:400]
+    goals = []
+    for g in (raw.get("goals") or [])[:4]:
+        if isinstance(g, dict) and g.get("title"):
+            goals.append({"id": uuid.uuid4().hex[:8], "title": str(g["title"]).strip()[:60],
+                          "description": str(g.get("description", "")).strip()[:120], "status": "incomplete"})
+    out_weeks = []
+    raw_weeks = raw.get("weeks") or []
+    for wi in range(weeks):
+        rw = raw_weeks[wi] if wi < len(raw_weeks) and isinstance(raw_weeks[wi], dict) else {}
+        focus = str(rw.get("focus") or f"Week {wi + 1}").strip()[:80]
+        rdays = rw.get("days") or []
+        days = []
+        for di in range(7):
+            rd = rdays[di] if di < len(rdays) and isinstance(rdays[di], dict) else {}
+            kind = _norm_kind(rd.get("kind"))
+            dur_min = rd.get("duration_min")
+            try:
+                dur_min = int(dur_min)
+            except Exception:
+                dur_min = 0
+            day = {"day_name": _DAY_NAMES[di], "kind": kind,
+                   "title": str(rd.get("title") or "").strip()[:50]}
+            if kind == "cycling":
+                if dur_min <= 0:
+                    dur_min = 60
+                tss = rd.get("tss")
+                try:
+                    tss = int(tss)
+                except Exception:
+                    tss = round(dur_min * 1.0)
+                day["title"] = day["title"] or "Ride"
+                day["zone"] = str(rd.get("zone") or "Z2").strip()[:4]
+                day["duration"] = _fmt_dur(dur_min)
+                day["duration_min"] = dur_min
+                day["tss"] = max(0, tss)
+            elif kind == "rest":
+                day["title"] = day["title"] or "Rest Day"
+            else:
+                day["title"] = day["title"] or {"strength": "Strength", "mobility": "Mobility Flow",
+                                                 "recovery": "Recovery Session", "balance": "Balance Work"}[kind]
+                day["duration"] = _SUPP_META.get(kind, {}).get("duration", "15 min")
+            days.append(day)
+        out_weeks.append({"focus": focus, "days": days})
+    return {"title": title, "description": description, "goals": goals,
+            "weeks_count": weeks, "days_per_week": days_per_week, "weeks": out_weeks}
+
+
+@router.post("/coach/create-plan")
+async def coach_create_plan(body: dict):
+    """Ask the coach (LLM) to design a brand-new custom training plan. Returns a
+    PREVIEW only — nothing is persisted until the rider accepts."""
+    key = os.environ.get("EMERGENT_LLM_KEY")
+    if not key:
+        raise HTTPException(status_code=503, detail="Coaching model not configured")
+    coach_name = str(body.get("coach_name") or "Alberto")
+    coach_gender = str(body.get("coach_gender") or "male")
+    goal = str(body.get("goal") or "get fitter and ride stronger").strip()[:200]
+    try:
+        weeks = max(2, min(16, int(body.get("weeks") or 8)))
+    except Exception:
+        weeks = 8
+    try:
+        days_per_week = max(2, min(6, int(body.get("days_per_week") or 4)))
+    except Exception:
+        days_per_week = 4
+
+    rider = await _rider_line()
+    prompt = (
+        f"{rider}\n"
+        f"Design a personalised {weeks}-week cycling training plan for this rider. "
+        f"Their goal: \"{goal}\". They can train about {days_per_week} days per week.\n"
+        "Each week has exactly 7 days (Mon-Sun). Include per week: "
+        f"{days_per_week} CYCLING days (progressive, varied — endurance/tempo/threshold/vo2/recovery as appropriate), "
+        "1-2 STRENGTH or MOBILITY days (short home sessions), and REST days for the remainder. "
+        "Progress the load sensibly week to week and include a lighter/recovery week roughly every 4th week.\n"
+        "Reply with ONLY valid minified JSON (no markdown, no code fences) of the shape: "
+        '{"title": string, "description": string, "goals": [{"title": string, "description": string}], '
+        '"weeks": [{"focus": string, "days": [{"day": "Mon", "kind": "cycling|strength|mobility|recovery|rest", '
+        '"title": string, "zone": "Z2", "duration_min": number, "tss": number}]}]}. '
+        "For non-cycling days omit zone/tss. Keep titles short (<= 4 words). "
+        f"'title' names the plan for the goal. 'description' is 1-2 sentences. Give exactly {weeks} weeks."
+    )
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(api_key=key, session_id=f"{coach_name.lower()}-create-plan",
+                       system_message=coach_system(coach_name, coach_gender)).with_model("anthropic", "claude-sonnet-4-6")
+        reply = await chat.send_message(UserMessage(text=prompt))
+        rawtxt = (reply or "").strip()
+        if rawtxt.startswith("```"):
+            rawtxt = rawtxt.strip("`")
+        s, e = rawtxt.find("{"), rawtxt.rfind("}")
+        data = json.loads(rawtxt[s:e + 1]) if s >= 0 and e > s else {}
+        plan = _normalize_created_plan(data, weeks, days_per_week)
+        plan["created_by"] = coach_name
+        return {"plan": plan}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.exception("coach_create_plan failed")
+        raise HTTPException(status_code=502, detail=f"Plan generation failed: {e}")
+
+
+def _build_custom_definition(plan: dict, plan_id: str, coach_name: str) -> dict:
+    """Convert an accepted preview plan into the structured `definition` the plan
+    engine renders (weeks[].days[] with dated weeks starting next Monday)."""
+    weeks_in = plan.get("weeks") or []
+    n_weeks = len(weeks_in)
+    today = date.today()
+    dow = today.weekday()
+    next_mon = today if dow == 0 else today + timedelta(days=7 - dow)
+    def_weeks = []
+    for wi, wk in enumerate(weeks_in):
+        wnum = wi + 1
+        wk_start = next_mon + timedelta(days=7 * wi)
+        phase_num = (wi // 4) + 1
+        days = []
+        for di, d in enumerate(wk.get("days", [])):
+            kind = d.get("kind", "rest")
+            day = {"day_name": _DAY_NAMES[di % 7], "kind": kind, "title": d.get("title", "")}
+            if kind == "cycling":
+                day["workout_id"] = f"{plan_id}-ride-w{wnum}-d{di}"
+                day["zone"] = d.get("zone", "Z2")
+                day["duration"] = d.get("duration", "1h 00m")
+                day["tss"] = int(d.get("tss") or 0)
+            elif kind != "rest":
+                day["duration"] = d.get("duration", "15 min")
+            days.append(day)
+        def_weeks.append({
+            "number": wnum, "title": wk.get("focus", f"Week {wnum}"),
+            "objective": wk.get("focus", ""), "start_date": wk_start.isoformat(),
+            "phase": phase_num, "phase_name": f"Block {phase_num}",
+            "phase_weeks": f"Weeks {(phase_num - 1) * 4 + 1}\u2013{min(n_weeks, phase_num * 4)}",
+            "days": days,
+        })
+    phases = []
+    for pn in range(1, (n_weeks - 1) // 4 + 2):
+        a = (pn - 1) * 4 + 1
+        b = min(n_weeks, pn * 4)
+        phases.append({"number": pn, "name": f"Block {pn}", "objective": "",
+                       "weeks_label": f"Weeks {a}\u2013{b}"})
+    return {
+        "id": plan_id, "title": plan.get("title", "Custom Plan"),
+        "description": plan.get("description", ""),
+        "duration_weeks": n_weeks, "average_days_per_week": plan.get("days_per_week", 4),
+        "duration_label": f"{n_weeks} Weeks",
+        "average_label": f"{plan.get('days_per_week', 4)} Days/Week",
+        "level": "Custom", "created_by": coach_name,
+        "goals": plan.get("goals", []), "phases": phases, "weeks": def_weeks,
+        "custom": True,
+    }
+
+
+@router.post("/coach/create-plan/accept")
+async def coach_accept_plan(body: dict):
+    """Persist an accepted coach-created plan as the rider's active plan. This
+    makes it show on the Training Plan screen and fills the Calendar (structured)."""
+    plan = body.get("plan") or {}
+    if not plan.get("weeks"):
+        raise HTTPException(status_code=400, detail="No plan to accept")
+    coach_name = str(body.get("coach_name") or plan.get("created_by") or "Alberto")
+    plan_id = f"custom-{uuid.uuid4().hex[:10]}"
+    definition = _build_custom_definition(plan, plan_id, coach_name)
+
+    # Store the rider's own plan definition + set it active, reset progress.
+    await udb.training_plans.update_one(
+        {"id": plan_id},
+        {"$set": {"id": plan_id, "definition": definition, "goals": definition["goals"],
+                  "created_by": coach_name, "custom": True, "snapshot_at": now_iso()}},
+        upsert=True,
+    )
+    await udb.plan_state.update_one(
+        {"id": plan_id}, {"$set": {"current_week": 1, "updated_at": now_iso()}}, upsert=True)
+    await udb.rider_profile.update_one(
+        {"id": "me"}, {"$set": {"id": "me", "assigned_plan_id": plan_id}}, upsert=True)
+    try:
+        await auth._db.users.update_one(
+            {"user_id": auth.current_user_id()},
+            {"$set": {"onboarded": True, "assigned_plan_id": plan_id}})
+    except Exception:
+        logging.warning("accept plan: user assignment update failed")
+
+    # Seed the coach's first adaptation note for the new plan.
+    try:
+        await _record_adaptation(
+            plan_id, coach_name,
+            f"I've built your {definition['duration_weeks']}-week plan around your goal. "
+            "We'll adapt it as you ride — let's get started.", "Plan created")
+    except Exception:
+        pass
+    return {"ok": True, "plan_id": plan_id, "title": definition["title"]}

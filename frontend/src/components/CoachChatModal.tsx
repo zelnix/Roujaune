@@ -18,7 +18,7 @@ function TypingDots() {
   );
 }
 
-export function CoachChatModal({ visible, onClose, persona, onPlanUpdated, seedMessage }: { visible: boolean; onClose: () => void; persona: CoachPersona; onPlanUpdated?: () => void; seedMessage?: string }) {
+export function CoachChatModal({ visible, onClose, persona, onPlanUpdated, seedMessage, onCreatePlan }: { visible: boolean; onClose: () => void; persona: CoachPersona; onPlanUpdated?: () => void; seedMessage?: string; onCreatePlan?: () => void }) {
   const style = useCoachStyle();
   const { speak, stop, speakingId } = useCoachSpeech(persona.id);
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
@@ -104,6 +104,13 @@ export function CoachChatModal({ visible, onClose, persona, onPlanUpdated, seedM
                 <Ionicons name="close" size={20} color={C.white} />
               </Pressable>
             </View>
+
+            {onCreatePlan ? (
+              <Pressable testID="chat-create-plan" onPress={onCreatePlan} style={s.createPlanBtn} accessibilityRole="button" accessibilityLabel="Build a new training plan">
+                <Ionicons name="sparkles" size={15} color="#050506" />
+                <Text style={s.createPlanText}>Build me a training plan</Text>
+              </Pressable>
+            ) : null}
 
             {planNotice ? (
               <View style={s.planNotice} testID="chat-plan-notice">
@@ -216,6 +223,8 @@ const s = StyleSheet.create({
   headBtn: { width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   headBtnHover: { backgroundColor: "rgba(255,255,255,0.08)" },
   planNotice: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: "rgba(85,200,80,0.1)", borderBottomWidth: 1, borderBottomColor: C.borderSoft },
+  createPlanBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, margin: 12, paddingVertical: 11, borderRadius: 12, backgroundColor: C.yellow },
+  createPlanText: { color: "#050506", fontSize: 14, fontWeight: "800" },
   planNoticeText: { flex: 1, color: C.green, fontSize: 12.5, fontWeight: "700" },
 
   list: { flex: 1 },

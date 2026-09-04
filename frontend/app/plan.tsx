@@ -26,6 +26,7 @@ import { ShareCardModal } from "@/src/components/ShareCardModal";
 import type { AchievementCardData } from "@/src/components/AchievementCard";
 import { usePhaseCelebration, usePlanCompletion } from "@/src/lib/phase-complete";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
+import { CoachPlanCreatorModal } from "@/src/components/CoachPlanCreatorModal";
 import type { EditableGoal } from "@/src/lib/plan";
 
 function Toast({ message }: { message: { id: number; text: string } | null }) {
@@ -93,6 +94,7 @@ export default function TrainingPlanScreen() {
   const [phaseDetail, setPhaseDetail] = React.useState<string | null>(null);
   const [workoutDetail, setWorkoutDetail] = React.useState<KeyWorkout | null>(null);
   const [showChat, setShowChat] = React.useState(false);
+  const [showCreator, setShowCreator] = React.useState(false);
   const [chatSeed, setChatSeed] = React.useState<string | undefined>(undefined);
   const [goalsOverride, setGoalsOverride] = React.useState<EditableGoal[] | null>(null);
 
@@ -177,8 +179,8 @@ export default function TrainingPlanScreen() {
           <Ionicons name="list" size={16} color="#fff" />
           <Text style={styles.npBtnText}>Choose a plan</Text>
         </Pressable>
-        <Pressable testID="np-coach" onPress={() => { setChatSeed("Can you build me a training plan around my goals?"); setShowChat(true); }} style={[styles.npBtn, styles.npBtnGhost]}>
-          <Ionicons name="chatbubble-ellipses" size={16} color={C.yellow} />
+        <Pressable testID="np-coach" onPress={() => setShowCreator(true)} style={[styles.npBtn, styles.npBtnGhost]}>
+          <Ionicons name="sparkles" size={16} color={C.yellow} />
           <Text style={styles.npBtnText}>Ask {persona.name} to build one</Text>
         </Pressable>
       </View>
@@ -193,6 +195,16 @@ export default function TrainingPlanScreen() {
           <PlanTabs active={tab} onChange={setTab} />
         </View>
         <View style={styles.headerRight}>
+          <Pressable
+            testID="create-plan-btn"
+            onPress={() => setShowCreator(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`Build a training plan with ${persona.name}`}
+            style={({ hovered }: any) => [styles.messageBtn, hovered && styles.messageBtnHover]}
+          >
+            <Ionicons name="sparkles" size={15} color={C.yellow} />
+            <Text style={styles.messageBtnText}>Create plan</Text>
+          </Pressable>
           <Pressable
             testID="message-coach"
             onPress={() => setShowChat(true)}
@@ -250,7 +262,8 @@ export default function TrainingPlanScreen() {
           workout={workoutDetail}
           onOpen={(w) => { setWorkoutDetail(null); router.push({ pathname: "/training", params: { workoutId: w.id, title: w.title } } as any); }}
         />
-        <CoachChatModal visible={showChat} onClose={() => { setShowChat(false); setChatSeed(undefined); }} persona={persona} onPlanUpdated={refreshPlan} seedMessage={chatSeed} />
+        <CoachChatModal visible={showChat} onClose={() => { setShowChat(false); setChatSeed(undefined); }} persona={persona} onPlanUpdated={refreshPlan} seedMessage={chatSeed} onCreatePlan={() => { setShowChat(false); setShowCreator(true); }} />
+        <CoachPlanCreatorModal visible={showCreator} onClose={() => setShowCreator(false)} persona={persona} onAccepted={(title) => { showToast(`New plan ready: ${title}`); refreshPlan(); }} />
         <PhaseCelebrationModal
           visible={!!celebration && !completion}
           celebration={celebration}

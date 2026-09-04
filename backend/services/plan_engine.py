@@ -295,7 +295,7 @@ async def _struct_ctx_for_rider(plan_id: str):
     """Rider-scoped equivalent of _struct_ctx that reads the rider's snapshot
     definition. Falls back to the global default if no snapshot can be built."""
     d = await _rider_plan_def(plan_id)
-    prefix = _RIDE_PREFIX.get(plan_id, "ctr-ride-")
+    prefix = _RIDE_PREFIX.get(plan_id) or f"{plan_id}-ride-"
     if not d or not d.get("weeks"):
         return _struct_ctx(plan_id)
     weeks_map, planned = _weeks_and_tss(d)

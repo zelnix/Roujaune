@@ -144,7 +144,7 @@ async def get_plan(id: str = ""):
                     "workouts": [], "goals": [], "progress_pct": 0}
         if not active:
             return dict(NO_PLAN)
-        if active in STRUCTURED_PLAN_IDS:
+        if active in STRUCTURED_PLAN_IDS or active.startswith("custom-"):
             spid = active
             pdoc, weeks_map, planned, prefix = await _struct_ctx_for_rider(spid)
             cur, ride_map, supp = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id=spid, ride_prefix=prefix)
@@ -369,6 +369,10 @@ async def get_calendar_week(start: str = "2025-05-12"):
         elif active == "ride-beyond":
             pdoc, weeks_map, planned, prefix = _struct_ctx("ride-beyond")
             cur, ride_map, supp_dates = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id="ride-beyond", ride_prefix=prefix)
+            doc = _ctr_calendar_week(weeks_map[cur], ride_map, supp_dates, _ctr_today())
+        elif active.startswith("custom-"):
+            pdoc, weeks_map, planned, prefix = await _struct_ctx_for_rider(active)
+            cur, ride_map, supp_dates = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id=active, ride_prefix=prefix)
             doc = _ctr_calendar_week(weeks_map[cur], ride_map, supp_dates, _ctr_today())
         elif active == "build-and-climb":
             # The dedicated demo account keeps the illustrative demo week.
