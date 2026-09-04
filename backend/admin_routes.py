@@ -303,6 +303,103 @@ async def me():
     }
 
 
+
+# --------------------------------------------------------------------------- #
+#  Manifest — self-describing admin API surface for the HWG Console.          #
+#  The console auto-builds its API Checklist from this and live-probes the    #
+#  safe GET endpoints (skipping path-templated ones like /riders/{id}).       #
+# --------------------------------------------------------------------------- #
+_MANIFEST_ENDPOINTS = [
+    # system
+    {"category": "system", "method": "GET", "path": "/api/admin/me", "description": "Handshake / health check", "auth": "admin_key"},
+    {"category": "system", "method": "GET", "path": "/api/admin/manifest", "description": "This admin API manifest", "auth": "admin_key"},
+    {"category": "system", "method": "GET", "path": "/api/admin/health", "description": "Service health + uptime", "auth": "admin_key"},
+    {"category": "system", "method": "GET", "path": "/api/admin/metrics", "description": "Runtime metrics", "auth": "admin_key"},
+    {"category": "system", "method": "GET", "path": "/api/admin/dashboard", "description": "Console dashboard summary", "auth": "admin_key"},
+    {"category": "system", "method": "GET", "path": "/api/admin/nav-badges", "description": "Sidebar badge counts", "auth": "admin_key"},
+    {"category": "system", "method": "GET", "path": "/api/admin/audit", "description": "Admin audit log", "auth": "admin_key"},
+    # members
+    {"category": "members", "method": "GET", "path": "/api/admin/riders", "description": "Paginated rider list", "auth": "admin_key"},
+    {"category": "members", "method": "GET", "path": "/api/admin/riders/export/csv", "description": "Export riders as CSV", "auth": "admin_key"},
+    {"category": "members", "method": "GET", "path": "/api/admin/riders/{user_id}", "description": "Rider detail", "auth": "admin_key"},
+    {"category": "members", "method": "POST", "path": "/api/admin/riders/{user_id}/suspend", "description": "Suspend a rider", "auth": "admin_key"},
+    {"category": "members", "method": "POST", "path": "/api/admin/riders/{user_id}/reactivate", "description": "Reactivate a rider", "auth": "admin_key"},
+    {"category": "members", "method": "POST", "path": "/api/admin/riders/{user_id}/reset-password", "description": "Reset a rider's password", "auth": "admin_key"},
+    {"category": "members", "method": "DELETE", "path": "/api/admin/riders/{user_id}", "description": "Delete a rider", "auth": "admin_key"},
+    {"category": "members", "method": "GET", "path": "/api/admin/users", "description": "User list (legacy)", "auth": "admin_key"},
+    {"category": "members", "method": "GET", "path": "/api/admin/users/{user_id}", "description": "User detail (incl. billing)", "auth": "admin_key"},
+    {"category": "members", "method": "PATCH", "path": "/api/admin/users/{user_id}", "description": "Update user fields", "auth": "admin_key"},
+    {"category": "members", "method": "POST", "path": "/api/admin/users/{user_id}/export", "description": "Export a user's data", "auth": "admin_key"},
+    {"category": "members", "method": "DELETE", "path": "/api/admin/users/{user_id}", "description": "Delete a user", "auth": "admin_key"},
+    {"category": "members", "method": "GET", "path": "/api/admin/riders/{user_id}/workouts", "description": "A rider's assigned workouts", "auth": "admin_key"},
+    {"category": "members", "method": "POST", "path": "/api/admin/riders/{user_id}/workouts/{workout_id}/assign", "description": "Assign a workout", "auth": "admin_key"},
+    {"category": "members", "method": "PUT", "path": "/api/admin/riders/{user_id}/workouts/{workout_id}", "description": "Update an assigned workout", "auth": "admin_key"},
+    {"category": "members", "method": "DELETE", "path": "/api/admin/riders/{user_id}/workouts/{workout_id}", "description": "Remove an assigned workout", "auth": "admin_key"},
+    # revenue
+    {"category": "revenue", "method": "POST", "path": "/api/admin/riders/{user_id}/premium", "description": "Grant / gift / revoke premium", "auth": "admin_key"},
+    {"category": "revenue", "method": "GET", "path": "/api/admin/integrations", "description": "Integration usage & costs", "auth": "admin_key"},
+    {"category": "revenue", "method": "PUT", "path": "/api/admin/integrations/costs", "description": "Update integration cost rates", "auth": "admin_key"},
+    {"category": "revenue", "method": "PUT", "path": "/api/admin/integrations/{iid}/cost-estimate", "description": "Set an integration cost estimate", "auth": "admin_key"},
+    # analytics
+    {"category": "analytics", "method": "GET", "path": "/api/admin/analytics/growth", "description": "Growth analytics series", "auth": "admin_key"},
+    {"category": "analytics", "method": "GET", "path": "/api/admin/interest", "description": "Interest / waitlist signups", "auth": "admin_key"},
+    # content
+    {"category": "content", "method": "GET", "path": "/api/admin/plans", "description": "Training plan definitions", "auth": "admin_key"},
+    {"category": "content", "method": "POST", "path": "/api/admin/plans/{plan_id}/publish", "description": "Publish a plan", "auth": "admin_key"},
+    {"category": "content", "method": "POST", "path": "/api/admin/plans/{plan_id}/archive", "description": "Archive a plan", "auth": "admin_key"},
+    {"category": "content", "method": "DELETE", "path": "/api/admin/plans/{plan_id}", "description": "Delete a plan", "auth": "admin_key"},
+    {"category": "content", "method": "GET", "path": "/api/admin/catalog", "description": "Workout catalog", "auth": "admin_key"},
+    {"category": "content", "method": "GET", "path": "/api/admin/catalog/{item_id}", "description": "Catalog item detail", "auth": "admin_key"},
+    {"category": "content", "method": "POST", "path": "/api/admin/catalog", "description": "Create a catalog item", "auth": "admin_key"},
+    {"category": "content", "method": "PUT", "path": "/api/admin/catalog/{item_id}", "description": "Update a catalog item", "auth": "admin_key"},
+    {"category": "content", "method": "DELETE", "path": "/api/admin/catalog/{item_id}", "description": "Delete a catalog item", "auth": "admin_key"},
+    {"category": "content", "method": "GET", "path": "/api/admin/scenic-routes", "description": "Scenic / activity POV routes", "auth": "admin_key"},
+    {"category": "content", "method": "GET", "path": "/api/admin/scenic-routes/{route_id}", "description": "Scenic route detail", "auth": "admin_key"},
+    {"category": "content", "method": "POST", "path": "/api/admin/scenic-routes", "description": "Create a scenic route", "auth": "admin_key"},
+    {"category": "content", "method": "PUT", "path": "/api/admin/scenic-routes/{route_id}", "description": "Update a scenic route", "auth": "admin_key"},
+    {"category": "content", "method": "DELETE", "path": "/api/admin/scenic-routes/{route_id}", "description": "Delete a scenic route", "auth": "admin_key"},
+    {"category": "content", "method": "POST", "path": "/api/admin/scenic-routes/{route_id}/publish", "description": "Publish a scenic route", "auth": "admin_key"},
+    {"category": "content", "method": "POST", "path": "/api/admin/scenic-routes/{route_id}/archive", "description": "Archive a scenic route", "auth": "admin_key"},
+    # screens
+    {"category": "screens", "method": "GET", "path": "/api/admin/screen-captures/screens", "description": "Capturable screen catalogue", "auth": "admin_key"},
+    {"category": "screens", "method": "POST", "path": "/api/admin/screen-captures/refresh", "description": "Trigger a capture job", "auth": "admin_key"},
+    {"category": "screens", "method": "GET", "path": "/api/admin/screen-captures/status", "description": "Capture job status", "auth": "admin_key"},
+    {"category": "screens", "method": "GET", "path": "/api/admin/screen-captures", "description": "Capture list (metadata + thumbs)", "auth": "admin_key"},
+    {"category": "screens", "method": "GET", "path": "/api/admin/screen-captures/export", "description": "Export captures as a ZIP", "auth": "admin_key"},
+    {"category": "screens", "method": "GET", "path": "/api/admin/screen-captures/{key}", "description": "A single capture PNG", "auth": "admin_key"},
+    # store
+    {"category": "store", "method": "GET", "path": "/api/admin/screen-captures/store-listing", "description": "App store listing copy", "auth": "admin_key"},
+    {"category": "store", "method": "PUT", "path": "/api/admin/screen-captures/store-listing", "description": "Edit store listing copy", "auth": "admin_key"},
+    {"category": "store", "method": "POST", "path": "/api/admin/screen-captures/store-listing/generate", "description": "Regenerate store copy (LLM)", "auth": "admin_key"},
+    # feedback
+    {"category": "feedback", "method": "GET", "path": "/api/admin/feedback", "description": "Rider feedback inbox", "auth": "admin_key"},
+]
+
+
+@admin_router.get("/manifest")
+async def manifest():
+    """Self-describing admin API surface for the HWG Console's auto-built API
+    Checklist. Authorized by the same `hwg_svc_*` service token as every other
+    admin endpoint. Paths are full (from the app origin) with no trailing
+    slashes; the console live-probes only safe GET/admin_key endpoints and
+    skips path-templated ones."""
+    categories = []
+    for e in _MANIFEST_ENDPOINTS:
+        if e["category"] not in categories:
+            categories.append(e["category"])
+    return {
+        "name": "Roujaune Admin API",
+        "version": _VERSION,
+        "base_path": "/api/admin",
+        "auth_modes": {
+            "admin_key": "Authorization: Bearer <hwg_svc_roujaune_* token>",
+        },
+        "categories": categories,
+        "endpoints": _MANIFEST_ENDPOINTS,
+    }
+
+
+
 @admin_router.get("/nav-badges")
 async def nav_badges():
     """Counts the console renders as sidebar/nav badges."""
