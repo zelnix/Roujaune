@@ -1,0 +1,23 @@
+{
+  "summary": "Regression-only smoke test after adding local Expo config plugin ./plugins/withChromeOsCompat and registering it in app.json. Confirmed the plugin (a native AndroidManifest-only mod) does NOT affect Metro/web runtime. Expo web bundle built cleanly (Web Bundled ~786-4676ms, no bundler errors in expo.err.log). All 3 requested regression flows pass: (1) login screen renders with title 'Your strongest ride is your own.', 'Continue with Google', and 'Sign in with email'; (2) demo@roujaune.app / demo9900 email sign-in succeeds and Today/home screen renders with today-mode-button showing 'Training'; (3) opening today-mode-button and selecting today-mode-option-gravel switches to the Gravel Today view (button label becomes 'Gravel', Tuscan Gravel Roads adventure card visible). NOTE: the actual ChromeOS APK install fix cannot be validated in web preview — it requires a fresh native Android build, which is out of scope.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_100.json"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "plugins/withChromeOsCompat.js is clean: uses @expo/config-plugins withAndroidManifest, dedupes existing entries by android:name before pushing, and only mutates AndroidManifest — zero runtime/JS bundle impact, so web preview is unaffected as expected.",
+    "app.json plugin registration './plugins/withChromeOsCompat' is correctly placed as the last entry in the plugins array, so it runs after other plugins that may add uses-feature entries (e.g. react-native-ble-plx, google-signin, camera) and will overwrite their required flags to false as intended."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only round)", "frontend": "100% (3/3 regression flows passed)"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The ChromeOS APK install fix (uses-feature required=false in AndroidManifest) is a native-Android-only concern and cannot be reproduced in Expo Go or web preview. To validate the real fix, run `eas build -p android --profile preview` (or `expo prebuild && ./gradlew assembleRelease`), then either (a) inspect the merged AndroidManifest.xml to confirm the 13 features are declared with android:required=\"false\", or (b) attempt sideloading the APK on a Chromebook. The main agent already verified via `npx expo config --type introspect`.",
+  "rca_of_issue": "N/A — no runtime regression detected. Config plugins that only call withAndroidManifest are pure native-build mods and are a no-op for Metro/web, which is why the web preview regression pass is a sufficient signal that startup was not broken."
+}

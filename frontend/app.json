@@ -136,7 +136,8 @@
         {
           "iosUrlScheme": "com.googleusercontent.apps.100157698823-0cc8mq63uan5cenfgqeoo049ushvqlk0"
         }
-      ]
+      ],
+      "./plugins/withChromeOsCompat"
     ],
     "experiments": {
       "typedRoutes": true
