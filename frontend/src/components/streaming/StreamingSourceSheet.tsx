@@ -6,7 +6,7 @@ import {
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { colors, radius, spacing } from "@/src/theme";
-import { STREAMING_SERVICES, parseYouTubeId, launchStreaming, pipTip, StreamingService, loadYouTubeRecents, addYouTubeRecent, YouTubeRecent, youtubeThumb } from "@/src/lib/streaming";
+import { STREAMING_SERVICES, parseYouTubeId, launchStreaming, pipTip, StreamingService, loadYouTubeRecents, addYouTubeRecent, YouTubeRecent, youtubeThumb, CustomStreamingApp, loadCustomApps, addCustomApp, removeCustomApp, launchCustomApp } from "@/src/lib/streaming";
 
 type Props = {
   visible: boolean;
@@ -26,9 +26,20 @@ export function StreamingSourceSheet({ visible, source, onClose, onPickRoute, on
   const [err, setErr] = React.useState<string | null>(null);
   const [expandYT, setExpandYT] = React.useState(source === "youtube");
   const [recents, setRecents] = React.useState<YouTubeRecent[]>([]);
+  const [customApps, setCustomApps] = React.useState<CustomStreamingApp[]>([]);
+  const [showAdd, setShowAdd] = React.useState(false);
+  const [addName, setAddName] = React.useState("");
+  const [addUrl, setAddUrl] = React.useState("");
+  const [addErr, setAddErr] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    if (visible) { setExpandYT(source === "youtube"); setErr(null); loadYouTubeRecents().then(setRecents); }
+    if (visible) {
+      setExpandYT(source === "youtube");
+      setErr(null);
+      loadYouTubeRecents().then(setRecents);
+      loadCustomApps().then(setCustomApps);
+      setShowAdd(false); setAddName(""); setAddUrl(""); setAddErr(null);
+    }
   }, [visible, source]);
 
   const submitYouTube = () => {
@@ -56,6 +67,49 @@ export function StreamingSourceSheet({ visible, source, onClose, onPickRoute, on
       ],
     );
   };
+
+  const launchCustom = (app: CustomStreamingApp) => {
+    Alert.alert(
+      `Watch on ${app.name}`,
+      pipTip(app.name),
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: `Open ${app.name}`, onPress: () => launchCustomApp(app) },
+      ],
+    );
+  };
+
+  const confirmRemoveCustom = (app: CustomStreamingApp) => {
+    Alert.alert(
+      `Remove ${app.name}?`,
+      "This deletes the shortcut. You can add it again anytime.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Remove", style: "destructive", onPress: () => removeCustomApp(app.id).then(setCustomApps) },
+      ],
+    );
+  };
+
+  const saveCustom = () => {
+    const name = addName.trim();
+    const link = addUrl.trim();
+    if (!name) { setAddErr("Give the app a name."); return; }
+    if (!link) { setAddErr("Paste the app's link or scheme."); return; }
+    setAddErr(null);
+    addCustomApp(name, link).then((list) => {
+      setCustomApps(list);
+      setShowAdd(false); setAddName(""); setAddUrl("");
+    });
+  };
+
+  /** Tile body: brand icon when available, else a colored monogram. */
+  const TileFace = ({ svc }: { svc: StreamingService }) => (
+    <View style={[sx.tileIcon, { backgroundColor: svc.color }]}>
+      {svc.icon
+        ? <MaterialCommunityIcons name={svc.icon as any} size={24} color="#fff" />
+        : <Text style={sx.tileMono} numberOfLines={1}>{svc.label || svc.name.slice(0, 2)}</Text>}
+    </View>
+  );
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -147,13 +201,72 @@ export function StreamingSourceSheet({ visible, source, onClose, onPickRoute, on
             <View style={sx.grid}>
               {STREAMING_SERVICES.map((svc) => (
                 <Pressable key={svc.id} style={sx.tile} onPress={() => launch(svc)} testID={`stream-${svc.id}`}>
-                  <View style={[sx.tileIcon, { backgroundColor: svc.color }]}>
-                    <MaterialCommunityIcons name={svc.icon as any} size={24} color="#fff" />
-                  </View>
+                  <TileFace svc={svc} />
                   <Text style={sx.tileName} numberOfLines={1}>{svc.name}</Text>
                 </Pressable>
               ))}
             </View>
+
+            {/* Rider's own custom app shortcuts */}
+            <Text style={sx.divLabel}>MY APPS</Text>
+            <Text style={sx.hint}>Add any streaming or video app once — it becomes a one-tap tile here. Long-press a tile to remove it.</Text>
+            <View style={sx.grid}>
+              {customApps.map((app) => (
+                <Pressable
+                  key={app.id}
+                  style={sx.tile}
+                  onPress={() => launchCustom(app)}
+                  onLongPress={() => confirmRemoveCustom(app)}
+                  delayLongPress={350}
+                  testID={`stream-custom-${app.id}`}
+                >
+                  <View style={[sx.tileIcon, { backgroundColor: colors.cardElevated, borderWidth: 1, borderColor: colors.border }]}>
+                    <Text style={[sx.tileMono, { color: colors.yellow }]} numberOfLines={1}>{app.name.slice(0, 2).toUpperCase()}</Text>
+                  </View>
+                  <Text style={sx.tileName} numberOfLines={1}>{app.name}</Text>
+                </Pressable>
+              ))}
+              <Pressable style={[sx.tile, sx.tileAdd]} onPress={() => setShowAdd((v) => !v)} testID="stream-add-app">
+                <View style={[sx.tileIcon, sx.tileAddIcon]}>
+                  <Ionicons name={showAdd ? "close" : "add"} size={24} color={colors.yellow} />
+                </View>
+                <Text style={sx.tileName} numberOfLines={1}>{showAdd ? "Cancel" : "Add app"}</Text>
+              </Pressable>
+            </View>
+
+            {showAdd && (
+              <View style={sx.addBox} testID="stream-add-form">
+                <TextInput
+                  value={addName}
+                  onChangeText={(t) => { setAddName(t); if (addErr) setAddErr(null); }}
+                  placeholder="App name (e.g. SBS On Demand)"
+                  placeholderTextColor={colors.textFaint}
+                  style={sx.input}
+                  autoCapitalize="words"
+                  returnKeyType="next"
+                  testID="add-name"
+                />
+                <TextInput
+                  value={addUrl}
+                  onChangeText={(t) => { setAddUrl(t); if (addErr) setAddErr(null); }}
+                  placeholder="Link or scheme (e.g. https://… or app://)"
+                  placeholderTextColor={colors.textFaint}
+                  style={sx.input}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  returnKeyType="done"
+                  onSubmitEditing={saveCustom}
+                  testID="add-url"
+                />
+                {addErr && <Text style={sx.err}>{addErr}</Text>}
+                <Pressable style={sx.playBtn} onPress={saveCustom} testID="add-save">
+                  <Ionicons name="bookmark" size={16} color="#04210F" />
+                  <Text style={sx.playText}>Save shortcut</Text>
+                </Pressable>
+                <Text style={sx.addTip}>Tip: paste the app&apos;s website link (opens the app if it&apos;s installed) or its URL scheme if you know it.</Text>
+              </View>
+            )}
 
             <Text style={sx.foot}>Streaming apps run on your device with your own account. Requires the app installed on this phone.</Text>
           </ScrollView>
@@ -196,7 +309,13 @@ const sx = StyleSheet.create({
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   tile: { width: "30%", alignItems: "center", gap: 8, paddingVertical: 12, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardElevated },
   tileIcon: { width: 46, height: 46, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  tileMono: { color: "#fff", fontSize: 17, fontWeight: "900", letterSpacing: -0.5 },
   tileName: { color: colors.white, fontSize: 12.5, fontWeight: "700" },
+  tileAdd: { borderStyle: "dashed", borderColor: "rgba(245,179,1,0.5)", backgroundColor: "rgba(245,179,1,0.05)" },
+  tileAddIcon: { backgroundColor: "rgba(245,179,1,0.14)" },
+
+  addBox: { marginTop: 12, gap: 10 },
+  addTip: { color: colors.textFaint, fontSize: 11.5, lineHeight: 17 },
 
   foot: { color: colors.textFaint, fontSize: 11.5, lineHeight: 17, marginTop: 16 },
 });

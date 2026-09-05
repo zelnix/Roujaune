@@ -24,7 +24,8 @@ export type StreamingService = {
   id: string;
   name: string;
   color: string;
-  icon: string; // MaterialCommunityIcons name
+  icon?: string; // MaterialCommunityIcons name (brand apps)
+  label?: string; // short monogram shown when there's no brand icon (e.g. "9", "7+")
   appUrl: string; // deep-link / universal link that opens the app if installed
   webUrl: string; // fallback (browser)
 };
@@ -38,6 +39,16 @@ export const STREAMING_SERVICES: StreamingService[] = [
   { id: "disney", name: "Disney+", color: "#1a3fe0", icon: "movie-open", appUrl: "disneyplus://", webUrl: "https://www.disneyplus.com" },
   { id: "appletv", name: "Apple TV", color: "#0a84ff", icon: "apple", appUrl: Platform.OS === "ios" ? "videos://" : "https://tv.apple.com", webUrl: "https://tv.apple.com" },
   { id: "youtube", name: "YouTube", color: "#FF0000", icon: "youtube", appUrl: "youtube://", webUrl: "https://www.youtube.com" },
+  // --- Australian free-to-air & subscription services (universal links open --
+  //     the app when installed, else the website) --------------------------- //
+  { id: "sbs", name: "SBS On Demand", color: "#5A5A5A", label: "SBS", appUrl: "https://www.sbs.com.au/ondemand", webUrl: "https://www.sbs.com.au/ondemand" },
+  { id: "9now", name: "9Now", color: "#0096D6", label: "9", appUrl: "https://www.9now.com.au", webUrl: "https://www.9now.com.au" },
+  { id: "7plus", name: "7plus", color: "#EE3124", label: "7+", appUrl: "https://7plus.com.au", webUrl: "https://7plus.com.au" },
+  { id: "10play", name: "10 play", color: "#005CB9", label: "10", appUrl: "https://10play.com.au", webUrl: "https://10play.com.au" },
+  { id: "iview", name: "ABC iview", color: "#14C5C8", label: "iV", appUrl: "https://iview.abc.net.au", webUrl: "https://iview.abc.net.au" },
+  { id: "stan", name: "Stan", color: "#0067FF", label: "S", appUrl: "https://www.stan.com.au", webUrl: "https://www.stan.com.au" },
+  { id: "binge", name: "Binge", color: "#E4007C", label: "B", appUrl: "https://binge.com.au", webUrl: "https://binge.com.au" },
+  { id: "kayo", name: "Kayo Sports", color: "#0A8F5B", label: "K", appUrl: "https://kayosports.com.au", webUrl: "https://kayosports.com.au" },
 ];
 
 /** Open the streaming app if installed, else fall back to the web/store URL.
@@ -60,6 +71,74 @@ export function pipTip(name: string): string {
   return Platform.OS === "ios"
     ? `Start playing in ${name}, tap the Picture-in-Picture button, then swipe back here. Your ride keeps recording while the video floats on top.`
     : `Start playing in ${name}, then open split-screen with ROUJAUNE (or Picture-in-Picture). Your ride keeps recording alongside the video.`;
+}
+
+// --- Rider's own custom streaming apps ("More apps") --------------------- //
+const CUSTOM_APPS_KEY = "roujaune.streaming.customapps";
+const CUSTOM_APPS_MAX = 12;
+export type CustomStreamingApp = { id: string; name: string; url: string };
+
+/** Turn whatever the rider typed into an openable URL: keep an explicit scheme
+ *  (e.g. `sbsondemand://`) as-is, otherwise assume a website and prefix https. */
+export function normalizeAppUrl(raw: string): string {
+  const s = (raw || "").trim();
+  if (!s) return "";
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s) || /^[a-z][a-z0-9+.-]*:/i.test(s)) return s;
+  return `https://${s.replace(/^\/+/, "")}`;
+}
+
+export async function loadCustomApps(): Promise<CustomStreamingApp[]> {
+  try {
+    const raw = await AsyncStorage.getItem(CUSTOM_APPS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Add a rider-named app (deduped by name, capped). Returns the new list. */
+export async function addCustomApp(name: string, url: string): Promise<CustomStreamingApp[]> {
+  const cleanName = (name || "").trim();
+  const cleanUrl = normalizeAppUrl(url);
+  if (!cleanName || !cleanUrl) return loadCustomApps();
+  try {
+    const cur = await loadCustomApps();
+    const id = `custom-${Date.now()}`;
+    const deduped = cur.filter((a) => a.name.trim().toLowerCase() !== cleanName.toLowerCase());
+    const next = [{ id, name: cleanName, url: cleanUrl }, ...deduped].slice(0, CUSTOM_APPS_MAX);
+    await AsyncStorage.setItem(CUSTOM_APPS_KEY, JSON.stringify(next));
+    return next;
+  } catch {
+    return loadCustomApps();
+  }
+}
+
+export async function removeCustomApp(id: string): Promise<CustomStreamingApp[]> {
+  try {
+    const cur = await loadCustomApps();
+    const next = cur.filter((a) => a.id !== id);
+    await AsyncStorage.setItem(CUSTOM_APPS_KEY, JSON.stringify(next));
+    return next;
+  } catch {
+    return loadCustomApps();
+  }
+}
+
+/** Open a rider's custom app link, falling back to a store/web search so it
+ *  never dead-ends if the deep-link scheme isn't installed. */
+export async function launchCustomApp(app: CustomStreamingApp): Promise<boolean> {
+  try {
+    await Linking.openURL(app.url);
+    return true;
+  } catch {
+    try {
+      await Linking.openURL(`https://www.google.com/search?q=${encodeURIComponent(app.name)}`);
+      return true;
+    } catch {
+      return false;
+    }
+  }
 }
 
 // --- Recently used "My YouTube" sources (one-tap reselection) ------------- //
