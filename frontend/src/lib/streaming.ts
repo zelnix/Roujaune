@@ -125,6 +125,31 @@ export async function removeCustomApp(id: string): Promise<CustomStreamingApp[]>
   }
 }
 
+// --- Favourites (pinned to the top of the picker, in pin order) ---------- //
+const FAV_KEY = "roujaune.streaming.favorites";
+
+export async function loadFavorites(): Promise<string[]> {
+  try {
+    const raw = await AsyncStorage.getItem(FAV_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Pin (move to front) or unpin a service/app id. Returns the new fav order. */
+export async function toggleFavorite(id: string): Promise<string[]> {
+  try {
+    const cur = await loadFavorites();
+    const next = cur.includes(id) ? cur.filter((x) => x !== id) : [id, ...cur];
+    await AsyncStorage.setItem(FAV_KEY, JSON.stringify(next));
+    return next;
+  } catch {
+    return loadFavorites();
+  }
+}
+
 /** Open a rider's custom app link, falling back to a store/web search so it
  *  never dead-ends if the deep-link scheme isn't installed. */
 export async function launchCustomApp(app: CustomStreamingApp): Promise<boolean> {

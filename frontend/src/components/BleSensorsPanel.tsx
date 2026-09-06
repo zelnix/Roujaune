@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, Linking, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView, Linking, ActivityIndicator, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing, shadow } from "../theme";
 import type { BleDevice, BleReadings, PermState } from "../hooks/useBleSensors";
@@ -54,6 +54,12 @@ export function BleSensorsPanel({
           </View>
         ) : (
           <>
+            {Platform.OS === "web" && (
+              <View style={styles.demoBanner} testID="ble-demo-banner">
+                <Ionicons name="flask-outline" size={15} color={colors.yellow} />
+                <Text style={styles.demoText}>Preview demo — showing simulated sensors. Real Bluetooth needs a device build.</Text>
+              </View>
+            )}
             <View style={styles.explain}>
               <Ionicons name="information-circle-outline" size={16} color={colors.textDim} />
               <Text style={styles.explainText}>We use Bluetooth only to read your trainer and heart-rate sensor during the ride.</Text>
@@ -168,6 +174,8 @@ const styles = StyleSheet.create({
   notice: { flexDirection: "row", gap: 10, alignItems: "flex-start", backgroundColor: "rgba(233,180,76,0.08)", borderRadius: radius.md, padding: 14, borderWidth: 1, borderColor: "rgba(233,180,76,0.3)" },
   noticeText: { flex: 1, color: colors.white, fontSize: 13.5, lineHeight: 19 },
   explain: { flexDirection: "row", gap: 8, alignItems: "flex-start" },
+  demoBanner: { flexDirection: "row", gap: 8, alignItems: "center", backgroundColor: "rgba(245,179,1,0.08)", borderRadius: radius.sm, borderWidth: 1, borderColor: "rgba(245,179,1,0.3)", paddingHorizontal: 10, paddingVertical: 8 },
+  demoText: { flex: 1, color: colors.yellow, fontSize: 11.5, fontWeight: "600", lineHeight: 15 },
   explainText: { flex: 1, color: colors.textDim, fontSize: 12.5, lineHeight: 17 },
   warn: { flexDirection: "row", gap: 8, alignItems: "center", backgroundColor: "rgba(224,30,43,0.08)", borderRadius: radius.sm, padding: 10 },
   warnText: { color: colors.red, fontSize: 13, fontWeight: "600" },

@@ -36,6 +36,9 @@ function loadBle(): any {
 }
 
 const RELEVANT_SERVICES = [UUID.heartRate, UUID.cyclingPower, UUID.csc, UUID.fitnessMachine];
+// Names commonly used by trainers / power meters / HR straps / speed & cadence
+// sensors — lets us surface sensors that don't advertise their service UUIDs.
+const SENSOR_NAME_HINT = /kickr|tacx|wahoo|polar|garmin|hrm|heart|\bhr\b|power|cadence|speed|elite|saris|hammer|neo|stages|4iiii|assioma|magene|coospo|zwift|trainer|flux|suito|direto|bike|watt|rhythm|tickr|cadenc/i;
 
 /**
  * Connects to standard Bluetooth LE cycling sensors (Cycling Power 0x1818,
@@ -72,6 +75,7 @@ export function useBleSensors(wheelCircumferenceMm: number = 2105) {
   useEffect(() => { circumferenceRef.current = wheelCircumferenceMm || 2105; }, [wheelCircumferenceMm]);
   const seen = useRef<Set<string>>(new Set());
   const subs = useRef<any[]>([]);
+  const scanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Auto-reconnect bookkeeping.
   const intentionalRef = useRef<Set<string>>(new Set());
   const reconnectTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -144,6 +148,7 @@ export function useBleSensors(wheelCircumferenceMm: number = 2105) {
 
   const stopScan = useCallback(() => {
     try { managerRef.current?.stopDeviceScan(); } catch { /* noop */ }
+    if (scanTimeoutRef.current) { clearTimeout(scanTimeoutRef.current); scanTimeoutRef.current = null; }
     setScanning(false);
   }, []);
 
@@ -156,18 +161,27 @@ export function useBleSensors(wheelCircumferenceMm: number = 2105) {
     setDevices([]);
     seen.current = new Set();
     setScanning(true);
-    manager.startDeviceScan(RELEVANT_SERVICES, null, (err: any, device: any) => {
+    // Scan for ALL peripherals (no service pre-filter) and decide per-device:
+    // many real sensors don't put their service UUIDs in the advertisement, so
+    // a strict service filter silently hides them. We keep a device if it
+    // advertises a relevant service OR its name looks like a bike sensor.
+    manager.startDeviceScan(null, { allowDuplicates: false }, (err: any, device: any) => {
       if (err) {
         setError(err?.message ?? "Scan failed");
         setScanning(false);
         return;
       }
       if (!device?.id || seen.current.has(device.id)) return;
+      const name: string = device.name || device.localName || "";
+      const advUuids: string[] = (device.serviceUUIDs || []).map((u: string) => (u || "").toLowerCase());
+      const hasRelevant = advUuids.some((u) => RELEVANT_SERVICES.includes(u));
+      const looksLikeSensor = !!name && SENSOR_NAME_HINT.test(name);
+      if (!hasRelevant && !looksLikeSensor) return;
       seen.current.add(device.id);
-      setDevices((prev) => [...prev, { id: device.id, name: device.name || device.localName || "Unknown sensor" }]);
+      setDevices((prev) => [...prev, { id: device.id, name: name || "Unknown sensor" }]);
     });
     // Auto-stop after 15s to save battery.
-    setTimeout(() => stopScan(), 15000);
+    scanTimeoutRef.current = setTimeout(() => stopScan(), 15000);
   }, [requestPermission, stopScan]);
 
   const handleValue = useCallback((deviceId: string, serviceUuid: string, charUuid: string, value: string | null) => {

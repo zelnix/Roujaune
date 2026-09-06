@@ -6,7 +6,7 @@ import {
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { colors, radius, spacing } from "@/src/theme";
-import { STREAMING_SERVICES, parseYouTubeId, launchStreaming, pipTip, StreamingService, loadYouTubeRecents, addYouTubeRecent, YouTubeRecent, youtubeThumb, CustomStreamingApp, loadCustomApps, addCustomApp, removeCustomApp, launchCustomApp } from "@/src/lib/streaming";
+import { STREAMING_SERVICES, parseYouTubeId, launchStreaming, pipTip, StreamingService, loadYouTubeRecents, addYouTubeRecent, YouTubeRecent, youtubeThumb, CustomStreamingApp, loadCustomApps, addCustomApp, removeCustomApp, launchCustomApp, loadFavorites, toggleFavorite } from "@/src/lib/streaming";
 
 type Props = {
   visible: boolean;
@@ -27,6 +27,7 @@ export function StreamingSourceSheet({ visible, source, onClose, onPickRoute, on
   const [expandYT, setExpandYT] = React.useState(source === "youtube");
   const [recents, setRecents] = React.useState<YouTubeRecent[]>([]);
   const [customApps, setCustomApps] = React.useState<CustomStreamingApp[]>([]);
+  const [favs, setFavs] = React.useState<string[]>([]);
   const [showAdd, setShowAdd] = React.useState(false);
   const [addName, setAddName] = React.useState("");
   const [addUrl, setAddUrl] = React.useState("");
@@ -38,6 +39,7 @@ export function StreamingSourceSheet({ visible, source, onClose, onPickRoute, on
       setErr(null);
       loadYouTubeRecents().then(setRecents);
       loadCustomApps().then(setCustomApps);
+      loadFavorites().then(setFavs);
       setShowAdd(false); setAddName(""); setAddUrl(""); setAddErr(null);
     }
   }, [visible, source]);
@@ -102,14 +104,54 @@ export function StreamingSourceSheet({ visible, source, onClose, onPickRoute, on
     });
   };
 
-  /** Tile body: brand icon when available, else a colored monogram. */
-  const TileFace = ({ svc }: { svc: StreamingService }) => (
-    <View style={[sx.tileIcon, { backgroundColor: svc.color }]}>
-      {svc.icon
-        ? <MaterialCommunityIcons name={svc.icon as any} size={24} color="#fff" />
-        : <Text style={sx.tileMono} numberOfLines={1}>{svc.label || svc.name.slice(0, 2)}</Text>}
-    </View>
-  );
+  const onToggleFav = (id: string) => { toggleFavorite(id).then(setFavs); };
+
+  // Unified tile model across built-in services + the rider's custom apps.
+  type TileItem = { id: string; name: string; color: string; icon?: string; label?: string; custom?: boolean; url?: string };
+  const builtin: TileItem[] = STREAMING_SERVICES.map((s) => ({ id: s.id, name: s.name, color: s.color, icon: s.icon, label: s.label }));
+  const custom: TileItem[] = customApps.map((a) => ({ id: a.id, name: a.name, color: colors.cardElevated, label: a.name.slice(0, 2).toUpperCase(), custom: true, url: a.url }));
+  const byId = new Map<string, TileItem>([...builtin, ...custom].map((i) => [i.id, i]));
+  const favSet = new Set(favs);
+  const favItems: TileItem[] = favs.map((id) => byId.get(id)).filter(Boolean) as TileItem[];
+
+  const launchItem = (item: TileItem) => {
+    if (item.custom) { launchCustom({ id: item.id, name: item.name, url: item.url || "" }); return; }
+    const svc = STREAMING_SERVICES.find((s) => s.id === item.id);
+    if (svc) launch(svc);
+  };
+
+  /** One app tile: brand icon or colored monogram, a star to pin to the top,
+   *  tap to launch, long-press (custom apps) to remove. */
+  const TileButton = ({ item }: { item: TileItem }) => {
+    const pinned = favSet.has(item.id);
+    return (
+      <Pressable
+        style={sx.tile}
+        onPress={() => launchItem(item)}
+        onLongPress={item.custom ? () => confirmRemoveCustom({ id: item.id, name: item.name, url: item.url || "" }) : undefined}
+        delayLongPress={350}
+        testID={item.custom ? `stream-custom-${item.id}` : `stream-${item.id}`}
+      >
+        <Pressable
+          onPress={() => onToggleFav(item.id)}
+          hitSlop={8}
+          style={sx.star}
+          testID={`fav-${item.id}`}
+          accessibilityLabel={pinned ? `Unpin ${item.name}` : `Pin ${item.name} to top`}
+        >
+          <Ionicons name={pinned ? "star" : "star-outline"} size={16} color={pinned ? colors.yellow : colors.textFaint} />
+        </Pressable>
+        <View style={[sx.tileIcon, item.custom
+          ? { backgroundColor: colors.cardElevated, borderWidth: 1, borderColor: colors.border }
+          : { backgroundColor: item.color }]}>
+          {item.icon
+            ? <MaterialCommunityIcons name={item.icon as any} size={24} color="#fff" />
+            : <Text style={[sx.tileMono, item.custom && { color: colors.yellow }]} numberOfLines={1}>{item.label || item.name.slice(0, 2)}</Text>}
+        </View>
+        <Text style={sx.tileName} numberOfLines={1}>{item.name}</Text>
+      </Pressable>
+    );
+  };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -195,37 +237,28 @@ export function StreamingSourceSheet({ visible, source, onClose, onPickRoute, on
               </View>
             )}
 
+            {/* Favourites — pinned to the top, always first */}
+            {favItems.length > 0 && (
+              <>
+                <Text style={sx.divLabel}>FAVOURITES</Text>
+                <View style={sx.grid} testID="stream-favourites">
+                  {favItems.map((item) => <TileButton key={`fav-${item.id}`} item={item} />)}
+                </View>
+              </>
+            )}
+
             {/* External streaming apps */}
             <Text style={sx.divLabel}>OR WATCH YOUR OWN APP</Text>
-            <Text style={sx.hint}>Opens your app with your subscription — keep it in Picture-in-Picture (iOS) or split-screen (Android) and your ride keeps recording.</Text>
+            <Text style={sx.hint}>Opens your app with your subscription — keep it in Picture-in-Picture (iOS) or split-screen (Android) and your ride keeps recording. Tap ★ to pin favourites to the top.</Text>
             <View style={sx.grid}>
-              {STREAMING_SERVICES.map((svc) => (
-                <Pressable key={svc.id} style={sx.tile} onPress={() => launch(svc)} testID={`stream-${svc.id}`}>
-                  <TileFace svc={svc} />
-                  <Text style={sx.tileName} numberOfLines={1}>{svc.name}</Text>
-                </Pressable>
-              ))}
+              {builtin.filter((s) => !favSet.has(s.id)).map((item) => <TileButton key={item.id} item={item} />)}
             </View>
 
             {/* Rider's own custom app shortcuts */}
             <Text style={sx.divLabel}>MY APPS</Text>
             <Text style={sx.hint}>Add any streaming or video app once — it becomes a one-tap tile here. Long-press a tile to remove it.</Text>
             <View style={sx.grid}>
-              {customApps.map((app) => (
-                <Pressable
-                  key={app.id}
-                  style={sx.tile}
-                  onPress={() => launchCustom(app)}
-                  onLongPress={() => confirmRemoveCustom(app)}
-                  delayLongPress={350}
-                  testID={`stream-custom-${app.id}`}
-                >
-                  <View style={[sx.tileIcon, { backgroundColor: colors.cardElevated, borderWidth: 1, borderColor: colors.border }]}>
-                    <Text style={[sx.tileMono, { color: colors.yellow }]} numberOfLines={1}>{app.name.slice(0, 2).toUpperCase()}</Text>
-                  </View>
-                  <Text style={sx.tileName} numberOfLines={1}>{app.name}</Text>
-                </Pressable>
-              ))}
+              {custom.filter((a) => !favSet.has(a.id)).map((item) => <TileButton key={item.id} item={item} />)}
               <Pressable style={[sx.tile, sx.tileAdd]} onPress={() => setShowAdd((v) => !v)} testID="stream-add-app">
                 <View style={[sx.tileIcon, sx.tileAddIcon]}>
                   <Ionicons name={showAdd ? "close" : "add"} size={24} color={colors.yellow} />
@@ -307,7 +340,8 @@ const sx = StyleSheet.create({
   divLabel: { color: colors.textFaint, fontSize: 11, fontWeight: "900", letterSpacing: 1.5, marginTop: 8, marginBottom: 6 },
   hint: { color: colors.textDim, fontSize: 12.5, lineHeight: 18, marginBottom: 14 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-  tile: { width: "30%", alignItems: "center", gap: 8, paddingVertical: 12, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardElevated },
+  tile: { width: "30%", alignItems: "center", gap: 8, paddingVertical: 12, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardElevated, position: "relative" },
+  star: { position: "absolute", top: 4, right: 4, padding: 4, zIndex: 2 },
   tileIcon: { width: 46, height: 46, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   tileMono: { color: "#fff", fontSize: 17, fontWeight: "900", letterSpacing: -0.5 },
   tileName: { color: colors.white, fontSize: 12.5, fontWeight: "700" },

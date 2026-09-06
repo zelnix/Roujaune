@@ -1,0 +1,24 @@
+{
+  "summary": "Tested (frontend-only, web preview @ 1280x900) the two in-scope changes: (A) streaming FAVOURITES flow in the /scenic-ride source sheet, and (B) BLE web-DEMO simulation on /connections. ALL 8 in-scope checks PASSED. Logged in as demo@roujaune.app/demo9900, opened today-mode -> gravel -> begin-scenic-journey -> /scenic-ride?route=gravel-tuscany-strade, opened scenic-source sheet: initial state has no stream-favourites section and stream-netflix present exactly once in the OR-WATCH grid. Tapping fav-netflix pinned Netflix into a new FAVOURITES section (testID stream-favourites) with the star toggle turning solid yellow; Netflix disappeared from the normal grid (single stream-netflix instance total, inside favourites). Closing via stream-close and reopening via scenic-source preserved the favourite (AsyncStorage-backed). Tapping fav-netflix again unpinned it — stream-favourites section disappeared and Netflix returned to the OR-WATCH grid (still exactly one stream-netflix). Tapping the star did NOT launch the app (no external navigation). BLE DEMO on /connections: device-btn-trainer opens ble-panel, yellow ble-demo-banner is visible; ble-scan reveals all three demo devices (ble-connect-demo-trainer, ble-connect-demo-hr, ble-connect-demo-cadence) within ~4s; connecting the trainer moves it to CONNECTED, shows ble-battery pill (92%), ble-disconnect-demo-trainer button, and live readings turn green (POWER 189 W, CADENCE 93 rpm, SPEED 26.2 km/h — not '—'); after ~6-9s the trainer row briefly showed the 'Reconnecting…' spinner and returned to the Disconnect state without crashing; tapping ble-disconnect-demo-trainer removed the trainer row. No React Native red screens, no deprecated packages detected in the tested files (BleSensorsPanel/StreamingSourceSheet/useBleSensors.web.ts/streaming.ts). Note: many /api/... 401 console errors observed at initial landing before login — pre-existing behaviour (unauthenticated fetches) and NOT introduced by this change; app recovers cleanly after login.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "StreamingSourceSheet.tsx line 9 has a very long single-line import (12+ named symbols) — consider wrapping for readability, but not a bug.",
+    "useBleSensors.web.ts correctly uses connectedRef to avoid stale closures inside setInterval — good.",
+    "BleSensorsPanel.tsx overlay Pressable onPress={onClose} may close panel when tapping empty inner area; inner Pressable swallows correctly — verified working."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only)", "frontend": "100% (8/8 in-scope checks)"},
+  "seed_data_creation": "None. Used demo@roujaune.app/demo9900 as documented.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Streaming favourites (AsyncStorage key roujaune.streaming.favorites) and web-only BLE demo (useBleSensors.web.ts) work end-to-end in the preview. Note star Pressable is nested inside tile Pressable — RN-Web correctly stops propagation via nested Pressable; tapping ★ does NOT trigger the tile's launch Alert. If you retest, always drive through /scenic-ride?route=... path and check counts of the [data-testid='stream-<id>'] selector to verify grid vs favourites placement.",
+  "rca_of_issue": "n/a — no defects found in the tested scope."
+}
