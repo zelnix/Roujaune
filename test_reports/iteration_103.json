@@ -1,0 +1,29 @@
+{
+  "summary": "Verified the google_fit retirement change end-to-end (backend + web preview). Backend: 5/5 pytest cases pass in /app/backend/tests/test_iter103_no_google_fit.py — GET /api/connections (logged in as demo@roujaune.app/demo9900) returns exactly the providers [apple_health, health_connect], both kind=device_native / requires_native_build=true / connection_status=requires_build / connected=false; NO provider with id 'google_fit' or name 'Google Fit' is returned, encryption_ready=true, imported_activities=2. Frontend (/connections @ 1280x900 landscape, after email login): the screen renders without any red/error screen, no 'Google Fit' CARD/section is present, and there is exactly one on-page mention of the string 'Google Fit' — descriptive prose inside the HEALTH SYNC blurb ('… Health Connect (Android — covers Samsung Health & Google Fit)'), which explains that Health Connect subsumes Google Fit on-device (not a Google Fit provider card). The 'Available in an installed iOS/Android build with your permission.' note is present exactly once, on the single HEALTH SYNC card (testID health-provider). BLE regression on /connections passed: tapping device-btn-trainer opens ble-panel, ble-scan surfaces all three demo devices (ble-connect-demo-trainer / ble-connect-demo-hr / ble-connect-demo-cadence), and the imported-rides card renders with the 2 seeded outdoor rides. DISCREPANCY vs review request: the frontend does NOT expose testIDs 'provider-apple_health' or 'provider-health_connect' — device-native providers are surfaced via the unified HealthSyncCard (testID='health-provider') because /app/frontend/app/connections.tsx filters `p.kind !== 'device_native'` out of ProviderRow (line 186). This is pre-existing behaviour (no frontend code changed this round, per the agent-to-agent note) and is functionally correct: the two native cards are represented by a single platform-aware HEALTH SYNC card in web preview. Flagging so the main agent can confirm expected UX / testID contract.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Connections screen — native provider cards", "issue": "Review request expected testIDs 'provider-apple_health' and 'provider-health_connect' but neither is rendered on /connections. Native providers are filtered out of ProviderRow (connections.tsx:186) and represented by the unified HealthSyncCard (testID='health-provider'). No crash, and the required note text is shown. If per-provider testIDs are required, HealthSyncCard needs to render two testID'd cards.", "affected_testIDs": ["provider-apple_health", "provider-health_connect", "health-provider"]}
+    ],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iter103_no_google_fit.py", "/app/test_reports/pytest/iter103.xml", "/app/test_reports/screens/i103_connections.jpeg", "/app/test_reports/screens/i103_ble.jpeg"],
+  "action_items": [
+    "Optional: if the app spec demands per-provider testIDs 'provider-apple_health' & 'provider-health_connect' on the Connections screen (as stated in the review request), update HealthSyncCard.tsx to render two testID'd rows keyed off /api/connections instead of the single 'health-provider' card. Otherwise no action — the google_fit retirement is complete and the screen is correct."
+  ],
+  "critical_code_review_comments": [
+    "backend/providers/__init__.py cleanly documents why google_fit was retired and re-exports registry — good.",
+    "backend/routes/connections.py:41 correctly maps native providers (requires_native_build) to connection_status='requires_build' when unlinked — matches frontend HealthSyncCard's 'available' check.",
+    "frontend/app/connections.tsx:37 startConnect Alert copy still mentions 'Google Cloud Console' + 'Fitness API' as generic OAuth setup guidance — harmless (only shown when a cloud OAuth provider returns setup_required, and with google_fit removed there is currently no cloud provider surfaced). Consider trimming Google-specific wording since no Google Fit OAuth flow exists anymore.",
+    "The HEALTH SYNC card blurb mentions 'Samsung Health & Google Fit' as a descriptor of what Health Connect wraps — this is intentional and NOT a Google Fit provider card. Leave as-is."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter103_no_google_fit.py"],
+  "success_rate": {"backend": "100% (5/5)", "frontend": "100% for stated google_fit retirement + BLE regression; 1 discrepancy flagged on native-provider testID naming"},
+  "seed_data_creation": "None. Used demo@roujaune.app / demo9900 as per test_credentials.md.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "GET /api/connections (auth required) now returns only [apple_health, health_connect] — no garmin, no google_fit. The frontend renders device-native providers via a single HEALTH SYNC card (testID='health-provider' inside 'health-sync'), NOT per-provider testIDs 'provider-apple_health'/'provider-health_connect'. The OUTDOOR RIDE SYNC card (testID='ride-sync') is intentionally empty because all remaining providers are device_native and filtered out at connections.tsx:186 — this is pre-existing and correct. To assert 'no Google Fit card' from Playwright, prefer counting a provider testID that would only exist for a google_fit provider (currently 0) rather than raw body text, because the HEALTH SYNC descriptive blurb legitimately contains the words 'Google Fit'.",
+  "rca_of_issue": "n/a — retirement of the google_fit cloud provider is confirmed."
+}
