@@ -1,0 +1,30 @@
+{
+  "summary": "Verified iter104 changes end-to-end. Backend 6/6 pytest pass (/app/backend/tests/test_iter104_strava_and_health_rename.py): GET /api/connections (demo@roujaune.app/demo9900) returns providers including id='apple_health', id='health_connect' (name EXACTLY 'Google Health (Health Connect)', kind=device_native, requires_native_build=true, connection_status=requires_build), and id='strava' (name='Strava', kind=cloud_oauth, configured=false, connection_status=not_configured, connected=false). No provider with id='google_fit' is present. POST /api/connections/strava/authorize with {\"redirect_uri\":\"roujaune://oauth/strava\"} returns 200 {\"setup_required\": true} (no authorize_url leak). Frontend /connections @ 1280x900 landscape after email login: OUTDOOR RIDE SYNC section renders the Strava provider card (testID=provider-strava) with a 'Setup required' chip, a 'Set up' primary button (testID=connect-strava), and 'Requires Strava credentials' helper text. HEALTH SYNC blurb reads 'Sync your rides with Apple Health (iOS) and Google Health (Health Connect, Android — covers Samsung Health & Google Fit).' — contains the required 'Google Health (Health Connect' substring. Regressions clean: BLE demo works (device-btn-trainer opens ble-panel portal, ble-scan surfaces demo devices — Demo Smart Trainer + Demo Heart Rate visible in scan list within 2.5s), and IMPORTED OUTDOOR RIDES card renders both seeded rides (count=2, Col de Test entries). Tapping connect-strava did not surface a window.dialog because Alert.alert on RN-web is a portal Modal (per agent-to-agent note); we did not further probe it since the backend contract already covers setup_required and the button visibly says 'Set up'.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter104_strava_and_health_rename.py",
+    "/app/test_reports/pytest/iter104.xml",
+    "/app/test_reports/screens/i104_connections.jpeg",
+    "/app/test_reports/screens/i104_ble.jpeg"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "backend/providers/strava.py cleanly reports is_configured()=False when STRAVA_CLIENT_ID/SECRET are empty; routes/connections.py:79-80 returns {setup_required:true, message:...} short-circuit before touching secrets/PKCE — correct and safe.",
+    "backend/providers/native.py: HealthConnectProvider.meta.name = 'Google Health (Health Connect)' matches spec.",
+    "frontend/app/connections.tsx:104-108 correctly toggles the primary button label between 'Connect' (configured) and 'Set up' (not_configured) driven by p.configured — no client-side branching bug.",
+    "HealthSyncCard.tsx web-preview branch (line 25) already mentions 'Google Health (Health Connect, Android — covers Samsung Health & Google Fit)' — no drift with the Android on-device blurb."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter104_strava_and_health_rename.py"],
+  "success_rate": {"backend": "100% (6/6)", "frontend": "100% for stated Strava + rename + BLE regression"},
+  "seed_data_creation": "None. Used demo@roujaune.app / demo9900 as per /app/memory/test_credentials.md.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Strava is registered as cloud_oauth but STRAVA_CLIENT_ID/SECRET are unset in preview -> connection_status='not_configured', authorize endpoint returns {setup_required:true}. Do NOT attempt a real OAuth round-trip until env creds are provisioned. Frontend testIDs of interest: provider-strava, connect-strava, health-sync (blurb host), health-provider, imported-rides, ble-panel, ble-scan, device-btn-trainer, device-btn-wearable. Alert.alert on RN-web is a portal Modal, not window.alert — probe with visible locators.",
+  "rca_of_issue": "n/a — both features (Android health provider rename + Strava OAuth registration in not_configured state) are correctly implemented."
+}

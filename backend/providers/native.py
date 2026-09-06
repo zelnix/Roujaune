@@ -35,7 +35,7 @@ class HealthConnectProvider(_NativeProvider):
     """Android Health Connect — the OS hub that Samsung Health and Google Fit
     read/write through, so a single connection covers both."""
     meta: ProviderMeta = {
-        "id": "health_connect", "name": "Health Connect", "kind": "device_native",
+        "id": "health_connect", "name": "Google Health (Health Connect)", "kind": "device_native",
         "requires_native_build": True, "icon": "fitness",
     }
 

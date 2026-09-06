@@ -20,9 +20,9 @@ export function HealthSyncCard({ showToast }: { showToast: (m: string) => void }
   }, [h.message]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const iosDetail = "Push your Roujaune rides to Apple Health and import outdoor rides back in.";
-  const androidDetail = "Push your Roujaune rides to Health Connect (Samsung Health & Google Fit) and import rides back in.";
+  const androidDetail = "Push your Roujaune rides to Google Health (Health Connect — covers Samsung Health & Google Fit) and import rides back in.";
   const blurb = Platform.OS === "android" ? androidDetail : Platform.OS === "ios" ? iosDetail
-    : "Sync your rides with Apple Health (iOS) and Health Connect (Android — covers Samsung Health & Google Fit).";
+    : "Sync your rides with Apple Health (iOS) and Google Health (Health Connect, Android — covers Samsung Health & Google Fit).";
 
   return (
     <Card testID="health-sync">

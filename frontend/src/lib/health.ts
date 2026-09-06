@@ -45,7 +45,7 @@ async function savePrefs(p: HealthPrefs) {
 }
 
 export function platformLabel(p: HealthPlatform): string {
-  return p === "apple_health" ? "Apple Health" : p === "health_connect" ? "Health Connect" : "Health";
+  return p === "apple_health" ? "Apple Health" : p === "health_connect" ? "Google Health (Health Connect)" : "Health";
 }
 
 /**
@@ -112,7 +112,7 @@ export function useHealthSync() {
       } else if (res.state === "unsupported") {
         setMessage(
           Platform.OS === "android"
-            ? "Health Connect isn't available on this device"
+            ? "Google Health (Health Connect) isn't available on this device"
             : "Health isn't available on this device"
         );
       } else if (!res.canAskAgain) {
