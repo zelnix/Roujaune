@@ -113,6 +113,13 @@ export async function startConnect(providerId: string): Promise<ConnectResult> {
 
 export const syncNow = (id: string) => api(`/connections/${id}/sync`, "POST");
 export const disconnect = (id: string) => api(`/connections/${id}/disconnect`, "POST");
+
+/** Push one indoor ride up to Strava (TCX with graph, or summary activity). */
+export const pushRideToStrava = (rideId: string, coachSummary?: string) =>
+  api(`/connections/strava/push`, "POST", { ride_id: rideId, coach_summary: coachSummary });
+/** Button state for the summary: connected? can upload? already synced? */
+export const stravaRideStatus = (rideId: string): Promise<{ connected: boolean; can_write: boolean; synced: boolean; pending: boolean }> =>
+  api(`/connections/strava/ride-status?ride_id=${encodeURIComponent(rideId)}`, "GET");
 export const deleteImported = (id: string) => api(`/connections/${id}/data`, "DELETE");
 export const updateConnSettings = (id: string, patch: { disable_route_import?: boolean; disable_auto_sync?: boolean }) =>
   api(`/connections/${id}/settings`, "PATCH", patch);

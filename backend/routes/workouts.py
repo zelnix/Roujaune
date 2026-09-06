@@ -295,6 +295,12 @@ async def _save_ride_history(body: SummarizeRequest, result: dict) -> Optional[s
     Returns the new record id so the debrief can later be cached against it."""
     try:
         rid = str(uuid.uuid4())
+        # Persist a compact ~1 Hz sample track so the power/HR graph can be
+        # rebuilt later and pushed to Strava as a full ride file.
+        raw = [{"power": s.power, "hr": s.hr, "cadence": s.cadence, "speed": s.speed}
+               for s in (body.samples or [])]
+        step = max(1, len(raw) // 3600)  # cap ~3600 points (1 Hz for a 1h ride)
+        samples = raw[::step][:3600] if raw else []
         doc = {
             "id": rid,
             "created_at": now_iso(),
@@ -305,18 +311,28 @@ async def _save_ride_history(body: SummarizeRequest, result: dict) -> Optional[s
             "distance_km": result.get("distance_km"),
             "elevation_m": result.get("elevation_m"),
             "avg_power": result.get("avg_power"),
+            "max_power": result.get("max_power") or result.get("norm_power"),
+            "avg_hr": result.get("avg_hr"),
+            "max_hr": result.get("max_hr"),
+            "avg_cadence": result.get("avg_cadence"),
             "tss": result.get("tss"),
             "calories": result.get("calories", 0),
             "computed": result.get("computed", False),
+            "samples": samples,
+            "strava_activity_id": None,
             "debrief": None,
         }
         await udb.ride_history.insert_one(doc)
         try:
             import asyncio
+            import auth
             from routes.analysis import check_and_email_milestones
+            from routes.connections import auto_push_strava
             asyncio.create_task(check_and_email_milestones())  # celebratory email, non-blocking
+            uid = auth.current_user_id()
+            asyncio.create_task(auto_push_strava(uid, rid))  # auto-upload to Strava if enabled
         except Exception as e:
-            logger.warning(f"milestone email hook failed: {e}")
+            logger.warning(f"post-save hooks failed: {e}")
         return rid
     except Exception as e:  # never block the summary on history write
         logger.warning(f"ride_history insert failed: {e}")

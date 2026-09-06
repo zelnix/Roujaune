@@ -1,0 +1,34 @@
+{
+  "summary": "Iter105 verification of the new 'push indoor rides UP to Strava' feature + samples persistence + no-regression on connections/BLE. Backend 7/7 pytest PASS (/app/backend/tests/test_iter105_strava_push_and_samples.py). Verified: (1) POST /api/workouts/summarize with 60 telemetry samples (power/hr/cadence/speed) + elapsed=60 returns 200 with an 'id'. (2) GET /api/rides/history?limit=1 returns the newest ride with a non-empty 'samples' array (per-second track persisted) and a numeric 'avg_hr' > 0. (3) GET /api/connections/strava/ride-status?ride_id=... returns 200 {connected:false, can_write:false, synced:false, pending:false} for the demo rider (Strava not connected). (4) POST /api/connections/strava/push {ride_id} returns HTTP 400 'Strava is not connected' (NOT a 500). Also POST /api/connections/strava/push {} (missing ride_id) returns 400. (5) PATCH /api/connections/strava/settings {strava_auto_push:false} returns 200 with the strava account view; GET /api/connections lists strava (kind=cloud_oauth) present. (6) Regression: GET /api/connections lists strava + apple_health + health_connect (name EXACTLY 'Google Health (Health Connect)') and NO google_fit. Frontend regression @1280x900 (demo@roujaune.app/demo9900): /connections still renders provider-strava with connect-strava button; BLE demo works — device-btn-trainer opens ble-panel Modal portal, ble-scan surfaces Demo Smart Trainer + Demo Heart Rate + Demo Cadence within 2.5s; no red-screen, no pageerror events. StravaPushButton correctly renders null on summary because connected=false (per agent-to-agent note) — not tested/expected. NOTE: connect-strava button label is now 'Connect' (iter104 showed 'Set up') meaning STRAVA_CLIENT_ID/SECRET are now provisioned in preview env (is_configured=true) — this is consistent with the new feature intent (the rider must reconnect Strava with activity:write), NOT a regression.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter105_strava_push_and_samples.py",
+    "/app/test_reports/pytest/iter105.xml",
+    "/app/test_reports/screens/i105_connections.jpeg",
+    "/app/test_reports/screens/i105_ble.jpeg"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routes/workouts.py:_save_ride_history correctly persists a compact ~1 Hz track (samples[::step][:3600]) capped at 3600 points; safe for a 1h ride.",
+    "routes/workouts.py:_save_ride_history spawns asyncio.create_task(auto_push_strava(uid, rid)) fire-and-forget after captured uid — no ContextVar leak into background task.",
+    "routes/connections.py:strava_push guards: (a) 400 if missing ride_id, (b) 400 if not connected, (c) {reauth_required:true} if connected but no activity:write scope, (d) 404 if ride missing, (e) idempotent {already:true} if strava_activity_id already set, (f) 502 wraps upstream Strava upload failure — no 500 leaks.",
+    "routes/connections.py:_do_strava_push chooses upload_tcx when samples present else create_manual_activity — clean split.",
+    "providers/strava.py:build_tcx renders per-second TCX with Watts/Cadence/HeartRate/Speed extensions — matches Strava's TCX ingestion format; omits HeartRate/Cadence tags cleanly when 0.",
+    "providers/strava.py:upload_tcx polls status up to 6×1.5s (~9s) — reasonable; returns status='processing' if not ready (surfaces to ride-status.pending true when strava_activity_id absent + strava_status=='processing').",
+    "PATCH /api/connections/strava/settings correctly whitelists only disable_route_import/disable_auto_sync/strava_auto_push — no mass-assignment risk.",
+    "auto_push_strava short-circuits when strava_auto_push is False OR permissions missing WRITE_SCOPE OR ride already pushed — idempotent + safe."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter105_strava_push_and_samples.py"],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "100% for stated regression (connections renders, BLE demo, no red screen)"},
+  "seed_data_creation": "None. Test creates 1 ride_history doc via POST /api/workouts/summarize (workout='TEST_iter105 push') under demo@roujaune.app.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "iter105 feature is 'push indoor rides UP to Strava (TCX)' + per-second samples persistence. Demo account is NOT Strava-connected → ride-status returns connected=false / synced=false / pending=false; strava/push returns 400. StravaPushButton renders null on summary when not connected — expected, not a bug. Real TCX upload path (upload_tcx) is NOT exercised in preview (no live token). Note: connect-strava button label flipped from 'Set up' → 'Connect' between iter104 and iter105, meaning STRAVA_CLIENT_ID/SECRET are now provisioned in preview env (is_configured=true). Do NOT attempt real OAuth round-trip. Endpoints of interest: POST /api/workouts/summarize (persists samples[]), GET /api/rides/history, GET /api/connections/strava/ride-status?ride_id=, POST /api/connections/strava/push, PATCH /api/connections/strava/settings. RN-Web: BLE panel is a portal Modal, not window.alert.",
+  "rca_of_issue": "n/a — all iter105 acceptance criteria (samples persistence with avg_hr, ride-status flags, push 400-not-500 guard, settings PATCH, connections regression, /connections + BLE frontend regression) verified passing."
+}

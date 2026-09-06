@@ -10,6 +10,8 @@ import { colors, radius, spacing, shadow, textShadow } from "../theme";
 import { Touchable, SectionLabel } from "./ui";
 import { summaryContent as C, SummaryStats, IntervalScore, fmtDuration } from "../lib/summary";
 import { useCoach } from "../lib/coach-persona";
+import { useRouter } from "expo-router";
+import { pushRideToStrava, stravaRideStatus } from "../lib/ridesync";
 
 const glyph = require("../../assets/images/logo_glyph_t.png");
 const heroImg = require("../../assets/images/hero_cyclist_b2.jpg");
@@ -469,6 +471,57 @@ const SYNC_ICON: Record<string, { icon: React.ReactNode }> = {
   wellness: { icon: <MaterialCommunityIcons name="flower-tulip" size={18} color="#B983FF" /> },
 };
 
+/** Push this indoor ride up to Strava. Reflects auto-upload state: once the
+ *  ride is on Strava the button reads "Synced to Strava". */
+export function StravaPushButton({ rideId, coachSummary, onToast }: { rideId?: string | null; coachSummary?: string; onToast: (m: string) => void }) {
+  const router = useRouter();
+  const [state, setState] = React.useState<{ connected: boolean; can_write: boolean; synced: boolean; pending: boolean } | null>(null);
+  const [busy, setBusy] = React.useState(false);
+
+  const refresh = React.useCallback(async () => {
+    if (!rideId) return;
+    try { setState(await stravaRideStatus(rideId)); } catch { /* offline */ }
+  }, [rideId]);
+
+  React.useEffect(() => {
+    refresh();
+    // Auto-push runs server-side on save — re-check shortly to catch it.
+    const t = setTimeout(refresh, 3000);
+    return () => clearTimeout(t);
+  }, [refresh]);
+
+  if (!rideId || !state || !state.connected) return null;  // hide unless Strava is linked
+
+  const synced = state.synced;
+  const pending = state.pending && !synced;
+  const needsReauth = state.connected && !state.can_write;
+
+  const onPress = async () => {
+    if (synced || busy) return;
+    if (needsReauth) { router.push("/connections" as any); onToast("Reconnect Strava to allow uploads"); return; }
+    setBusy(true);
+    try {
+      const r: any = await pushRideToStrava(rideId, coachSummary);
+      if (r?.reauth_required) { onToast("Reconnect Strava to allow uploads"); router.push("/connections" as any); }
+      else if (r?.ok) { setState((s) => ({ ...(s as any), synced: true })); onToast(r.already ? "Already on Strava" : (r.with_graph ? "Uploaded to Strava with graph" : "Sent to Strava")); }
+    } catch { onToast("Strava upload failed — try again"); }
+    finally { setBusy(false); }
+  };
+
+  const label = synced ? "Synced to Strava" : pending ? "Uploading to Strava…" : needsReauth ? "Reconnect Strava to upload" : "Send to Strava";
+  const icon: any = synced ? "checkmark-circle" : pending ? "cloud-upload-outline" : "logo-buffer";
+  const tint = synced ? colors.green : colors.yellow;
+
+  return (
+    <Pressable testID="strava-push" onPress={onPress} disabled={synced || busy || pending}
+      style={[styles.stravaBtn, { borderColor: tint }, (synced || pending) && { opacity: 0.85 }]}
+      accessibilityRole="button" accessibilityLabel={label}>
+      {busy || pending ? <ActivityIndicator size="small" color={tint} /> : <Ionicons name={icon} size={18} color={tint} />}
+      <Text style={[styles.stravaBtnText, { color: tint }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 export function SyncExportRow({ onToast, compact = false }: { onToast: (m: string) => void; compact?: boolean }) {
   return (
     <View style={[styles.syncCard, compact && styles.syncCardWrap]} testID="sync-export-row">
@@ -764,6 +817,8 @@ const styles = StyleSheet.create({
 
   /* sync */
   syncCard: { ...cardBase, flexDirection: "row", alignItems: "center", paddingVertical: 10, paddingHorizontal: spacing.md, gap: spacing.md },
+  stravaBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 13, borderRadius: radius.md, borderWidth: 1.5, backgroundColor: "rgba(245,179,1,0.06)" },
+  stravaBtnText: { fontSize: 14, fontWeight: "800", letterSpacing: 0.2 },
   syncCardWrap: { flexWrap: "wrap", rowGap: spacing.sm },
   syncLabelWrap: { flexDirection: "row", alignItems: "center", gap: 6, paddingRight: spacing.md, borderRightWidth: 1, borderRightColor: colors.borderSoft },
   syncLabel: { color: colors.textDim, fontSize: 10.5, fontWeight: "800", letterSpacing: 0.6 },

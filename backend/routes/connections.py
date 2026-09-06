@@ -53,6 +53,7 @@ async def _account_view(provider_id: str, acc: Optional[dict]) -> dict:
             "permissions": acc.get("permissions", []),
             "disable_route_import": acc.get("disable_route_import", False),
             "disable_auto_sync": acc.get("disable_auto_sync", False),
+            "strava_auto_push": acc.get("strava_auto_push", True),
             "last_error": acc.get("last_error")}
 
 
@@ -192,7 +193,7 @@ async def connection_delete_data(provider_id: str):
 @router.patch("/connections/{provider_id}/settings")
 async def connection_settings(provider_id: str, body: dict):
     patch = {}
-    for k in ("disable_route_import", "disable_auto_sync"):
+    for k in ("disable_route_import", "disable_auto_sync", "strava_auto_push"):
         if k in body:
             patch[k] = bool(body[k])
     if patch:
@@ -310,3 +311,122 @@ async def sandbox_import(count: int = 3):
     acts = [dict(a) for a in generate_sandbox_activities(count)]
     summary = await activity_sync.ingest_activities(db, auth.current_user_id(), acts, ftp)
     return {"sandbox": True, **summary}
+
+
+# --- Pushing indoor rides UP to Strava ------------------------------------ #
+async def _fresh_access_token(acc: dict) -> str:
+    """Return a valid access token for a connected account, refreshing (and
+    persisting the rotated token) when it is at/near expiry."""
+    access = crypto_util.decrypt_token(acc.get("access_token_encrypted"))
+    now = int(datetime.now(timezone.utc).timestamp())
+    if acc.get("token_expiry") and acc["token_expiry"] < now + 120 and acc.get("refresh_token_encrypted"):
+        p = get_provider(acc["provider"])
+        rt = crypto_util.decrypt_token(acc["refresh_token_encrypted"])
+        newtok = await p.refresh(rt)
+        access = newtok["access_token"]
+        await udb.connected_accounts.update_one({"id": acc["id"]}, {"$set": {
+            "access_token_encrypted": crypto_util.encrypt_token(newtok["access_token"]),
+            "refresh_token_encrypted": crypto_util.encrypt_token(newtok.get("refresh_token")),
+            "token_expiry": now + int(newtok.get("expires_in", 21600))}})
+    return access
+
+
+def _ride_to_strava(h: dict, coach_summary: str | None = None) -> dict:
+    # Prefer an explicit summary (from the summary screen), else any cached
+    # coach debrief stored on the ride (keyed `debrief_<coach>`).
+    if not coach_summary:
+        for k, v in h.items():
+            if k.startswith("debrief_") and isinstance(v, str) and v.strip():
+                coach_summary = v.strip()
+                break
+    return {
+        "id": h.get("id"),
+        "name": (h.get("workout") or (h.get("route") or {}).get("name") or "Indoor Ride"),
+        "started_at": h.get("created_at"),
+        "elapsed_seconds": h.get("duration_sec"),
+        "distance_metres": round(float(h["distance_km"]) * 1000) if h.get("distance_km") else None,
+        "average_power": h.get("avg_power"),
+        "average_heart_rate": h.get("avg_hr"),
+        "tss": h.get("tss"),
+        "calories": h.get("calories"),
+        "coach_summary": coach_summary,
+    }
+
+
+async def _do_strava_push(acc: dict, h: dict, coach_summary: str | None = None) -> dict:
+    """Upload one ride to Strava (TCX when we have samples, else a summary
+    activity) and record the resulting id on the ride. Idempotent per ride."""
+    import providers.strava as strava
+    ride = _ride_to_strava(h, coach_summary)
+    samples = h.get("samples") or []
+    access = await _fresh_access_token(acc)
+    if samples:
+        res = await strava.upload_tcx(access, ride, samples)
+    else:
+        res = await strava.create_manual_activity(access, ride)
+    await udb.ride_history.update_one({"id": h["id"]}, {"$set": {
+        "strava_activity_id": res.get("activity_id"),
+        "strava_upload_id": res.get("upload_id"),
+        "strava_status": res.get("status"),
+        "strava_pushed_at": now_iso()}})
+    await udb.connected_accounts.update_one({"id": acc["id"]}, {"$set": {
+        "last_successful_sync_at": now_iso(), "connection_status": "connected", "last_error": None}})
+    return {"ok": True, "already": False, "status": res.get("status"),
+            "activity_id": res.get("activity_id"), "with_graph": bool(samples)}
+
+
+async def auto_push_strava(user_id: str, ride_id: str) -> None:
+    """Fire-and-forget auto-upload of a just-saved indoor ride, if the rider
+    connected Strava with write access and left auto-push on."""
+    try:
+        import providers.strava as strava
+        acc = await udb.connected_accounts.find_one({"user_id": user_id, "provider": "strava"})
+        if not acc or acc.get("strava_auto_push") is False:
+            return
+        if strava.WRITE_SCOPE not in (acc.get("permissions") or []):
+            return
+        h = await udb.ride_history.find_one({"id": ride_id})
+        if not h or h.get("strava_activity_id"):
+            return
+        await _do_strava_push(acc, h)
+    except Exception as e:
+        logging.warning(f"auto strava push failed: {e}")
+
+
+@router.get("/connections/strava/ride-status")
+async def strava_ride_status(ride_id: str):
+    """Button state for the summary screen: is Strava connected + writable, and
+    has this ride already been pushed?"""
+    import providers.strava as strava
+    acc = await udb.connected_accounts.find_one({"user_id": auth.current_user_id(), "provider": "strava"})
+    h = await udb.ride_history.find_one({"id": ride_id})
+    return {
+        "connected": bool(acc),
+        "can_write": bool(acc and strava.WRITE_SCOPE in (acc.get("permissions") or [])),
+        "synced": bool(h and h.get("strava_activity_id")),
+        "pending": bool(h and h.get("strava_status") == "processing" and not (h or {}).get("strava_activity_id")),
+    }
+
+
+@router.post("/connections/strava/push")
+async def strava_push(body: dict):
+    """Manually push one indoor ride to Strava."""
+    import providers.strava as strava
+    ride_id = body.get("ride_id")
+    if not ride_id:
+        raise HTTPException(400, "ride_id required")
+    acc = await udb.connected_accounts.find_one({"user_id": auth.current_user_id(), "provider": "strava"})
+    if not acc:
+        raise HTTPException(400, "Strava is not connected")
+    if strava.WRITE_SCOPE not in (acc.get("permissions") or []):
+        return {"reauth_required": True, "message": "Reconnect Strava and allow uploads to enable this."}
+    h = await udb.ride_history.find_one({"id": ride_id})
+    if not h:
+        raise HTTPException(404, "Ride not found")
+    if h.get("strava_activity_id"):
+        return {"ok": True, "already": True, "activity_id": h["strava_activity_id"]}
+    try:
+        return await _do_strava_push(acc, h, body.get("coach_summary"))
+    except Exception as e:
+        logging.warning(f"strava push failed: {e}")
+        raise HTTPException(502, "Strava upload failed — please try again")

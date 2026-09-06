@@ -17,7 +17,7 @@ import { CoachChatModal } from "@/src/components/CoachChatModal";
 import {
   SummaryHeader, HeroSummaryCard, MetricsGrid, ComplianceCard,
   ChartsRow, SyncExportRow, RouteSummaryCard, AchievementsCard, RecoveryCard, BottomActionBar,
-  IntervalTargetsCard,
+  IntervalTargetsCard, StravaPushButton,
 } from "@/src/components/summary";
 
 // Build a shareable caption from the ride's stats + route.
@@ -156,6 +156,7 @@ export default function WorkoutComplete() {
                 <ChartsRow stats={stats} width={mainW} vertical={phone} />
                 <KmSplitsCard splits={kmSplits} />
                 {phone && <RightColumn score={78} phone route={route} />}
+                <StravaPushButton rideId={stats?.id} coachSummary={debriefLoading ? undefined : debrief} onToast={showToast} />
                 <SyncExportRow onToast={showToast} compact={phone} />
               </View>
 
