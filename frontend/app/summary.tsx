@@ -14,6 +14,7 @@ import { useSummary, useCoachDebrief, useIntervals, useKmSplits, KmSplit } from 
 import { autoPushCompletedRide } from "@/src/lib/health";
 import { useCoach } from "@/src/lib/coach-persona";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
+import { RidePhotos } from "@/src/components/RidePhotos";
 import {
   SummaryHeader, HeroSummaryCard, MetricsGrid, ComplianceCard,
   ChartsRow, SyncExportRow, RouteSummaryCard, AchievementsCard, RecoveryCard, BottomActionBar,
@@ -157,6 +158,7 @@ export default function WorkoutComplete() {
                 <KmSplitsCard splits={kmSplits} />
                 {phone && <RightColumn score={78} phone route={route} />}
                 <StravaPushButton rideId={stats?.id} coachSummary={debriefLoading ? undefined : debrief} onToast={showToast} />
+                <RidePhotos rideId={stats?.id} onToast={showToast} />
                 <SyncExportRow onToast={showToast} compact={phone} />
               </View>
 

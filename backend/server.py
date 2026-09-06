@@ -410,6 +410,8 @@ from routes import analysis as analysis_routes  # noqa: E402
 api_router.include_router(analysis_routes.router)
 from routes import feedback as feedback_routes  # noqa: E402
 api_router.include_router(feedback_routes.router)
+from routes import ride_photos as ride_photos_routes  # noqa: E402
+api_router.include_router(ride_photos_routes.router)
 app.include_router(api_router)
 app.include_router(feedback_routes.admin_router)
 app.include_router(push.router)

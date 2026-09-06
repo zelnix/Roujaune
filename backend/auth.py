@@ -475,6 +475,13 @@ class AuthMiddleware:
         headers = {k.decode().lower(): v.decode() for k, v in scope.get("headers", [])}
         auth = headers.get("authorization", "")
         token = auth[7:] if auth.lower().startswith("bearer ") else ""
+        if not token:
+            # Fallback: `?token=` query param, for web <img>/download reads that
+            # can't send an Authorization header.
+            qs = (scope.get("query_string") or b"").decode()
+            if "token=" in qs:
+                from urllib.parse import parse_qs
+                token = (parse_qs(qs).get("token") or [""])[0]
         user = await _resolve_token(token) if token else None
         ctx = _current_user.set(user)
         try:

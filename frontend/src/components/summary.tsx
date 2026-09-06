@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, ActivityIndicator, Pressable } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, Pressable, TextInput } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -477,6 +477,10 @@ export function StravaPushButton({ rideId, coachSummary, onToast }: { rideId?: s
   const router = useRouter();
   const [state, setState] = React.useState<{ connected: boolean; can_write: boolean; synced: boolean; pending: boolean } | null>(null);
   const [busy, setBusy] = React.useState(false);
+  const [editing, setEditing] = React.useState(false);
+  const [note, setNote] = React.useState<string>("");
+  // Seed the editable note from the coach summary once it arrives.
+  React.useEffect(() => { if (coachSummary && !note) setNote(coachSummary); }, [coachSummary]);
 
   const refresh = React.useCallback(async () => {
     if (!rideId) return;
@@ -501,7 +505,7 @@ export function StravaPushButton({ rideId, coachSummary, onToast }: { rideId?: s
     if (needsReauth) { router.push("/connections" as any); onToast("Reconnect Strava to allow uploads"); return; }
     setBusy(true);
     try {
-      const r: any = await pushRideToStrava(rideId, coachSummary);
+      const r: any = await pushRideToStrava(rideId, (note || coachSummary || "").trim() || undefined);
       if (r?.reauth_required) { onToast("Reconnect Strava to allow uploads"); router.push("/connections" as any); }
       else if (r?.ok) { setState((s) => ({ ...(s as any), synced: true })); onToast(r.already ? "Already on Strava" : (r.with_graph ? "Uploaded to Strava with graph" : "Sent to Strava")); }
     } catch { onToast("Strava upload failed — try again"); }
@@ -513,12 +517,31 @@ export function StravaPushButton({ rideId, coachSummary, onToast }: { rideId?: s
   const tint = synced ? colors.green : colors.yellow;
 
   return (
-    <Pressable testID="strava-push" onPress={onPress} disabled={synced || busy || pending}
-      style={[styles.stravaBtn, { borderColor: tint }, (synced || pending) && { opacity: 0.85 }]}
-      accessibilityRole="button" accessibilityLabel={label}>
-      {busy || pending ? <ActivityIndicator size="small" color={tint} /> : <Ionicons name={icon} size={18} color={tint} />}
-      <Text style={[styles.stravaBtnText, { color: tint }]}>{label}</Text>
-    </Pressable>
+    <View style={{ gap: 8 }}>
+      <Pressable testID="strava-push" onPress={onPress} disabled={synced || busy || pending}
+        style={[styles.stravaBtn, { borderColor: tint }, (synced || pending) && { opacity: 0.85 }]}
+        accessibilityRole="button" accessibilityLabel={label}>
+        {busy || pending ? <ActivityIndicator size="small" color={tint} /> : <Ionicons name={icon} size={18} color={tint} />}
+        <Text style={[styles.stravaBtnText, { color: tint }]}>{label}</Text>
+      </Pressable>
+      {!synced && !needsReauth && (
+        <Pressable onPress={() => setEditing((v) => !v)} style={styles.stravaEditToggle} testID="strava-edit-note">
+          <Ionicons name={editing ? "chevron-up" : "create-outline"} size={14} color={colors.textDim} />
+          <Text style={styles.stravaEditText}>{editing ? "Hide note" : "Edit note sent to Strava"}</Text>
+        </Pressable>
+      )}
+      {editing && !synced && (
+        <TextInput
+          value={note}
+          onChangeText={setNote}
+          placeholder="Add a note for your Strava activity…"
+          placeholderTextColor={colors.textFaint}
+          multiline
+          style={styles.stravaNote}
+          testID="strava-note-input"
+        />
+      )}
+    </View>
   );
 }
 
@@ -819,6 +842,9 @@ const styles = StyleSheet.create({
   syncCard: { ...cardBase, flexDirection: "row", alignItems: "center", paddingVertical: 10, paddingHorizontal: spacing.md, gap: spacing.md },
   stravaBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 13, borderRadius: radius.md, borderWidth: 1.5, backgroundColor: "rgba(245,179,1,0.06)" },
   stravaBtnText: { fontSize: 14, fontWeight: "800", letterSpacing: 0.2 },
+  stravaEditToggle: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "center", paddingVertical: 2 },
+  stravaEditText: { color: colors.textDim, fontSize: 12.5, fontWeight: "700" },
+  stravaNote: { minHeight: 66, color: colors.white, fontSize: 13.5, lineHeight: 19, backgroundColor: colors.cardElevated, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: 10, textAlignVertical: "top" },
   syncCardWrap: { flexWrap: "wrap", rowGap: spacing.sm },
   syncLabelWrap: { flexDirection: "row", alignItems: "center", gap: 6, paddingRight: spacing.md, borderRightWidth: 1, borderRightColor: colors.borderSoft },
   syncLabel: { color: colors.textDim, fontSize: 10.5, fontWeight: "800", letterSpacing: 0.6 },
