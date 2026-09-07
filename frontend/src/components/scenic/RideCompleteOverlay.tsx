@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { colors, radius } from "@/src/theme";
 import { RideRouteMap, RouteMapPoint } from "@/src/components/RideRouteMap";
 import { ConfettiBurst } from "@/src/components/ConfettiBurst";

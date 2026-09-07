@@ -2,7 +2,9 @@ import React from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, Switch, Platform, TextInput } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
+import type { IoniconName } from "@/src/lib/icon-types";
+import MaterialCommunityIcons from "@react-native-vector-icons/material-design-icons";
 import Svg, { Rect, Polyline, Circle, Line } from "react-native-svg";
 import { colors, radius, spacing, shadow, textShadow } from "../theme";
 import { Touchable, SectionLabel } from "./ui";
@@ -807,7 +809,7 @@ const mh = { flexDirection: "row" as const, alignItems: "center" as const, gap: 
 export function SettingsPanel({ settings, setSetting, onClose }: {
   settings: Settings; setSetting: <K extends keyof Settings>(k: K, v: Settings[K]) => void; onClose: () => void;
 }) {
-  const rows: { key: keyof Settings; icon: keyof typeof Ionicons.glyphMap; label: string; sub: string }[] = [
+  const rows: { key: keyof Settings; icon: IoniconName; label: string; sub: string }[] = [
     { key: "demoMode", icon: "flask-outline", label: "Demo mode", sub: "Simulate a ride without hardware — Live by default" },
     { key: "hudEnabled", icon: "eye", label: "Show on-screen HUD", sub: "Live-data overlay in full screen" },
     { key: "seatedMode", icon: "body-outline", label: "Seated mode", sub: "Stay in the saddle — cues avoid standing efforts" },

@@ -1,6 +1,6 @@
 import React from "react";
 import { Modal, View, Text, StyleSheet, Pressable, Switch } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { colors, radius } from "@/src/theme";
 import type { ControlMode } from "@/src/hooks/useBleSensors";
 

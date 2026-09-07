@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, Modal, Pressable, ScrollView, Platform } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { useRouter } from "expo-router";
 import { colors, radius, spacing } from "../../theme";
 import { TODAY_MODES, TodayModeMeta, useTodayMode } from "../../lib/today-mode";

@@ -2,7 +2,8 @@ import React from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
+import type { IoniconName } from "@/src/lib/icon-types";
 import * as Speech from "expo-speech";
 import { AppScaffold, Card, SectionTitle, Toggle } from "@/src/components/app-scaffold";
 import { CC } from "@/src/components/calendar";
@@ -358,7 +359,7 @@ function PrefToggle({ label, sub, on, onToggle, testID, divider }: { label: stri
   );
 }
 
-function PrefRow({ icon, label, sub, onPress, testID, divider }: { icon: keyof typeof Ionicons.glyphMap; label: string; sub: string; onPress: () => void; testID: string; divider?: boolean }) {
+function PrefRow({ icon, label, sub, onPress, testID, divider }: { icon: IoniconName; label: string; sub: string; onPress: () => void; testID: string; divider?: boolean }) {
   return (
     <Pressable testID={testID} onPress={onPress} style={({ hovered }: any) => [s.prefRow, divider && s.divider, hovered && { opacity: 0.9 }]} accessibilityRole="button">
       <Ionicons name={icon} size={20} color={CC.dim} style={{ marginRight: 12 }} />

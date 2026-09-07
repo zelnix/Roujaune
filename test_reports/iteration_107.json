@@ -1,0 +1,44 @@
+{
+  "summary": "Expo SDK 54 -> 57 upgrade + @expo/vector-icons -> @react-native-vector-icons migration frontend regression: PASSED. All targeted flows verified end-to-end on the web preview (landscape 1280x900) with demo@roujaune.app / demo9900. Landing (Google G + Mail glyphs), sign-in, home/today (Alberto, bottom-nav, weather, calendar, cadence/power/HR/streak icons, sidebar 11-item nav) all render real Ionicons/MaterialDesignIcons glyphs (no tofu). /connections: today-mode-button, device-btn-trainer/wearable, provider-strava, connect-strava all resolve; tapping device-btn-trainer opens ble-panel; ble-scan yields exactly 3 demo devices (ble-connect-demo-trainer, ble-connect-demo-hr, ble-connect-demo-cadence); connecting the trainer shows live POWER=143 W, CADENCE=82 rpm, SPEED=32 km/h and battery 92% badge with real bluetooth/battery glyphs. Mode picker (today-mode-button) shows all 8 riding-experience rows with icons; selecting today-mode-option-gravel works. /scenic-destinations renders 27 destinations with all filter icons (search, back, shuffle, region/distance/climb/sort filters, heart favorite, clock, distance, climb glyphs) and destination-card-* testIDs; note the flow now taps a destination card directly to open /scenic-ride?route=<slug> (no intermediate detail screen with begin-scenic-journey on web). /scenic-ride loads for Lake Garda without any red-screen; YouTube embed shows 'Video unavailable' (EXPECTED per review); scenic-source opens the streaming sheet with app tiles (Netflix, Prime Video, Disney+, Apple TV, YouTube, SBS, 9Now, 7+, 10, plus Scenic route video + My YouTube video toggles) and 13 fav-* star icons render. /settings renders with 42 elements bound to Ionicons/MaterialDesignIcons font family (PrefRow icons on Premium star, Alberto/Adriana coach cards, hear-a-sample speaker, Balanced/Voice/Speed radios, gear/etc). /summary renders without crashing (real save/edit/chart/wifi/checkmark/share glyphs, VIEW FULL ANALYSIS/SAVE & EXIT/SHARE RIDE buttons); StravaPushButton intentionally null for the demo (Strava not connected) - EXPECTED; RidePhotos not shown on this manual-entry stub - EXPECTED. Console shows only pre-login 401s (expected), a benign expo-notifications web warning, one 'No available adapters.' warning (benign, likely BLE web stub) and one React Native 'Image: style.resizeMode is deprecated. Please use props.resizeMode.' warning (worth a low-priority cleanup - not a SDK57 regression). No pageerrors from the app code; only a browser-policy 'play() failed because the user didn't interact with the document first' from the auto-playing scenic ride audio (browser autoplay policy, not a bug).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {
+        "component": "Image (some screen — appears when /summary loads)",
+        "issue": "React Native warning: 'Image: style.resizeMode is deprecated. Please use props.resizeMode.' Move resizeMode from style={{resizeMode:'cover'}} to props (resizeMode='cover'). Low priority - purely a deprecation warning, no visual regression. Not caused by the SDK57 upgrade."
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/test_reports/screens/01_landing.png",
+    "/app/test_reports/screens/03_after_login.png",
+    "/app/test_reports/screens/04_connections.png",
+    "/app/test_reports/screens/05_ble_panel.png",
+    "/app/test_reports/screens/06_ble_scanned.png",
+    "/app/test_reports/screens/07_ble_connected.png",
+    "/app/test_reports/screens/08_mode_menu.png",
+    "/app/test_reports/screens/09_scenic_destinations.png",
+    "/app/test_reports/screens/10_settings.png",
+    "/app/test_reports/screens/14_scenic_ride_direct.png",
+    "/app/test_reports/screens/15_scenic_source_open.png",
+    "/app/test_reports/screens/17_summary.png"
+  ],
+  "action_items": [
+    "(Low) Fix the React Native 'Image: style.resizeMode is deprecated' warning by moving resizeMode from style to a prop on the offending <Image>. Grep: `resizeMode:\\s*['\"]` inside /app/frontend/src and /app/frontend/app.",
+    "(Info, no action needed) The review mentioned 'provider-apple_health / provider-health_connect' testIDs — on the web preview /connections renders the combined HealthSyncCard (testID=health-sync, 'Available in an installed iOS/Android build'), which is by design. The provider-* variants only exist on native builds."
+  ],
+  "critical_code_review_comments": [
+    "use-icon-fonts.ts preloads only Ionicons + MaterialDesignIcons .ttf assets. Verified via computed fontFamily inspection that /settings has 42 elements bound to those families and their glyphs render. Nothing else needed for @react-native-vector-icons migration.",
+    "connections.tsx (screenshot 04): HealthSyncCard is the correct single-card web renderer; do not treat missing provider-apple_health / provider-health_connect on web as a regression."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "N/A (frontend-only regression)", "frontend": "100%" },
+  "seed_data_creation": "None. Read-only regression - no persistent state written.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "SDK 54 -> 57 upgrade + vector-icons migration is verified clean on web preview. Regression flow (login -> /connections -> BLE demo -> mode picker -> Gravel -> /scenic-destinations -> tap destination-card-lake-garda -> /scenic-ride -> scenic-source sheet -> /settings -> /summary) is a fast smoke path (~90s). Note that on web the flow tap-to-ride is direct: destination-card-* click routes to /scenic-ride?route=<slug> (there is no separate detail screen with a begin-scenic-journey testID on web preview). Only warnings in console are the harmless expo-notifications web warning, one 'No available adapters.' from the BLE web stub, and an Image resizeMode deprecation warning.",
+  "rca_of_issue": "N/A — no regressions found."
+}

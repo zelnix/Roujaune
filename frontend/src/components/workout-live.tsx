@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import Svg, { Polyline, Polygon as SvgPolygon } from "react-native-svg";
 import { colors, radius, spacing, textShadow } from "@/src/theme";
 import { versionLabel } from "./AppVersionTag";

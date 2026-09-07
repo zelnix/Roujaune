@@ -1,6 +1,6 @@
 // Central mock data for the ROUJAUNE dashboard — data-driven, matches the reference.
 import type { ComponentProps } from "react";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { colors } from "./theme";
 
 type Ion = ComponentProps<typeof Ionicons>["name"];

@@ -1,6 +1,6 @@
 import React from "react";
 import { Modal, View, Text, StyleSheet, Pressable, ScrollView, TextInput, ActivityIndicator } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 
 import { CC } from "./calendar";
 import { loadCatalog } from "@/src/lib/catalog";

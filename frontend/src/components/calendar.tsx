@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
+import type { IoniconName } from "@/src/lib/icon-types";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Rect, Circle } from "react-native-svg";
@@ -76,7 +77,7 @@ export function DraggableSession({
 }
 
 /* ── row label ──────────────────────────────────────────────────────────── */
-export function RowLabel({ icon, label, color }: { icon: keyof typeof Ionicons.glyphMap; label: string; color: string }) {
+export function RowLabel({ icon, label, color }: { icon: IoniconName; label: string; color: string }) {
   return (
     <View style={cs.rowLabel}>
       <Ionicons name={icon} size={17} color={color} />
@@ -426,7 +427,7 @@ export function DateControls({
   );
 }
 
-function CtrlBtn({ icon, onPress, testID, label }: { icon: keyof typeof Ionicons.glyphMap; onPress: () => void; testID: string; label: string }) {
+function CtrlBtn({ icon, onPress, testID, label }: { icon: IoniconName; onPress: () => void; testID: string; label: string }) {
   return (
     <Pressable testID={testID} onPress={onPress} accessibilityRole="button" accessibilityLabel={label}
       style={({ hovered }: any) => [cs.iconBtn, hovered && cs.hover]}>

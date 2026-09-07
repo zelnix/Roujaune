@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable, Platform, Alert, Linking, TextInput, Image, ActivityIndicator } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as MailComposer from "expo-mail-composer";

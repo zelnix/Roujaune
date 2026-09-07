@@ -7,7 +7,7 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { CC } from "@/src/components/calendar";
 import { getBenchmarkTest } from "@/src/lib/benchmark/catalog";
 import {

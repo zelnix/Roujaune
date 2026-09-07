@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, Animated, Platform, Pressable, ActivityIndicator } from "react-native";
 import { Image } from "expo-image";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { colors, radius, shadow, spacing } from "@/src/theme";
 
 // Lightweight ephemeral toast shown near the bottom of the live-workout screen.

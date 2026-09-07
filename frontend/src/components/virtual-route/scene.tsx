@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Image, StyleSheet, Animated, Platform } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import Svg, { Circle, Line, G } from "react-native-svg";
 import { colors } from "@/src/theme";
 import type { VirtualRider } from "@/src/lib/virtual-riders";

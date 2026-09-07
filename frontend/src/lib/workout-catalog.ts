@@ -1,10 +1,10 @@
-import { Ionicons } from "@expo/vector-icons";
+import type { IoniconName } from "@/src/lib/icon-types";
 import { COUCH_TO_ROAD, ctrRideId, type Interval, type Session } from "./programs/couch-to-road";
 import { RIDE_STRONGER, rsRideId } from "./programs/ride-stronger";
 import { RIDE_BEYOND, rbRideId } from "./programs/ride-beyond";
 import { cachedWorkout } from "./catalog-cache";
 
-type Ion = keyof typeof Ionicons.glyphMap;
+type Ion = IoniconName;
 
 export type Zone = { label: string; pct: number; color: string };
 export type Workout = {

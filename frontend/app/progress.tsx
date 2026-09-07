@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
 import Svg, { Path, Line, Circle, Defs, LinearGradient as SvgGrad, Stop } from "react-native-svg";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { AppScaffold, useApiData, Card, SectionTitle } from "@/src/components/app-scaffold";
 import { CC, colorOf } from "@/src/components/calendar";
 import { useProgressTimeline, RANGE_OPTIONS, TimelineRange } from "@/src/lib/progress-timeline";

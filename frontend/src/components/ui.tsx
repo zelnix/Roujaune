@@ -9,7 +9,7 @@ import {
   Animated,
   Platform,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import Svg, { Circle, Polyline, Rect, Circle as SvgCircle } from "react-native-svg";

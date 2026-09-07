@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { CC } from "@/src/components/calendar";
 import { CATEGORY_META } from "@/src/lib/benchmark/catalog";
 import type { BenchmarkTest, EquipmentKey } from "@/src/lib/benchmark/types";

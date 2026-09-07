@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from "react-native";
 import Svg, { Polyline, Line, Path } from "react-native-svg";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { AppScaffold, Card } from "@/src/components/app-scaffold";
 import { colors, radius } from "@/src/theme";
 import { fetchActivities, fetchActivity, RideListItem, RideDetail } from "@/src/lib/activities";

@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, Image, StyleSheet, Pressable, ScrollView, useWindowDimensions, StyleProp, ViewStyle } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
+import type { IoniconName } from "@/src/lib/icon-types";
 import { colors, radius, shadow } from "@/src/theme";
 import { VirtualRouteScene, SceneTelemetry } from "./scene";
 import { RouteProfile } from "./RouteProfile";
@@ -47,7 +48,7 @@ export type VirtualRidePlayerProps = {
   stepTimeLeft?: string;
   compact?: boolean;
   style?: StyleProp<ViewStyle>;
-  routeBadge?: { icon: keyof typeof Ionicons.glyphMap; label: string } | null;
+  routeBadge?: { icon: IoniconName; label: string } | null;
   /** Vertical stage/segment progression shown in the rail (workout intervals or route checkpoints). */
   stages?: { label: string; sub?: string; state: "done" | "active" | "upcoming" }[];
   // Controls
@@ -58,14 +59,14 @@ export type VirtualRidePlayerProps = {
   /** Opens the "Ride screen" source picker (scenic route vs YouTube). */
   onOpenSource?: () => void;
   sourceLabel?: string;
-  sourceIcon?: keyof typeof Ionicons.glyphMap;
+  sourceIcon?: IoniconName;
   onPreset?: (watts: number) => void;
   ergOn?: boolean;
   onErgToggle?: () => void;
   onReconnect?: () => void;
   // Context-aware extras (used by the standalone Virtual Routes ride)
   exitLabel?: string;
-  exitIcon?: keyof typeof Ionicons.glyphMap;
+  exitIcon?: IoniconName;
   onSensors?: () => void;
   sensorsOn?: boolean;
   onEmergency?: () => void;

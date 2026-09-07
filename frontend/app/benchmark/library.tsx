@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { CC } from "@/src/components/calendar";
 import { AVAILABLE_TESTS } from "@/src/lib/benchmark/catalog";
 import { BenchmarkLibrary, type BenchmarkLibraryFilter } from "@/src/components/benchmark/BenchmarkLibrary";

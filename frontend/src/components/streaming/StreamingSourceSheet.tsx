@@ -3,7 +3,8 @@ import {
   Modal, View, Text, StyleSheet, Pressable, TextInput, ScrollView,
   KeyboardAvoidingView, Platform, Alert,
 } from "react-native";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
+import MaterialCommunityIcons from "@react-native-vector-icons/material-design-icons";
 import { Image } from "expo-image";
 import { colors, radius, spacing } from "@/src/theme";
 import { STREAMING_SERVICES, parseYouTubeId, launchStreaming, pipTip, StreamingService, loadYouTubeRecents, addYouTubeRecent, YouTubeRecent, youtubeThumb, CustomStreamingApp, loadCustomApps, addCustomApp, removeCustomApp, launchCustomApp, loadFavorites, toggleFavorite } from "@/src/lib/streaming";

@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable, Image, ActivityIndicator, Alert, Linking } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { colors, radius, spacing } from "@/src/theme";
 import { RidePhoto, listRidePhotos, uploadRidePhoto, deleteRidePhoto, ridePhotoUri } from "@/src/lib/ride-photos";
 

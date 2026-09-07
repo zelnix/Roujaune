@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, ActivityIndicator, Pressable, LayoutChangeEvent } from "react-native";
 import { Image } from "expo-image";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { colors, radius } from "../theme";
 import { getYouTubeId, posterFor } from "../lib/youtube";
 import Player from "./video/RouteVideoPlayer";

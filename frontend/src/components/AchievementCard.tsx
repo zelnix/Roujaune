@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ImageBackground } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle, Polygon } from "react-native-svg";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { C } from "./plan";
 
 const BG = require("../../assets/images/auth_bg_sunset.png");

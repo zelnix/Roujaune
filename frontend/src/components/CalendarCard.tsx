@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import dayjs from "dayjs";
 import { colors, radius, spacing } from "../theme";
 import { todayPlan } from "../data";

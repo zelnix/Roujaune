@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, Pressable, ScrollView, Image, ActivityIndicator
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
+import type { IoniconName } from "@/src/lib/icon-types";
 import { colors, radius, spacing, shadow } from "@/src/theme";
 import {
   RIDER_TYPES,
@@ -23,12 +24,12 @@ import { RiveRider } from "@/src/components/virtual-route/RiveRider";
 const eq = (a: RiderAppearanceConfiguration, b: RiderAppearanceConfiguration) =>
   a.riderType === b.riderType && a.bikeType === b.bikeType && a.clothingStyle === b.clothingStyle;
 
-const BIKE_ICON: Record<BikeType, keyof typeof Ionicons.glyphMap> = {
+const BIKE_ICON: Record<BikeType, IoniconName> = {
   road: "bicycle",
   mountain: "trail-sign",
   vintage: "time",
 };
-const CLOTHING_ICON: Record<ClothingStyle, keyof typeof Ionicons.glyphMap> = {
+const CLOTHING_ICON: Record<ClothingStyle, IoniconName> = {
   pro: "trophy",
   get_fit: "fitness",
   casual: "shirt",
@@ -205,7 +206,7 @@ export default function RiderCustomiseScreen() {
 }
 
 function OptionRow({ icon, label, sub, selected, onPress, testID }: {
-  icon: keyof typeof Ionicons.glyphMap; label: string; sub: string; selected: boolean; onPress: () => void; testID: string;
+  icon: IoniconName; label: string; sub: string; selected: boolean; onPress: () => void; testID: string;
 }) {
   return (
     <Pressable onPress={onPress} testID={testID} style={[s.optRow, selected && s.optRowSel]} accessibilityRole="button" accessibilityLabel={`Choose ${label}`}>

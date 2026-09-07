@@ -4,7 +4,7 @@
 // setup, player, results, history). Data-driven so new tests reuse the same UI.
 // ─────────────────────────────────────────────────────────────────────────
 import type { ComponentProps } from "react";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 
 type Ion = ComponentProps<typeof Ionicons>["name"];
 

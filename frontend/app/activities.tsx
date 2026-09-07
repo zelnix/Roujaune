@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Pressable, RefreshControl } from "react-native";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { AppScaffold, Card } from "@/src/components/app-scaffold";
 import { colors, radius } from "@/src/theme";
 import { fetchActivities, uploadActivity, RideListItem } from "@/src/lib/activities";

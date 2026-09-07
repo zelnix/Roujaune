@@ -2,7 +2,8 @@ import React from "react";
 import { View, Text, StyleSheet, ActivityIndicator, Pressable, TextInput } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
+import MaterialCommunityIcons from "@react-native-vector-icons/material-design-icons";
 import Svg, {
   Rect, Path, Polyline, Circle, Line, Defs, LinearGradient as SvgGradient, Stop,
 } from "react-native-svg";

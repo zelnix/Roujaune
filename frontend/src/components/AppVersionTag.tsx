@@ -2,7 +2,7 @@ import React from "react";
 import { Text, StyleSheet, Platform, TextStyle, StyleProp, Pressable, Modal, View } from "react-native";
 import Constants from "expo-constants";
 import * as Clipboard from "expo-clipboard";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { textShadow } from "../theme";
 
 /** "v1.0.0 · Build 1" — reads the version from app config and the platform

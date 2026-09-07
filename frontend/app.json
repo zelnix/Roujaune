@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "roujaune",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "usesAppleSignIn": true,
@@ -47,7 +46,6 @@
         "monochromeImage": "./assets/images/adaptive-icon-monochrome.png",
         "backgroundColor": "#000000"
       },
-      "edgeToEdgeEnabled": true,
       "permissions": [
         "android.permission.BLUETOOTH_SCAN",
         "android.permission.BLUETOOTH_CONNECT",
@@ -102,7 +100,7 @@
         {
           "ios": {
             "useFrameworks": "static",
-            "deploymentTarget": "15.1"
+            "deploymentTarget": "16.4"
           },
           "android": {
             "minSdkVersion": 26
@@ -137,7 +135,10 @@
           "iosUrlScheme": "com.googleusercontent.apps.100157698823-0cc8mq63uan5cenfgqeoo049ushvqlk0"
         }
       ],
-      "./plugins/withChromeOsCompat"
+      "./plugins/withChromeOsCompat",
+      "expo-asset",
+      "@react-native-vector-icons/ionicons",
+      "@react-native-vector-icons/material-design-icons"
     ],
     "experiments": {
       "typedRoutes": true

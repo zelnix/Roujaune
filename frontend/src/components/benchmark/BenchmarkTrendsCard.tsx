@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────────
 import React from "react";
 import { View, Text, StyleSheet, Pressable, ActivityIndicator } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { CC } from "@/src/components/calendar";
 import { Card, SectionTitle } from "@/src/components/app-scaffold";
 import { useBenchmarkTrends } from "@/src/lib/benchmark/api";

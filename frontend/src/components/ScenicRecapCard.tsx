@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, ImageBackground } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop, Line } from "react-native-svg";
 import { colors } from "@/src/theme";
 import { ScenicJourney } from "@/src/lib/scenic-routes";

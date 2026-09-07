@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
+import type { IoniconName } from "@/src/lib/icon-types";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Rect, Path, Circle, Line, Text as SvgText, Defs, LinearGradient as SvgGrad, Stop } from "react-native-svg";
@@ -20,7 +21,7 @@ const heroImg = require("../../assets/images/hero_cyclist_b2.jpg");
 /* ── mock data (matches the reference exactly) ───────────────────────────── */
 export type PlanGoal = { id: string; title: string; description: string; status: "complete" | "incomplete" };
 export type PlanPhase = { id: string; number: number; name: string; weeks: string; pct: number; active?: boolean; objective?: string; points: number[] };
-export type KeyWorkout = { id: string; title: string; icon: keyof typeof Ionicons.glyphMap; duration: string; zone: string; tss: string; footer: string; color: string; profile: number[]; completed?: boolean; status?: string; actual_tss?: string; actual_duration?: string; type?: string; subtitle?: string; date?: string; date_label?: string; is_today?: boolean };
+export type KeyWorkout = { id: string; title: string; icon: IoniconName; duration: string; zone: string; tss: string; footer: string; color: string; profile: number[]; completed?: boolean; status?: string; actual_tss?: string; actual_duration?: string; type?: string; subtitle?: string; date?: string; date_label?: string; is_today?: boolean };
 
 export const PLAN = {
   id: "build-and-climb",

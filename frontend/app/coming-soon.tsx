@@ -2,7 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView, useWindowDimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { colors, radius, spacing } from "@/src/theme";
 import { modeMeta, RiderExperience } from "@/src/lib/today-mode";

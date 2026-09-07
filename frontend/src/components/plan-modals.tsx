@@ -3,7 +3,8 @@ import {
   View, Text, StyleSheet, Modal, Pressable, ScrollView, TextInput,
   ActivityIndicator, Platform, KeyboardAvoidingView,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
+import type { IoniconName } from "@/src/lib/icon-types";
 import { Image } from "expo-image";
 import Svg, { Path, Circle, Line, Rect, Text as SvgText } from "react-native-svg";
 import { C, ProgressRing, PlanPhase, KeyWorkout, WorkoutProfile } from "./plan";
@@ -19,7 +20,7 @@ function ModalShell({
   visible, onClose, title, subtitle, icon, iconColor = C.yellow, maxWidth = 760, children, footer,
 }: {
   visible: boolean; onClose: () => void; title: string; subtitle?: string;
-  icon: keyof typeof Ionicons.glyphMap; iconColor?: string; maxWidth?: number;
+  icon: IoniconName; iconColor?: string; maxWidth?: number;
   children: React.ReactNode; footer?: React.ReactNode;
 }) {
   return (

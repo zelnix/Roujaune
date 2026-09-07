@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, Modal, Pressable, ScrollView, TextInput,
   ActivityIndicator, Platform, KeyboardAvoidingView,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@react-native-vector-icons/ionicons";
 import { Image } from "expo-image";
 import { C } from "./plan";
 import { CoachPersona, useCoachStyle } from "../lib/coach-persona";

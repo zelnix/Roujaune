@@ -1,6 +1,6 @@
-import { Ionicons } from "@expo/vector-icons";
+import type { IoniconName } from "@/src/lib/icon-types";
 
-type Ion = keyof typeof Ionicons.glyphMap;
+type Ion = IoniconName;
 
 export type WorkoutType = {
   id: string;
