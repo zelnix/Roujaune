@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Modal, Pressable, ActivityIndicator, Platform, Linking, ScrollView } from "react-native";
+import { View, Text, StyleSheet, Modal, Pressable, ActivityIndicator, Platform, Linking, ScrollView, TextInput } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { Image } from "expo-image";
 import { captureRef } from "react-native-view-shot";
@@ -8,6 +8,7 @@ import * as MediaLibrary from "expo-media-library/legacy";
 import { colors, radius } from "@/src/theme";
 import { ScenicJourney, setRecapCover } from "@/src/lib/scenic-routes";
 import { ScenicRecapCard } from "./ScenicRecapCard";
+import { SocialShareRow } from "./SocialShareRow";
 
 /** Presents the branded scenic ride recap and lets the rider share or save it. */
 export function ScenicRecapShareModal({
@@ -23,9 +24,18 @@ export function ScenicRecapShareModal({
   const [notice, setNotice] = React.useState<{ msg: string; action?: "settings" } | null>(null);
   // Live cover override so the card updates the instant a cover is picked.
   const [cover, setCover] = React.useState<string | null | undefined>(undefined);
+  const [caption, setCaption] = React.useState("");
 
   React.useEffect(() => { if (visible) setNotice(null); }, [visible]);
   React.useEffect(() => { setCover(journey?.cover ?? null); }, [journey]);
+  React.useEffect(() => {
+    if (visible && journey) {
+      const j = journey as any;
+      const name = j.name || j.title || j.routeName || "My scenic ride";
+      const place = j.place || j.location ? ` · ${j.place || j.location}` : "";
+      setCaption(`${name}${place}\nROUJAUNE · Your strongest ride is your own.`);
+    }
+  }, [visible, journey]);
 
   const coverPhotos = React.useMemo(
     () => Array.from(new Set((journey?.discoveries || []).map((d) => d.photo).filter(Boolean) as string[])),
@@ -126,11 +136,21 @@ export function ScenicRecapShareModal({
               </View>
             ) : null}
 
+            <View style={s.captionWrap}>
+              <Text style={s.captionLabel}>YOUR CAPTION</Text>
+              <TextInput testID="recap-caption-input" style={s.captionInput} value={caption}
+                onChangeText={setCaption} multiline placeholder="Say something about your ride…"
+                placeholderTextColor={colors.textDim} accessibilityLabel="Edit the caption shared with your recap" />
+            </View>
+
+            <SocialShareRow caption={caption} getImageUri={capture} disabled={!!busy}
+              onNotice={(msg, action) => setNotice({ msg, action })} />
+
             <View style={s.actions}>
-              <Pressable testID="recap-share" onPress={onShare} disabled={!!busy} accessibilityRole="button" accessibilityLabel="Share scenic ride recap"
+              <Pressable testID="recap-share" onPress={onShare} disabled={!!busy} accessibilityRole="button" accessibilityLabel="Share scenic ride recap image via more apps"
                 style={({ pressed }: any) => [s.primaryBtn, pressed && { opacity: 0.9 }, !!busy && { opacity: 0.6 }]}>
                 {busy === "share" ? <ActivityIndicator size="small" color="#241B00" /> : <Ionicons name="share-social" size={18} color="#241B00" />}
-                <Text style={s.primaryText}>Share</Text>
+                <Text style={s.primaryText}>More…</Text>
               </Pressable>
               <Pressable testID="recap-save" onPress={onSave} disabled={!!busy} accessibilityRole="button" accessibilityLabel="Save scenic ride recap to photos"
                 style={({ pressed }: any) => [s.secondaryBtn, pressed && s.secondaryHover, !!busy && { opacity: 0.6 }]}>
@@ -155,6 +175,9 @@ const s = StyleSheet.create({
   sheet: { width: "100%", maxWidth: 440, alignItems: "center" },
   cardWrap: { borderRadius: 22, ...Platform.select({ web: { boxShadow: "0px 12px 24px rgba(0,0,0,0.5)" }, default: { shadowColor: "#000", shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 12 } }) },
   coverPicker: { alignSelf: "stretch", marginTop: 16, maxWidth: 360, width: "100%" },
+  captionWrap: { alignSelf: "stretch", marginTop: 16, maxWidth: 360, width: "100%" },
+  captionLabel: { color: colors.yellow, fontSize: 10.5, fontWeight: "900", letterSpacing: 1.4, marginBottom: 6 },
+  captionInput: { color: colors.white, fontSize: 13.5, lineHeight: 19, minHeight: 62, borderWidth: 1, borderColor: "rgba(255,255,255,0.14)", borderRadius: 12, backgroundColor: "rgba(255,255,255,0.04)", paddingHorizontal: 12, paddingVertical: 10, textAlignVertical: "top" },
   coverLabel: { color: colors.yellow, fontSize: 10.5, fontWeight: "900", letterSpacing: 1.4, marginBottom: 8 },
   coverRow: { gap: 10, paddingRight: 8 },
   coverThumb: { width: 64, height: 64, borderRadius: 12, overflow: "hidden", borderWidth: 2, borderColor: "transparent", backgroundColor: "#0E1512" },

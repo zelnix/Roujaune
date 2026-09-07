@@ -1,14 +1,14 @@
 import React from "react";
-import { View, Text, StyleSheet, Modal, Pressable, ActivityIndicator, Platform, Linking, ScrollView } from "react-native";
+import { View, Text, StyleSheet, Modal, Pressable, ActivityIndicator, Platform, Linking, ScrollView, TextInput } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { Image } from "expo-image";
 import { captureRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import * as MediaLibrary from "expo-media-library/legacy";
 import * as ImagePicker from "expo-image-picker";
-import * as Clipboard from "expo-clipboard";
 import { fetchDiscoveries } from "../lib/scenic-routes";
 import { C } from "./plan";
+import { SocialShareRow } from "./SocialShareRow";
 import { AchievementCard, AchievementCardData } from "./AchievementCard";
 
 /** Presents the branded achievement card and lets the rider share it or save it
@@ -25,6 +25,14 @@ export function ShareCardModal({
   const [notice, setNotice] = React.useState<{ msg: string; action?: "settings" } | null>(null);
   const [bgUri, setBgUri] = React.useState<string | null>(null);
   const [discoPhotos, setDiscoPhotos] = React.useState<string[]>([]);
+  const [caption, setCaption] = React.useState("");
+
+  React.useEffect(() => {
+    if (visible && data) {
+      const head = [data.kicker, data.title].filter(Boolean).join(" · ");
+      setCaption(`${head}${data.subtitle ? ` — ${data.subtitle}` : ""}\nROUJAUNE · Your strongest ride is your own.`);
+    }
+  }, [visible, data]);
 
   React.useEffect(() => {
     if (visible) { setNotice(null); setBgUri(null); }
@@ -117,26 +125,6 @@ export function ShareCardModal({
 
   if (!data) return null;
 
-  // Caption used by the quick social buttons (image itself goes via the OS
-  // sheet under "More"). IG / FB / YouTube don't accept pre-filled posts, so
-  // those live in the native share sheet only.
-  const caption = `${[data.kicker, data.title].filter(Boolean).join(" · ")}${data.subtitle ? ` — ${data.subtitle}` : ""}\nROUJAUNE · Your strongest ride is your own.`;
-
-  const openUrl = async (url: string, failMsg: string) => {
-    try {
-      if (Platform.OS === "web") { await Linking.openURL(url); return; }
-      const ok = await Linking.canOpenURL(url);
-      if (ok) await Linking.openURL(url);
-      else setNotice({ msg: failMsg });
-    } catch { setNotice({ msg: failMsg }); }
-  };
-  const shareX = () => openUrl(`https://twitter.com/intent/tweet?text=${encodeURIComponent(caption)}`, "X isn't installed — try More to pick another app.");
-  const shareWhatsApp = () => openUrl(`https://wa.me/?text=${encodeURIComponent(caption)}`, "WhatsApp isn't installed — try More to pick another app.");
-  const copyCaption = async () => {
-    try { await Clipboard.setStringAsync(caption); setNotice({ msg: "Caption copied — paste it into any app 📋" }); }
-    catch { setNotice({ msg: "Couldn't copy the caption." }); }
-  };
-
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={s.backdrop}>
@@ -193,11 +181,22 @@ export function ShareCardModal({
             </View>
           ) : null}
 
-          <View style={s.socialRow}>
-            <SocialBtn testID="share-x" label="X" icon="logo-twitter" onPress={shareX} disabled={!!busy} />
-            <SocialBtn testID="share-whatsapp" label="WhatsApp" icon="logo-whatsapp" onPress={shareWhatsApp} disabled={!!busy} />
-            <SocialBtn testID="share-copy" label="Copy" icon="copy-outline" onPress={copyCaption} disabled={!!busy} />
+          <View style={s.captionWrap}>
+            <Text style={s.captionLabel}>YOUR CAPTION</Text>
+            <TextInput
+              testID="share-caption-input"
+              style={s.captionInput}
+              value={caption}
+              onChangeText={setCaption}
+              multiline
+              placeholder="Say something about your ride…"
+              placeholderTextColor={C.dim}
+              accessibilityLabel="Edit the caption shared with your card"
+            />
           </View>
+
+          <SocialShareRow caption={caption} getImageUri={capture} disabled={!!busy}
+            onNotice={(msg, action) => setNotice({ msg, action })} />
 
           <View style={s.actions}>
             <Pressable testID="share-card-share" onPress={onShare} disabled={!!busy} accessibilityRole="button" accessibilityLabel="Share achievement card image via more apps"
@@ -221,23 +220,12 @@ export function ShareCardModal({
   );
 }
 
-function SocialBtn({ label, icon, onPress, disabled, testID }: { label: string; icon: any; onPress: () => void; disabled?: boolean; testID?: string }) {
-  return (
-    <Pressable testID={testID} onPress={onPress} disabled={disabled} accessibilityRole="button" accessibilityLabel={`Share to ${label}`}
-      style={({ hovered, pressed }: any) => [s.socialBtn, (hovered || pressed) && s.socialBtnHover, disabled && { opacity: 0.6 }]}>
-      <Ionicons name={icon} size={17} color={C.white} />
-      <Text style={s.socialText}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const s = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(6,7,7,0.9)", alignItems: "center", justifyContent: "center", padding: 20 },
   sheet: { width: "100%", maxWidth: 440, alignItems: "center" },
-  socialRow: { flexDirection: "row", gap: 10, marginTop: 18, alignSelf: "stretch", justifyContent: "center" },
-  socialBtn: { flex: 1, maxWidth: 130, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, borderRadius: 12, paddingVertical: 11, borderWidth: 1, borderColor: "rgba(255,255,255,0.14)", backgroundColor: "rgba(255,255,255,0.05)" },
-  socialBtnHover: { backgroundColor: "rgba(255,255,255,0.1)", borderColor: "rgba(255,255,255,0.24)" },
-  socialText: { color: C.white, fontSize: 13, fontWeight: "700" },
+  captionWrap: { alignSelf: "stretch", marginTop: 16 },
+  captionLabel: { color: C.yellow, fontSize: 10.5, fontWeight: "900", letterSpacing: 1.4, marginBottom: 6 },
+  captionInput: { color: C.white, fontSize: 13.5, lineHeight: 19, minHeight: 62, borderWidth: 1, borderColor: "rgba(255,255,255,0.14)", borderRadius: 12, backgroundColor: "rgba(255,255,255,0.04)", paddingHorizontal: 12, paddingVertical: 10, textAlignVertical: "top" },
   cardWrap: { borderRadius: 22, ...Platform.select({ web: { boxShadow: "0px 12px 24px rgba(0,0,0,0.5)" }, default: { shadowColor: "#000", shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 12 } }) },
   notice: { marginTop: 16, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 12, borderWidth: 1, borderColor: C.border, paddingVertical: 10, paddingHorizontal: 14, maxWidth: 360, alignItems: "center" },
   noticeText: { color: C.white, fontSize: 12.5, textAlign: "center", lineHeight: 18 },

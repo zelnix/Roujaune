@@ -125,7 +125,10 @@ export async function startConnect(providerId: string): Promise<ConnectResult> {
 }
 
 export const syncNow = (id: string) => api(`/connections/${id}/sync`, "POST");
-export const disconnect = (id: string) => api(`/connections/${id}/disconnect`, "POST");
+/** Finalise an OAuth connection from the web return route (native completes
+ * inside startConnect via the WebBrowser session). */
+export const finishConnect = (providerId: string, code: string, state: string) =>
+  api(`/connections/${providerId}/callback`, "POST", { code, state, redirect_uri: "" });export const disconnect = (id: string) => api(`/connections/${id}/disconnect`, "POST");
 
 /** Push one indoor ride up to Strava (TCX with graph, or summary activity). */
 export const pushRideToStrava = (rideId: string, coachSummary?: string) =>
