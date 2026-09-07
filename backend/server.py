@@ -123,8 +123,13 @@ class TrainerSim:
             target_hr = 118 + (self.power - 150) * 0.34
             self.hr += (target_hr - self.hr) * 0.15 + random.uniform(-1.5, 1.5)
             self.hr = max(90.0, min(185.0, self.hr))
-            # simplified physics: speed rises with power, falls with gradient
-            self.speed = max(0.0, 12 + (self.power - 180) / 14 - self.gradient * 0.4 + random.uniform(-0.4, 0.4))
+            # Speed model calibrated to real road cycling: flat-road speed rises
+            # ~ with the cube-root of power (aero-dominated), and is reduced on
+            # climbs. Tuned so ~250 W ≈ 35 km/h on the flat (the old linear model
+            # under-read by ~40%). gradient is a % grade.
+            flat_kmh = 3.6 * (max(0.0, self.power) / 0.27) ** (1.0 / 3.0)
+            grade_factor = 1.0 / (1.0 + max(0.0, self.gradient) * 0.11)
+            self.speed = max(0.0, flat_kmh * grade_factor + random.uniform(-0.4, 0.4))
         else:
             # LIVE mode: never fabricate. Only real sensor readings count.
             self.power = 0.0

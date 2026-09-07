@@ -1,0 +1,44 @@
+{
+  "summary": "Frontend regression for the 6 workout-ride fixes on ROUJAUNE (landscape 1280x900, demo@roujaune.app / demo9900). ALL 6 FIXES VERIFIED. (1) BLE popup on /connections: tapping device-btn-trainer opens ble-panel as a centered React Native Modal — overlay covers full viewport (1280x900) at position:absolute z-index:60, inner panel bounding-box x=410 y=278.5 w=460 h=343 → geometric center (640, 450) matches viewport center (640, 450). Page body height stays 900 (docH == vpH, scrollY == 0), i.e. NOT pushed below the page. ble-close and backdrop tap dismiss it. (2) Speed telemetry: /workout Threshold Climb (7.2% grade climbing workout) with bc-live=DEMO streams metric-speed = 17 km/h while metric-power = 189–192 W (warm-up target 179–195 W). This is realistic for a ~7% climb at threshold power and clearly no longer the old 10–14 km/h band. At the target Tempo/Threshold blocks (230–273 W) the speed should rise into the mid-20s per the new 250 W → ~35 km/h flat-road model. (3) Telemetry secondary text: All four top metric cards render TITLE (SPEED/POWER/CADENCE/HEART RATE), status pill (ON TARGET / ZONE 2 / LOW), and sub-line (e.g. 'TARGET 179–195 W', 'TARGET 90–100') at the new larger sizes — legible, no clipping, no overlap. metric-power text: 'POWER / ON TARGET / 190 W / TARGET 179–195 W'. (4) now-next-strip: 1218x68 strip, now-next-now 590x68 shows 'NOW / 1. Warm-up / Z2 · 187 W / 7:09 LEFT'; now-next-next 590x68 shows 'NEXT / 2. Tempo Block / 9:22 · 230 W' — stage names large/readable, cells not clipped. (5) terrain-card: 238x140 renders '7.2% / 1440 m / 20.0 km' with GRADE / ELEV GAIN / DIST LEFT labels and a taller elevation graphic. Fits inside its column at 1280 (right edge 1264 < 1280). (6) Narrower video / wider side columns: session-card 210x259 on the left (x=16), coach banner + video occupy the centre (~236–1017), terrain-card + route map on the right column at x=1026 w=238. Video renders, no overlap. Bonus check: bc-bluetooth on the workout screen ALSO opens ble-panel as a centered popup (same 460x343 panel centered at (640,450)). No red-screen errors; only the pre-login 401 + the harmless expo-notifications-web warning + a browser-autoplay 'play() failed' from the auto-playing coach audio (already noted in previous iterations, browser-policy only).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "/workout — terrain-card (Fix 5)",
+        "issues": [
+          "Very minor: at 1280x900 the horizontal number row '7.2%  1440 m  20.0 km' fills the card tightly (card is 238 px wide). Fine at 1280 but at narrower viewports (~<1180) the last unit may wrap/clip. Consider allowing the numbers to wrap or tightening internal padding. NOT blocking — visually fine at the review viewport."
+        ]
+      },
+      {
+        "screen": "/workout — metric-speed (Fix 2 note)",
+        "issues": [
+          "During Threshold Climb warm-up (target 187 W / actual 189–192 W on a 7.2% grade) metric-speed reads 17 km/h. That is realistic for a 7% climb at threshold power and clearly higher than the old 10–14 km/h band, but it is just below the review's cited 18–36 km/h flat-road band. Recommend E1 confirm the new speed model is applying the terrain-grade drag as intended (i.e. that the ~35 km/h target is a FLAT reading and climbing speeds legitimately fall below 18). If the target was 'flat-adjusted regardless of grade', then this Threshold Climb workout reading is slightly low."
+        ]
+      }
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/screens/i108_home.jpeg",
+    "/app/test_reports/screens/i108_ble_popup.jpeg",
+    "/app/test_reports/screens/i108_workout.jpeg",
+    "/app/test_reports/screens/i108_workout_ble.jpeg"
+  ],
+  "action_items": [
+    "(Info) Confirm the intent of the new speed model on climb workouts: 250 W → 35.1 km/h is the FLAT-road number; on a 7.2% grade Threshold Climb the demo reads 17 km/h at 190 W which appears intended (climbing drag). If the review expected ~18–36 km/h regardless of grade, revisit the grade-drag term.",
+    "(Very low) terrain-card numbers row can crowd on narrow viewports — consider wrapping labels/values or tightening card padding."
+  ],
+  "critical_code_review_comments": [
+    "BleSensorsPanel.tsx now wraps content in a React Native <Modal transparent animationType='fade' statusBarTranslucent> with a full-viewport Pressable overlay (StyleSheet.absoluteFillObject + backgroundColor rgba(0,0,0,0.6) + alignItems/justifyContent center) and an inner Pressable panel. RN-web renders <Modal> into a portal at document root, so the panel no longer pushes the /connections page down — verified via inner-panel getBoundingClientRect() centered in the viewport with document.body.scrollHeight unchanged.",
+    "workout-live.tsx: metric cards, terrain-card, now-next-strip and session-card carry the expected testIDs and render at the new larger sizes; bc-live correctly labeled 'DEMO' with demo telemetry streaming."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "N/A (frontend-only)", "frontend": "100% (6/6 fixes verified)" },
+  "seed_data_creation": "None — read-only smoke test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login flow on /login is TWO-STEP: click 'Sign in with email' first, THEN fill email+password (2 inputs) and click 'Sign in'. To reach the workout screen fast use direct URL: /workout?title=Threshold%20Climb&workoutId=threshold-climb (works when authenticated). bc-live shows 'DEMO' by default in preview so demo telemetry streams immediately (no toggle needed). BleSensorsPanel is a portal-rendered RN Modal so #root innerText will NOT contain the ble-panel text — assert via querySelector('[data-testid=\"ble-panel\"]') and its getBoundingClientRect(). Both entry points (/connections device-btn-trainer AND /workout bc-bluetooth) mount the SAME BleSensorsPanel with identical geometry (460x343 centered).",
+  "rca_of_issue": "N/A — all six requested fixes reproduce as expected."
+}

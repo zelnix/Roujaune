@@ -510,9 +510,9 @@ export function StepDetailModal({
 
 // ---- Bottom controls ------------------------------------------------------
 export function LiveControlBar({
-  paused, erg, audioOn, live, onLive, onAudio, onMirror, onErg, onControls, onReconnect, onSettings, onBluetooth, onLock, locked, onPauseToggle, onEnd,
+  paused, erg, audioOn, onAudio, onMirror, onErg, onControls, onReconnect, onSettings, onBluetooth, onLock, locked, onPauseToggle, onEnd,
 }: {
-  paused: boolean; erg: number; audioOn: boolean; live: boolean; onLive: () => void; onAudio: () => void; onMirror: () => void;
+  paused: boolean; erg: number; audioOn: boolean; onAudio: () => void; onMirror: () => void;
   onErg: (d: number) => void; onControls: () => void; onReconnect: () => void; onSettings: () => void; onBluetooth: () => void; onLock: () => void; locked: boolean;
   onPauseToggle: () => void; onEnd: () => void;
 }) {
@@ -537,10 +537,6 @@ export function LiveControlBar({
   return (
     <View style={bc.bar}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={bc.group} contentContainerStyle={bc.groupInner}>
-        <Pressable onPress={onLive} style={[bc.pill, { height: H }, live ? bc.pillOn : bc.pillOff]} testID="bc-live">
-          <View style={[bc.pillDot, { backgroundColor: live ? colors.green : colors.textDim }]} />
-          <Text style={[bc.pillText, { color: live ? colors.green : colors.textDim, fontSize: PTXT }]}>{live ? "LIVE" : "DEMO"}</Text>
-        </Pressable>
         <Pressable onPress={onAudio} style={roundStyle} testID="bc-audio" accessibilityLabel="Audio">
           <Ionicons name={audioOn ? "volume-high" : "volume-mute"} size={ICON} color={colors.white} />
           <Text style={rtxt}>Audio</Text>
@@ -653,20 +649,20 @@ const m = StyleSheet.create({
   connDot: { width: 8, height: 8, borderRadius: 4, borderWidth: 1.5 },
   connText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.3, textTransform: "uppercase", maxWidth: 96 },
   batIcon: { marginLeft: 2, transform: [{ rotate: "90deg" }] },
-  label: { color: colors.textDim, fontSize: 11.5, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase", flex: 1 },
-  labelDense: { fontSize: 9.5, letterSpacing: 0.6 },
+  label: { color: colors.textDim, fontSize: 13, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase", flex: 1 },
+  labelDense: { fontSize: 11.5, letterSpacing: 0.6 },
   pill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, borderWidth: 1 },
-  pillDense: { paddingHorizontal: 6, paddingVertical: 2 },
-  pillText: { fontSize: 11, fontWeight: "800", letterSpacing: 0.5 },
-  pillTextDense: { fontSize: 9.5 },
+  pillDense: { paddingHorizontal: 7, paddingVertical: 3 },
+  pillText: { fontSize: 12.5, fontWeight: "800", letterSpacing: 0.5 },
+  pillTextDense: { fontSize: 11.5 },
   valueRow: { flexDirection: "row", alignItems: "flex-end", gap: 6, marginTop: 8 },
   valueRowDense: { marginTop: 3, gap: 4 },
   value: { fontSize: 40, fontWeight: "900", fontVariant: ["tabular-nums"], lineHeight: 44 },
   valueDense: { fontSize: 25, lineHeight: 28 },
   unit: { color: colors.textDim, fontSize: 14, fontWeight: "700", marginBottom: 7 },
   unitDense: { fontSize: 11, marginBottom: 3 },
-  sub: { color: colors.textDim, fontSize: 12.5, fontWeight: "700", marginTop: 4, letterSpacing: 0.3 },
-  subDense: { fontSize: 10, marginTop: 2 },
+  sub: { color: colors.textDim, fontSize: 14, fontWeight: "800", marginTop: 5, letterSpacing: 0.3 },
+  subDense: { fontSize: 12, marginTop: 3 },
 });
 
 const sh = StyleSheet.create({
@@ -726,18 +722,18 @@ const ic = StyleSheet.create({
 });
 
 const ep = StyleSheet.create({
-  wrap: { position: "absolute", left: 0, right: 0, bottom: 0, height: 30, paddingHorizontal: 2 },
+  wrap: { position: "absolute", left: 0, right: 0, bottom: 0, height: 42, paddingHorizontal: 2 },
 });
 
 const tc = StyleSheet.create({
-  card: { ...card, padding: 14, paddingBottom: 24, minHeight: 100, overflow: "hidden" },
+  card: { ...card, padding: 16, paddingBottom: 34, minHeight: 140, overflow: "hidden" },
   head: { flexDirection: "row", alignItems: "center", gap: 7 },
-  title: { color: colors.textDim, fontSize: 11, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase" },
-  stats: { flexDirection: "row", justifyContent: "space-between", marginTop: 12, gap: 6 },
+  title: { color: colors.textDim, fontSize: 13, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase" },
+  stats: { flexDirection: "row", justifyContent: "space-between", marginTop: 16, gap: 6 },
   stat: { alignItems: "flex-start" },
-  statVal: { color: colors.white, fontSize: 17, fontWeight: "900", fontVariant: ["tabular-nums"] },
-  statLbl: { color: colors.textFaint, fontSize: 8.5, fontWeight: "800", letterSpacing: 0.6, marginTop: 2 },
-  profileWrap: { position: "absolute", left: 12, right: 12, bottom: 6 },
+  statVal: { color: colors.white, fontSize: 23, fontWeight: "900", fontVariant: ["tabular-nums"] },
+  statLbl: { color: colors.textFaint, fontSize: 10.5, fontWeight: "800", letterSpacing: 0.6, marginTop: 3 },
+  profileWrap: { position: "absolute", left: 12, right: 12, bottom: 8 },
 });
 
 const st = StyleSheet.create({
@@ -759,18 +755,18 @@ const st = StyleSheet.create({
   progressFill: { height: "100%", backgroundColor: colors.yellow, borderRadius: 4 },
   progressPct: { color: colors.yellow, fontSize: 11, fontWeight: "800", minWidth: 34, textAlign: "right" },
   nowNext: { flexDirection: "row", alignItems: "stretch", gap: 8 },
-  nnCell: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 14, paddingVertical: 10, minHeight: 58, overflow: "hidden" },
+  nnCell: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 14, paddingVertical: 12, minHeight: 68, overflow: "hidden" },
   nnNow: { backgroundColor: colors.yellow + "16", borderColor: colors.yellow + "44" },
   nnNext: { backgroundColor: "rgba(255,255,255,0.04)", borderColor: colors.border },
   nnArrow: { alignSelf: "center" },
   nnDot: { width: 12, height: 12, borderRadius: 6 },
   nnBody: { flex: 1 },
-  nnTagNow: { backgroundColor: colors.yellow, borderRadius: radius.sm, paddingHorizontal: 8, paddingVertical: 4 },
-  nnTagNowText: { color: colors.bg, fontSize: 11, fontWeight: "900", letterSpacing: 1 },
-  nnTagNext: { backgroundColor: "rgba(255,255,255,0.08)", borderRadius: radius.sm, paddingHorizontal: 8, paddingVertical: 4 },
-  nnTagNextText: { color: colors.textDim, fontSize: 11, fontWeight: "900", letterSpacing: 1 },
-  nnName: { color: colors.white, fontSize: 16, fontWeight: "800" },
-  nnMeta: { color: colors.textDim, fontSize: 12.5, fontWeight: "700", marginTop: 2 },
+  nnTagNow: { backgroundColor: colors.yellow, borderRadius: radius.sm, paddingHorizontal: 9, paddingVertical: 5 },
+  nnTagNowText: { color: colors.bg, fontSize: 12.5, fontWeight: "900", letterSpacing: 1 },
+  nnTagNext: { backgroundColor: "rgba(255,255,255,0.08)", borderRadius: radius.sm, paddingHorizontal: 9, paddingVertical: 5 },
+  nnTagNextText: { color: colors.textDim, fontSize: 12.5, fontWeight: "900", letterSpacing: 1 },
+  nnName: { color: colors.white, fontSize: 19, fontWeight: "800" },
+  nnMeta: { color: colors.textDim, fontSize: 14.5, fontWeight: "700", marginTop: 3 },
   nnCountdown: { alignItems: "flex-end", marginLeft: 6, paddingLeft: 12, borderLeftWidth: 1, borderLeftColor: colors.yellow + "33" },
   nnCountValue: { color: colors.yellow, fontSize: 22, fontWeight: "900", fontVariant: ["tabular-nums"], letterSpacing: 0.5 },
   nnCountLabel: { color: colors.yellow, fontSize: 9, fontWeight: "800", letterSpacing: 1.5, marginTop: -1 },

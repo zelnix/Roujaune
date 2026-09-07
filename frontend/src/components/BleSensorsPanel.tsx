@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, Linking, ActivityIndicator, Platform } from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView, Linking, ActivityIndicator, Platform, Modal } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { colors, radius, spacing, shadow } from "../theme";
 import type { BleDevice, BleReadings, PermState } from "../hooks/useBleSensors";
@@ -34,8 +34,9 @@ export function BleSensorsPanel({
     : "—";
 
   return (
-    <Pressable style={styles.overlay} onPress={onClose} testID="ble-panel">
-      <Pressable style={styles.panel} onPress={() => { /* swallow */ }}>
+    <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
+      <Pressable style={styles.overlay} onPress={onClose} testID="ble-panel">
+        <Pressable style={styles.panel} onPress={() => { /* swallow */ }}>
         <View style={styles.head}>
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>Bluetooth sensors</Text>
@@ -140,7 +141,8 @@ export function BleSensorsPanel({
           </>
         )}
       </Pressable>
-    </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 

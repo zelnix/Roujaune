@@ -127,8 +127,8 @@ export default function LiveWorkout() {
   const segments = React.useMemo(() => [...baseSegments, ...extraSegments], [baseSegments, extraSegments]);
   const compact = height < 620;
   const narrow = height >= 620 && winW < 1000;   // small-wide screens (e.g. Z Fold): 2×2 metric grid
-  const leftW = compact ? 150 : 184;
-  const rightW = compact ? 170 : 196;
+  const leftW = compact ? 168 : 210;
+  const rightW = compact ? 194 : 238;
 
   const [centerW, setCenterW] = React.useState(560);
   const [videoSlotH, setVideoSlotH] = React.useState(0);
@@ -937,8 +937,6 @@ export default function LiveWorkout() {
         paused={paused}
         erg={erg}
         audioOn={musicOn}
-        live={!settings.demoMode}
-        onLive={() => { const next = !settings.demoMode; setSetting("demoMode", next); showToast(next ? "Demo data on — showing a simulated ride" : "Live ride — showing your connected sensors"); }}
         onAudio={() => setShowMusic(true)}
         onMirror={() => setShowCast(true)}
         onErg={onErg}
