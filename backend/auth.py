@@ -85,7 +85,7 @@ _PUBLIC = {
     "/api/auth/register", "/api/auth/login", "/api/auth/google", "/api/auth/apple",
     "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/verify-email",
     "/api/admin/login", "/api/admin/logout", "/api/openapi.json",
-    "/api/analysis/unsubscribe",
+    "/api/analysis/unsubscribe", "/api/connections/strava/oauth-return",
 }
 
 

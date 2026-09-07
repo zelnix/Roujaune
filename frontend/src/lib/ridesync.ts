@@ -93,19 +93,32 @@ export type ConnectResult =
   | { connected: true; sync: any }
   | { error: string };
 
-/** Backend-mediated PKCE OAuth: open the provider URL, hand the code back. */
+/** Backend-mediated OAuth: open the provider URL, hand the code back.
+ * Strava is special-cased: it rejects custom app schemes, so the URL Strava
+ * redirects to is our HTTPS backend bounce endpoint, which forwards the code
+ * back into the app via the `roujaune://` deep link (what WebBrowser watches). */
 export async function startConnect(providerId: string): Promise<ConnectResult> {
-  const redirect = Linking.createURL(`oauth/${providerId}`);
-  const auth = await api(`/connections/${providerId}/authorize`, "POST", { redirect_uri: redirect });
+  const appRedirect = Linking.createURL(`oauth/${providerId}`);
+  const backendBase = (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/+$/, "");
+  const providerRedirect =
+    providerId === "strava" && backendBase
+      ? `${backendBase}/api/connections/strava/oauth-return`
+      : appRedirect;
+  const auth = await api(`/connections/${providerId}/authorize`, "POST", {
+    redirect_uri: providerRedirect,
+    app_redirect: appRedirect,
+  });
   if (auth.setup_required) return { setup_required: true, message: auth.message };
   try {
-    const result = await WebBrowser.openAuthSessionAsync(auth.authorize_url, redirect);
+    const result = await WebBrowser.openAuthSessionAsync(auth.authorize_url, appRedirect);
     if (result.type !== "success" || !result.url) return { cancelled: true };
     const { queryParams } = Linking.parse(result.url);
     const code = queryParams?.code as string | undefined;
     const state = (queryParams?.state as string) ?? auth.state;
+    const err = queryParams?.error as string | undefined;
+    if (err) return { error: `Authorization failed: ${err}` };
     if (!code) return { cancelled: true };
-    return await api(`/connections/${providerId}/callback`, "POST", { code, state, redirect_uri: redirect });
+    return await api(`/connections/${providerId}/callback`, "POST", { code, state, redirect_uri: appRedirect });
   } catch (e: any) {
     return { error: e?.message ?? "Connection failed" };
   }

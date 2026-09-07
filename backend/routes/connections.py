@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import HTMLResponse
 
 import auth
 import activity_sync
@@ -83,9 +84,13 @@ async def connection_authorize(provider_id: str, body: dict):
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
     state = str(uuid.uuid4())
     redirect_uri = body.get("redirect_uri", "")
+    # For Strava the `redirect_uri` sent to the provider is our HTTPS bounce
+    # endpoint (Strava rejects custom app schemes); `app_redirect` is the native
+    # deep link the bounce page forwards the code/state to.
+    app_redirect = body.get("app_redirect") or redirect_uri
     await db.oauth_pending.update_one({"state": state}, {"$set": {
         "state": state, "verifier": verifier, "provider": provider_id,
-        "redirect_uri": redirect_uri, "created_at": now_iso()}}, upsert=True)
+        "redirect_uri": redirect_uri, "app_redirect": app_redirect, "created_at": now_iso()}}, upsert=True)
     url = await p.build_authorize_url(state, challenge, redirect_uri)
     return {"authorize_url": url, "state": state}
 
@@ -126,6 +131,45 @@ async def connection_callback(provider_id: str, body: dict):
         {"user_id": auth.current_user_id(), "provider": provider_id}, {"$set": acc}, upsert=True)
     result = await _run_sync(provider_id, initial=True)
     return {"connected": True, "sync": result}
+
+
+@router.get("/connections/strava/oauth-return", response_class=HTMLResponse)
+async def strava_oauth_return(code: str | None = None, state: str | None = None,
+                             scope: str | None = None, error: str | None = None):
+    """Public HTTPS callback registered as Strava's Authorization Callback Domain.
+    Strava (which rejects custom app schemes) redirects the browser here with the
+    one-time code; we bounce it straight into the native app via its deep link so
+    expo-web-browser detects completion. No app session exists on this request."""
+    import html as _html
+    import json as _json
+    from urllib.parse import urlencode as _urlencode
+
+    pend = await db.oauth_pending.find_one({"state": state}) if state else None
+    app_redirect = (pend or {}).get("app_redirect") or "roujaune://oauth/strava"
+    params = {}
+    if code:
+        params["code"] = code
+    if state:
+        params["state"] = state
+    if scope:
+        params["scope"] = scope
+    if error:
+        params["error"] = error
+    native_url = app_redirect + (("?" + _urlencode(params)) if params else "")
+    js_url = _json.dumps(native_url)
+    safe_link = _html.escape(native_url, quote=True)
+    return HTMLResponse(f"""<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Returning to ROUJAUNE</title>
+<style>body{{background:#0b0c0c;color:#f4f0e9;font-family:-apple-system,Segoe UI,Roboto,sans-serif;
+display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:24px}}
+a{{color:#f5b301;font-weight:700;text-decoration:none;margin-top:14px;font-size:17px}}</style></head>
+<body>
+<p>Connecting your Strava account…</p>
+<p><a href="{safe_link}">Return to ROUJAUNE</a></p>
+<script>window.location.replace({js_url});</script>
+</body></html>""")
+
 
 
 async def _run_sync(provider_id: str, initial: bool = False) -> dict:
