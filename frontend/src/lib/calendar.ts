@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { subscribePlanChange } from "./plan";
 
 function apiBase(): string {
   return (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
@@ -98,6 +99,7 @@ export function useCalendarWeek(focusDate?: string, start = "2025-05-12") {
   }, [start, focusDate]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => subscribePlanChange(() => { load(); }), [load]);
 
   return { week, setWeek, loading, reload: load };
 }

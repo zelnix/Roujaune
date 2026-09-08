@@ -392,7 +392,11 @@ def _parse_natural_date(msg: str):
         return None
 
 
-_START_RE = re.compile(r"\b(start\s*date|restart|re-?start|start (my|the) plan|reset (my|the )?(plan|start)|begin (my|the) plan|push (my|the) plan)\b")
+_START_RE = re.compile(
+    r"\b(start\s*date|restart|re-?start"
+    r"|reset (my|the )?(plan|start|schedule|training)"
+    r"|(start|begin|kick\s*off|push|move|shift|change|adjust|set)\s+(my|the)?\s*(\w+\s+){0,2}(plan|schedule|training))\b"
+)
 _MISSED_RE = re.compile(r"\b(missed|couldn'?t (ride|do)|skip(ped)?|reschedul|move (my|the|that) (ride|workout|session))\b")
 
 

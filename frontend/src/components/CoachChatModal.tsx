@@ -8,6 +8,7 @@ import { Image } from "expo-image";
 import { C } from "./plan";
 import { CoachPersona, useCoachStyle } from "../lib/coach-persona";
 import { ChatMessage, fetchChatHistory, sendChatMessage, clearChatHistory, CHAT_SUGGESTIONS, fetchLatestRide, LatestRide } from "../lib/coach-chat";
+import { notifyPlanChanged } from "../lib/plan";
 import { useCoachSpeech } from "../hooks/useCoachSpeech";
 
 function TypingDots() {
@@ -61,6 +62,7 @@ export function CoachChatModal({ visible, onClose, persona, onPlanUpdated, seedM
       setMessages((m) => [...m.filter((x) => x.id !== optimistic.id), res.user_message, res.coach_message]);
       if (res.plan_updated) {
         setPlanNotice(res.plan_change || "Your plan was updated");
+        notifyPlanChanged();
         onPlanUpdated?.();
       }
     } catch {

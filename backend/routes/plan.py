@@ -388,16 +388,7 @@ async def get_calendar_week(start: str = "2025-05-12", focus_date: Optional[str]
         ride_map: dict = {}
         supp_dates: set = set()
         cur = None
-        if active == "couch-to-road":
-            cur, ride_map, supp_dates = await _ctr_state()
-            weeks_map = plan_engine.CTR_WEEKS
-        elif active == "ride-stronger":
-            pdoc, weeks_map, planned, prefix = _struct_ctx("ride-stronger")
-            cur, ride_map, supp_dates = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id="ride-stronger", ride_prefix=prefix)
-        elif active == "ride-beyond":
-            pdoc, weeks_map, planned, prefix = _struct_ctx("ride-beyond")
-            cur, ride_map, supp_dates = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id="ride-beyond", ride_prefix=prefix)
-        elif active.startswith("custom-"):
+        if active in ("couch-to-road", "ride-stronger", "ride-beyond") or active.startswith("custom-"):
             pdoc, weeks_map, planned, prefix = await _struct_ctx_for_rider(active)
             cur, ride_map, supp_dates = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id=active, ride_prefix=prefix)
 
@@ -800,6 +791,27 @@ async def _plan_event_date(plan_id: str):
         return None
 
 
+async def _rebase_plan_def(plan_id: str, new_start: date, override_weeks: Optional[int]) -> bool:
+    """Re-anchor the rider's own plan definition so week 1 begins on `new_start`
+    and each subsequent week follows 7 days later. Persisted to the rider's
+    snapshot so both the plan and the calendar reflect the new dates."""
+    d = await _rider_plan_def(plan_id)
+    if not d or not d.get("weeks"):
+        return False
+    wks = sorted(d["weeks"], key=lambda w: int(w.get("number", 0) or 0))
+    for idx, wk in enumerate(wks):
+        wk["start_date"] = (new_start + timedelta(days=7 * idx)).isoformat()
+    d["weeks"] = wks
+    d["start_date"] = new_start.isoformat()
+    if override_weeks:
+        d["duration_weeks_override"] = override_weeks
+    else:
+        d.pop("duration_weeks_override", None)
+    await udb.training_plans.update_one(
+        {"id": plan_id}, {"$set": {"id": plan_id, "definition": d}}, upsert=True)
+    return True
+
+
 async def _reset_plan_start(plan_id: str, new_start: date) -> dict:
     """Re-anchor the plan to `new_start` and shift everything after it. If the
     plan has a hard event date, keep that fixed and COMPRESS the plan to fit
@@ -819,6 +831,12 @@ async def _reset_plan_start(plan_id: str, new_start: date) -> dict:
                           f"{event.isoformat()} — firmer than ideal, but your event stays on track.")
         else:
             note_event = f" It still lands comfortably before your event on {event.isoformat()}."
+    # Physically re-date the rider's plan weeks so the whole schedule moves.
+    if plan_id in STRUCTURED_PLAN_IDS or plan_id.startswith("custom-"):
+        try:
+            await _rebase_plan_def(plan_id, new_start, weeks if compressed else None)
+        except Exception:
+            logging.warning("plan rebase failed")
     set_doc = {"start_date": new_start.isoformat(), "current_week": 1}
     if compressed:
         set_doc["duration_weeks_override"] = weeks

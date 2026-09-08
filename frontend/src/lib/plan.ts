@@ -7,6 +7,17 @@ function apiBase(): string {
   return (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
 }
 
+// Lightweight cross-component signal so a plan change made on one screen (e.g.
+// the coach rescheduling the plan from chat) re-fetches every usePlan() mount.
+const _planSubs = new Set<() => void>();
+export function subscribePlanChange(fn: () => void): () => void {
+  _planSubs.add(fn);
+  return () => { _planSubs.delete(fn); };
+}
+export function notifyPlanChanged(): void {
+  _planSubs.forEach((f) => { try { f(); } catch { /* ignore */ } });
+}
+
 // Cache key is versioned + rider-active-scoped (NOT keyed by the requested id,
 // which is always the "build-and-climb" default). Bumping the version purges any
 // legacy `roujaune:plan:build-and-climb` cache that could otherwise keep showing
@@ -74,6 +85,10 @@ export function usePlan(id = "build-and-climb") {
   const [loading, setLoading] = useState(true);
   const [live, setLive] = useState(false);
   const [nonce, setNonce] = useState(0);
+
+  // Re-fetch whenever any screen signals the plan changed (e.g. the coach
+  // rescheduled it from chat), so the Today card / plan strip update live.
+  useEffect(() => subscribePlanChange(() => setNonce((n) => n + 1)), []);
 
   useEffect(() => {
     let alive = true;
