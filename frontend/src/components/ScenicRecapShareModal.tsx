@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Modal, Pressable, ActivityIndicator, Platform, Linking, ScrollView, TextInput } from "react-native";
+import { View, Text, StyleSheet, Modal, Pressable, ActivityIndicator, Platform, Linking, ScrollView } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { Image } from "expo-image";
 import { captureRef } from "react-native-view-shot";
@@ -9,6 +9,7 @@ import { colors, radius } from "@/src/theme";
 import { ScenicJourney, setRecapCover } from "@/src/lib/scenic-routes";
 import { ScenicRecapCard } from "./ScenicRecapCard";
 import { SocialShareRow } from "./SocialShareRow";
+import { CaptionEditor } from "./CaptionEditor";
 
 /** Presents the branded scenic ride recap and lets the rider share or save it. */
 export function ScenicRecapShareModal({
@@ -136,12 +137,21 @@ export function ScenicRecapShareModal({
               </View>
             ) : null}
 
-            <View style={s.captionWrap}>
-              <Text style={s.captionLabel}>YOUR CAPTION</Text>
-              <TextInput testID="recap-caption-input" style={s.captionInput} value={caption}
-                onChangeText={setCaption} multiline placeholder="Say something about your ride…"
-                placeholderTextColor={colors.textDim} accessibilityLabel="Edit the caption shared with your recap" />
-            </View>
+            <CaptionEditor
+              value={caption}
+              onChange={setCaption}
+              testID="recap-caption"
+              onAuto={() => {
+                const j = journey as any;
+                const parts: string[] = [];
+                if (j.distance_km != null) { const n = typeof j.distance_km === "string" ? parseFloat(j.distance_km) : j.distance_km; if (!isNaN(n)) parts.push(`${n.toFixed(n >= 10 ? 0 : 1)} km`); }
+                if (j.duration_sec) { const m = Math.round(j.duration_sec / 60); parts.push(m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m} min`); }
+                if (j.elevation_m != null && j.elevation_m > 0) parts.push(`${j.elevation_m} m climb`);
+                const name = j.name || j.title || "Scenic ride";
+                const place = j.place ? ` through ${j.place}` : "";
+                setCaption(`${name}${place}${parts.length ? ` — ${parts.join(" · ")}` : ""}\nRidden on ROUJAUNE 🚴 · Your strongest ride is your own.`);
+              }}
+            />
 
             <SocialShareRow caption={caption} getImageUri={capture} disabled={!!busy}
               onNotice={(msg, action) => setNotice({ msg, action })} />
@@ -175,9 +185,6 @@ const s = StyleSheet.create({
   sheet: { width: "100%", maxWidth: 440, alignItems: "center" },
   cardWrap: { borderRadius: 22, ...Platform.select({ web: { boxShadow: "0px 12px 24px rgba(0,0,0,0.5)" }, default: { shadowColor: "#000", shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 12 } }) },
   coverPicker: { alignSelf: "stretch", marginTop: 16, maxWidth: 360, width: "100%" },
-  captionWrap: { alignSelf: "stretch", marginTop: 16, maxWidth: 360, width: "100%" },
-  captionLabel: { color: colors.yellow, fontSize: 10.5, fontWeight: "900", letterSpacing: 1.4, marginBottom: 6 },
-  captionInput: { color: colors.white, fontSize: 13.5, lineHeight: 19, minHeight: 62, borderWidth: 1, borderColor: "rgba(255,255,255,0.14)", borderRadius: 12, backgroundColor: "rgba(255,255,255,0.04)", paddingHorizontal: 12, paddingVertical: 10, textAlignVertical: "top" },
   coverLabel: { color: colors.yellow, fontSize: 10.5, fontWeight: "900", letterSpacing: 1.4, marginBottom: 8 },
   coverRow: { gap: 10, paddingRight: 8 },
   coverThumb: { width: 64, height: 64, borderRadius: 12, overflow: "hidden", borderWidth: 2, borderColor: "transparent", backgroundColor: "#0E1512" },

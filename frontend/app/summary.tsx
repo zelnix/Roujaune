@@ -15,6 +15,7 @@ import { autoPushCompletedRide } from "@/src/lib/health";
 import { useCoach } from "@/src/lib/coach-persona";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
 import { RidePhotos } from "@/src/components/RidePhotos";
+import { RideShareSheet } from "@/src/components/RideShareSheet";
 import {
   SummaryHeader, HeroSummaryCard, MetricsGrid, ComplianceCard,
   ChartsRow, SyncExportRow, RouteSummaryCard, AchievementsCard, RecoveryCard, BottomActionBar,
@@ -73,6 +74,7 @@ export default function WorkoutComplete() {
   const persona = useCoach();
   const [showChat, setShowChat] = React.useState(false);
   const [showAnalysis, setShowAnalysis] = React.useState(false);
+  const [showShare, setShowShare] = React.useState(false);
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
   const [mainW, setMainW] = React.useState(600);
   const showToast = React.useCallback((text: string) => setToast({ id: Date.now(), text }), []);
@@ -180,7 +182,7 @@ export default function WorkoutComplete() {
               saved={saved}
               onView={() => setShowAnalysis(true)}
               onSave={() => router.replace("/")}
-              onShare={shareRideCard}
+              onShare={() => setShowShare(true)}
             />
           </View>
         </View>
@@ -198,6 +200,16 @@ export default function WorkoutComplete() {
           onClose={() => setShowAnalysis(false)}
         />
       )}
+
+      <RideShareSheet
+        visible={showShare}
+        onClose={() => setShowShare(false)}
+        initialCaption={rideCaption(stats, route)}
+        autoCaption={rideCaption(stats, route)}
+        getImageUri={() => captureRef(cardRef, { format: "png", quality: 0.95 })}
+        onMore={shareRideCard}
+        onNotice={showToast}
+      />
 
       <Toast message={toast} />
       <CoachChatModal visible={showChat} onClose={() => setShowChat(false)} persona={persona} />

@@ -32,7 +32,7 @@ export function SocialShareRow({
     try { await Clipboard.setStringAsync(caption); onNotice("Caption copied — paste it into any app 📋"); }
     catch { onNotice("Couldn't copy the caption."); }
   };
-  const shareInstagram = async () => {
+  const shareInstagram = async (mode: "story" | "feed") => {
     if (Platform.OS === "web") { onNotice("Instagram sharing is available on the mobile app."); return; }
     try {
       let perm = await MediaLibrary.getPermissionsAsync();
@@ -41,23 +41,30 @@ export function SocialShareRow({
       try { await Clipboard.setStringAsync(caption); } catch { /* caption copy is best-effort */ }
       const uri = await getImageUri();
       await MediaLibrary.saveToLibraryAsync(uri);
-      if (await Linking.canOpenURL("instagram-stories://share")) {
-        await Linking.openURL("instagram-stories://share");
-        onNotice("Saved to Photos ✓ Opening Instagram — add your ROUJAUNE card to your Story (caption copied).");
-        return;
+      const targets = mode === "story"
+        ? ["instagram-stories://share", "instagram://app"]
+        : ["instagram://library", "instagram://app"];
+      // Open the deep link directly (canOpenURL needs per-scheme manifest
+      // entries; openURL just fails if Instagram isn't installed).
+      for (const t of targets) {
+        try {
+          await Linking.openURL(t);
+          onNotice(mode === "story"
+            ? "Saved to Photos ✓ Opening Instagram — add your card to your Story (caption copied)."
+            : "Saved to Photos ✓ Opening Instagram — pick your ROUJAUNE card to post (caption copied).");
+          return;
+        } catch { /* try next target */ }
       }
-      if (await Linking.canOpenURL("instagram://app")) {
-        await Linking.openURL("instagram://app");
-        onNotice("Saved to Photos ✓ Start a new Story in Instagram and pick your ROUJAUNE card.");
-        return;
-      }
-      onNotice("Saved to Photos ✓ Instagram isn't installed — install it to post your Story.");
+      onNotice("Saved to Photos ✓ Instagram isn't installed — install it to post.");
     } catch { onNotice("Couldn't prepare your Instagram share. Please try again."); }
   };
   return (
     <View style={st.row}>
       {Platform.OS !== "web" ? (
-        <Btn testID="share-instagram" label="Story" icon="logo-instagram" onPress={shareInstagram} disabled={disabled} />
+        <>
+          <Btn testID="share-instagram" label="Story" icon="logo-instagram" onPress={() => shareInstagram("story")} disabled={disabled} />
+          <Btn testID="share-instagram-feed" label="Feed" icon="logo-instagram" onPress={() => shareInstagram("feed")} disabled={disabled} />
+        </>
       ) : null}
       <Btn testID="share-x" label="X" icon="logo-twitter" onPress={shareX} disabled={disabled} />
       <Btn testID="share-whatsapp" label="WhatsApp" icon="logo-whatsapp" onPress={shareWhatsApp} disabled={disabled} />

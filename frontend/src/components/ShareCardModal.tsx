@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Modal, Pressable, ActivityIndicator, Platform, Linking, ScrollView, TextInput } from "react-native";
+import { View, Text, StyleSheet, Modal, Pressable, ActivityIndicator, Platform, Linking, ScrollView } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { Image } from "expo-image";
 import { captureRef } from "react-native-view-shot";
@@ -9,6 +9,7 @@ import * as ImagePicker from "expo-image-picker";
 import { fetchDiscoveries } from "../lib/scenic-routes";
 import { C } from "./plan";
 import { SocialShareRow } from "./SocialShareRow";
+import { CaptionEditor } from "./CaptionEditor";
 import { AchievementCard, AchievementCardData } from "./AchievementCard";
 
 /** Presents the branded achievement card and lets the rider share it or save it
@@ -181,19 +182,15 @@ export function ShareCardModal({
             </View>
           ) : null}
 
-          <View style={s.captionWrap}>
-            <Text style={s.captionLabel}>YOUR CAPTION</Text>
-            <TextInput
-              testID="share-caption-input"
-              style={s.captionInput}
-              value={caption}
-              onChangeText={setCaption}
-              multiline
-              placeholder="Say something about your ride…"
-              placeholderTextColor={C.dim}
-              accessibilityLabel="Edit the caption shared with your card"
-            />
-          </View>
+          <CaptionEditor
+            value={caption}
+            onChange={setCaption}
+            testID="share-caption"
+            onAuto={() => {
+              const line = (data.stats || []).map((st) => `${st.value} ${st.label.toLowerCase()}`).join(" · ");
+              setCaption(`${data.title}${line ? ` — ${line}` : ""}\nRidden on ROUJAUNE 🚴 · Your strongest ride is your own.`);
+            }}
+          />
 
           <SocialShareRow caption={caption} getImageUri={capture} disabled={!!busy}
             onNotice={(msg, action) => setNotice({ msg, action })} />
@@ -223,9 +220,6 @@ export function ShareCardModal({
 const s = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(6,7,7,0.9)", alignItems: "center", justifyContent: "center", padding: 20 },
   sheet: { width: "100%", maxWidth: 440, alignItems: "center" },
-  captionWrap: { alignSelf: "stretch", marginTop: 16 },
-  captionLabel: { color: C.yellow, fontSize: 10.5, fontWeight: "900", letterSpacing: 1.4, marginBottom: 6 },
-  captionInput: { color: C.white, fontSize: 13.5, lineHeight: 19, minHeight: 62, borderWidth: 1, borderColor: "rgba(255,255,255,0.14)", borderRadius: 12, backgroundColor: "rgba(255,255,255,0.04)", paddingHorizontal: 12, paddingVertical: 10, textAlignVertical: "top" },
   cardWrap: { borderRadius: 22, ...Platform.select({ web: { boxShadow: "0px 12px 24px rgba(0,0,0,0.5)" }, default: { shadowColor: "#000", shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 12 } }) },
   notice: { marginTop: 16, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 12, borderWidth: 1, borderColor: C.border, paddingVertical: 10, paddingHorizontal: 14, maxWidth: 360, alignItems: "center" },
   noticeText: { color: C.white, fontSize: 12.5, textAlign: "center", lineHeight: 18 },
