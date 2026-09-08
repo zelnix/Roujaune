@@ -234,6 +234,17 @@ class MoveSessionRequest(BaseModel):
     to_date: str
 
 
+class StartDateRequest(BaseModel):
+    start_date: str  # YYYY-MM-DD — new anchor day for the plan
+    plan_id: str = ""
+
+
+class MissedResolveRequest(BaseModel):
+    entry_id: str
+    action: str  # "skip" | "reschedule"
+    date: str = ""  # required for reschedule; blank => use coach's safe pick
+
+
 class ReviewRequest(BaseModel):
     session_title: str
     session_type: str = "cycling"

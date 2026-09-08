@@ -45,7 +45,7 @@ function TodayRow({ label, time, state, active, onPress, testID }: {
   );
 }
 
-export function CalendarCard({ onToast, onOpenCalendar, onOpenToday, scope = "today" }: { onToast: (m: string) => void; onOpenCalendar?: () => void; onOpenToday?: () => void; scope?: "today" | "week" }) {
+export function CalendarCard({ onToast, onOpenCalendar, onOpenToday, scope = "today" }: { onToast: (m: string) => void; onOpenCalendar?: (date?: string) => void; onOpenToday?: () => void; scope?: "today" | "week" }) {
   const { week } = useCalendarWeek();
   const [month, setMonth] = React.useState(dayjs("2025-05-13").startOf("month"));
   const [selected, setSelected] = React.useState(13);
@@ -158,7 +158,7 @@ export function CalendarCard({ onToast, onOpenCalendar, onOpenToday, scope = "to
                     testID={`day-${d.format("YYYY-MM-DD")}`}
                     scaleTo={0.85}
                     lift={false}
-                    onPress={() => inMonth && setSelected(num)}
+                    onPress={() => { if (inMonth) { setSelected(num); onOpenCalendar?.(d.format("YYYY-MM-DD")); } }}
                     containerStyle={styles.dayCell}
                   >
                     <View style={[styles.dayInner, isSel && styles.daySelected]}>
@@ -232,7 +232,7 @@ export function CalendarCard({ onToast, onOpenCalendar, onOpenToday, scope = "to
                 time={w.time}
                 state={w.state}
                 active={w.state === "active"}
-                onPress={() => onToast(`${w.label} selected`)}
+                onPress={() => (scope === "week" && onOpenCalendar ? onOpenCalendar(w.key) : onToast(`${w.label} selected`))}
               />
             ))}
           </View>

@@ -20,6 +20,7 @@ from services.coach_llm import coach_system
 from models import (
     AssignPlanRequest, OnboardingReq, GoalsUpdateRequest, FavToggleRequest,
     ScheduleRequest, MoveSessionRequest, ReviewRequest,
+    StartDateRequest, MissedResolveRequest,
 )
 from services import plan_engine
 from services.plan_engine import (
@@ -727,32 +728,131 @@ async def get_progress_timeline(rng: str = Query("3m", alias="range"), offset: i
 
 
 
+def _parse_ymd(s: str):
+    try:
+        y, m, d = (int(x) for x in str(s).split("-")[:3])
+        return date(y, m, d)
+    except Exception:
+        return None
+
+
+def _next_free_day(sched, from_day):
+    """The coach's safe reschedule pick: the next day (from tomorrow) with no
+    cycling session already scheduled, within the next 10 days."""
+    busy = {str(w.get("date", "")) for w in sched
+            if w.get("type") == "cycling" and w.get("status") not in ("skipped", "completed")}
+    for i in range(1, 11):
+        cand = (from_day + timedelta(days=i)).isoformat()
+        if cand not in busy:
+            return cand
+    return (from_day + timedelta(days=1)).isoformat()
+
+
+async def _plan_event_date(plan_id: str):
+    """Latest goal date on the plan = the rider's hard event/finish date (if any)."""
+    try:
+        plan = await udb.training_plans.find_one({"id": plan_id}) or {}
+        dates = [_parse_ymd(g.get("date")) for g in (plan.get("goals") or []) if g.get("date")]
+        dates = [d for d in dates if d]
+        return max(dates) if dates else None
+    except Exception:
+        return None
+
+
+async def _reset_plan_start(plan_id: str, new_start: date) -> dict:
+    """Re-anchor the plan to `new_start` and shift everything after it. If the
+    plan has a hard event date, keep that fixed and COMPRESS the plan to fit
+    (tighter than ideal, but the event stays on track)."""
+    resp = await get_plan(id=plan_id)
+    duration = int(resp.get("duration_weeks") or 12)
+    title = resp.get("title") or "your plan"
+    event = await _plan_event_date(plan_id)
+    compressed = False
+    weeks = duration
+    note_event = ""
+    if event and event > new_start:
+        avail = max(1, ((event - new_start).days + 6) // 7)  # ceil to whole weeks
+        if avail < duration:
+            weeks, compressed = avail, True
+            note_event = (f" I've tightened it to {weeks} weeks so it still finishes by your event on "
+                          f"{event.isoformat()} — firmer than ideal, but your event stays on track.")
+        else:
+            note_event = f" It still lands comfortably before your event on {event.isoformat()}."
+    set_doc = {"start_date": new_start.isoformat(), "current_week": 1}
+    if compressed:
+        set_doc["duration_weeks_override"] = weeks
+    else:
+        # clear any earlier compression when it's no longer needed
+        await udb.plan_state.update_one({"id": plan_id}, {"$unset": {"duration_weeks_override": ""}}, upsert=True)
+    await udb.plan_state.update_one({"id": plan_id}, {"$set": set_doc}, upsert=True)
+    note = (f"Restarted {title} on {new_start.isoformat()} — every session shifts with the new start."
+            + note_event)
+    return {"start_date": new_start.isoformat(), "duration_weeks": weeks, "compressed": compressed,
+            "event_date": event.isoformat() if event else None, "note": note}
+
+
+@router.post("/plan/start-date")
+async def reset_plan_start_date(req: StartDateRequest):
+    """Reset the plan's start date; the rest of the plan shifts, honouring any
+    hard event date by compressing if necessary."""
+    new_start = _parse_ymd(req.start_date)
+    if not new_start:
+        raise HTTPException(status_code=400, detail="Invalid date (use YYYY-MM-DD)")
+    plan_id = await _plan_id_or_active(req.plan_id)
+    if not plan_id or plan_id == "none":
+        raise HTTPException(status_code=400, detail="No active plan to reschedule")
+    return await _reset_plan_start(plan_id, new_start)
+
+
 @router.get("/rider/missed")
 async def rider_missed():
-    """Safe missed-workout handling: count past scheduled cycling sessions that
-    weren't completed. Guidance intentionally never encourages stacking or unsafe
-    catch-up — the plan simply continues from today."""
-    uid = auth.current_user_id()
-    today = datetime.now(timezone.utc).date().isoformat()
+    """Missed cycling sessions the rider can Skip or Reschedule. Includes a
+    coach-suggested safe reschedule date (next free day)."""
+    today_d = datetime.now(timezone.utc).date()
+    today = today_d.isoformat()
     try:
         sched = await udb.scheduled_workouts.find().to_list(500)
     except Exception:
         sched = []
     missed = [
         w for w in sched
-        if str(w.get("date", "")) < today and w.get("status") not in ("completed", "skipped")
+        if str(w.get("date", "")) < today and w.get("status") not in ("completed", "skipped", "rescheduled")
     ]
     missed.sort(key=lambda w: str(w.get("date", "")), reverse=True)
-    count = len(missed)
-    guidance = (
-        "No need to make these up — don't stack hard sessions. Pick up today's ride "
-        "as planned; your plan continues safely from here."
-    ) if count else ""
+    suggested = _next_free_day(sched, today_d)
     return {
-        "count": count,
-        "missed": [{"date": w.get("date"), "title": w.get("title") or w.get("name")} for w in missed[:5]],
-        "guidance": guidance,
+        "count": len(missed),
+        "suggested_date": suggested,
+        "missed": [{"id": w.get("id"), "date": w.get("date"), "title": w.get("title") or w.get("name"),
+                    "suggested_date": suggested} for w in missed[:5]],
+        "guidance": ("Skip if life got in the way, or reschedule to a free day — "
+                     "your plan adjusts and your event date stays fixed.") if missed else "",
     }
+
+
+@router.post("/rider/missed/resolve")
+async def resolve_missed_workout(req: MissedResolveRequest):
+    """Skip a missed workout (mark skipped, plan continues) or reschedule it to a
+    new day (plan updates). Reschedule uses the given date or the coach's pick."""
+    entry = await udb.scheduled_workouts.find_one({"id": req.entry_id})
+    if not entry:
+        raise HTTPException(status_code=404, detail="Workout not found")
+    if req.action == "skip":
+        await udb.scheduled_workouts.update_one({"id": req.entry_id}, {"$set": {"status": "skipped"}})
+        return {"ok": True, "action": "skip",
+                "message": "Marked as skipped — no make-up needed. Your plan continues from here."}
+    if req.action == "reschedule":
+        sched = await udb.scheduled_workouts.find().to_list(500)
+        new_date = req.date or _next_free_day(sched, datetime.now(timezone.utc).date())
+        if not _parse_ymd(new_date):
+            raise HTTPException(status_code=400, detail="Invalid reschedule date")
+        await udb.scheduled_workouts.update_one(
+            {"id": req.entry_id},
+            {"$set": {"date": new_date, "status": "scheduled", "rescheduled_from": entry.get("date")}},
+        )
+        return {"ok": True, "action": "reschedule", "date": new_date,
+                "message": f"Moved '{entry.get('title') or 'your ride'}' to {new_date}. Plan updated."}
+    raise HTTPException(status_code=400, detail="action must be 'skip' or 'reschedule'")
 
 
 # /scenic/last moved to routes/scenic.py (scenic rides now tracked separately

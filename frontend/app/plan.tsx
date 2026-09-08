@@ -148,7 +148,7 @@ export default function TrainingPlanScreen() {
         <PlanGoalsCard onEdit={() => setShowGoals(true)} />
       </View>
       <View style={styles.heroCalendar}>
-        <CalendarCard onToast={showToast} onOpenCalendar={() => router.push("/calendar")} scope="week" />
+        <CalendarCard onToast={showToast} onOpenCalendar={(date) => router.push(date ? { pathname: "/calendar", params: { date } } : "/calendar")} scope="week" />
       </View>
     </View>
   );

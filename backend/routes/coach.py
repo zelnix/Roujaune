@@ -5,6 +5,7 @@ services.coach_llm; all plan math from services.plan_engine (one-way dependency)
 """
 import os  # noqa: F401
 import json
+import re
 import asyncio
 import logging
 import uuid
@@ -36,7 +37,7 @@ router = APIRouter()
 # Shared with the plan routes (one-way coach -> plan dependency; plan.py never
 # imports coach, so no cycle). get_plan gives structured-plan grounding for the
 # adaptation detail; WELLNESS_DATA feeds the readiness snippet in coach context.
-from routes.plan import get_plan, WELLNESS_DATA  # noqa: E402
+from routes.plan import get_plan, WELLNESS_DATA, _reset_plan_start, _parse_ymd, _next_free_day  # noqa: E402
 
 
 # ── Coach voice (Gemini TTS) ────────────────────────────────────────────────
@@ -366,6 +367,35 @@ def _chat_id(coach_name: str) -> str:
     return f"chat-{coach_name.lower()}"
 
 
+_WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+
+
+def _parse_natural_date(msg: str):
+    """Best-effort date from a chat phrase: today/tomorrow, a weekday name, or an
+    explicit date like '15 June' / 'June 15' / '2026-06-15'."""
+    from datetime import datetime, timezone, timedelta
+    m = (msg or "").lower()
+    today = datetime.now(timezone.utc).date()
+    if "today" in m:
+        return today
+    if "tomorrow" in m:
+        return today + timedelta(days=1)
+    for i, wd in enumerate(_WEEKDAYS):
+        if wd in m:
+            ahead = (i - today.weekday()) % 7
+            return today + timedelta(days=ahead or 7)  # the upcoming one
+    try:
+        from dateutil import parser as _dp
+        d = _dp.parse(m, fuzzy=True, default=datetime(today.year, today.month, today.day))
+        return d.date()
+    except Exception:
+        return None
+
+
+_START_RE = re.compile(r"\b(start\s*date|restart|re-?start|start (my|the) plan|reset (my|the )?(plan|start)|begin (my|the) plan|push (my|the) plan)\b")
+_MISSED_RE = re.compile(r"\b(missed|couldn'?t (ride|do)|skip(ped)?|reschedul|move (my|the|that) (ride|workout|session))\b")
+
+
 # ----------------------- Rider domain moved to routes/rider.py --------------
 # (_rider_doc / _rider_line / _cal_status now imported from services.rider_common)
 
@@ -486,7 +516,56 @@ async def coach_chat(req: CoachChatRequest):
     # safe structured edits and apply them so the coach can confirm in-reply.
     applied_note = ""
     plan_updated = False
-    if companion_plan.has_plan_edit_intent(req.message):
+
+    _ml = (req.message or "").lower()
+    # Reset the plan start date from chat ("restart my plan Monday", "reset the
+    # start date to 15 June"). Shifts the whole plan; honours a hard event date.
+    if not plan_updated and _START_RE.search(_ml):
+        d = _parse_natural_date(req.message)
+        if d:
+            try:
+                plan_id = await _active_plan_id()
+                if plan_id and plan_id != "none":
+                    res = await _reset_plan_start(plan_id, d)
+                    plan_updated = True
+                    applied_note = res["note"]
+                    await _record_adaptation(plan_id, req.coach_name, res["note"], "Start date reset")
+            except Exception:
+                logging.warning("chat start-date reset failed")
+
+    # Missed workout: skip or reschedule the most recent missed session.
+    if not plan_updated and _MISSED_RE.search(_ml):
+        try:
+            today = datetime.now(timezone.utc).date()
+            sched = await udb.scheduled_workouts.find().to_list(500)
+            missed = sorted(
+                [w for w in sched if str(w.get("date", "")) < today.isoformat()
+                 and w.get("status") not in ("completed", "skipped", "rescheduled")],
+                key=lambda w: str(w.get("date", "")), reverse=True,
+            )
+            if missed:
+                entry = missed[0]
+                if "skip" in _ml:
+                    await udb.scheduled_workouts.update_one({"id": entry["id"]}, {"$set": {"status": "skipped"}})
+                    applied_note = f"marked your missed '{entry.get('title') or 'ride'}' as skipped — no make-up, the plan continues"
+                else:
+                    d2 = _parse_natural_date(req.message)
+                    new_date = d2.isoformat() if d2 else _next_free_day(sched, today)
+                    await udb.scheduled_workouts.update_one(
+                        {"id": entry["id"]},
+                        {"$set": {"date": new_date, "status": "scheduled", "rescheduled_from": entry.get("date")}},
+                    )
+                    applied_note = f"rescheduled your missed '{entry.get('title') or 'ride'}' to {new_date} and shifted the plan to suit"
+                plan_updated = True
+                _pid = await _active_plan_id()
+                if _pid:
+                    await _record_adaptation(_pid, req.coach_name, f"At your request, I {applied_note}.", "Missed workout")
+        except Exception:
+            logging.warning("chat missed-resolve failed")
+
+    # Companion plan editing: if the rider asks for a plan change, turn it into
+    # safe structured edits and apply them so the coach can confirm in-reply.
+    if not plan_updated and companion_plan.has_plan_edit_intent(req.message):
         try:
             plan_id = await _active_plan_id()
             plan_def = await plans_admin.get_plan_def(plan_id)

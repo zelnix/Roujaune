@@ -614,11 +614,12 @@ def _ctr_plan_response(cur, ride_map, prog, weeks=None, plan_doc=None, plan_id="
         weekly_load = [sum(int(dd.get("tss", 0) or 0) for dd in weeks_map[n]["days"] if dd["kind"] == "cycling") for n in sorted(weeks_map)]
         description = pdoc.get("description", "")
         goals = pdoc.get("goals") or []
+    dw_final = int(pdoc.get("duration_weeks_override") or dw)
     plan = {
         "id": plan_id, "title": pdoc.get("title"), "label": (pdoc.get("title") or "").upper(),
         "description": description,
-        "duration_weeks": dw, "average_days_per_week": 3, "current_week": cur, "start_date": pdoc.get("start_date"),
-        "duration_label": pdoc.get("duration_label", f"{dw} Weeks"), "average_label": pdoc.get("average_label", "3 Rides/Week"),
+        "duration_weeks": dw_final, "average_days_per_week": 3, "current_week": cur, "start_date": pdoc.get("start_date"),
+        "duration_label": pdoc.get("duration_label", f"{dw_final} Weeks"), "average_label": pdoc.get("average_label", "3 Rides/Week"),
         "phase": {"name": week.get("phase_name", ""), "weeks": week.get("phase_weeks", ""),
                   "description": next((p["objective"] for p in pdoc.get("phases", []) if p["number"] == week.get("phase")), "")},
         "goals": goals,
