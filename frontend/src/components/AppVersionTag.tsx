@@ -5,14 +5,28 @@ import * as Clipboard from "expo-clipboard";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { textShadow } from "../theme";
 
-/** "v1.0.0 · Build 1" — reads the version from app config and the platform
- *  build number (ios.buildNumber / android.versionCode), falling back to the
- *  native build version on a real device. */
+/** Format an ISO timestamp as "8 Sep 2026, 08:54" (local time). */
+function fmtStamp(iso?: string): string {
+  const d = iso ? new Date(iso) : new Date();
+  if (isNaN(d.getTime())) return "";
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}, ${hh}:${mm}`;
+}
+
+/** In production: "v1.0.0 · Build 1". In preview builds (__DEV__): the publish
+ *  date/time + build instead of the version, so testers can see exactly which
+ *  bundle they're on. Build number falls back to the native build version. */
 export function versionLabel(): string {
   const cfg: any = Constants.expoConfig ?? {};
   const v = cfg.version ?? "1.0.0";
   const b = Platform.OS === "ios" ? cfg.ios?.buildNumber : cfg.android?.versionCode;
   const build = b ?? (Constants as any).nativeBuildVersion ?? "1";
+  if (__DEV__) {
+    const when = fmtStamp(cfg.extra?.buildStamp);
+    return `Published ${when} · Build ${build}`;
+  }
   return `v${v} · Build ${build}`;
 }
 
@@ -24,6 +38,7 @@ function buildDetails(): { label: string; value: string }[] {
   const rows: { label: string; value: string | undefined }[] = [
     { label: "Version", value: cfg.version ?? "1.0.0" },
     { label: "Build", value: (Platform.OS === "ios" ? cfg.ios?.buildNumber : cfg.android?.versionCode) ?? C.nativeBuildVersion ?? "1" },
+    { label: "Published", value: cfg.extra?.buildStamp ? fmtStamp(cfg.extra.buildStamp) : undefined },
     { label: "Bundle ID", value: bundleId },
     { label: "Runtime", value: cfg.runtimeVersion ? String(cfg.runtimeVersion) : undefined },
     { label: "Expo SDK", value: cfg.sdkVersion },
