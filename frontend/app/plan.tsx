@@ -7,7 +7,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { useCoach } from "@/src/lib/coach-persona";
-import { usePlan, useAdaptation, useAdaptiveTargets } from "@/src/lib/plan";
+import { usePlan, useAdaptation, useAdaptiveTargets, resetPlanStart, undoReschedule } from "@/src/lib/plan";
 import { markPlanSeen } from "@/src/lib/plan-badge";
 import PlanBenchmarkGate from "@/src/components/benchmark/PlanBenchmarkGate";
 import {
@@ -28,6 +28,7 @@ import { usePhaseCelebration, usePlanCompletion } from "@/src/lib/phase-complete
 import { CoachChatModal } from "@/src/components/CoachChatModal";
 import { CoachPlanCreatorModal } from "@/src/components/CoachPlanCreatorModal";
 import { SwapSessionSheet } from "@/src/components/SwapSessionSheet";
+import { ChangeStartDateModal } from "@/src/components/ChangeStartDateModal";
 import { swapSession } from "@/src/lib/plan-create";
 import type { EditableGoal } from "@/src/lib/plan";
 
@@ -102,6 +103,7 @@ export default function TrainingPlanScreen() {
   const [swapWO, setSwapWO] = React.useState<KeyWorkout | null>(null);
   const [showChat, setShowChat] = React.useState(false);
   const [showCreator, setShowCreator] = React.useState(false);
+  const [showStartDate, setShowStartDate] = React.useState(false);
   const [chatSeed, setChatSeed] = React.useState<string | undefined>(undefined);
   const [goalsOverride, setGoalsOverride] = React.useState<EditableGoal[] | null>(null);
 
@@ -138,6 +140,21 @@ export default function TrainingPlanScreen() {
   const onWorkout = (w: KeyWorkout) => setWorkoutDetail(w);
   const viewAllWorkouts = React.useCallback(() => router.push({ pathname: "/workout-list", params: { type: "all" } } as any), [router]);
   const activePlanId = (plan as any)?.id ?? "build-and-climb";
+  const hasPlan = !(displayPlan as any).no_plan;
+
+  const onChangeStart = React.useCallback(async (dateISO: string) => {
+    setShowStartDate(false);
+    const r = await resetPlanStart(dateISO);
+    refreshPlan();
+    if (r.ok) {
+      showToast(
+        r.note || "Plan start date updated",
+        r.can_undo ? async () => { await undoReschedule(); refreshPlan(); showToast("Reverted to your previous schedule"); } : undefined,
+      );
+    } else {
+      showToast("Couldn't change the start date — try again");
+    }
+  }, [refreshPlan, showToast]);
 
   const contentW = availW > 0 ? availW : width - 96;
   const fullW = Math.max(600, contentW - 44); // content minus horizontal padding
@@ -212,6 +229,18 @@ export default function TrainingPlanScreen() {
           <PlanTabs active={tab} onChange={setTab} />
         </View>
         <View style={styles.headerRight}>
+          {hasPlan ? (
+            <Pressable
+              testID="change-start-date"
+              onPress={() => setShowStartDate(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Change plan start date"
+              style={({ hovered }: any) => [styles.messageBtn, hovered && styles.messageBtnHover]}
+            >
+              <Ionicons name="calendar-outline" size={15} color={C.yellow} />
+              <Text style={styles.messageBtnText}>Change start date</Text>
+            </Pressable>
+          ) : null}
           <Pressable
             testID="create-plan-btn"
             onPress={() => setShowCreator(true)}
@@ -282,6 +311,12 @@ export default function TrainingPlanScreen() {
         />
         <CoachChatModal visible={showChat} onClose={() => { setShowChat(false); setChatSeed(undefined); }} persona={persona} onPlanUpdated={refreshPlan} seedMessage={chatSeed} onCreatePlan={() => { setShowChat(false); setShowCreator(true); }} />
         <CoachPlanCreatorModal visible={showCreator} onClose={() => setShowCreator(false)} persona={persona} onAccepted={(title) => { showToast(`New plan ready: ${title}`); refreshPlan(); }} />
+        <ChangeStartDateModal
+          visible={showStartDate}
+          onClose={() => setShowStartDate(false)}
+          onConfirm={onChangeStart}
+          currentStart={(displayPlan as any)?.start_date}
+        />
         <SwapSessionSheet
           visible={!!swapWO}
           onClose={() => setSwapWO(null)}

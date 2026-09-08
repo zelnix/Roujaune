@@ -8,7 +8,7 @@ import { Image } from "expo-image";
 import { C } from "./plan";
 import { CoachPersona, useCoachStyle } from "../lib/coach-persona";
 import { ChatMessage, fetchChatHistory, sendChatMessage, clearChatHistory, CHAT_SUGGESTIONS, fetchLatestRide, LatestRide } from "../lib/coach-chat";
-import { notifyPlanChanged } from "../lib/plan";
+import { notifyPlanChanged, undoReschedule } from "../lib/plan";
 import { useCoachSpeech } from "../hooks/useCoachSpeech";
 
 function TypingDots() {
@@ -28,6 +28,7 @@ export function CoachChatModal({ visible, onClose, persona, onPlanUpdated, seedM
   const [sending, setSending] = React.useState(false);
   const [latestRide, setLatestRide] = React.useState<LatestRide | null>(null);
   const [planNotice, setPlanNotice] = React.useState<string | null>(null);
+  const [canUndo, setCanUndo] = React.useState(false);
   const scrollRef = React.useRef<ScrollView>(null);
 
   const scrollToEnd = React.useCallback(() => {
@@ -62,6 +63,7 @@ export function CoachChatModal({ visible, onClose, persona, onPlanUpdated, seedM
       setMessages((m) => [...m.filter((x) => x.id !== optimistic.id), res.user_message, res.coach_message]);
       if (res.plan_updated) {
         setPlanNotice(res.plan_change || "Your plan was updated");
+        setCanUndo(!!res.can_undo);
         notifyPlanChanged();
         onPlanUpdated?.();
       }
@@ -118,6 +120,19 @@ export function CoachChatModal({ visible, onClose, persona, onPlanUpdated, seedM
               <View style={s.planNotice} testID="chat-plan-notice">
                 <Ionicons name="checkmark-circle" size={15} color={C.green} />
                 <Text style={s.planNoticeText} numberOfLines={2}>Plan updated · {planNotice}</Text>
+                {canUndo ? (
+                  <Pressable
+                    testID="chat-plan-undo"
+                    onPress={async () => {
+                      const ok = await undoReschedule();
+                      if (ok) { setPlanNotice("Reverted to your previous schedule"); setCanUndo(false); }
+                    }}
+                    style={s.undoBtn}
+                  >
+                    <Ionicons name="arrow-undo" size={13} color={C.white} />
+                    <Text style={s.undoText}>Undo</Text>
+                  </Pressable>
+                ) : null}
               </View>
             ) : null}
 
@@ -228,6 +243,8 @@ const s = StyleSheet.create({
   createPlanBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, margin: 12, paddingVertical: 11, borderRadius: 12, backgroundColor: C.yellow },
   createPlanText: { color: "#050506", fontSize: 14, fontWeight: "800" },
   planNoticeText: { flex: 1, color: C.green, fontSize: 12.5, fontWeight: "700" },
+  undoBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingVertical: 5, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: C.border },
+  undoText: { color: C.white, fontSize: 12, fontWeight: "800" },
 
   list: { flex: 1 },
   listContent: { padding: 16, gap: 12 },

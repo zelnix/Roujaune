@@ -520,6 +520,7 @@ async def coach_chat(req: CoachChatRequest):
     # safe structured edits and apply them so the coach can confirm in-reply.
     applied_note = ""
     plan_updated = False
+    can_undo = False
 
     _ml = (req.message or "").lower()
     # Reset the plan start date from chat ("restart my plan Monday", "reset the
@@ -532,6 +533,7 @@ async def coach_chat(req: CoachChatRequest):
                 if plan_id and plan_id != "none":
                     res = await _reset_plan_start(plan_id, d)
                     plan_updated = True
+                    can_undo = True
                     applied_note = res["note"]
                     await _record_adaptation(plan_id, req.coach_name, res["note"], "Start date reset")
             except Exception:
@@ -633,7 +635,7 @@ async def coach_chat(req: CoachChatRequest):
         logging.warning("coach chat persist failed")
 
     return {"reply": reply, "user_message": user_msg, "coach_message": coach_msg,
-            "plan_updated": plan_updated, "plan_change": applied_note}
+            "plan_updated": plan_updated, "plan_change": applied_note, "can_undo": can_undo}
 
 
 @router.get("/coach/weekly-note")

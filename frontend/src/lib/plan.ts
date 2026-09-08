@@ -18,6 +18,34 @@ export function notifyPlanChanged(): void {
   _planSubs.forEach((f) => { try { f(); } catch { /* ignore */ } });
 }
 
+/** Change the active plan's start date; the whole plan re-anchors to it. */
+export async function resetPlanStart(dateISO: string): Promise<{ ok: boolean; note?: string; can_undo?: boolean }> {
+  try {
+    const res = await fetch(`${apiBase()}/api/plan/start-date`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ start_date: dateISO, plan_id: "" }),
+    });
+    if (!res.ok) return { ok: false };
+    const j = await res.json();
+    notifyPlanChanged();
+    return { ok: true, note: j.note, can_undo: j.can_undo };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/** Revert the most recent plan reschedule. */
+export async function undoReschedule(): Promise<boolean> {
+  try {
+    const res = await fetch(`${apiBase()}/api/plan/undo-reschedule`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ start_date: "", plan_id: "" }),
+    });
+    if (res.ok) { notifyPlanChanged(); return true; }
+  } catch { /* ignore */ }
+  return false;
+}
+
 // Cache key is versioned + rider-active-scoped (NOT keyed by the requested id,
 // which is always the "build-and-climb" default). Bumping the version purges any
 // legacy `roujaune:plan:build-and-climb` cache that could otherwise keep showing

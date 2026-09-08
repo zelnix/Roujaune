@@ -834,6 +834,18 @@ async def _reset_plan_start(plan_id: str, new_start: date) -> dict:
     # Physically re-date the rider's plan weeks so the whole schedule moves.
     if plan_id in STRUCTURED_PLAN_IDS or plan_id.startswith("custom-"):
         try:
+            # Snapshot the PRE-change state so the rider can undo the reschedule.
+            import copy
+            prev_state = await udb.plan_state.find_one({"id": plan_id}) or {}
+            prev_def = await _rider_plan_def(plan_id)
+            await udb.plan_undo.update_one({"id": plan_id}, {"$set": {
+                "id": plan_id,
+                "prev_start_date": prev_state.get("start_date"),
+                "prev_current_week": prev_state.get("current_week"),
+                "prev_duration_override": prev_state.get("duration_weeks_override"),
+                "prev_def": copy.deepcopy(prev_def) if prev_def else None,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }}, upsert=True)
             await _rebase_plan_def(plan_id, new_start, weeks if compressed else None)
         except Exception:
             logging.warning("plan rebase failed")
@@ -847,7 +859,7 @@ async def _reset_plan_start(plan_id: str, new_start: date) -> dict:
     note = (f"Restarted {title} on {new_start.isoformat()} — every session shifts with the new start."
             + note_event)
     return {"start_date": new_start.isoformat(), "duration_weeks": weeks, "compressed": compressed,
-            "event_date": event.isoformat() if event else None, "note": note}
+            "event_date": event.isoformat() if event else None, "note": note, "can_undo": True}
 
 
 @router.post("/plan/start-date")
@@ -861,6 +873,32 @@ async def reset_plan_start_date(req: StartDateRequest):
     if not plan_id or plan_id == "none":
         raise HTTPException(status_code=400, detail="No active plan to reschedule")
     return await _reset_plan_start(plan_id, new_start)
+
+
+@router.post("/plan/undo-reschedule")
+async def undo_reschedule(req: StartDateRequest):
+    """Revert the most recent plan reschedule for the active plan."""
+    plan_id = await _plan_id_or_active(req.plan_id)
+    snap = await udb.plan_undo.find_one({"id": plan_id})
+    if not snap:
+        raise HTTPException(status_code=404, detail="Nothing to undo")
+    # Restore the rider's plan definition verbatim.
+    if snap.get("prev_def"):
+        pd = dict(snap["prev_def"])
+        pd.pop("_id", None)
+        await udb.training_plans.update_one({"id": plan_id}, {"$set": {"id": plan_id, "definition": pd}}, upsert=True)
+    # Restore plan_state.
+    await udb.plan_state.update_one(
+        {"id": plan_id},
+        {"$set": {"start_date": snap.get("prev_start_date"), "current_week": snap.get("prev_current_week") or 1}},
+        upsert=True)
+    if snap.get("prev_duration_override"):
+        await udb.plan_state.update_one({"id": plan_id}, {"$set": {"duration_weeks_override": snap["prev_duration_override"]}})
+    else:
+        await udb.plan_state.update_one({"id": plan_id}, {"$unset": {"duration_weeks_override": ""}})
+    await udb.plan_undo.delete_one({"id": plan_id})
+    return {"ok": True, "start_date": snap.get("prev_start_date"),
+            "note": "Reverted your plan back to the previous schedule."}
 
 
 @router.get("/rider/missed")

@@ -457,7 +457,8 @@ def _ctr_calendar_week(week, ride_map, supp_dates, today):
     completed_rides = 0
     for i, day in enumerate(week["days"]):
         dt = start + timedelta(days=i)
-        entry = {"date": dt.isoformat(), "day_name": day["day_name"], "day_num": dt.strftime("%-d %b").upper(),
+        wd = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"][dt.weekday()]
+        entry = {"date": dt.isoformat(), "day_name": wd, "day_num": dt.strftime("%-d %b").upper(),
                  "focus": day["title"], "cycling": None, "fb50": None, "wellness": None, "readiness": _ctr_readiness(78 if i == 1 else 80)}
         kind = day["kind"]
         if kind == "cycling":
