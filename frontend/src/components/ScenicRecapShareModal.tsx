@@ -10,7 +10,7 @@ import { ScenicJourney, setRecapCover } from "@/src/lib/scenic-routes";
 import { ScenicRecapCard } from "./ScenicRecapCard";
 import { SocialShareRow } from "./SocialShareRow";
 import { CaptionEditor } from "./CaptionEditor";
-import { styleCaption } from "@/src/lib/caption-styles";
+import { styleCaption, getSavedTone, CaptionTone } from "@/src/lib/caption-styles";
 
 /** Presents the branded scenic ride recap and lets the rider share or save it. */
 export function ScenicRecapShareModal({
@@ -27,17 +27,22 @@ export function ScenicRecapShareModal({
   // Live cover override so the card updates the instant a cover is picked.
   const [cover, setCover] = React.useState<string | null | undefined>(undefined);
   const [caption, setCaption] = React.useState("");
+  const [tone, setTone] = React.useState<CaptionTone>("proud");
+
+  const buildCaption = React.useCallback((t: CaptionTone) => {
+    const j = journey as any;
+    const stats: string[] = [];
+    if (j?.distance_km != null) { const n = typeof j.distance_km === "string" ? parseFloat(j.distance_km) : j.distance_km; if (!isNaN(n)) stats.push(`${n.toFixed(n >= 10 ? 0 : 1)} km`); }
+    if (j?.duration_sec) { const m = Math.round(j.duration_sec / 60); stats.push(m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m} min`); }
+    if (j?.elevation_m != null && j.elevation_m > 0) stats.push(`${j.elevation_m} m climb`);
+    return styleCaption(t, { title: j?.name || j?.title || "Scenic ride", place: j?.place, stats });
+  }, [journey]);
 
   React.useEffect(() => { if (visible) setNotice(null); }, [visible]);
   React.useEffect(() => { setCover(journey?.cover ?? null); }, [journey]);
   React.useEffect(() => {
-    if (visible && journey) {
-      const j = journey as any;
-      const name = j.name || j.title || j.routeName || "My scenic ride";
-      const place = j.place || j.location ? ` · ${j.place || j.location}` : "";
-      setCaption(`${name}${place}\nROUJAUNE · Your strongest ride is your own.`);
-    }
-  }, [visible, journey]);
+    if (visible && journey) getSavedTone().then((t) => { setTone(t); setCaption(buildCaption(t)); });
+  }, [visible, journey, buildCaption]);
 
   const coverPhotos = React.useMemo(
     () => Array.from(new Set((journey?.discoveries || []).map((d) => d.photo).filter(Boolean) as string[])),
@@ -142,14 +147,8 @@ export function ScenicRecapShareModal({
               value={caption}
               onChange={setCaption}
               testID="recap-caption"
-              onTone={(tone) => {
-                const j = journey as any;
-                const stats: string[] = [];
-                if (j.distance_km != null) { const n = typeof j.distance_km === "string" ? parseFloat(j.distance_km) : j.distance_km; if (!isNaN(n)) stats.push(`${n.toFixed(n >= 10 ? 0 : 1)} km`); }
-                if (j.duration_sec) { const m = Math.round(j.duration_sec / 60); stats.push(m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m} min`); }
-                if (j.elevation_m != null && j.elevation_m > 0) stats.push(`${j.elevation_m} m climb`);
-                setCaption(styleCaption(tone, { title: j.name || j.title || "Scenic ride", place: j.place, stats }));
-              }}
+              activeTone={tone}
+              onTone={(t) => { setTone(t); setCaption(buildCaption(t)); }}
             />
 
             <SocialShareRow caption={caption} getImageUri={capture} disabled={!!busy}

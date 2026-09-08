@@ -4,7 +4,7 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 import { colors, radius, spacing } from "@/src/theme";
 import { SocialShareRow } from "./SocialShareRow";
 import { CaptionEditor } from "./CaptionEditor";
-import { styleCaption } from "@/src/lib/caption-styles";
+import { styleCaption, getSavedTone, CaptionTone } from "@/src/lib/caption-styles";
 
 /** End-of-ride share sheet: same quick-share row (Instagram Story/Feed, X,
  * WhatsApp, Copy) + editable caption with tone chips, opened from the ride
@@ -21,7 +21,15 @@ export function RideShareSheet({
   onNotice: (msg: string) => void;
 }) {
   const [caption, setCaption] = React.useState("");
-  React.useEffect(() => { if (visible) setCaption(initialCaption); }, [visible, initialCaption]);
+  const [tone, setTone] = React.useState<CaptionTone>("proud");
+  const seededRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!visible) { seededRef.current = false; return; }
+    if (seededRef.current) return;
+    seededRef.current = true;
+    if (captionFacts) getSavedTone().then((t) => { setTone(t); setCaption(styleCaption(t, captionFacts)); });
+    else setCaption(initialCaption);
+  }, [visible, initialCaption, captionFacts]);
   if (!visible) return null;
   return (
     <Modal visible transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
@@ -34,7 +42,8 @@ export function RideShareSheet({
             value={caption}
             onChange={setCaption}
             testID="ride-share-caption"
-            onTone={captionFacts ? (tone) => setCaption(styleCaption(tone, captionFacts)) : undefined}
+            activeTone={tone}
+            onTone={captionFacts ? (t) => { setTone(t); setCaption(styleCaption(t, captionFacts)); } : undefined}
           />
           <SocialShareRow caption={caption} getImageUri={getImageUri} onNotice={(m) => onNotice(m)} />
           <View style={st.actions}>

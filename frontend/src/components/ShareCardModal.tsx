@@ -10,7 +10,7 @@ import { fetchDiscoveries } from "../lib/scenic-routes";
 import { C } from "./plan";
 import { SocialShareRow } from "./SocialShareRow";
 import { CaptionEditor } from "./CaptionEditor";
-import { styleCaption } from "../lib/caption-styles";
+import { styleCaption, getSavedTone, CaptionTone } from "../lib/caption-styles";
 import { AchievementCard, AchievementCardData } from "./AchievementCard";
 
 /** Presents the branded achievement card and lets the rider share it or save it
@@ -28,13 +28,16 @@ export function ShareCardModal({
   const [bgUri, setBgUri] = React.useState<string | null>(null);
   const [discoPhotos, setDiscoPhotos] = React.useState<string[]>([]);
   const [caption, setCaption] = React.useState("");
+  const [tone, setTone] = React.useState<CaptionTone>("proud");
+
+  const buildCaption = React.useCallback((t: CaptionTone) => styleCaption(t, {
+    title: data?.title,
+    stats: (data?.stats || []).map((st) => `${st.value} ${st.label.toLowerCase()}`),
+  }), [data]);
 
   React.useEffect(() => {
-    if (visible && data) {
-      const head = [data.kicker, data.title].filter(Boolean).join(" · ");
-      setCaption(`${head}${data.subtitle ? ` — ${data.subtitle}` : ""}\nROUJAUNE · Your strongest ride is your own.`);
-    }
-  }, [visible, data]);
+    if (visible && data) getSavedTone().then((t) => { setTone(t); setCaption(buildCaption(t)); });
+  }, [visible, data, buildCaption]);
 
   React.useEffect(() => {
     if (visible) { setNotice(null); setBgUri(null); }
@@ -187,10 +190,8 @@ export function ShareCardModal({
             value={caption}
             onChange={setCaption}
             testID="share-caption"
-            onTone={(tone) => setCaption(styleCaption(tone, {
-              title: data.title,
-              stats: (data.stats || []).map((st) => `${st.value} ${st.label.toLowerCase()}`),
-            }))}
+            activeTone={tone}
+            onTone={(t) => { setTone(t); setCaption(buildCaption(t)); }}
           />
 
           <SocialShareRow caption={caption} getImageUri={capture} disabled={!!busy}

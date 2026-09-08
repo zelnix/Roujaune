@@ -1,3 +1,5 @@
+import { Platform } from "react-native";
+
 export type IgMode = "feed" | "story";
 export type IgResult = "shared" | "notinstalled" | "error";
 
@@ -21,6 +23,25 @@ export async function shareToInstagram(mode: IgMode, imageUri: string, appId: st
     } else {
       await Share.shareSingle({ social: Social.INSTAGRAM_STORIES, appId, backgroundImage: url });
     }
+    return "shared";
+  } catch (e: any) {
+    const msg = String(e?.message || e || "").toLowerCase();
+    if (msg.includes("not installed") || msg.includes("no app") || msg.includes("could not") || msg.includes("activity")) {
+      return "notinstalled";
+    }
+    return "error";
+  }
+}
+
+/** Share a local PNG straight into the Facebook composer (native build only). */
+export async function shareToFacebook(imageUri: string): Promise<IgResult> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const RNShare = require("react-native-share");
+    const Share = RNShare.default;
+    const Social = RNShare.Social;
+    const url = imageUri.startsWith("file://") || imageUri.startsWith("data:") ? imageUri : `file://${imageUri}`;
+    await Share.shareSingle({ social: Social.FACEBOOK, url, type: "image/png", useInternalStorage: Platform.OS === "android" });
     return "shared";
   } catch (e: any) {
     const msg = String(e?.message || e || "").toLowerCase();

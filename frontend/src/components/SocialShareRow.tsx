@@ -4,7 +4,7 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Clipboard from "expo-clipboard";
 import * as MediaLibrary from "expo-media-library/legacy";
 import { colors } from "@/src/theme";
-import { shareToInstagram } from "@/src/lib/ig-share";
+import { shareToInstagram, shareToFacebook } from "@/src/lib/ig-share";
 
 const META_APP_ID = process.env.EXPO_PUBLIC_META_APP_ID || "";
 
@@ -70,12 +70,29 @@ export function SocialShareRow({
       onNotice("Saved to Photos ✓ Instagram isn't installed — install it to post.");
     } catch { onNotice("Couldn't prepare your Instagram share. Please try again."); }
   };
+  const shareFacebook = async () => {
+    if (Platform.OS === "web") { onNotice("Facebook sharing is available on the mobile app."); return; }
+    try {
+      try { await Clipboard.setStringAsync(caption); } catch { /* best-effort */ }
+      const uri = await getImageUri();
+      const res = await shareToFacebook(uri);
+      if (res === "shared") { onNotice("Opening Facebook — caption copied to paste (Facebook won't pre-fill it)."); return; }
+      if (res === "notinstalled") { onNotice("Facebook isn't installed — install it to post."); return; }
+      // error -> save to Photos so the rider can attach it manually
+      let perm = await MediaLibrary.getPermissionsAsync();
+      if (!perm.granted && perm.canAskAgain) perm = await MediaLibrary.requestPermissionsAsync();
+      if (!perm.granted) { onNotice("Turn on photo access so we can save your card for Facebook.", "settings"); return; }
+      await MediaLibrary.saveToLibraryAsync(uri);
+      onNotice("Saved to Photos ✓ Open Facebook and attach your ROUJAUNE card (caption copied).");
+    } catch { onNotice("Couldn't prepare your Facebook share. Please try again."); }
+  };
   return (
     <View style={st.row}>
       {Platform.OS !== "web" ? (
         <>
           <Btn testID="share-instagram" label="Story" icon="logo-instagram" onPress={() => shareInstagram("story")} disabled={disabled} />
           <Btn testID="share-instagram-feed" label="Feed" icon="logo-instagram" onPress={() => shareInstagram("feed")} disabled={disabled} />
+          <Btn testID="share-facebook" label="Facebook" icon="logo-facebook" onPress={shareFacebook} disabled={disabled} />
         </>
       ) : null}
       <Btn testID="share-x" label="X" icon="logo-twitter" onPress={shareX} disabled={disabled} />

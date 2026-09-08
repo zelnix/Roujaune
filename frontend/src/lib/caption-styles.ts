@@ -1,4 +1,20 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 export type CaptionTone = "proud" | "playful" | "minimal";
+
+const TONE_KEY = "roujaune.captionTone";
+
+/** Remember the rider's last-used caption voice so future shares default to it. */
+export async function getSavedTone(): Promise<CaptionTone> {
+  try {
+    const v = await AsyncStorage.getItem(TONE_KEY);
+    return v === "proud" || v === "playful" || v === "minimal" ? v : "proud";
+  } catch { return "proud"; }
+}
+export async function saveTone(tone: CaptionTone): Promise<void> {
+  try { await AsyncStorage.setItem(TONE_KEY, tone); } catch { /* best-effort */ }
+}
+
 
 export const CAPTION_TONES: { key: CaptionTone; label: string }[] = [
   { key: "proud", label: "Proud" },
