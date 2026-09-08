@@ -1,0 +1,50 @@
+{
+  "summary": "Iteration 111: verified the calendar day-tap fix, plan/summary/workouts real-action replacements, and the new custom-workout builder end-to-end on demo@roujaune.app (build-and-climb, week 2025-05-12..18) in landscape 1280x900. BACKEND (6/6 PASS via pytest, /app/test_reports/pytest/iter111.xml): /api/calendar/week returns the plan week (start_date=2025-05-12, free unset) when ?date=2025-05-14; returns a free week (free:true) whose start_date is the Monday of the requested date for ?date=2026-03-11 → 2026-03-09 and for ?date=2027-01-04 → 2027-01-04; default (no date) returns a 7-day week. Custom workout lifecycle passes: POST /api/catalog returns {workout:{id:'custom-…', custom:true}}; GET /api/catalog includes it; DELETE /api/catalog/{id}/reset removes it and returns {reset,reverted:true}; POST with blank name → 400. FRONTEND — WORKS: (a) /plan tapping 'This Week's Plan' row (Tue · Threshold…) navigates to /calendar?date=2025-05-13 (URL param verified); (b) /plan mini-calendar day tile testID=day-2025-05-13 also navigates to /calendar?date=2025-05-13; (c) /plan view-all-workouts navigates to /workout-list?type=all; (d) /plan load-filter renders as a static chip (no phantom dropdown); (e) /workouts compare-types opens the modal with 8 type rows (testIDs compare-endurance/…/compare-restday) and picking a row navigates to /workout-list?type=<id>; (f) Custom-workout builder opens from /workouts My Workouts → new-custom-workout, exposes builder-name/builder-desc/builder-summary/add-segment/seg-min-up-0/seg-pct-up-0/seg-zone-0/builder-save, builder-summary live-updated from '35 MIN / 34 TSS / 0.76 IF / Moderate EFFORT' to '38 MIN / 40 TSS / 0.79 IF / Moderate EFFORT' after 3× seg-min-up-0 + 3× seg-pct-up-0; builder-save lands on /workout-list?workout=custom-b44b0dd057; returning to /workouts My Workouts shows the new custom-<id> card with a custom-del-<id> button; delete removes it (custom-del count 1 → 0). CRITICAL BUG FOUND — CALENDAR FREE-WEEK CRASH: on /calendar, clicking next-week (or any nav that moves outside the demo/plan week) triggers a red-screen 'Uncaught Error: Cannot read properties of undefined (reading \\'score\\')' at /app/frontend/app/calendar.tsx:321 (`<ReadinessRing score={d.readiness.score} status={d.readiness.status} />`). Root cause: the backend _free_calendar_week() (services/plan_engine.py:684) intentionally does NOT emit a `readiness` object on each day (only date/day_name/day_num/focus), and the readiness row in calendar.tsx dereferences d.readiness.score with no null-guard. This blocks prev-week / next-week / today-btn / day-head selection on any free week — which is now the DEFAULT for any date outside the demo plan window. Not covered: /summary sync-strava/sync-apple tiles were not present when /summary loaded in manual-entry mode for the demo rider (no completed ride yet). The tiles likely only render after a real ride summary — acceptable per the review request note.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Calendar (free week rendering)",
+        "issue": "Red-screen crash on any navigation that lands on a free week (Prev/Next week, Today after browsing, direct ?date outside plan). Error 'Cannot read properties of undefined (reading \\'score\\')' at app/calendar.tsx:321 — the readiness row does <ReadinessRing score={d.readiness.score} status={d.readiness.status} /> but _free_calendar_week() does not include a `readiness` field on its days. Fix options: (1) null-guard on the client — e.g. `d.readiness ? <ReadinessRing …/> : <PlaceholderDim/>` (or `d.readiness?.score ?? 0`); (2) have _free_calendar_week() emit a stub readiness (score:0/status:'—') per day so the ring can render 'no data' visually. Client-side guard is preferred so future backend changes don't break the UI.",
+        "testID": "readiness-<i>",
+        "priority": "CRITICAL"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Calendar prev/next/today week navigation",
+        "issue": "Frontend crashes as soon as the current rider tries to leave the demo week (or before any plan is loaded, when the response is a free week). Blocks the entire calendar navigation feature described in review-request item 2 for anything outside 2025-05-12..18.",
+        "affected_testIDs": ["prev-week", "next-week", "today-btn", "day-head-<i>", "readiness-<i>"]
+      }
+    ],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter111_calendar_week_and_custom_catalog.py",
+    "/app/test_reports/pytest/iter111.xml"
+  ],
+  "action_items": [
+    "FIX CRITICAL: null-guard the readiness row in /app/frontend/app/calendar.tsx (~line 319-323). Wrap the ReadinessRing with `d.readiness ? <ReadinessRing …/> : null` (or render a dim placeholder), so free-week days without readiness don't crash. Optionally also have _free_calendar_week() attach a placeholder readiness so Day Readiness shows the row consistently.",
+    "OPTIONAL (parity): audit calendar.tsx for other unconditional dereferences of day.cycling / day.fb50 / day.readiness that might be undefined on free weeks (the current demo path always has these).",
+    "OPTIONAL (testability): expose `range-label` as a testID on /calendar's date range so testers can assert the week actually changed (currently no stable selector for the label)."
+  ],
+  "critical_code_review_comments": [
+    "backend/routes/plan.py get_calendar_week: correctly falls through to _free_calendar_week(target.isoformat()) whenever the plan doesn't contain the target date — the intended new behavior — but the client isn't ready for the shape returned. Consider making _free_calendar_week emit an empty readiness stub to prevent future UI-side crashes even without the client fix.",
+    "backend/routes/catalog.py create_my_workout: id is 'custom-'+uuid[:10] (10 hex chars) — unique enough at low scale but not collision-safe if the same rider creates thousands. Not a blocker.",
+    "backend/routes/catalog.py reset_my_workout: for a global workout (non-custom) the rider has NOT copied, `reset` returns reverted:false and does nothing — semantically fine, but 'reset' is a slight misnomer for pure-custom deletes. Consider a dedicated DELETE endpoint for custom-owned workouts.",
+    "frontend/app/calendar.tsx: the crash isolates to one line but there are several other `d.readiness…` accesses in the same file (metrics row, panel). None of them are hit for a free week because those rows key off d.cycling/d.fb50 first, but they are latent risks if the shape ever partially drops fields."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter111_calendar_week_and_custom_catalog.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (6/6 pytest)",
+    "frontend": "Plan day-tap → calendar: PASS. Plan view-all/load-filter/week-row: PASS. Compare Types modal + navigation: PASS. Custom workout builder end-to-end (open/edit/summary-updates/save/list/my-tab/delete): PASS. Calendar week Prev/Next/Today/day-head: FAIL (red-screen crash on free week). Summary sync tiles: NOT REACHED (no completed ride for demo — acceptable per request)."
+  },
+  "seed_data_creation": "Backend pytest fixture creates + deletes one custom workout named 'TEST_Custom Sweet Spot' per run; cleaned up in-test. UI test created 'TEST Custom SS 111' and deleted it via the My Workouts custom-del button.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login recipe (repeatable in the preview): goto '/', wait 3.5s, click page.get_by_text('Sign in with email', exact=True).first, wait 1s, inputs.nth(0)=demo@roujaune.app, inputs.nth(1)=demo9900, click the LAST page.get_by_text('Sign in', exact=True). Viewport 1280x900 landscape is required for the tablet grid layouts. Real testIDs discovered this round: /plan mini-cal cells use `day-YYYY-MM-DD` (not `mini-day-<i>`); 'This Week's Plan' rows have no `week-row-<i>` testID and were tapped via text 'Tue ·'; /workouts My-tab is `tab-My Workouts` (space in the id!); Compare modal rows are `compare-<type_id>` (endurance/climbing/threshold/vo2max/sprints/tempo/recovery/restday); workout-list schedule button is `add-calendar` (not `add-to-cal`). Do NOT navigate the /calendar Prev/Next arrows until the readiness-row null-guard is added — will red-screen.",
+  "rca_of_issue": "Calendar free-week crash — RCA: When the caller navigates to a date outside the active plan (or the rider has no structured plan at all), backend `_free_calendar_week()` returns days with only {date, day_name, day_num, focus} and the top-level flag `free:true`. The frontend calendar screen (`/app/frontend/app/calendar.tsx` lines 319-323) unconditionally reads `d.readiness.score` and `d.readiness.status` when rendering the DAY READINESS row, so the first missing `readiness` throws a runtime TypeError which Expo Router surfaces as an uncaught-error red screen. Reproduction: login as demo → /calendar → click [data-testid=next-week]. Mitigation (client-side, recommended): change line 321 to `d.readiness ? <ReadinessRing score={d.readiness.score} status={d.readiness.status} /> : null` (or render a dim '—' placeholder). Optional server-side fix: append a stub `readiness: {score:0, status:'—', source:'', metrics:[]}` to each day in _free_calendar_week() so the ring renders consistently even without data."
+}

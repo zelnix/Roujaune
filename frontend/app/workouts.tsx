@@ -1,9 +1,9 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, Animated, useWindowDimensions } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable, Animated, useWindowDimensions, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { StatusBar } from "expo-status-bar";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { Image } from "expo-image";
 import Svg, { Rect } from "react-native-svg";
@@ -15,6 +15,8 @@ import { CoachChatModal } from "@/src/components/CoachChatModal";
 import { useCoach } from "@/src/lib/coach-persona";
 import { markPlanSeen } from "@/src/lib/plan-badge";
 import { fetchFavorites, toggleFavorite } from "@/src/lib/workout-prefs";
+import { listCustomWorkouts, deleteCustomWorkout } from "@/src/lib/custom-workouts";
+import type { Workout } from "@/src/lib/workout-catalog";
 import {
   WORKOUT_TABS, WorkoutTab, WORKOUT_CATEGORIES, POPULAR_THIS_WEEK, QUICK_ACTIONS,
   typesForTab, WorkoutType,
@@ -107,12 +109,26 @@ export default function WorkoutsScreen() {
   const [tab, setTab] = React.useState<WorkoutTab>("All Workouts");
   const [favs, setFavs] = React.useState<Set<string>>(new Set());
   const [showChat, setShowChat] = React.useState(false);
+  const [showCompare, setShowCompare] = React.useState(false);
+  const [customs, setCustoms] = React.useState<Workout[]>([]);
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
   const [centerW, setCenterW] = React.useState(760);
   const showToast = React.useCallback((t: string) => setToast({ id: Date.now(), text: t }), []);
   const openList = (params: Record<string, string>) => router.push({ pathname: "/workout-list", params } as any);
 
   React.useEffect(() => { fetchFavorites().then((ids) => setFavs(new Set(ids))); }, []);
+  useFocusEffect(React.useCallback(() => { listCustomWorkouts().then(setCustoms); }, []));
+
+  const onQuickAction = (id: string) => {
+    if (id === "import") { router.push({ pathname: "/workout-builder", params: { import: "1" } } as any); return; }
+    router.push("/workout-builder"); // create / builder
+  };
+  const removeCustom = (w: Workout) => {
+    deleteCustomWorkout(w.id).then((ok) => {
+      if (ok) { setCustoms((prev) => prev.filter((x) => x.id !== w.id)); showToast(`Deleted ${w.name}`); }
+      else showToast("Couldn't delete — try again");
+    });
+  };
 
   const onSelectNav = (key: string) => {
     if (key === "workouts") return;
@@ -173,7 +189,29 @@ export default function WorkoutsScreen() {
       );
     }
     if (tab === "My Workouts") {
-      return <EmptyState icon="create-outline" title="No custom workouts yet" sub="Build your own sessions and they'll live here for quick access." cta="Create Custom Workout" onCta={() => showToast("Opening workout builder…")} />;
+      if (!customs.length) {
+        return <EmptyState icon="create-outline" title="No custom workouts yet" sub="Build your own sessions and they'll live here for quick access." cta="Create Custom Workout" onCta={() => router.push("/workout-builder")} />;
+      }
+      return (
+        <View style={{ gap: 12 }}>
+          {customs.map((w) => (
+            <View key={w.id} style={s.customCard} testID={`custom-${w.id}`}>
+              <Pressable style={{ flex: 1 }} onPress={() => openList({ workout: w.id })} accessibilityRole="button" accessibilityLabel={`Open ${w.name}`}>
+                <Text style={s.customName} numberOfLines={1}>{w.name}</Text>
+                <Text style={s.customMeta}>{w.duration} min · {w.tss} TSS · {w.difficulty}</Text>
+                {w.description ? <Text style={s.customDesc} numberOfLines={2}>{w.description}</Text> : null}
+              </Pressable>
+              <Pressable testID={`custom-del-${w.id}`} onPress={() => removeCustom(w)} hitSlop={8} style={s.customDel}>
+                <Ionicons name="trash-outline" size={18} color={CC.rouge} />
+              </Pressable>
+            </View>
+          ))}
+          <Pressable testID="new-custom-workout" onPress={() => router.push("/workout-builder")} style={({ hovered }: any) => [s.emptyBtn, { alignSelf: "flex-start" }, hovered && { opacity: 0.9 }]}>
+            <Ionicons name="add" size={16} color="#241B00" />
+            <Text style={s.emptyBtnText}>Create Custom Workout</Text>
+          </Pressable>
+        </View>
+      );
     }
     if (tab === "Favorites" && gridTypes.length === 0) {
       return <EmptyState icon="star-outline" title="No favorites yet" sub="Tap the star on any workout type to pin it here for later." />;
@@ -219,7 +257,7 @@ export default function WorkoutsScreen() {
                     <Text style={s.sectionTitle}>ALL WORKOUT TYPES</Text>
                     <Text style={s.sectionSub}>Select a workout type below to see examples and recommended uses.</Text>
                   </View>
-                  <Pressable testID="compare-types" onPress={() => showToast("Compare workout types")} style={({ hovered }: any) => [s.compareBtn, hovered && s.ghostHover]}>
+                  <Pressable testID="compare-types" onPress={() => setShowCompare(true)} style={({ hovered }: any) => [s.compareBtn, hovered && s.ghostHover]}>
                     <Text style={s.compareText}>Compare Types</Text>
                     <Ionicons name="copy-outline" size={14} color={CC.white} />
                   </Pressable>
@@ -296,7 +334,7 @@ export default function WorkoutsScreen() {
                 <View style={s.card}>
                   <Text style={[s.cardTitle, { color: CC.rouge }]}>QUICK ACTIONS</Text>
                   {QUICK_ACTIONS.map((q, i) => (
-                    <Pressable key={q.id} testID={`quick-${q.id}`} onPress={() => showToast(q.label)}
+                    <Pressable key={q.id} testID={`quick-${q.id}`} onPress={() => onQuickAction(q.id)}
                       style={({ hovered }: any) => [s.quickRow, i < QUICK_ACTIONS.length - 1 && s.divider, hovered && s.catRowOn]}>
                       <Ionicons name={q.icon} size={17} color={CC.rouge} />
                       <Text style={s.quickText}>{q.label}</Text>
@@ -310,10 +348,55 @@ export default function WorkoutsScreen() {
         </View>
         <Toast message={toast} />
         <CoachChatModal visible={showChat} onClose={() => setShowChat(false)} persona={persona} />
+        <CompareTypesModal visible={showCompare} onClose={() => setShowCompare(false)} onPick={(id) => { setShowCompare(false); openList({ type: id }); }} />
       </SafeAreaView>
     </GestureHandlerRootView>
   );
 }
+
+/* ── compare workout types ──────────────────────────────────────────────── */
+function CompareTypesModal({ visible, onClose, onPick }: { visible: boolean; onClose: () => void; onPick: (id: string) => void }) {
+  const types = typesForTab("All Workouts");
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={cmp.bg} onPress={onClose}>
+        <Pressable style={cmp.sheet} onPress={() => {}}>
+          <View style={cmp.head}>
+            <Text style={cmp.title}>Compare Workout Types</Text>
+            <Pressable testID="compare-close" onPress={onClose} hitSlop={8}><Ionicons name="close" size={20} color={CC.white} /></Pressable>
+          </View>
+          <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={false}>
+            {types.map((t) => (
+              <Pressable key={t.id} testID={`compare-${t.id}`} onPress={() => onPick(t.id)} style={({ hovered }: any) => [cmp.row, hovered && { backgroundColor: "rgba(255,255,255,0.05)" }]}>
+                <View style={[cmp.icon, { backgroundColor: `${t.color}1F`, borderColor: `${t.color}66` }]}>
+                  <Ionicons name={t.icon} size={18} color={t.color} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={cmp.name}>{t.name}</Text>
+                  <Text style={cmp.purpose} numberOfLines={2}>{t.purpose}</Text>
+                  <Text style={cmp.best}><Text style={{ color: CC.dim }}>Best for: </Text>{t.bestFor}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={CC.dim} />
+              </Pressable>
+            ))}
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+const cmp = StyleSheet.create({
+  bg: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center", padding: 20 },
+  sheet: { width: 560, maxWidth: "100%", backgroundColor: CC.cardHi, borderRadius: 18, borderWidth: 1, borderColor: CC.border, padding: 18 },
+  head: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
+  title: { color: CC.white, fontSize: 17, fontWeight: "800" },
+  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, paddingHorizontal: 8, borderRadius: 12, borderBottomWidth: 1, borderBottomColor: CC.borderSoft, minHeight: 60 },
+  icon: { width: 40, height: 40, borderRadius: 11, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  name: { color: CC.white, fontSize: 14.5, fontWeight: "800" },
+  purpose: { color: CC.dim, fontSize: 12, lineHeight: 16, marginTop: 2 },
+  best: { color: CC.white, fontSize: 11.5, lineHeight: 15, marginTop: 3 },
+});
 
 const s = StyleSheet.create({
   canvas: { flex: 1, flexDirection: "row", backgroundColor: CC.bg },
@@ -352,6 +435,12 @@ const s = StyleSheet.create({
   emptySub: { color: CC.dim, fontSize: 13, textAlign: "center", maxWidth: 360, lineHeight: 18 },
   emptyBtn: { flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: CC.yellow, borderRadius: 12, paddingVertical: 11, paddingHorizontal: 18, marginTop: 6, minHeight: 44 },
   emptyBtnText: { color: "#241B00", fontSize: 13, fontWeight: "800" },
+
+  customCard: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: CC.card, borderRadius: 14, borderWidth: 1, borderColor: CC.border, padding: 14 },
+  customName: { color: CC.white, fontSize: 15, fontWeight: "800" },
+  customMeta: { color: CC.yellow, fontSize: 12, fontWeight: "700", marginTop: 3 },
+  customDesc: { color: CC.dim, fontSize: 12, lineHeight: 16, marginTop: 4 },
+  customDel: { width: 40, height: 40, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(201,23,39,0.1)" },
 
   fb50: { backgroundColor: CC.card, borderRadius: 16, borderWidth: 1.5, padding: 20, gap: 10 },
   fb50Title: { color: CC.white, fontSize: 18, fontWeight: "800", marginTop: 4 },

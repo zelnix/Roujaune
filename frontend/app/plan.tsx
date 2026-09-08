@@ -136,6 +136,7 @@ export default function TrainingPlanScreen() {
 
   const onPhase = (p: PlanPhase) => setPhaseDetail(p.id);
   const onWorkout = (w: KeyWorkout) => setWorkoutDetail(w);
+  const viewAllWorkouts = React.useCallback(() => router.push({ pathname: "/workout-list", params: { type: "all" } } as any), [router]);
   const activePlanId = (plan as any)?.id ?? "build-and-climb";
 
   const contentW = availW > 0 ? availW : width - 96;
@@ -155,12 +156,12 @@ export default function TrainingPlanScreen() {
   const roadmapRow = (
     <View style={styles.rowGap}>
       <CurrentPhaseRoadmap onPhase={onPhase} />
-      <View style={{ width: 440 }}><WeeklyLoadCard width={440} onFilter={() => showToast("Filter: This Plan")} /></View>
+      <View style={{ width: 440 }}><WeeklyLoadCard width={440} onFilter={() => {}} /></View>
     </View>
   );
   const workoutsRow = (
     <View style={styles.rowGap}>
-      <KeyWorkoutsCard onView={() => showToast("View all workouts")} onWorkout={onWorkout} onNext={() => showToast("More workouts")} />
+      <KeyWorkoutsCard onView={viewAllWorkouts} onWorkout={onWorkout} onNext={viewAllWorkouts} />
       <View style={{ width: 440 }}><AlbertoAdaptationsCard persona={persona} width={440} onViewAll={() => setShowAdaptations(true)} text={adaptation.text} loading={adaptation.loading} onRefresh={adaptation.refresh} /></View>
     </View>
   );
@@ -172,9 +173,9 @@ export default function TrainingPlanScreen() {
   if (tab === "Phases") {
     body = (<><CurrentPhaseRoadmap onPhase={onPhase} /><PhasesDetailCard onPhase={onPhase} />{tip}</>);
   } else if (tab === "Key Workouts") {
-    body = (<><KeyWorkoutsCard onView={() => showToast("View all workouts")} onWorkout={onWorkout} onNext={() => showToast("More workouts")} /><View style={styles.rowGap}><WeeklyLoadCard width={fullW - 460} onFilter={() => showToast("Filter: This Plan")} /><View style={{ width: 440 }}><AlbertoAdaptationsCard persona={persona} width={440} onViewAll={() => setShowAdaptations(true)} text={adaptation.text} loading={adaptation.loading} onRefresh={adaptation.refresh} /></View></View>{tip}</>);
+    body = (<><KeyWorkoutsCard onView={viewAllWorkouts} onWorkout={onWorkout} onNext={viewAllWorkouts} /><View style={styles.rowGap}><WeeklyLoadCard width={fullW - 460} onFilter={() => {}} /><View style={{ width: 440 }}><AlbertoAdaptationsCard persona={persona} width={440} onViewAll={() => setShowAdaptations(true)} text={adaptation.text} loading={adaptation.loading} onRefresh={adaptation.refresh} /></View></View>{tip}</>);
   } else if (tab === "Load & Progress") {
-    body = (<><WeeklyLoadCard width={fullW} onFilter={() => showToast("Filter: This Plan")} />{progress}{tip}</>);
+    body = (<><WeeklyLoadCard width={fullW} onFilter={() => {}} />{progress}{tip}</>);
   } else if (tab === "Adaptations") {
     body = (<><View style={styles.rowGap}><AlbertoAdaptationsCard persona={persona} onViewAll={() => setShowAdaptations(true)} text={adaptation.text} loading={adaptation.loading} onRefresh={adaptation.refresh} /><View style={{ width: 380 }}><AdaptiveTargetsCard targets={adaptiveTargets.targets} loading={adaptiveTargets.loading} width={380} /></View></View>{progress}{tip}</>);
   } else {

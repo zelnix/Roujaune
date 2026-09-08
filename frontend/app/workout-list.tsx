@@ -88,7 +88,7 @@ export default function WorkoutListScreen() {
   const router = useRouter();
   const persona = useCoach();
   const { profile } = useRiderProfile();
-  const params = useLocalSearchParams<{ type?: string; workout?: string; band?: string }>();
+  const params = useLocalSearchParams<{ type?: string; workout?: string; band?: string; date?: string }>();
   const { width, height } = useWindowDimensions();
   const compact = width < 900;
   const navCompact = height < 560;
@@ -155,11 +155,15 @@ export default function WorkoutListScreen() {
 
   const addToCalendar = (w: Workout) => {
     const mainZone = w.zones.reduce((a, b) => (b.pct > a.pct ? b : a), w.zones[0]);
+    const dateISO = typeof params.date === "string" && params.date ? params.date : undefined;
+    const when = dateISO
+      ? new Date(`${dateISO}T00:00:00`).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })
+      : null;
     scheduleWorkout({
       workout_id: w.id, workout_name: w.name,
       duration: fmtDuration(w.duration), tss: w.tss ? `${w.tss} TSS` : "",
-      zone: mainZone?.label ?? "", color: w.color,
-    }).then(() => showToast(`Added ${w.name} to your calendar`))
+      zone: mainZone?.label ?? "", color: w.color, date: dateISO,
+    }).then(() => showToast(when ? `Added ${w.name} to ${when}` : `Added ${w.name} to your calendar`))
       .catch(() => showToast("Couldn't add to calendar — try again"));
   };
 

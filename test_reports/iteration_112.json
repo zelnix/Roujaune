@@ -1,0 +1,23 @@
+{
+  "summary": "Retest of fixes since iter 111 PASSED. All 17 sub-assertions green. Day Detail modal correctly auto-opens on /calendar?date=2025-05-13 with title 'Tuesday', showing Threshold Climb card (with View workout button testID=day-detail-view) and Mobility Flow FB50 card, plus 'Add a workout to this day' (day-detail-add) and close (day-detail-close) controls — all present and functional. Tapping day-head-3 (Thursday) opens Day Detail for Thursday showing Sweet Spot + Hip Mobility FB50. Week navigation regression fully fixed: prev-week / next-week (x3 into open week 02–08 Jun 2025) / today-btn (07–13 Sep 2026 open week) all work without any red-screen or pageerror. All 7 DAY READINESS rings render (score 80 Good) on open weeks confirming the readiness null-guard + backend _free_calendar_week readiness/summary/tip emission fix. Empty + tiles show for FOCUS row ('Open' cells) and 28 add-session slots across the 4 empty rows (TRAINING / STRENGTH&MOBILITY / RECOVERY / SCHEDULED BY YOU). WEEK SUMMARY shows 0/0 · 0h 00m · 0 TSS as expected. NOTE: /plan and /workout-list add-to-day round trip flows were not re-tested this iteration (already covered in iter 111 and no changes to those files reported); primary retest scope (Day Detail modal fix + week-nav crash regression) fully validated.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_112.json"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "calendar.tsx (/app/frontend/app/calendar.tsx) is ~677 lines including inline DayDetail + SupplementaryCompleteCard + Toast + styles. Above the 700-line soft threshold trend; consider extracting DayDetail (lines 453-552) into /src/components/calendar/DayDetail.tsx to keep the screen file focused.",
+    "In performMove Alberto-review flow, review.confirm is set to a no-op ({}) while loading; fine, but the disabled={review?.loading} guard on the Confirm button already handles it — dead code could be simplified."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (per request)", "frontend": "100% (17/17 assertions)"},
+  "seed_data_creation": "None. Used seeded demo rider demo@roujaune.app / demo9900.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Auth persists across in-app SPA navigation but NOT across page.goto() to protected routes after login (auth guard redirects). Pattern that works: login via 'Sign in with email' → fill 2 inputs → page.get_by_text('Sign in', exact=True).last.click(force=True) → wait 7s → then use page.evaluate(\"window.history.pushState({}, '', '/calendar?date=YYYY-MM-DD'); window.dispatchEvent(new PopStateEvent('popstate'));\") to navigate. Nav testIDs on /calendar: prev-week, next-week, today-btn, date-range, week-dd. Day headers: day-head-0..6 (Mon=0). Day Detail modal: day-detail (root), day-detail-close, day-detail-view (cycling), day-detail-add, day-detail-supp-0/1, day-detail-scheduled-<id>. Landscape viewport 1280x900 confirmed to render tablet layout (compact=false at width>=720).",
+  "rca_of_issue": "N/A — this iteration is a validation of fixes, not a bug reproduction. Prior red-screen on Prev/Next week was caused by _free_calendar_week omitting readiness/summary/tip fields; fix in /app/backend/services/plan_engine.py now emits readiness (score 80 status 'good') + null cycling/fb50/wellness + summary(0/0) + tip('An open week — add any workouts you feel like riding.') for every day, and calendar.tsx null-guards the ReadinessRing render (line 332). Both verified live."
+}

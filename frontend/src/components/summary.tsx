@@ -547,6 +547,7 @@ export function StravaPushButton({ rideId, coachSummary, onToast }: { rideId?: s
 }
 
 export function SyncExportRow({ onToast, compact = false }: { onToast: (m: string) => void; compact?: boolean }) {
+  const router = useRouter();
   return (
     <View style={[styles.syncCard, compact && styles.syncCardWrap]} testID="sync-export-row">
       <View style={styles.syncLabelWrap}>
@@ -554,7 +555,7 @@ export function SyncExportRow({ onToast, compact = false }: { onToast: (m: strin
         <Text style={styles.syncLabel}>SYNC & EXPORT</Text>
       </View>
       {C.sync.map((s) => (
-        <Touchable key={s.key} testID={`sync-${s.key}`} onPress={() => onToast(`${s.label} — ${s.status}`)} scaleTo={0.96} lift={false} containerStyle={compact ? { minWidth: "44%", flexGrow: 1 } : { flex: 1 }}>
+        <Touchable key={s.key} testID={`sync-${s.key}`} onPress={() => router.push("/connections" as any)} scaleTo={0.96} lift={false} containerStyle={compact ? { minWidth: "44%", flexGrow: 1 } : { flex: 1 }}>
           <View style={styles.syncItem}>
             {SYNC_ICON[s.key].icon}
             <View style={{ flexShrink: 1 }}>

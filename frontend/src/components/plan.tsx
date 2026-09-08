@@ -471,10 +471,9 @@ export function WeeklyLoadCard({ onFilter, width = 430 }: { onFilter: () => void
     <View style={[s.card, { flex: 1 }]} testID="weekly-load">
       <View style={s.cardHeadRow}>
         <View style={s.cardHead}><Text style={[s.cardHeadText, { color: C.yellow }]}>WEEKLY LOAD OVERVIEW <Text style={{ color: C.dim }}>(TSS)</Text></Text></View>
-        <Pressable testID="load-filter" onPress={onFilter} style={({ hovered }: any) => [s.miniSelect, hovered && s.secBtnHover]}>
+        <View testID="load-filter" style={s.miniSelect}>
           <Text style={s.miniSelectText}>This Plan</Text>
-          <Ionicons name="chevron-down" size={13} color={C.dim} />
-        </Pressable>
+        </View>
       </View>
       <WeeklyLoadChart values={PLAN.weeklyLoad} hereWeek={PLAN.youAreHere} width={chartW} height={150} />
       <View style={s.legend}>

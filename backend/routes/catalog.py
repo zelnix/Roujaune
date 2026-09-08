@@ -1,7 +1,8 @@
 """Rider workout catalog — read + copy-on-assign + personal edits."""
+import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Body, HTTPException
 
 import auth
 from db import db
@@ -15,6 +16,25 @@ router = APIRouter()
 async def get_catalog():
     """The current rider's effective catalog (global overlaid by their copies)."""
     return {"items": await resolve_catalog(auth.current_user_id())}
+
+
+@router.post("/catalog")
+async def create_my_workout(body: dict = Body(...)):
+    """Create a rider-authored custom workout (stored only for this rider)."""
+    uid = auth.current_user_id()
+    name = str((body or {}).get("name") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Workout needs a name")
+    doc = {k: v for k, v in (body or {}).items() if k in _CATALOG_EDITABLE}
+    doc["id"] = "custom-" + uuid.uuid4().hex[:10]
+    doc["name"] = name
+    doc.setdefault("typeId", "custom")
+    doc.setdefault("typeName", "Custom")
+    doc["custom"] = True
+    doc["created_at"] = datetime.now(timezone.utc).isoformat()
+    await db.rider_workouts.update_one(
+        {"user_id": uid, "id": doc["id"]}, {"$set": {**doc, "user_id": uid}}, upsert=True)
+    return {"workout": doc}
 
 
 @router.get("/catalog/{workout_id}")

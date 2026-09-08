@@ -698,6 +698,10 @@ def _free_calendar_week(start: str) -> dict:
         "day_name": names[i],
         "day_num": (mon + timedelta(days=i)).strftime("%d %b").upper(),
         "focus": "Open",
+        "cycling": None,
+        "fb50": None,
+        "wellness": None,
+        "readiness": _ctr_readiness(80),
     } for i in range(7)]
     sel = today.isoformat() if mon <= today <= end else mon.isoformat()
     return {
@@ -708,5 +712,10 @@ def _free_calendar_week(start: str) -> dict:
         "selected_date": sel,
         "free": True,
         "days": days,
+        "summary": {
+            "workouts_completed": 0, "workouts_planned": 0,
+            "duration": "0h 00m", "tss": "0", "zones": [],
+        },
+        "tip": "An open week — add any workouts you feel like riding.",
     }
 

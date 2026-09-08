@@ -417,10 +417,9 @@ export function DateControls({
           <Ionicons name="filter-outline" size={15} color={CC.dim} />
           <Text style={cs.pillText}>Filters</Text>
         </Pressable>
-        <Pressable testID="week-dd" onPress={onWeek} style={({ hovered }: any) => [cs.pillBtn, hovered && cs.hover]}>
+        <View testID="week-dd" style={cs.pillBtn}>
           <Text style={cs.pillText}>Week</Text>
-          <Ionicons name="chevron-down" size={14} color={CC.dim} />
-        </Pressable>
+        </View>
         <CtrlBtn testID="settings-btn" icon="settings-outline" onPress={onSettings} label="Calendar settings" />
       </View>
     </View>

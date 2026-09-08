@@ -44,15 +44,58 @@ function Toast({ message, onUndo }: { message: { id: number; text: string; undo?
   );
 }
 
+const shiftISO = (iso: string, days: number) => {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+};
+const todayISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
 export default function CalendarScreen() {
   const router = useRouter();
   const persona = useCoach();
   const { width } = useWindowDimensions();
   const compact = width < 720; // phones scroll a stacked view
   const goBack = () => (router.canGoBack() ? router.back() : router.replace("/plan"));
-  const { week, setWeek, loading, reload } = useCalendarWeek();
+  const params = useLocalSearchParams<{ date?: string }>();
+  const [focusDate, setFocusDate] = React.useState<string | undefined>(
+    typeof params.date === "string" ? params.date : undefined
+  );
+  const { week, setWeek, loading, reload } = useCalendarWeek(focusDate);
+
+  // Keep focus in sync when navigated here with a new ?date=
+  React.useEffect(() => {
+    if (typeof params.date === "string" && params.date && params.date !== focusDate) {
+      setFocusDate(params.date);
+    }
+  }, [params.date]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [selected, setSelected] = React.useState(1); // Tuesday
+  const [dayModalIdx, setDayModalIdx] = React.useState<number | null>(null);
+  const autoOpenedFor = React.useRef<string | null>(null);
+
+  // Focus the requested day once the week loads (falls back to the week's own
+  // selected day, then Tuesday).
+  React.useEffect(() => {
+    const dd = week?.days ?? [];
+    if (!dd.length) return;
+    const target = focusDate || week?.selected_date;
+    let idx = dd.findIndex((d) => d.date === target);
+    if (idx < 0) idx = dd.findIndex((d) => d.date === week?.selected_date);
+    setSelected(idx >= 0 ? idx : 1);
+  }, [week, focusDate]);
+
+  // Arriving via a day tap (?date=) auto-opens that day's detail once.
+  React.useEffect(() => {
+    const dd = week?.days ?? [];
+    const p = typeof params.date === "string" ? params.date : null;
+    if (!p || !dd.length || autoOpenedFor.current === p) return;
+    const idx = dd.findIndex((d) => d.date === p);
+    if (idx >= 0) { autoOpenedFor.current = p; setDayModalIdx(idx); }
+  }, [week, params.date]);
   const [toast, setToast] = React.useState<{ id: number; text: string; undo?: () => void } | null>(null);
   const [filter, setFilter] = React.useState("All");
   const [showFilters, setShowFilters] = React.useState(false);
@@ -69,10 +112,21 @@ export default function CalendarScreen() {
   const swapCyc = selDay?.cycling as any;
   const swapPlanId = typeof swapCyc?.workout_id === "string" && swapCyc.workout_id.startsWith("custom-")
     ? String(swapCyc.workout_id).split("-ride-")[0] : null;
+
+  // Route to the workout library, pre-filtered by type and targeting a day so
+  // the picked session is scheduled straight onto that date.
+  const goSchedule = React.useCallback((type?: string, dateISO?: string) => {
+    const p: Record<string, string> = {};
+    if (type) p.type = type;
+    const d = dateISO || selDay?.date;
+    if (d) p.date = d;
+    router.push({ pathname: "/workout-list", params: p } as any);
+  }, [router, selDay]);
+
   const openSwap = React.useCallback(() => {
     if (swapPlanId) setSwapOpen(true);
-    else showToast("Session options");
-  }, [swapPlanId, showToast]);
+    else goSchedule();
+  }, [swapPlanId, goSchedule]);
 
   const measureCol = (i: number) => (e: any) => {
     const { x, width: w } = e.nativeEvent.layout;
@@ -118,7 +172,12 @@ export default function CalendarScreen() {
     });
   }, [week, days, persona, performMove]);
 
-  const onQuickAction = (id: string, title: string) => showToast(title);
+  const onQuickAction = (id: string, _title: string) => {
+    if (id === "reschedule") { openSwap(); return; }
+    if (id === "recovery") { goSchedule("recovery"); return; }
+    if (id === "fb50") { goSchedule("fb50"); return; }
+    goSchedule(); // "add" → any workout onto the selected day
+  };
 
   const onToggleSupp = React.useCallback(async (session: any, kind: string) => {
     if (!selDay) return;
@@ -182,12 +241,12 @@ export default function CalendarScreen() {
 
             <DateControls
               rangeLabel={week?.range_label ?? "12 – 18 May 2025"}
-              onPrev={() => showToast("Previous week")}
-              onNext={() => showToast("Next week")}
-              onToday={() => { setSelected(1); showToast("Jumped to this week"); }}
+              onPrev={() => week && setFocusDate(shiftISO(week.start_date, -7))}
+              onNext={() => week && setFocusDate(shiftISO(week.start_date, 7))}
+              onToday={() => setFocusDate(todayISO())}
               onFilters={() => setShowFilters(true)}
-              onWeek={() => showToast("View: Week")}
-              onSettings={() => showToast("Calendar settings")}
+              onWeek={() => {}}
+              onSettings={() => router.push("/settings")}
             />
             {filter !== "All" ? (
               <Pressable testID="active-filter" onPress={() => setFilter("All")} style={styles.filterChip}>
@@ -203,7 +262,7 @@ export default function CalendarScreen() {
                 <View style={styles.gridRow}>
                   <View style={{ width: LABEL_W }} />
                   {days.map((d, i) => (
-                    <Pressable key={d.date} testID={`day-head-${i}`} onPress={() => setSelected(i)} style={styles.col}>
+                    <Pressable key={d.date} testID={`day-head-${i}`} onPress={() => { setSelected(i); setDayModalIdx(i); }} style={styles.col}>
                       <DayHeader day={d} selected={i === selected} />
                     </Pressable>
                   ))}
@@ -222,7 +281,7 @@ export default function CalendarScreen() {
                         <DraggableSession enabled={d.cycling.status !== "rest"} onSelect={() => setSelected(i)} onDrop={onDrop("cycling", i)}>
                           <TrainingSessionCard s={d.cycling} selected={i === selected} />
                         </DraggableSession>
-                      ) : <EmptySlot onPress={() => showToast("Add session")} />}
+                      ) : <EmptySlot onPress={() => goSchedule(undefined, d.date)} />}
                     </View>
                   ))}
                 </GridRow>
@@ -235,7 +294,7 @@ export default function CalendarScreen() {
                         <DraggableSession onSelect={() => setSelected(i)} onDrop={onDrop("fb50", i)}>
                           <FB50SessionCard s={d.fb50} />
                         </DraggableSession>
-                      ) : <EmptySlot onPress={() => showToast("Plan FB50 session")} />}
+                      ) : <EmptySlot onPress={() => goSchedule("fb50", d.date)} />}
                     </View>
                   ))}
                 </GridRow>
@@ -248,7 +307,7 @@ export default function CalendarScreen() {
                         <DraggableSession onSelect={() => setSelected(i)} onDrop={onDrop("wellness", i)}>
                           <WellnessSessionCard s={d.wellness} />
                         </DraggableSession>
-                      ) : <EmptySlot onPress={() => showToast("Add recovery activity")} />}
+                      ) : <EmptySlot onPress={() => goSchedule("recovery", d.date)} />}
                     </View>
                   ))}
                 </GridRow>
@@ -261,7 +320,7 @@ export default function CalendarScreen() {
                         ? (d.scheduled ?? []).map((w) => (
                             <ScheduledSessionCard key={w.id} w={w} onRemove={async () => { await unscheduleWorkout(w.id); reload(); showToast(`Removed ${w.title}`); }} />
                           ))
-                        : <EmptySlot onPress={() => router.push("/workouts")} />}
+                        : <EmptySlot onPress={() => goSchedule(undefined, d.date)} />}
                     </View>
                   ))}
                 </GridRow>
@@ -270,7 +329,7 @@ export default function CalendarScreen() {
                 <GridRow icon="heart" label={"DAY\nREADINESS"} color={CC.rouge}>
                   {days.map((d, i) => (
                     <Pressable key={d.date} testID={`readiness-${i}`} onPress={() => { setSelected(i); setReadyDay(i); }} style={[styles.col, i === selected && styles.colSel]}>
-                      <ReadinessRing score={d.readiness.score} status={d.readiness.status} />
+                      {d.readiness ? <ReadinessRing score={d.readiness.score} status={d.readiness.status} /> : <View style={{ height: 44 }} />}
                     </Pressable>
                   ))}
                 </GridRow>
@@ -306,6 +365,31 @@ export default function CalendarScreen() {
             </Pressable>
           </Pressable>
         </Modal>
+
+        {/* day detail — the workouts scheduled for a tapped day */}
+        <Modal visible={dayModalIdx !== null} transparent animationType="fade" onRequestClose={() => setDayModalIdx(null)}>
+          <Pressable style={styles.modalBg} onPress={() => setDayModalIdx(null)}>
+            <Pressable style={styles.daySheet} onPress={() => {}}>
+              {dayModalIdx !== null && days[dayModalIdx] ? (
+                <DayDetail
+                  day={days[dayModalIdx]}
+                  onClose={() => setDayModalIdx(null)}
+                  onViewCycling={() => {
+                    const wid = days[dayModalIdx]?.cycling?.workout_id;
+                    setDayModalIdx(null);
+                    router.push(wid ? { pathname: "/training", params: { workoutId: wid } } as any : "/training");
+                  }}
+                  onViewScheduled={(w) => {
+                    setDayModalIdx(null);
+                    router.push(w.workout_id ? { pathname: "/training", params: { workoutId: w.workout_id } } as any : "/workouts");
+                  }}
+                  onAdd={() => { const d = days[dayModalIdx]?.date; setDayModalIdx(null); goSchedule(undefined, d); }}
+                />
+              ) : null}
+            </Pressable>
+          </Pressable>
+        </Modal>
+
 
         {/* Alberto review dialog */}
         <Modal visible={!!review} transparent animationType="fade" onRequestClose={() => setReview(null)}>
@@ -365,6 +449,108 @@ export default function CalendarScreen() {
     </GestureHandlerRootView>
   );
 }
+
+function DayDetail({ day, onClose, onViewCycling, onViewScheduled, onAdd }: {
+  day: CalendarDay;
+  onClose: () => void;
+  onViewCycling: () => void;
+  onViewScheduled: (w: any) => void;
+  onAdd: () => void;
+}) {
+  const isRestRide = day.cycling && (day.cycling.status === "rest" || (!day.cycling.workout_id && !day.cycling.duration));
+  const scheduled = day.scheduled ?? [];
+  const hasAny = !!(day.cycling || day.fb50 || day.wellness || scheduled.length);
+
+  const StatusPill = ({ status }: { status?: string }) => {
+    const label = status === "completed" ? "Completed" : status === "today" ? "Today" : status === "rest" ? "Rest" : "Planned";
+    const col = status === "completed" ? CC.green : status === "today" ? CC.yellow : CC.dim;
+    return <View style={[styles.ddPill, { borderColor: col }]}><Text style={[styles.ddPillText, { color: col }]}>{label}</Text></View>;
+  };
+
+  return (
+    <View testID="day-detail">
+      <View style={styles.ddHead}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.ddTitle}>{dayName(day.day_name)}</Text>
+          <Text style={styles.ddSub}>{day.day_num}{day.focus ? ` · ${day.focus}` : ""}</Text>
+        </View>
+        <Pressable testID="day-detail-close" onPress={onClose} hitSlop={8} style={styles.ddClose}>
+          <Ionicons name="close" size={20} color={CC.white} />
+        </Pressable>
+      </View>
+
+      {!hasAny ? (
+        <View style={styles.ddEmpty}>
+          <Ionicons name="bed-outline" size={26} color={CC.dim} />
+          <Text style={styles.ddEmptyText}>No workouts scheduled this day.</Text>
+        </View>
+      ) : null}
+
+      {day.cycling ? (
+        <View style={styles.ddCard} testID="day-detail-cycling">
+          <View style={styles.ddCardHead}>
+            <Ionicons name={isRestRide ? "bed-outline" : "bicycle"} size={18} color={isRestRide ? CC.purple : CC.yellow} />
+            <Text style={styles.ddCardTitle} numberOfLines={2}>{day.cycling.title}</Text>
+            <StatusPill status={day.cycling.status} />
+          </View>
+          {!isRestRide ? (
+            <>
+              <View style={styles.ddMeta}>
+                {day.cycling.duration ? <Text style={styles.ddMetaText}>{day.cycling.duration}</Text> : null}
+                {day.cycling.zone ? <Text style={styles.ddMetaText}>· {day.cycling.zone}</Text> : null}
+                {day.cycling.tss ? <Text style={styles.ddMetaText}>· {day.cycling.tss}</Text> : null}
+              </View>
+              <Pressable testID="day-detail-view" onPress={onViewCycling} style={({ hovered }: any) => [styles.ddBtn, hovered && styles.hover]}>
+                <Ionicons name="play" size={15} color="#241B00" />
+                <Text style={styles.ddBtnText}>View workout</Text>
+              </Pressable>
+            </>
+          ) : (
+            <Text style={styles.ddRestText}>Rest & recovery — no ride today.</Text>
+          )}
+        </View>
+      ) : null}
+
+      {[day.fb50, day.wellness].filter(Boolean).map((s: any, i) => (
+        <View key={`supp-${i}`} style={styles.ddCard} testID={`day-detail-supp-${i}`}>
+          <View style={styles.ddCardHead}>
+            <Ionicons name={s.type === "wellness" ? "leaf-outline" : "barbell-outline"} size={18} color={s.type === "wellness" ? CC.green : CC.amber} />
+            <Text style={styles.ddCardTitle} numberOfLines={2}>{s.title}</Text>
+            <StatusPill status={s.status} />
+          </View>
+          <View style={styles.ddMeta}>
+            <Text style={styles.ddMetaText}>{s.duration || "Session"}{s.category ? ` · ${s.category}` : ""}</Text>
+          </View>
+        </View>
+      ))}
+
+      {scheduled.map((w) => (
+        <View key={w.id} style={styles.ddCard} testID={`day-detail-scheduled-${w.id}`}>
+          <View style={styles.ddCardHead}>
+            <Ionicons name="add-circle-outline" size={18} color={CC.greenyellow} />
+            <Text style={styles.ddCardTitle} numberOfLines={2}>{w.title}</Text>
+            <StatusPill status={w.status} />
+          </View>
+          <View style={styles.ddMeta}>
+            {w.duration ? <Text style={styles.ddMetaText}>{w.duration}</Text> : null}
+            {w.zone ? <Text style={styles.ddMetaText}>· {w.zone}</Text> : null}
+            {w.tss ? <Text style={styles.ddMetaText}>· {w.tss}</Text> : null}
+          </View>
+          <Pressable testID={`day-detail-view-sched-${w.id}`} onPress={() => onViewScheduled(w)} style={({ hovered }: any) => [styles.ddBtn, hovered && styles.hover]}>
+            <Ionicons name="play" size={15} color="#241B00" />
+            <Text style={styles.ddBtnText}>View workout</Text>
+          </Pressable>
+        </View>
+      ))}
+
+      <Pressable testID="day-detail-add" onPress={onAdd} style={({ hovered }: any) => [styles.ddAdd, hovered && styles.hover]}>
+        <Ionicons name="add" size={17} color={CC.yellow} />
+        <Text style={styles.ddAddText}>Add a workout to this day</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 
 function SupplementaryCompleteCard({ day, onToggle }: { day: CalendarDay; onToggle: (session: any, kind: string) => void }) {
   const items: { s: any; kind: string }[] = [];
@@ -467,4 +653,24 @@ const styles = StyleSheet.create({
   suppRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 6, borderRadius: 8, minHeight: 44 },
   suppName: { color: CC.white, fontSize: 13.5, fontWeight: "700" },
   suppMeta: { color: CC.dim, fontSize: 11.5, fontWeight: "500", marginTop: 1 },
+
+  daySheet: { width: 460, maxWidth: "100%", backgroundColor: CC.cardHi, borderRadius: 18, borderWidth: 1, borderColor: CC.border, padding: 18, gap: 12 },
+  ddHead: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  ddTitle: { color: CC.white, fontSize: 20, fontWeight: "800" },
+  ddSub: { color: CC.dim, fontSize: 13, fontWeight: "600", marginTop: 3 },
+  ddClose: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.05)" },
+  ddEmpty: { alignItems: "center", gap: 8, paddingVertical: 22, backgroundColor: "rgba(255,255,255,0.03)", borderRadius: 12, borderWidth: 1, borderColor: CC.borderSoft },
+  ddEmptyText: { color: CC.dim, fontSize: 13, fontWeight: "600" },
+  ddCard: { backgroundColor: CC.card, borderWidth: 1, borderColor: CC.border, borderRadius: 14, padding: 14, gap: 10 },
+  ddCardHead: { flexDirection: "row", alignItems: "center", gap: 10 },
+  ddCardTitle: { color: CC.white, fontSize: 15, fontWeight: "800", flex: 1 },
+  ddPill: { borderWidth: 1, borderRadius: 999, paddingVertical: 3, paddingHorizontal: 9 },
+  ddPillText: { fontSize: 10.5, fontWeight: "800", letterSpacing: 0.3 },
+  ddMeta: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
+  ddMetaText: { color: CC.dim, fontSize: 12.5, fontWeight: "600" },
+  ddBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, backgroundColor: CC.yellow, borderRadius: 11, paddingVertical: 11, minHeight: 44 },
+  ddBtnText: { color: "#241B00", fontSize: 13.5, fontWeight: "800" },
+  ddRestText: { color: CC.dim, fontSize: 13, lineHeight: 18 },
+  ddAdd: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1, borderStyle: "dashed", borderColor: CC.border, borderRadius: 12, paddingVertical: 12, minHeight: 46 },
+  ddAddText: { color: CC.yellow, fontSize: 13.5, fontWeight: "700" },
 });

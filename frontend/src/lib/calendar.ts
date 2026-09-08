@@ -76,7 +76,7 @@ export type CalendarWeek = {
 };
 
 /* ── data hook ──────────────────────────────────────────────────────────── */
-export function useCalendarWeek(start = "2025-05-12") {
+export function useCalendarWeek(focusDate?: string, start = "2025-05-12") {
   const [week, setWeek] = useState<CalendarWeek | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -85,7 +85,8 @@ export function useCalendarWeek(start = "2025-05-12") {
     try {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 8000);
-      const res = await fetch(`${apiBase()}/api/calendar/week?start=${start}`, { signal: ctrl.signal });
+      const qs = focusDate ? `date=${focusDate}` : `start=${start}`;
+      const res = await fetch(`${apiBase()}/api/calendar/week?${qs}`, { signal: ctrl.signal });
       clearTimeout(timer);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setWeek(await res.json());
@@ -94,7 +95,7 @@ export function useCalendarWeek(start = "2025-05-12") {
     } finally {
       setLoading(false);
     }
-  }, [start]);
+  }, [start, focusDate]);
 
   useEffect(() => { load(); }, [load]);
 

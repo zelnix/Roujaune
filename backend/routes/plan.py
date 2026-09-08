@@ -354,37 +354,78 @@ CALENDAR_WEEK = {
 # _free_calendar_week moved to services.plan_engine
 
 
+def _week_containing(weeks_map: dict, target: date):
+    """Return the plan-week dict whose 7-day span contains `target`, else None."""
+    for wk in weeks_map.values():
+        try:
+            y, m, d = (int(x) for x in str(wk.get("start_date", "")).split("-"))
+            ws = date(y, m, d)
+        except Exception:
+            continue
+        if ws <= target <= ws + timedelta(days=6):
+            return wk
+    return None
+
+
 @router.get("/calendar/week")
-async def get_calendar_week(start: str = "2025-05-12"):
-    """Return a scheduling week (seeded into Mongo on first read)."""
+async def get_calendar_week(start: str = "2025-05-12", focus_date: Optional[str] = Query(None, alias="date")):
+    """Return a scheduling week. When `date` is provided the week that contains
+    that date is returned (enabling prev/next/any-day navigation); otherwise the
+    rider's current week is returned."""
     try:
         rider = await _rider_doc()
         active = await _active_plan_id()
+
+        target: Optional[date] = None
+        if focus_date:
+            try:
+                target = datetime.strptime(focus_date, "%Y-%m-%d").date()
+            except Exception:
+                target = None
+
+        # Resolve the structured weeks_map + completion state (if any).
+        weeks_map = None
+        ride_map: dict = {}
+        supp_dates: set = set()
+        cur = None
         if active == "couch-to-road":
             cur, ride_map, supp_dates = await _ctr_state()
-            doc = _ctr_calendar_week(plan_engine.CTR_WEEKS[cur], ride_map, supp_dates, _ctr_today())
+            weeks_map = plan_engine.CTR_WEEKS
         elif active == "ride-stronger":
             pdoc, weeks_map, planned, prefix = _struct_ctx("ride-stronger")
             cur, ride_map, supp_dates = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id="ride-stronger", ride_prefix=prefix)
-            doc = _ctr_calendar_week(weeks_map[cur], ride_map, supp_dates, _ctr_today())
         elif active == "ride-beyond":
             pdoc, weeks_map, planned, prefix = _struct_ctx("ride-beyond")
             cur, ride_map, supp_dates = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id="ride-beyond", ride_prefix=prefix)
-            doc = _ctr_calendar_week(weeks_map[cur], ride_map, supp_dates, _ctr_today())
         elif active.startswith("custom-"):
             pdoc, weeks_map, planned, prefix = await _struct_ctx_for_rider(active)
             cur, ride_map, supp_dates = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id=active, ride_prefix=prefix)
-            doc = _ctr_calendar_week(weeks_map[cur], ride_map, supp_dates, _ctr_today())
+
+        if weeks_map is not None:
+            chosen = _week_containing(weeks_map, target) if target is not None else None
+            if chosen is not None:
+                doc = _ctr_calendar_week(chosen, ride_map, supp_dates, _ctr_today())
+            elif target is not None:
+                # Requested date falls outside the structured plan → open week.
+                doc = _free_calendar_week(target.isoformat())
+            else:
+                doc = _ctr_calendar_week(weeks_map[cur], ride_map, supp_dates, _ctr_today())
         elif active == "build-and-climb":
-            # The dedicated demo account keeps the illustrative demo week.
-            doc = await udb.calendar_weeks.find_one({"start_date": start})
-            if not doc or doc.get("seed_version") != CALENDAR_WEEK["seed_version"]:
-                await udb.calendar_weeks.update_one({"start_date": start}, {"$set": CALENDAR_WEEK}, upsert=True)
-                doc = dict(CALENDAR_WEEK)
+            # The dedicated demo account keeps the illustrative demo week; any
+            # other requested week is an open week so navigation still works.
+            demo_start = date(2025, 5, 12)
+            mon = (target - timedelta(days=target.weekday())) if target is not None else demo_start
+            if mon == demo_start:
+                doc = await udb.calendar_weeks.find_one({"start_date": "2025-05-12"})
+                if not doc or doc.get("seed_version") != CALENDAR_WEEK["seed_version"]:
+                    await udb.calendar_weeks.update_one({"start_date": "2025-05-12"}, {"$set": CALENDAR_WEEK}, upsert=True)
+                    doc = dict(CALENDAR_WEEK)
+            else:
+                doc = _free_calendar_week(mon.isoformat())
         else:
             # Casual rider (no structured plan): an OPEN week they can fill with
             # any workouts they pick — never the fabricated demo week.
-            doc = _free_calendar_week(start)
+            doc = _free_calendar_week(focus_date or start)
         doc.pop("_id", None)
         # Attach rider-scheduled catalog workouts to their matching day.
         try:
