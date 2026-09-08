@@ -4,6 +4,9 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Clipboard from "expo-clipboard";
 import * as MediaLibrary from "expo-media-library/legacy";
 import { colors } from "@/src/theme";
+import { shareToInstagram } from "@/src/lib/ig-share";
+
+const META_APP_ID = process.env.EXPO_PUBLIC_META_APP_ID || "";
 
 /** Quick share targets shown on the achievement + scenic-recap cards.
  * X / WhatsApp / Copy carry a text caption; Instagram Story (native only)
@@ -35,23 +38,32 @@ export function SocialShareRow({
   const shareInstagram = async (mode: "story" | "feed") => {
     if (Platform.OS === "web") { onNotice("Instagram sharing is available on the mobile app."); return; }
     try {
+      try { await Clipboard.setStringAsync(caption); } catch { /* caption copy is best-effort */ }
+      const uri = await getImageUri();
+      // 1) Direct hand-off — opens the IG Feed/Story composer with the card.
+      if (META_APP_ID) {
+        const res = await shareToInstagram(mode, uri, META_APP_ID);
+        if (res === "shared") {
+          onNotice(mode === "story"
+            ? "Opening your Instagram Story — caption copied to paste."
+            : "Opening the Instagram composer — caption copied to paste.");
+          return;
+        }
+        if (res === "notinstalled") { onNotice("Instagram isn't installed — install it to post."); return; }
+        // res === "error" -> fall through to the save-to-Photos path below.
+      }
+      // 2) Fallback: save to Photos, then open Instagram to pick the card.
       let perm = await MediaLibrary.getPermissionsAsync();
       if (!perm.granted && perm.canAskAgain) perm = await MediaLibrary.requestPermissionsAsync();
       if (!perm.granted) { onNotice("Turn on photo access so we can save your card for Instagram.", "settings"); return; }
-      try { await Clipboard.setStringAsync(caption); } catch { /* caption copy is best-effort */ }
-      const uri = await getImageUri();
       await MediaLibrary.saveToLibraryAsync(uri);
       const targets = mode === "story"
         ? ["instagram-stories://share", "instagram://app"]
         : ["instagram://library", "instagram://app"];
-      // Open the deep link directly (canOpenURL needs per-scheme manifest
-      // entries; openURL just fails if Instagram isn't installed).
       for (const t of targets) {
         try {
           await Linking.openURL(t);
-          onNotice(mode === "story"
-            ? "Saved to Photos ✓ Opening Instagram — add your card to your Story (caption copied)."
-            : "Saved to Photos ✓ Opening Instagram — pick your ROUJAUNE card to post (caption copied).");
+          onNotice("Saved to Photos ✓ Opening Instagram — pick your ROUJAUNE card (caption copied).");
           return;
         } catch { /* try next target */ }
       }

@@ -23,6 +23,23 @@ import {
 } from "@/src/components/summary";
 
 // Build a shareable caption from the ride's stats + route.
+function rideStatParts(stats: any, route: any): string[] {
+  const s = stats || {};
+  const dur = (sec: number) => {
+    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), ss = Math.floor(sec % 60);
+    return h ? `${h}:${String(m).padStart(2, "0")}:${String(ss).padStart(2, "0")}` : `${m}:${String(ss).padStart(2, "0")}`;
+  };
+  const parts: string[] = [];
+  if (s.duration_sec) parts.push(dur(s.duration_sec));
+  if (s.distance_km) parts.push(`${Number(s.distance_km).toFixed(1)} km`);
+  const elev = s.elevation_m ?? s.elevation_gain_m ?? route?.elevation_m;
+  if (elev) parts.push(`${Math.round(elev)} m climb`);
+  if (s.avg_power) parts.push(`${Math.round(s.avg_power)} W avg`);
+  if (s.avg_hr) parts.push(`${Math.round(s.avg_hr)} bpm`);
+  if (s.calories) parts.push(`${Math.round(s.calories)} kcal`);
+  return parts;
+}
+
 function rideCaption(stats: any, route: any): string {
   const s = stats || {};
   const dur = (sec: number) => {
@@ -205,7 +222,7 @@ export default function WorkoutComplete() {
         visible={showShare}
         onClose={() => setShowShare(false)}
         initialCaption={rideCaption(stats, route)}
-        autoCaption={rideCaption(stats, route)}
+        captionFacts={{ title: route?.name, place: (route as any)?.place, stats: rideStatParts(stats, route) }}
         getImageUri={() => captureRef(cardRef, { format: "png", quality: 0.95 })}
         onMore={shareRideCard}
         onNotice={showToast}

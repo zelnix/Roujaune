@@ -4,17 +4,18 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 import { colors, radius, spacing } from "@/src/theme";
 import { SocialShareRow } from "./SocialShareRow";
 import { CaptionEditor } from "./CaptionEditor";
+import { styleCaption } from "@/src/lib/caption-styles";
 
 /** End-of-ride share sheet: same quick-share row (Instagram Story/Feed, X,
- * WhatsApp, Copy) + editable caption used on the achievement and scenic-recap
- * cards, opened from the ride summary so riders can post right after finishing. */
+ * WhatsApp, Copy) + editable caption with tone chips, opened from the ride
+ * summary so riders can post right after finishing. */
 export function RideShareSheet({
-  visible, onClose, initialCaption, autoCaption, getImageUri, onMore, onNotice,
+  visible, onClose, initialCaption, captionFacts, getImageUri, onMore, onNotice,
 }: {
   visible: boolean;
   onClose: () => void;
   initialCaption: string;
-  autoCaption?: string;
+  captionFacts?: { title?: string; place?: string; stats?: string[] };
   getImageUri: () => Promise<string>;
   onMore: () => void;
   onNotice: (msg: string) => void;
@@ -33,7 +34,7 @@ export function RideShareSheet({
             value={caption}
             onChange={setCaption}
             testID="ride-share-caption"
-            onAuto={autoCaption ? () => setCaption(autoCaption) : undefined}
+            onTone={captionFacts ? (tone) => setCaption(styleCaption(tone, captionFacts)) : undefined}
           />
           <SocialShareRow caption={caption} getImageUri={getImageUri} onNotice={(m) => onNotice(m)} />
           <View style={st.actions}>

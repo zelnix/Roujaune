@@ -138,7 +138,14 @@
       "./plugins/withChromeOsCompat",
       "expo-asset",
       "@react-native-vector-icons/ionicons",
-      "@react-native-vector-icons/material-design-icons"
+      "@react-native-vector-icons/material-design-icons",
+      [
+        "react-native-share",
+        {
+          "ios": ["instagram", "instagram-stories"],
+          "android": ["com.instagram.android"]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

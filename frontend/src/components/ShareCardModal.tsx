@@ -10,6 +10,7 @@ import { fetchDiscoveries } from "../lib/scenic-routes";
 import { C } from "./plan";
 import { SocialShareRow } from "./SocialShareRow";
 import { CaptionEditor } from "./CaptionEditor";
+import { styleCaption } from "../lib/caption-styles";
 import { AchievementCard, AchievementCardData } from "./AchievementCard";
 
 /** Presents the branded achievement card and lets the rider share it or save it
@@ -186,10 +187,10 @@ export function ShareCardModal({
             value={caption}
             onChange={setCaption}
             testID="share-caption"
-            onAuto={() => {
-              const line = (data.stats || []).map((st) => `${st.value} ${st.label.toLowerCase()}`).join(" · ");
-              setCaption(`${data.title}${line ? ` — ${line}` : ""}\nRidden on ROUJAUNE 🚴 · Your strongest ride is your own.`);
-            }}
+            onTone={(tone) => setCaption(styleCaption(tone, {
+              title: data.title,
+              stats: (data.stats || []).map((st) => `${st.value} ${st.label.toLowerCase()}`),
+            }))}
           />
 
           <SocialShareRow caption={caption} getImageUri={capture} disabled={!!busy}
