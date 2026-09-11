@@ -395,7 +395,8 @@ def _parse_natural_date(msg: str):
 _START_RE = re.compile(
     r"\b(start\s*date|restart|re-?start"
     r"|reset (my|the )?(plan|start|schedule|training)"
-    r"|(start|begin|kick\s*off|push|move|shift|change|adjust|set)\s+(my|the)?\s*(\w+\s+){0,2}(plan|schedule|training))\b"
+    r"|(start|begin|kick\s*off|push|move|shift|change|adjust|set)\s+(my|the)?\s*(\w+\s+){0,2}(plan|schedule|training)"
+    r"|(start|begin|kick\s*off)\w*\s+(this|next|on|from|the)?\s*(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b"
 )
 _MISSED_RE = re.compile(r"\b(missed|couldn'?t (ride|do)|skip(ped)?|reschedul|move (my|the|that) (ride|workout|session))\b")
 

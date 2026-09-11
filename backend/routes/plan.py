@@ -169,6 +169,10 @@ async def get_plan(id: str = ""):
             for k, v in doc.items():
                 if k.startswith("adaptation_ai_"):
                     merged[k] = v
+        # Reflect a rider-chosen start date (e.g. the coach moved the plan).
+        _ov = await _plan_start_override(active)
+        if _ov is not None:
+            merged["start_date"] = _ov.isoformat()
         return merged
     except Exception:
         logging.exception("get_plan failed")
@@ -354,6 +358,35 @@ CALENDAR_WEEK = {
 # _free_calendar_week moved to services.plan_engine
 
 
+def _shift_demo_week(anchor: date) -> dict:
+    """A copy of the demo showcase week re-dated so day 0 falls on `anchor`.
+    Lets the coach genuinely 'move' the demo plan's start."""
+    import copy
+    wk = copy.deepcopy(CALENDAR_WEEK)
+    names = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
+    for i, day in enumerate(wk["days"]):
+        dt = anchor + timedelta(days=i)
+        day["date"] = dt.isoformat()
+        day["day_name"] = names[dt.weekday()]
+        day["day_num"] = dt.strftime("%-d %b").upper()
+    end = anchor + timedelta(days=6)
+    wk["id"] = f"demo-{anchor.isoformat()}"
+    wk["start_date"] = anchor.isoformat()
+    wk["end_date"] = end.isoformat()
+    wk["range_label"] = f"{anchor.strftime('%d')} \u2013 {end.strftime('%d %b %Y')}"
+    today = _ctr_today()
+    wk["selected_date"] = today.isoformat() if anchor <= today <= end else anchor.isoformat()
+    wk.pop("seed_version", None)
+    return wk
+
+
+async def _plan_start_override(plan_id: str):
+    """The rider's chosen start date for a plan (from plan_state), or None."""
+    st = await udb.plan_state.find_one({"id": plan_id}) or {}
+    return _parse_ymd(st.get("start_date")) if st.get("start_date") else None
+
+
+
 def _week_containing(weeks_map: dict, target: date):
     """Return the plan-week dict whose 7-day span contains `target`, else None."""
     for wk in weeks_map.values():
@@ -402,17 +435,24 @@ async def get_calendar_week(start: str = "2025-05-12", focus_date: Optional[str]
             else:
                 doc = _ctr_calendar_week(weeks_map[cur], ride_map, supp_dates, _ctr_today())
         elif active == "build-and-climb":
-            # The dedicated demo account keeps the illustrative demo week; any
-            # other requested week is an open week so navigation still works.
-            demo_start = date(2025, 5, 12)
-            mon = (target - timedelta(days=target.weekday())) if target is not None else demo_start
-            if mon == demo_start:
-                doc = await udb.calendar_weeks.find_one({"start_date": "2025-05-12"})
-                if not doc or doc.get("seed_version") != CALENDAR_WEEK["seed_version"]:
-                    await udb.calendar_weeks.update_one({"start_date": "2025-05-12"}, {"$set": CALENDAR_WEEK}, upsert=True)
-                    doc = dict(CALENDAR_WEEK)
+            # The demo showcase week; if the rider moved the plan start, the demo
+            # week travels with it so the coach's change is real and visible.
+            override = await _plan_start_override("build-and-climb")
+            if override is not None:
+                if target is None or (override <= target <= override + timedelta(days=6)):
+                    doc = _shift_demo_week(override)
+                else:
+                    doc = _free_calendar_week(target.isoformat())
             else:
-                doc = _free_calendar_week(mon.isoformat())
+                demo_start = date(2025, 5, 12)
+                mon = (target - timedelta(days=target.weekday())) if target is not None else demo_start
+                if mon == demo_start:
+                    doc = await udb.calendar_weeks.find_one({"start_date": "2025-05-12"})
+                    if not doc or doc.get("seed_version") != CALENDAR_WEEK["seed_version"]:
+                        await udb.calendar_weeks.update_one({"start_date": "2025-05-12"}, {"$set": CALENDAR_WEEK}, upsert=True)
+                        doc = dict(CALENDAR_WEEK)
+                else:
+                    doc = _free_calendar_week(mon.isoformat())
         else:
             # Casual rider (no structured plan): an OPEN week they can fill with
             # any workouts they pick — never the fabricated demo week.
@@ -831,24 +871,24 @@ async def _reset_plan_start(plan_id: str, new_start: date) -> dict:
                           f"{event.isoformat()} — firmer than ideal, but your event stays on track.")
         else:
             note_event = f" It still lands comfortably before your event on {event.isoformat()}."
-    # Physically re-date the rider's plan weeks so the whole schedule moves.
-    if plan_id in STRUCTURED_PLAN_IDS or plan_id.startswith("custom-"):
-        try:
-            # Snapshot the PRE-change state so the rider can undo the reschedule.
-            import copy
-            prev_state = await udb.plan_state.find_one({"id": plan_id}) or {}
-            prev_def = await _rider_plan_def(plan_id)
-            await udb.plan_undo.update_one({"id": plan_id}, {"$set": {
-                "id": plan_id,
-                "prev_start_date": prev_state.get("start_date"),
-                "prev_current_week": prev_state.get("current_week"),
-                "prev_duration_override": prev_state.get("duration_weeks_override"),
-                "prev_def": copy.deepcopy(prev_def) if prev_def else None,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-            }}, upsert=True)
+    # Snapshot the PRE-change state (for undo), then re-date the schedule.
+    try:
+        import copy
+        structured = plan_id in STRUCTURED_PLAN_IDS or plan_id.startswith("custom-")
+        prev_state = await udb.plan_state.find_one({"id": plan_id}) or {}
+        prev_def = await _rider_plan_def(plan_id) if structured else None
+        await udb.plan_undo.update_one({"id": plan_id}, {"$set": {
+            "id": plan_id,
+            "prev_start_date": prev_state.get("start_date"),
+            "prev_current_week": prev_state.get("current_week"),
+            "prev_duration_override": prev_state.get("duration_weeks_override"),
+            "prev_def": copy.deepcopy(prev_def) if prev_def else None,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }}, upsert=True)
+        if structured:
             await _rebase_plan_def(plan_id, new_start, weeks if compressed else None)
-        except Exception:
-            logging.warning("plan rebase failed")
+    except Exception:
+        logging.warning("plan reschedule snapshot/rebase failed")
     set_doc = {"start_date": new_start.isoformat(), "current_week": 1}
     if compressed:
         set_doc["duration_weeks_override"] = weeks
