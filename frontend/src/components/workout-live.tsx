@@ -252,12 +252,22 @@ export function SessionCard({ elapsed, estFinish, riddenKm, totalKm }: { elapsed
 }
 
 // ---- Alberto coaching banner ----------------------------------------------
-export function CoachBanner({ name, message, avatar }: { name: string; message: string; avatar: any }) {
+export function CoachBanner({ name, message, avatar, struggle }: { name: string; message: string; avatar: any; struggle?: { severity: string; safety: boolean; label: string } | null }) {
+  const alert = struggle && struggle.severity && struggle.severity !== "none";
+  const pillColor = struggle?.safety || struggle?.severity === "high" ? colors.red : colors.yellow;
   return (
-    <View style={cb.wrap} testID="coach-banner">
+    <View style={[cb.wrap, alert ? { borderColor: pillColor, borderWidth: 1 } : null]} testID="coach-banner">
       <Image source={avatar} style={cb.avatar} contentFit="cover" contentPosition="top center" />
       <View style={{ flex: 1 }}>
-        <Text style={cb.name}>{name} · Live coaching</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
+          <Text style={cb.name}>{name} · Live coaching</Text>
+          {alert ? (
+            <View style={[cb.pill, { backgroundColor: pillColor }]} testID="struggle-pill">
+              <Ionicons name={struggle?.safety ? "shield-half" : "pulse"} size={11} color="#180a0a" />
+              <Text style={cb.pillText}>{struggle?.safety ? "EASING TO RECOVER" : `HOLD ON · ${struggle?.label ?? "digging deep"}`}</Text>
+            </View>
+          ) : null}
+        </View>
         <Text style={cb.msg} numberOfLines={2}>{message}</Text>
       </View>
       <Ionicons name="mic" size={16} color={colors.yellow} />
@@ -711,6 +721,8 @@ const cb = StyleSheet.create({
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.08)" },
   name: { color: colors.yellow, fontSize: 11.5, fontWeight: "800", letterSpacing: 0.5 },
   msg: { color: colors.white, fontSize: 14, fontWeight: "600", lineHeight: 19, marginTop: 2 },
+  pill: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2, marginLeft: 8 },
+  pillText: { color: "#180a0a", fontSize: 9.5, fontWeight: "900", letterSpacing: 0.5, textTransform: "uppercase" },
 });
 
 const ic = StyleSheet.create({

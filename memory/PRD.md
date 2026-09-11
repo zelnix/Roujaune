@@ -1191,3 +1191,14 @@ User wanted an in-app rating + feedback capture (fb50-style) opened from Setting
 - Pause/resume: "pause my plan for 2 weeks" / "resume my plan" -> _pause_plan/_resume_plan shift current+future week dates (undo-able), plan_state.paused_weeks.
 - Coach style: "be tougher/gentler/keep it simple" -> style_override (performance/calm/essential) used for reply + returned as coaching_style; CoachChatModal setCoachStyle persists it.
 - All verified via curl (greenlantern); web bundles clean; lint clean. User picks 1a-e,2b,3a,4a,5a done (rounds 36-37).
+
+## AI Struggle Detection & Live Intervention (2026-06 fork)
+- **Core engine** `frontend/src/lib/struggle.ts` (pure/unit-tested `StruggleEngine`): 10s rolling averages of power/cadence/HR + Skiba W′-balance model (CP≈FTP, W′≈FTP×70 J). Signals: cadence_decay, power_fade (target−actual >10%), hr_near_max (≥93% maxHR), hr_decoupling (HR↑ while power↓ over window), power_variability (CV>0.2), w_prime_low (<15%), erg_spiral (cadence<70 on high target while fading), pedal_asymmetry (|balance−50|>15 from advanced CPM). Multi-variable trigger: active only when ≥2 signals fire; 60s warm-up grace (safety exempt). Personalised to FTP + max HR (220−age fallback via `resolveMaxHr`).
+- **Safety override**: HR ≥95% max + cadence collapse + power fade → `safety=true` → auto active-recovery (ease target to ~55%).
+- **Hook** `frontend/src/hooks/useStruggleMonitor.ts`: feeds the engine from live telemetry, fires onStruggle/onSafety/onRecover (45s onset cooldown, 12s recovery hold), collects `StruggleMoment[]`.
+- **Live wiring** `app/workout.tsx`: on struggle → auto-drop ERG target −8% (`struggleEase` → `effTarget` sent to sim + FTMS), coach `struggle` cue, toast, logControl; on safety → ease to active recovery + calm `safety` cue; on recover → restore target. `CoachBanner` shows a HOLD ON / EASING-TO-RECOVER pill.
+- **Coach cues** `backend/routes/coach.py` `/coach/cue`: new `struggle`/`safety` kinds build urgent/calm, route-contextual, cause-specific instructions (Claude persona). Verified live (urgent "spin up to 90rpm" + calm "sit up and spin easy").
+- **Post-ride**: struggle moments saved to `rideRecorder` → fed to `/coach/debrief` (`struggles[]`) so the debrief references tough moments + suggests FTP re-test/recovery; shown in Summary → Full Analysis "Tough Moments" card.
+- **Settings**: new "PHYSIOLOGY & SAFETY" card (`app/settings.tsx`) — editable Max HR + Age steppers (`settings.maxHr`/`age`), server-persisted.
+- **BLE**: `ble/parse.ts` now extracts Pedal Power Balance (L%) from CPM for the pedal_asymmetry signal (advanced power meters, native build).
+- Engine verified via standalone run (on-target=quiet, fade+cadence=high w/ ERG spiral, safety trip, single-signal=quiet, warm-up grace, W′→0). Advanced pedal dynamics = best-effort (native build only).

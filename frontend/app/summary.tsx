@@ -84,7 +84,7 @@ export default function WorkoutComplete() {
   const rightW = compact ? 300 : 344;
   const pad = phone ? spacing.sm : compact ? spacing.md : spacing.lg;
 
-  const { stats, route, needsManual, saved, submitManual, recordedElapsed, adjustments } = useSummary();
+  const { stats, route, needsManual, saved, submitManual, recordedElapsed, adjustments, struggles } = useSummary();
   const { debrief, loading: debriefLoading } = useCoachDebrief(stats, route);
   const { intervals, overall: intervalOverall, hasData: intervalHasData, ftp: intervalFtp } = useIntervals();
   const kmSplits = useKmSplits();
@@ -213,6 +213,7 @@ export default function WorkoutComplete() {
           hasData={intervalHasData}
           ftp={intervalFtp}
           adjustments={adjustments}
+          struggles={struggles}
           routeName={route.name}
           onClose={() => setShowAnalysis(false)}
         />
@@ -318,7 +319,7 @@ function KmSplitsCard({ splits }: { splits: KmSplit[] }) {
 
 // Deeper post-ride analysis: full-ride power/HR curves, time-in-zones and a
 // lap-by-lap interval breakdown — for data-focused riders.
-function FullAnalysisModal({ stats, intervals, overall, hasData, ftp, adjustments = [], routeName, onClose }: { stats: any; intervals: any[]; overall: number | null; hasData: boolean; ftp: number; adjustments?: { t: string; label: string }[]; routeName?: string; onClose: () => void }) {
+function FullAnalysisModal({ stats, intervals, overall, hasData, ftp, adjustments = [], struggles = [], routeName, onClose }: { stats: any; intervals: any[]; overall: number | null; hasData: boolean; ftp: number; adjustments?: { t: string; label: string }[]; struggles?: any[]; routeName?: string; onClose: () => void }) {
   const [w, setW] = React.useState(600);
   const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
   return (
@@ -402,11 +403,35 @@ function FullAnalysisModal({ stats, intervals, overall, hasData, ftp, adjustment
               ))}
             </View>
           )}
+
+          {struggles.length > 0 && (
+            <View style={styles.lapCard} testID="struggle-log">
+              <View style={styles.lapHeadRow}>
+                <Ionicons name="pulse" size={15} color={colors.red} />
+                <Text style={styles.lapTitle}>Tough Moments</Text>
+                <Text style={styles.lapHint}>Where the coach stepped in</Text>
+              </View>
+              {struggles.map((m, i) => (
+                <View key={i} style={[styles.adjRow, i % 2 === 1 && styles.lapRowAlt]}>
+                  <Text style={styles.adjTime}>{`${Math.floor(m.t / 60)}:${String(m.t % 60).padStart(2, "0")}`}</Text>
+                  <Text style={styles.adjLabel}>
+                    {(STRUGGLE_LABEL[m.primary as string] ?? "Strain")}{m.safety ? " · safety ease → recovery" : m.severity === "high" ? " · eased −8%" : " · eased −8%"}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
         </ScrollView>
       </View>
     </View>
   );
 }
+
+const STRUGGLE_LABEL: Record<string, string> = {
+  cadence_decay: "Cadence dropped", hr_decoupling: "HR decoupling", hr_near_max: "HR near max",
+  power_fade: "Power faded", power_variability: "Choppy power", w_prime_low: "Tank near empty",
+  erg_spiral: "ERG spiral", pedal_asymmetry: "One-sided stroke",
+};
 
 // Shown when the ride finished with no telemetry from the smart trainer or
 // wearables — lets the rider enter their workout data manually so it still

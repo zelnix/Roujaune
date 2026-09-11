@@ -12,10 +12,20 @@ export type CoachContext = {
   seated?: boolean;
   coach_name?: string;
   coach_gender?: string;
-  cue_kind?: "live" | "intro" | "next_preview" | "extend_advice";
+  cue_kind?: "live" | "intro" | "next_preview" | "extend_advice" | "struggle" | "safety" | "recover";
   next_segment?: string | null;
   next_zone?: string | null;
   next_target?: number | null;
+  // Struggle-detection context (sent with cue_kind "struggle" | "safety").
+  struggle_reasons?: string[];
+  struggle_primary?: string | null;
+  struggle_severity?: string | null;
+  struggle_safety?: boolean;
+  power_deficit_pct?: number;
+  w_prime_pct?: number;
+  near_max_hr_pct?: number;
+  place?: string | null;
+  eased_pct?: number;
 };
 
 function apiBase(): string {

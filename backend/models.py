@@ -82,10 +82,20 @@ class CoachCueRequest(BaseModel):
     seated: bool = False
     coach_name: str = "Alberto"
     coach_gender: str = "male"
-    cue_kind: str = "live"  # live | intro | next_preview | extend_advice
+    cue_kind: str = "live"  # live | intro | next_preview | extend_advice | struggle | safety | recover
     next_segment: Optional[str] = None
     next_zone: Optional[str] = None
     next_target: Optional[int] = None
+    # Struggle-detection context (cue_kind "struggle" | "safety").
+    struggle_reasons: List[str] = Field(default_factory=list)
+    struggle_primary: Optional[str] = None
+    struggle_severity: Optional[str] = None
+    struggle_safety: bool = False
+    power_deficit_pct: float = 0
+    w_prime_pct: float = 1
+    near_max_hr_pct: float = 0
+    place: Optional[str] = None
+    eased_pct: int = 0
 
 
 class ExtendAdviceRequest(BaseModel):
@@ -123,6 +133,7 @@ class CoachDebriefRequest(BaseModel):
     zones: List[Dict[str, Any]] = Field(default_factory=list)
     extended_min: int = 0
     adjustments: List[str] = Field(default_factory=list)
+    struggles: List[Dict[str, Any]] = Field(default_factory=list)
     coach_name: str = "Alberto"
     coach_gender: str = "male"
 

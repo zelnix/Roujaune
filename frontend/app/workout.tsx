@@ -37,6 +37,8 @@ import { useBleSensors } from "@/src/hooks/useBleSensors";
 import { BleSensorsPanel } from "@/src/components/BleSensorsPanel";
 import { TrainerControlPanel } from "@/src/components/streaming/TrainerControlPanel";
 import { fetchCoachCue, fetchExtendPlan, ExtendPlan } from "@/src/lib/coach";
+import { useStruggleMonitor } from "@/src/hooks/useStruggleMonitor";
+import { StruggleState, REASON_LABEL } from "@/src/lib/struggle";
 import { useCoach } from "@/src/lib/coach-persona";
 
 // Alberto's cues are generated live from the rider's real telemetry so the
@@ -179,6 +181,11 @@ export default function LiveWorkout() {
   const [ergMode, setErgMode] = React.useState(true);
   const ergModeRef = React.useRef(true);
   React.useEffect(() => { ergModeRef.current = ergMode; }, [ergMode]);
+  // Struggle auto-ease: the coach quietly drops the ERG target while the rider
+  // is struggling (1 = no ease, 0.92 = −8%, ~0.6 = safety active-recovery).
+  const [struggleEase, setStruggleEase] = React.useState(1);
+  const struggleEaseRef = React.useRef(1);
+  React.useEffect(() => { struggleEaseRef.current = struggleEase; }, [struggleEase]);
   React.useEffect(() => {
     if (Date.now() > ergPendingUntil.current) { ergRef.current = telemetry.erg; setErg(telemetry.erg); }
   }, [telemetry.erg]);
@@ -202,6 +209,9 @@ export default function LiveWorkout() {
     [segments, telemetry.elapsed],
   );
   const targetW = activeSeg ? targetWatts(activeSeg.segment, ftp, zoneBias) : 251;
+  // The watts actually sent to the trainer — the planned target, eased down while
+  // the rider is struggling so the resistance backs off to help them recover.
+  const effTarget = Math.max(0, Math.round(targetW * struggleEase));
   const timeLeftLabel = activeSeg ? mmss(activeSeg.remaining) : undefined;
   // Workout intervals as vertical "stages" for the shared fullscreen HUD rail.
   const workoutStages = React.useMemo(
@@ -239,21 +249,21 @@ export default function LiveWorkout() {
     if (connectionState !== "connected") return;
     if (!initSent.current) {
       initSent.current = true;
-      sendInit({ elapsed: 0, distance: 0, watts: targetW });
-      lastTargetSent.current = targetW;
+      sendInit({ elapsed: 0, distance: 0, watts: effTarget });
+      lastTargetSent.current = effTarget;
       return;
     }
-    if (targetW !== lastTargetSent.current) {
-      lastTargetSent.current = targetW;
-      if (ergModeRef.current) sendTarget(targetW);
+    if (effTarget !== lastTargetSent.current) {
+      lastTargetSent.current = effTarget;
+      if (ergModeRef.current) sendTarget(effTarget);
     }
-  }, [connectionState, targetW, sendInit, sendTarget]);
+  }, [connectionState, effTarget, sendInit, sendTarget]);
 
-  // Real FTMS trainer: in ERG mode, auto-hold the current interval's target watts.
+  // Real FTMS trainer: in ERG mode, auto-hold the current (eased) target watts.
   React.useEffect(() => {
-    if (ble.hasTrainerControl && autoErg && ergMode) ble.setErgWatts(targetW);
+    if (ble.hasTrainerControl && autoErg && ergMode) ble.setErgWatts(effTarget);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetW, ble.hasTrainerControl, autoErg, ergMode]);
+  }, [effTarget, ble.hasTrainerControl, autoErg, ergMode]);
 
   const showToast = React.useCallback((text: string) => setToast({ id: Date.now(), text }), []);
 
@@ -413,6 +423,7 @@ export default function LiveWorkout() {
   // (the summary screen is what saves), so the ride is never recorded.
   const requestEnd = () => { setExpanded(false); if (!paused) { pause(); setPaused(true); } setEndPrompt(true); };
   const onSaveRide = () => {
+    rideRecorder.setStruggles(struggleMon.moments.current);
     submitRoutePR(segTotalSec > 0 && telemetryRef.current.elapsed >= segTotalSec);
     setEndPrompt(false);
     router.replace("/summary");
@@ -491,7 +502,7 @@ export default function LiveWorkout() {
     }
   }, [speak]);
 
-  const onFinishComplete = () => { setCompletePrompt(false); router.replace("/summary"); };
+  const onFinishComplete = () => { rideRecorder.setStruggles(struggleMon.moments.current); setCompletePrompt(false); router.replace("/summary"); };
   const onExtendRide = (minutes: number, label: string) => {
     if (!selected) return;
     setExtraSegments((x) => [...x, extensionSegment(selected, minutes)]);
@@ -683,13 +694,13 @@ export default function LiveWorkout() {
   const coachCtxRef = React.useRef(coachCtx);
   React.useEffect(() => { coachCtxRef.current = coachCtx; }, [coachCtx]);
 
-  const generateCue = React.useCallback(async (kind: "live" | "intro" | "next_preview" = "live") => {
+  const generateCue = React.useCallback(async (kind: "live" | "intro" | "next_preview" | "struggle" | "safety" = "live", extra?: Record<string, any>) => {
     if (paused || cueBusy.current) return;
     cueBusy.current = true;
     lastCueAt.current = Date.now();
     const t = telemetryRef.current;
     const seg = activeSegRef.current;
-    const ctx: any = { ...coachCtxRef.current, cue_kind: kind };
+    const ctx: any = { ...coachCtxRef.current, cue_kind: kind, ...(extra ?? {}) };
     if (kind === "next_preview" && seg?.next) {
       ctx.next_segment = seg.next.label;
       ctx.next_zone = seg.next.zoneLabel;
@@ -705,6 +716,15 @@ export default function LiveWorkout() {
         fallback = `Starting ${seg.segment.label} — ${seg.segment.zoneLabel}, aim for about ${targetRef.current} W. Settle in and find your rhythm.`;
       } else if (kind === "next_preview" && seg?.next) {
         fallback = `Coming up next: ${seg.next.label} (${seg.next.zoneLabel}). Get ready to adjust your effort.`;
+      } else if (kind === "safety") {
+        fallback = "Ease right off and just spin — sit tall, breathe deep and let your heart rate come down. Recovery is the smart move here.";
+      } else if (kind === "struggle") {
+        const prim = (extra?.struggle_primary as keyof typeof REASON_LABEL) || null;
+        const tip = prim === "cadence_decay" ? "lift your cadence and keep the legs turning"
+          : prim === "hr_near_max" || prim === "hr_decoupling" ? "breathe deep and settle your effort"
+          : prim === "power_variability" || prim === "pedal_asymmetry" ? "smooth out your pedal stroke"
+          : "stay relaxed and hold your form";
+        fallback = `Dig in — ${tip}. You've got this, one pedal stroke at a time.`;
       } else {
         fallback = buildCue(t, Math.floor(Date.now() / 1000) % 4, targetRef.current, seatedRef.current);
       }
@@ -728,6 +748,49 @@ export default function LiveWorkout() {
     const offCadence = telemetry.cadence < CAD_LOW - 8 || telemetry.cadence > CAD_HIGH + 8;
     if ((offPower || offCadence) && Date.now() - lastCueAt.current > 25000) generateCue("live");
   }, [telemetry.power, telemetry.cadence, paused, generateCue]);
+
+  // ---- Live struggle detection + auto-ease intervention ----
+  // Watches multi-variable telemetry (cadence/HR/power, W′ balance, ERG spiral,
+  // pedal balance) and, when the rider starts to struggle, drops the ERG target
+  // ~8% and has the coach cue them; a safety trip eases them into recovery.
+  const struggleMon = useStruggleMonitor({
+    power: telemetry.power, cadence: telemetry.cadence, hr: telemetry.hr,
+    elapsed: telemetry.elapsed, source: telemetry.source,
+    balance: (ble.readings as any)?.balance ?? null,
+    targetW, ftp, maxHr: settings.maxHr, age: settings.age,
+    cadLow: CAD_LOW, cadHigh: CAD_HIGH, ergMode, trainerOn, wearableOn, paused,
+    onStruggle: (s: StruggleState) => {
+      setStruggleEase(0.92);
+      const label = REASON_LABEL[(s.primary ?? s.reasons[0]) as keyof typeof REASON_LABEL] ?? "you're straining";
+      showToast(`${persona.name} eased your target −8% · ${label}`);
+      logControl(`Coach eased −8% (${s.primary ?? "struggle"})`);
+      generateCue("struggle", {
+        struggle_reasons: s.reasons, struggle_primary: s.primary,
+        struggle_severity: s.severity, struggle_safety: false,
+        power_deficit_pct: Math.round(s.powerDeficitPct * 100) / 100,
+        w_prime_pct: Math.round(s.wPrimePct * 100) / 100,
+        near_max_hr_pct: Math.round(s.nearMaxHrPct * 100) / 100,
+        place: vroute.place, eased_pct: 8,
+      });
+    },
+    onSafety: (s: StruggleState) => {
+      setStruggleEase(0.55);
+      showToast(`${persona.name} eased you into active recovery — heart rate near your max`);
+      logControl("Safety ease → active recovery");
+      generateCue("safety", {
+        struggle_reasons: s.reasons, struggle_primary: s.primary,
+        struggle_severity: "high", struggle_safety: true,
+        near_max_hr_pct: Math.round(s.nearMaxHrPct * 100) / 100,
+        place: vroute.place,
+      });
+    },
+    onRecover: () => {
+      setStruggleEase(1);
+      showToast("Back on top of it — target restored.");
+      logControl("Recovered — target restored");
+    },
+  });
+  const struggle = struggleMon.state;
 
   // Introduce each step as the rider enters it (this also covers the very first
   // step shortly after the ride opens). Resets the "next step" preview guard.
@@ -862,7 +925,7 @@ export default function LiveWorkout() {
               <SessionCard elapsed={fmt(telemetry.elapsed)} estFinish={estFinish} riddenKm={riddenKm} totalKm={routeInfo.km} />
             </View>
             <View style={styles.centerCol} onLayout={onCenterLayout}>
-              <CoachBanner name={persona.name} message={liveCue} avatar={persona.image} />
+              <CoachBanner name={persona.name} message={liveCue} avatar={persona.image} struggle={struggle && struggle.active ? { severity: struggle.severity, safety: struggle.safety, label: REASON_LABEL[(struggle.primary ?? struggle.reasons[0]) as keyof typeof REASON_LABEL] ?? "digging deep" } : null} />
               <View
                 style={[styles.videoSlot, tablet && styles.flex1]}
                 onLayout={tablet ? (e) => setVideoSlotH(Math.round(e.nativeEvent.layout.height)) : undefined}

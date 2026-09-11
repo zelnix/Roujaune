@@ -24,6 +24,7 @@ type RideRecord = {
   extendedMin: number;   // total extra minutes the rider added after completing
   extensions: number;    // how many times they extended
   adjustments: { t: string; label: string }[]; // mid-ride control changes
+  struggles: import("./struggle").StruggleMoment[]; // flagged tough moments
   estCalories: number;   // live in-ride kcal estimate (actual watts when available)
 };
 
@@ -31,7 +32,7 @@ const DEFAULT_ROUTE: RideRoute = {
   id: "XlwjMjyU410", name: "Alpe d'Huez", place: "France", distance: "13.8 km", elevation: "1,120 m", tag: "Climb",
 };
 
-const store: RideRecord = { workout: "Threshold Climb", workoutId: undefined, ftp: 287, zoneBias: {}, route: { ...DEFAULT_ROUTE }, elapsed: 0, samples: [], extendedMin: 0, extensions: 0, adjustments: [], estCalories: 0 };
+const store: RideRecord = { workout: "Threshold Climb", workoutId: undefined, ftp: 287, zoneBias: {}, route: { ...DEFAULT_ROUTE }, elapsed: 0, samples: [], extendedMin: 0, extensions: 0, adjustments: [], struggles: [], estCalories: 0 };
 const MAX = 4000; // cap memory (~13 min at 5 Hz is plenty for aggregates)
 
 export const rideRecorder = {
@@ -41,6 +42,7 @@ export const rideRecorder = {
     store.extendedMin = 0;
     store.extensions = 0;
     store.adjustments = [];
+    store.struggles = [];
     store.estCalories = 0;
     if (meta?.workout) store.workout = meta.workout;
     if (meta && "workoutId" in meta) store.workoutId = meta.workoutId;
@@ -70,12 +72,16 @@ export const rideRecorder = {
     store.adjustments.push({ t, label });
     if (store.adjustments.length > 30) store.adjustments.shift();
   },
+  /** Store the flagged struggle moments from the live struggle detector. */
+  setStruggles(moments: import("./struggle").StruggleMoment[]) {
+    store.struggles = [...(moments || [])];
+  },
   push(sample: RideSample, elapsed: number) {
     store.elapsed = elapsed;
     if (store.samples.length < MAX) store.samples.push(sample);
     else store.samples[Math.floor(Math.random() * MAX)] = sample; // reservoir-ish
   },
   snapshot(): RideRecord {
-    return { ...store, route: { ...store.route }, samples: [...store.samples] };
+    return { ...store, route: { ...store.route }, samples: [...store.samples], struggles: [...store.struggles] };
   },
 };

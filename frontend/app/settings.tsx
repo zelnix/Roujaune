@@ -269,6 +269,48 @@ export default function SettingsScreen() {
         <Text style={s.coachHint}>Only used with a wheel / speed sensor. A smart trainer reports speed directly.</Text>
       </Card>
 
+      <Card testID="physiology">
+        <SectionTitle label="PHYSIOLOGY & SAFETY" color={CC.rouge} />
+        <Text style={s.coachHint}>Personalises the live struggle detector — {persona.name} coaches and eases your effort against your own limits, and eases you into recovery if your heart rate nears max.</Text>
+        <View style={[s.ftpRow, { marginTop: 12 }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.prefTitle}>Max heart rate</Text>
+            <Text style={s.prefSub}>{settings.maxHr > 0 ? "Your measured maximum." : `Not set — using ${settings.age > 0 ? 220 - settings.age : 190} bpm (220 − age).`}</Text>
+          </View>
+          <View style={s.ftpStepper}>
+            <Pressable testID="maxhr-minus" onPress={() => setSetting("maxHr", settings.maxHr <= 0 ? 0 : Math.max(0, settings.maxHr - 1))} style={s.ftpBtn}>
+              <Ionicons name="remove" size={18} color={CC.white} />
+            </Pressable>
+            <View style={[s.ftpValueWrap, { minWidth: 84 }]}>
+              <Text style={s.ftpValue}>{settings.maxHr > 0 ? settings.maxHr : "Auto"}</Text>
+              {settings.maxHr > 0 ? <Text style={s.ftpUnit}>bpm</Text> : null}
+            </View>
+            <Pressable testID="maxhr-plus" onPress={() => setSetting("maxHr", Math.min(230, (settings.maxHr > 0 ? settings.maxHr : ((settings.age > 0 ? 220 - settings.age : 190) - 1)) + 1))} style={s.ftpBtn}>
+              <Ionicons name="add" size={18} color={CC.white} />
+            </Pressable>
+          </View>
+        </View>
+        <View style={[s.ftpRow, { borderTopWidth: 1, borderTopColor: CC.borderSoft, marginTop: 14, paddingTop: 14 }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.prefTitle}>Age</Text>
+            <Text style={s.prefSub}>Used to estimate max HR when it isn&apos;t set.</Text>
+          </View>
+          <View style={s.ftpStepper}>
+            <Pressable testID="age-minus" onPress={() => setSetting("age", Math.max(0, settings.age - 1))} style={s.ftpBtn}>
+              <Ionicons name="remove" size={18} color={CC.white} />
+            </Pressable>
+            <View style={[s.ftpValueWrap, { minWidth: 84 }]}>
+              <Text style={s.ftpValue}>{settings.age > 0 ? settings.age : "—"}</Text>
+              {settings.age > 0 ? <Text style={s.ftpUnit}>yrs</Text> : null}
+            </View>
+            <Pressable testID="age-plus" onPress={() => setSetting("age", Math.min(100, settings.age + 1))} style={s.ftpBtn}>
+              <Ionicons name="add" size={18} color={CC.white} />
+            </Pressable>
+          </View>
+        </View>
+      </Card>
+
+
       <Card testID="preferences">
         <SectionTitle label="TRAINING PREFERENCES" />
         <View style={[s.prefRow, s.divider]}>

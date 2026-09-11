@@ -73,7 +73,7 @@ export type CrankSample = { revs: number; time: number }; // time in 1/1024 s
 // time resolution in ticks/second (1/2048 s for Cycling Power, 1/1024 s for CSC).
 export type WheelSample = { revs: number; time: number; res: number };
 
-export type CyclingPower = { power: number; crank?: CrankSample; wheel?: WheelSample };
+export type CyclingPower = { power: number; balance?: number | null; crank?: CrankSample; wheel?: WheelSample };
 
 /** Read an unsigned 32-bit little-endian value. */
 function u32(bytes: Uint8Array, off: number): number {
@@ -88,7 +88,10 @@ export function parseCyclingPower(bytes: Uint8Array): CyclingPower | null {
   let power = bytes[2] | (bytes[3] << 8);
   if (power > 0x7fff) power -= 0x10000;
   let off = 4;
-  if (flags & 0x01) off += 1; // Pedal Power Balance
+  // Pedal Power Balance (0.5% units) — advanced power meters report left-side
+  // contribution; a persistent lean off 50% is an early muscular-fatigue sign.
+  let balance: number | null = null;
+  if (flags & 0x01) { balance = Math.round((bytes[off] * 0.5) * 10) / 10; off += 1; }
   if (flags & 0x04) off += 2; // Accumulated Torque
   let wheel: WheelSample | undefined;
   if (flags & 0x10 && bytes.length >= off + 6) {
@@ -106,7 +109,7 @@ export function parseCyclingPower(bytes: Uint8Array): CyclingPower | null {
     const time = bytes[off + 2] | (bytes[off + 3] << 8);
     crank = { revs, time };
   }
-  return { power: Math.max(0, power), crank, wheel };
+  return { power: Math.max(0, power), balance, crank, wheel };
 }
 
 /** Cycling Speed & Cadence Measurement (0x2A5B) → optional wheel (speed) + crank (cadence) data. */

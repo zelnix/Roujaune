@@ -160,6 +160,36 @@ async def coach_cue(req: CoachCueRequest):
             "advise in 1-2 short sentences whether it is wise to extend the ride with extra easy/endurance time "
             "or to finish now and recover. Be specific, caring, and decisive."
         )
+    elif req.cue_kind in ("struggle", "safety"):
+        _RLABEL = {
+            "cadence_decay": "their cadence is dropping well below target",
+            "hr_decoupling": "their heart rate is drifting up while power fades (aerobic decoupling)",
+            "hr_near_max": "their heart rate is pinned near maximum",
+            "power_fade": f"their power has faded roughly {round(req.power_deficit_pct * 100)}% below the {req.power_target} W target",
+            "power_variability": "their pedal stroke has turned choppy and uneven",
+            "w_prime_low": "their anaerobic reserve (W-prime) is almost empty",
+            "erg_spiral": "they are sliding into an ERG spiral of death — cadence collapsing while resistance climbs",
+            "pedal_asymmetry": "their pedal stroke has gone one-sided, a sign of muscular fatigue",
+        }
+        signs = "; ".join(_RLABEL.get(r, r) for r in (req.struggle_reasons or [])) or "they are clearly straining"
+        where = f" on the climb into {req.place}" if req.place else ""
+        if req.cue_kind == "safety" or req.struggle_safety:
+            instruction = (
+                f"SAFETY FIRST: the rider is struggling dangerously — {signs}. "
+                "You are easing them into active recovery now. In one short, CALM, grounding sentence, "
+                "tell them to sit up, ease off and just spin easy to bring the heart rate down — reassure them this is the right call, no heroics."
+            )
+        else:
+            urgency = "with real urgency and belief" if req.struggle_severity == "high" else "warmly and encouragingly"
+            eased = (
+                f" You have quietly dropped their target about {req.eased_pct}% to help them hold on — do not dwell on it."
+                if req.eased_pct else ""
+            )
+            instruction = (
+                f"The rider is STARTING TO STRUGGLE{where}: {signs}. "
+                f"Give ONE short, specific, actionable cue {urgency} to help them dig in and hold form right now "
+                "(e.g. lift the cadence, relax the shoulders, breathe, smooth the stroke)." + eased
+            )
     else:
         instruction = "Give the rider one short coaching cue right now."
     prompt = (
@@ -325,6 +355,28 @@ async def coach_debrief(req: CoachDebriefRequest):
             f"\nPer-interval accuracy (overall {req.interval_compliance}% on target): "
             + "; ".join(parts) + "."
         )
+    struggle_txt = ""
+    if req.struggles:
+        _RL = {
+            "cadence_decay": "cadence dropping", "hr_decoupling": "HR decoupling",
+            "hr_near_max": "HR near max", "power_fade": "power fading",
+            "power_variability": "choppy power", "w_prime_low": "anaerobic tank empty",
+            "erg_spiral": "ERG spiral", "pedal_asymmetry": "one-sided stroke",
+        }
+        n = len(req.struggles)
+        had_safety = any(s.get("safety") for s in req.struggles)
+        causes = []
+        for s in req.struggles[:4]:
+            mins = (s.get("t") or 0) // 60
+            prim = _RL.get(s.get("primary"), s.get("primary") or "strain")
+            causes.append(f"~{mins} min in ({prim})")
+        struggle_txt = (
+            f"\nThe live coach flagged {n} tough moment(s) where the rider started to struggle: "
+            + "; ".join(causes) + ". "
+            + ("One tripped a SAFETY ease into active recovery. " if had_safety else "")
+            + "Acknowledge these moments with empathy, note how they pushed through, and if the fades were repeated "
+            "gently suggest whether an FTP re-test or a touch more recovery would help."
+        )
     prompt = (
         f"{await _rider_line()}\n"
         f"The rider just finished: {req.workout} on {req.route or 'the trainer'}.\n"
@@ -332,7 +384,7 @@ async def coach_debrief(req: CoachDebriefRequest):
         f"Avg power {req.avg_power} W (normalised {req.norm_power} W, target {req.power_target} W), "
         f"avg cadence {req.avg_cadence} rpm, avg HR {req.avg_hr} bpm (max {req.max_hr}).\n"
         f"TSS {req.tss}, intensity {req.intensity}, calories {req.calories}, "
-        f"plan compliance {req.compliance}%. Time in zones: {zones_txt}.{intervals_txt}{extended_txt}{adjust_txt}\n"
+        f"plan compliance {req.compliance}%. Time in zones: {zones_txt}.{intervals_txt}{struggle_txt}{extended_txt}{adjust_txt}\n"
         "Give a warm, personal post-ride debrief: 2 to 3 short sentences. "
         "Praise what went well, reference how well they held their interval power targets "
         "(call out a specific strong or weak segment if notable), and end with "
