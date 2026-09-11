@@ -126,6 +126,116 @@ def _form_state(form: float) -> str:
     return "High fatigue"
 
 
+def _lin_trend(pairs: list) -> dict | None:
+    """Least-squares slope of (index, value) points + first/last averages.
+    `pairs` is a chronological list of numeric values."""
+    vals = [v for v in pairs if v is not None]
+    if len(vals) < 3:
+        return None
+    n = len(vals)
+    xs = list(range(n))
+    mx = sum(xs) / n
+    my = sum(vals) / n
+    denom = sum((x - mx) ** 2 for x in xs) or 1.0
+    slope = sum((x - mx) * (v - my) for x, v in zip(xs, vals)) / denom
+    third = max(1, n // 3)
+    early = sum(vals[:third]) / third
+    late = sum(vals[-third:]) / third
+    pct = ((late - early) / abs(early) * 100) if early else 0.0
+    return {"slope": round(slope, 4), "early": round(early, 3), "late": round(late, 3),
+            "pct": round(pct, 1), "n": n}
+
+
+@router.get("/adaptation")
+async def adaptation(weeks: int = 8):
+    """Longitudinal adaptation assessment: EF / decoupling / HRR / W'-drain trends
+    over recent rides, the TSB training-load band, 'what's improving' callouts, and
+    a coach-acting recommendation (small tweaks auto-apply; big changes to confirm)."""
+    weeks = max(2, min(26, weeks))
+    since = (datetime.now(timezone.utc) - timedelta(weeks=weeks)).isoformat()
+    rides = await udb.ride_history.find(
+        {"created_at": {"$gte": since}},
+        {"_id": 0, "created_at": 1, "workout": 1, "ef": 1, "vi": 1, "decoupling": 1,
+         "hrr60": 1, "w_prime_min_pct": 1, "intensity": 1, "avg_hr": 1, "norm_power": 1, "tiz": 1},
+    ).sort("created_at", 1).to_list(length=2000)
+
+    def _series(key):
+        return [r.get(key) for r in rides if r.get(key) is not None]
+
+    ef_t = _lin_trend(_series("ef"))
+    dc_t = _lin_trend(_series("decoupling"))
+    hrr_t = _lin_trend(_series("hrr60"))
+    wp_t = _lin_trend(_series("w_prime_min_pct"))
+
+    # Zone-2 EF trend (aerobic efficiency at endurance intensity) is the cleanest
+    # adaptation signal — filter to steady endurance rides (IF 0.6–0.85).
+    z2 = [r.get("ef") for r in rides if r.get("ef") and 0.55 <= (r.get("intensity") or 0) <= 0.85]
+    ef_z2_t = _lin_trend(z2)
+
+    try:
+        pmc_data = await pmc(days=max(42, weeks * 7), forecast_days=0)
+    except Exception:
+        pmc_data = {}
+    tsb = pmc_data.get("form", 0)
+    ctl = pmc_data.get("fitness", 0)
+    ramp = pmc_data.get("ramp_rate", 0)
+
+    callouts: list[dict] = []
+    if (ef_z2_t or ef_t) and (ef_z2_t or ef_t)["pct"] >= 3:
+        t = ef_z2_t or ef_t
+        callouts.append({"kind": "ef", "good": True,
+            "text": f"Aerobic efficiency is up {t['pct']}% — you're making more watts for the same heart rate."})
+    elif (ef_z2_t or ef_t) and (ef_z2_t or ef_t)["pct"] <= -4:
+        t = ef_z2_t or ef_t
+        callouts.append({"kind": "ef", "good": False,
+            "text": f"Aerobic efficiency has dipped {abs(t['pct'])}% lately — likely fatigue or under-fuelling."})
+    if dc_t and dc_t["late"] < dc_t["early"] - 1:
+        callouts.append({"kind": "decoupling", "good": True,
+            "text": f"Your power-to-HR is holding steadier late in rides ({dc_t['late']}% drift vs {dc_t['early']}%) — better muscular endurance."})
+    elif dc_t and dc_t["late"] > 8:
+        callouts.append({"kind": "decoupling", "good": False,
+            "text": f"HR is drifting up ~{dc_t['late']}% in the back half of rides — ease the intensity or fuel earlier."})
+    if hrr_t and hrr_t["pct"] >= 8:
+        callouts.append({"kind": "hrr", "good": True,
+            "text": f"Heart-rate recovery is quicker (+{hrr_t['pct']}%) — your fitness base is deepening."})
+    if wp_t and wp_t["late"] > wp_t["early"] + 4:
+        callouts.append({"kind": "w_prime", "good": True,
+            "text": f"You're finishing hard efforts with more in the tank ({wp_t['late']}% vs {wp_t['early']}%) — anaerobic stamina is up."})
+
+    # Coach acting: hybrid. Small nudges auto-apply via the existing zone-bias
+    # engine; big load changes are surfaced here for the rider to confirm.
+    auto_apply: list[str] = []
+    confirm: list[dict] = []
+    if ctl and ramp is not None:
+        if ramp > 8:
+            confirm.append({"kind": "ease_volume",
+                "text": f"Your fitness is ramping fast (+{ramp}/wk). Want me to hold next week's volume steady so fatigue doesn't outrun recovery?"})
+        elif ramp < -6 and tsb > 10:
+            confirm.append({"kind": "add_volume",
+                "text": f"You're fresh (Form +{tsb}) and training has dropped off. Want me to add an endurance ride next week to rebuild fitness?"})
+    if tsb is not None and tsb < -25:
+        confirm.append({"kind": "recovery_week",
+            "text": f"Form is deep in the hole (TSB {tsb}). I'd recommend an easier recovery week — apply it?"})
+    if (ef_z2_t or ef_t) and (ef_z2_t or ef_t)["pct"] >= 6:
+        auto_apply.append("Nudged your endurance targets up slightly to match your improved efficiency.")
+
+    return {
+        "has_data": len(rides) >= 3,
+        "ride_count": len(rides),
+        "trends": {"ef": ef_t, "ef_z2": ef_z2_t, "decoupling": dc_t, "hrr": hrr_t, "w_prime": wp_t},
+        "series": {
+            "ef": _series("ef")[-12:],
+            "decoupling": _series("decoupling")[-12:],
+            "hrr": _series("hrr60")[-12:],
+            "w_prime": _series("w_prime_min_pct")[-12:],
+        },
+        "load": {"ctl": ctl, "tsb": tsb, "ramp_rate": ramp, "form_state": pmc_data.get("form_state")},
+        "callouts": callouts,
+        "coach_actions": {"auto_apply": auto_apply, "confirm": confirm},
+    }
+
+
+
 @router.get("/weekly-digest")
 async def weekly_digest():
     """This week's recap: TSS, hours, rides, distance (vs last week) + any new

@@ -10,6 +10,8 @@ import {
 } from "@/src/lib/analysis";
 import { PmcChart, PmcSummary, RecordsGrid, WeeklyDigestCard, ForecastSummary, FormTargetCard, CoachWeeklyNote, StreakCard, MilestonesCard, SeasonRecapCard } from "@/src/components/analysis/FitnessCharts";
 import { ShareCardModal } from "@/src/components/ShareCardModal";
+import { AdaptationCard } from "@/src/components/analysis/AdaptationCard";
+import { fetchAdaptation, Adaptation } from "@/src/lib/adaptation";
 import { AchievementCardData } from "@/src/components/AchievementCard";
 import { useCoach } from "@/src/lib/coach-persona";
 
@@ -24,6 +26,7 @@ export default function FitnessScreen() {
   const [streak, setStreak] = React.useState<Streak | null>(null);
   const [milestones, setMilestones] = React.useState<Milestones | null>(null);
   const [season, setSeason] = React.useState<SeasonRecap | null>(null);
+  const [adaptation, setAdaptation] = React.useState<Adaptation | null>(null);
   const currentYear = new Date().getFullYear();
   const [seasonYear, setSeasonYear] = React.useState(currentYear);
   const [noteLoading, setNoteLoading] = React.useState(true);
@@ -36,6 +39,7 @@ export default function FitnessScreen() {
       if (!alive) return;
       setPmc(p); setRecords(r); setDigest(wd); setTarget(ft); setStreak(st); setMilestones(ms); setLoading(false);
     });
+    fetchAdaptation(8).then((a) => { if (alive) setAdaptation(a); });
     return () => { alive = false; };
   }, []);
 
@@ -126,6 +130,13 @@ export default function FitnessScreen() {
         <View style={s.center}><ActivityIndicator color={colors.yellow} /></View>
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingBottom: 40 }}>
+          {adaptation?.has_data && (adaptation.callouts.length > 0 || adaptation.trends.ef || adaptation.trends.decoupling) && (
+            <Card>
+              <Text style={s.h}>Adaptation <Text style={s.hDim}>what&apos;s improving</Text></Text>
+              <AdaptationCard data={adaptation} onTalkToCoach={() => router.push("/plan")} />
+            </Card>
+          )}
+
           {digest && (
             <Card>
               <Text style={s.h}>This Week <Text style={s.hDim}>your recap</Text></Text>

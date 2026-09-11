@@ -4,6 +4,8 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/src/lib/auth-context";
+import { ChangeStartDateModal } from "@/src/components/ChangeStartDateModal";
+import { resetPlanStart } from "@/src/lib/plan";
 import { colors, radius, spacing, textShadow } from "@/src/theme";
 
 const AUTH_BG = require("../assets/images/auth_bg_sunset.png");
@@ -31,6 +33,7 @@ export default function OnboardingScreen() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [reco, setReco] = useState<Reco | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pendingPlan, setPendingPlan] = useState<string | null>(null);
 
   const allAnswered = Q.every((q) => answers[q.key] !== undefined);
 
@@ -60,7 +63,24 @@ export default function OnboardingScreen() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan_id: planId, reset_progress: true }),
       });
+      // Ride-free needs no schedule; a real plan prompts for a start date next.
+      if (planId === "none") {
+        await refresh();
+        router.replace("/");
+      } else {
+        setPendingPlan(planId);
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const finishWithStart = async (dateISO?: string) => {
+    setBusy(true);
+    try {
+      if (dateISO) { try { await resetPlanStart(dateISO); } catch { /* keep default anchor */ } }
       await refresh();
+      setPendingPlan(null);
       router.replace("/");
     } finally {
       setBusy(false);
@@ -89,7 +109,7 @@ export default function OnboardingScreen() {
         <Text style={styles.hi}>Hi {user?.name?.split(" ")[0] || "rider"} 👋</Text>
         {!reco ? (
           <>
-            <Text style={styles.title}>Let's find your plan</Text>
+            <Text style={styles.title}>Let&apos;s find your plan</Text>
             <Text style={styles.sub}>A few quick questions so we can match you to the right training.</Text>
             {Q.map((q) => (
               <View key={q.key} style={styles.qBlock}>
@@ -116,7 +136,7 @@ export default function OnboardingScreen() {
           </>
         ) : (
           <>
-            <Text style={styles.title}>{reco.level ? <>You're a <Text style={{ color: colors.yellow }}>{reco.level}</Text> rider</> : "Choose your plan"}</Text>
+            <Text style={styles.title}>{reco.level ? <>You&apos;re a <Text style={{ color: colors.yellow }}>{reco.level}</Text> rider</> : "Choose your plan"}</Text>
             {reco.recommended && (
               <Pressable style={styles.recoCard} onPress={() => choose(reco.recommended!.id)} testID="accept-reco">
                 <View style={styles.recoTop}>
@@ -154,6 +174,11 @@ export default function OnboardingScreen() {
           </>
         )}
       </ScrollView>
+      <ChangeStartDateModal
+        visible={!!pendingPlan}
+        onClose={() => finishWithStart()}
+        onConfirm={(dateISO) => finishWithStart(dateISO)}
+      />
     </ImageBackground>
   );
 }

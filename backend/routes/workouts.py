@@ -3,6 +3,7 @@
 Self-contained: only the per-user scoped DB (udb) + workout models.
 """
 import logging
+import math
 import uuid
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
@@ -225,8 +226,84 @@ async def summarize_workout(body: SummarizeRequest):
             "completed": 100,
         },
     }
+    # Longitudinal adaptation metrics (EF, VI, aerobic decoupling, HRR, W' drain,
+    # time-in-zone). Persisted per ride so trends can be computed over weeks.
+    result.update(_longitudinal_metrics(body.samples, dur, ftp, np_val, avg_power, avg_hr, zones))
     rid = await _save_ride_history(body, result)
     return {**result, "id": rid}
+
+
+def _longitudinal_metrics(samples, dur: int, ftp: int, np_val: float,
+                          avg_power: float, avg_hr: float, zones: list) -> dict:
+    """Per-ride assessment metrics for longitudinal tracking:
+      - ef: Efficiency Factor = NP / avg HR (aerobic efficiency; higher is better)
+      - vi: Variability Index = NP / avg power (how steady the effort was)
+      - decoupling: aerobic decoupling % — Pw:HR drift, 1st half vs 2nd half
+      - hrr60: heart-rate recovery over the final 60s (bpm drop in cool-down)
+      - w_prime_min_pct: lowest anaerobic-reserve % reached (Skiba W' balance)
+      - tiz: seconds in each power zone (from the zones table)
+    """
+    out: dict = {}
+    powers = [s.power for s in samples if s.power is not None]
+    if avg_hr and np_val:
+        out["ef"] = round(np_val / avg_hr, 3)
+    if avg_power and np_val:
+        out["vi"] = round(np_val / avg_power, 3)
+
+    # Aerobic decoupling: compare power:HR efficiency of the first vs second half.
+    pairs = [(s.power, s.hr) for s in samples if s.power is not None and s.hr]
+    if len(pairs) >= 20:
+        half = len(pairs) // 2
+        def _ratio(seg):
+            ps = [p for p, _ in seg]
+            hs = [h for _, h in seg]
+            ap = sum(ps) / len(ps)
+            ah = sum(hs) / len(hs)
+            return (ap / ah) if ah else None
+        r1 = _ratio(pairs[:half])
+        r2 = _ratio(pairs[half:])
+        if r1 and r2:
+            out["decoupling"] = round((r1 - r2) / r1 * 100, 1)  # + = fatigue drift
+
+    # Heart-rate recovery over the last 60 seconds of the session.
+    hrs_seq = [s.hr for s in samples if s.hr]
+    if len(hrs_seq) >= 20 and dur > 90:
+        dt = dur / len(samples)
+        back = max(1, int(60 / dt))
+        if len(hrs_seq) > back:
+            drop = hrs_seq[-back] - hrs_seq[-1]
+            if drop > 0:
+                out["hrr60"] = round(drop)
+
+    # W' balance drain (Skiba): lowest anaerobic reserve reached at this FTP.
+    if powers and ftp > 0:
+        w_prime = max(9000, ftp * 70)
+        w_bal = float(w_prime)
+        w_min = float(w_prime)
+        dt = dur / len(powers) if len(powers) else 1.0
+        for p in powers:
+            if p > ftp:
+                w_bal -= (p - ftp) * dt
+            else:
+                dcp = ftp - p
+                tau = 546 * math.exp(-0.01 * dcp) + 316
+                w_bal += (w_prime - w_bal) * (1 - math.exp(-dt / tau))
+            w_bal = max(0.0, min(float(w_prime), w_bal))
+            w_min = min(w_min, w_bal)
+        out["w_prime_min_pct"] = round(w_min / w_prime * 100)
+
+    # Time-in-zone seconds (parse the zones table's H:MM:SS strings).
+    tiz = {}
+    for z in zones or []:
+        t = str(z.get("time") or "0:00:00").split(":")
+        try:
+            secs = int(t[0]) * 3600 + int(t[1]) * 60 + int(t[2])
+        except Exception:
+            secs = 0
+        tiz[z.get("z")] = secs
+    if tiz:
+        out["tiz"] = tiz
+    return out
 
 
 def _manual_summary(body: SummarizeRequest) -> dict:
@@ -318,6 +395,15 @@ async def _save_ride_history(body: SummarizeRequest, result: dict) -> Optional[s
             "tss": result.get("tss"),
             "calories": result.get("calories", 0),
             "computed": result.get("computed", False),
+            "intensity": result.get("intensity"),
+            "norm_power": result.get("norm_power"),
+            # Longitudinal adaptation metrics (present for computed rides).
+            "ef": result.get("ef"),
+            "vi": result.get("vi"),
+            "decoupling": result.get("decoupling"),
+            "hrr60": result.get("hrr60"),
+            "w_prime_min_pct": result.get("w_prime_min_pct"),
+            "tiz": result.get("tiz"),
             "samples": samples,
             "strava_activity_id": None,
             "debrief": None,
