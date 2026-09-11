@@ -330,6 +330,13 @@ async def coach_debrief(req: CoachDebriefRequest):
         except Exception:
             logging.warning("debrief cache lookup failed")
 
+    # Track repeated power-fade struggles across rides so the coach can offer a
+    # one-tap FTP re-test when the target keeps proving too hard to hold.
+    try:
+        await _update_ftp_watch(req.ride_id, req.struggles)
+    except Exception:
+        logging.warning("ftp watch update failed")
+
     mins = req.duration_sec // 60
     zones_txt = ", ".join(f"{z.get('z')} {z.get('pct', 0)}%" for z in req.zones) if req.zones else "n/a"
     extended_txt = (
@@ -416,6 +423,127 @@ async def coach_debrief(req: CoachDebriefRequest):
     except Exception as e:
         logging.exception("coach_debrief failed")
         raise HTTPException(status_code=502, detail=f"Debrief generation failed: {e}")
+
+
+# ----------------------- Auto FTP re-test suggestion ------------------------
+# The live struggle detector flags "power fade" moments (rider can't hold the
+# target). When the same fade pattern repeats across consecutive rides, the
+# rider's FTP is probably set too high — so the coach proactively offers a
+# one-tap FTP re-test. We keep a short rolling per-ride log in a settings doc.
+_FADE_KINDS = {"power_fade", "w_prime_low", "erg_spiral"}
+_FTP_WATCH_ID = "ftp_watch"
+_FADE_STREAK_THRESHOLD = 2  # this many consecutive fade-heavy rides -> suggest
+_RETEST_RECENT_DAYS = 21    # don't nag if a re-test is already scheduled/recent
+
+
+def _ride_had_repeated_fade(struggles: List[Dict[str, Any]]) -> bool:
+    """A ride 'faded' if the coach caught 2+ power-fade struggle moments."""
+    n = 0
+    for s in struggles or []:
+        prim = s.get("primary")
+        reasons = s.get("reasons") or []
+        if (prim in _FADE_KINDS) or any(r in _FADE_KINDS for r in reasons):
+            n += 1
+    return n >= 2
+
+
+def _fade_streak(rides: List[Dict[str, Any]]) -> int:
+    """Trailing count of consecutive fade-heavy rides (newest first)."""
+    streak = 0
+    for r in sorted(rides, key=lambda x: str(x.get("at", "")), reverse=True):
+        if r.get("fade"):
+            streak += 1
+        else:
+            break
+    return streak
+
+
+async def _update_ftp_watch(ride_id: Optional[str], struggles: List[Dict[str, Any]]):
+    """Record this ride's fade verdict in the rolling watch (idempotent per ride)."""
+    doc = await udb.settings.find_one({"id": _FTP_WATCH_ID}) or {}
+    rides = [r for r in (doc.get("rides") or []) if r.get("ride_id") != ride_id]
+    rides.append({
+        "ride_id": ride_id or uuid.uuid4().hex,
+        "at": now_iso(),
+        "fade": _ride_had_repeated_fade(struggles),
+    })
+    rides = sorted(rides, key=lambda x: str(x.get("at", "")))[-6:]
+    await udb.settings.update_one(
+        {"id": _FTP_WATCH_ID}, {"$set": {"rides": rides}}, upsert=True)
+
+
+async def _ftp_retest_scheduled_recently() -> bool:
+    """True if an FTP test is already on the calendar (upcoming) or was booked
+    very recently — so we don't keep nagging."""
+    try:
+        sched = await udb.scheduled_workouts.find(
+            {"title": {"$regex": "FTP Test", "$options": "i"}}).to_list(50)
+    except Exception:
+        return False
+    today = datetime.now(timezone.utc).date()
+    for w in sched:
+        try:
+            d = date.fromisoformat(str(w.get("date"))[:10])
+        except Exception:
+            continue
+        if (d - today).days >= 0 or (today - d).days <= _RETEST_RECENT_DAYS:
+            if w.get("status") not in ("skipped", "cancelled"):
+                return True
+    return False
+
+
+@router.get("/coach/ftp-suggestion")
+async def coach_ftp_suggestion(coach_name: str = "Alberto"):
+    """Whether the coach should offer an FTP re-test right now, from the rolling
+    power-fade watch. Used by the ride summary to show a one-tap prompt."""
+    doc = await udb.settings.find_one({"id": _FTP_WATCH_ID}) or {}
+    rides = doc.get("rides") or []
+    streak = _fade_streak(rides)
+    already = await _ftp_retest_scheduled_recently()
+    suggest = streak >= _FADE_STREAK_THRESHOLD and not already
+    reason = ""
+    if suggest:
+        reason = (
+            f"You've faded off your power target in {streak} rides in a row — "
+            "your FTP may be set a touch high. A quick 20-minute re-test will re-baseline "
+            "every zone so your sessions land right."
+        )
+    return {"suggest": suggest, "streak": streak, "already_scheduled": already, "reason": reason}
+
+
+@router.post("/coach/ftp-retest")
+async def coach_ftp_retest(body: dict):
+    """One-tap: schedule an FTP re-test (defaults to tomorrow) and clear the
+    power-fade watch so the coach stops prompting until it re-emerges."""
+    coach_name = body.get("coach_name", "Alberto")
+    today = datetime.now(timezone.utc).date()
+    when = None
+    if body.get("date"):
+        try:
+            when = date.fromisoformat(str(body["date"])[:10])
+        except Exception:
+            when = None
+    if not when:
+        when = today + timedelta(days=1)
+    await udb.scheduled_workouts.insert_one({
+        "id": uuid.uuid4().hex, "type": "cycling", "workout_id": "", "title": "FTP Test (20 min)",
+        "duration": "1h 00m", "tss": "", "zone": "Z4", "color": "red",
+        "date": when.isoformat(), "status": "scheduled", "created_by": coach_name,
+    })
+    # Reset the watch so we don't re-prompt for this pattern.
+    await udb.settings.update_one({"id": _FTP_WATCH_ID}, {"$set": {"rides": []}}, upsert=True)
+    note = (
+        f"scheduled an FTP re-test for {when.isoformat()} (a focused 20-minute effort). "
+        "Warm up well, then ride it steady-hard — I'll re-baseline your zones from the result."
+    )
+    try:
+        _pid = await _active_plan_id()
+        if _pid:
+            await _record_adaptation(_pid, coach_name, f"I {note}", "FTP re-test")
+    except Exception:
+        logging.warning("ftp-retest adaptation record failed")
+    return {"ok": True, "date": when.isoformat(), "note": note}
+
 
 
 # ----------------------- Coach: conversational chat -----------------------

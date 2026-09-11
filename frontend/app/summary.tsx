@@ -8,9 +8,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { captureRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
+import { Image } from "expo-image";
 
 import { colors, radius, spacing, shadow } from "@/src/theme";
-import { useSummary, useCoachDebrief, useIntervals, useKmSplits, KmSplit } from "@/src/lib/summary";
+import { useSummary, useCoachDebrief, useIntervals, useKmSplits, KmSplit, useFtpSuggestion } from "@/src/lib/summary";
 import { autoPushCompletedRide } from "@/src/lib/health";
 import { useCoach } from "@/src/lib/coach-persona";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
@@ -86,6 +87,7 @@ export default function WorkoutComplete() {
 
   const { stats, route, needsManual, saved, submitManual, recordedElapsed, adjustments, struggles } = useSummary();
   const { debrief, loading: debriefLoading } = useCoachDebrief(stats, route);
+  const ftpSuggest = useFtpSuggestion(!debriefLoading && !needsManual);
   const { intervals, overall: intervalOverall, hasData: intervalHasData, ftp: intervalFtp } = useIntervals();
   const kmSplits = useKmSplits();
   const persona = useCoach();
@@ -170,6 +172,15 @@ export default function WorkoutComplete() {
               <>
               <View style={styles.mainCol} onLayout={onMainLayout}>
                 <HeroSummaryCard compact={phone} recap={debrief} recapLoading={debriefLoading} onChat={() => setShowChat(true)} />
+                {ftpSuggest.show && (
+                  <FtpRetestCard
+                    reason={ftpSuggest.suggestion?.reason ?? ""}
+                    coachName={persona.name}
+                    avatar={persona.image}
+                    onBook={async () => { const r = await ftpSuggest.book(); if (r.ok) showToast(`FTP re-test booked for ${r.date}`); else showToast("Couldn't book the re-test"); }}
+                    onDismiss={ftpSuggest.dismiss}
+                  />
+                )}
                 <MetricsGrid stats={stats} compact={compact} routeName={route.name} />
                 <ComplianceCard stats={stats} compact={phone} />
                 <IntervalTargetsCard intervals={intervals} overall={intervalOverall} hasData={intervalHasData} compact={phone} />
@@ -432,6 +443,47 @@ const STRUGGLE_LABEL: Record<string, string> = {
   power_fade: "Power faded", power_variability: "Choppy power", w_prime_low: "Tank near empty",
   erg_spiral: "ERG spiral", pedal_asymmetry: "One-sided stroke",
 };
+
+// Coach's one-tap FTP re-test prompt — shown when the struggle detector keeps
+// catching power fades across rides (FTP likely set too high).
+function FtpRetestCard({ reason, coachName, avatar, onBook, onDismiss }: { reason: string; coachName: string; avatar: any; onBook: () => void; onDismiss: () => void }) {
+  const [booking, setBooking] = React.useState(false);
+  return (
+    <View style={ftpCard.wrap} testID="ftp-retest-card">
+      <View style={ftpCard.head}>
+        <Image source={avatar} style={ftpCard.avatar} contentFit="cover" contentPosition="top center" />
+        <View style={{ flex: 1 }}>
+          <Text style={ftpCard.title}>{coachName} suggests an FTP re-test</Text>
+          <Text style={ftpCard.reason}>{reason}</Text>
+        </View>
+        <Pressable testID="ftp-retest-dismiss" onPress={onDismiss} hitSlop={8} accessibilityRole="button" accessibilityLabel="Dismiss">
+          <Ionicons name="close" size={18} color={colors.textDim} />
+        </Pressable>
+      </View>
+      <Pressable
+        testID="ftp-retest-book"
+        disabled={booking}
+        onPress={async () => { setBooking(true); await onBook(); }}
+        style={({ hovered }: any) => [ftpCard.btn, hovered && { opacity: 0.9 }, booking && { opacity: 0.6 }]}
+        accessibilityRole="button"
+        accessibilityLabel="Book FTP re-test"
+      >
+        <Ionicons name="flash" size={16} color="#180a0a" />
+        <Text style={ftpCard.btnText}>{booking ? "Booking…" : "Book FTP re-test"}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+const ftpCard = StyleSheet.create({
+  wrap: { borderRadius: radius.lg, borderWidth: 1, borderColor: colors.yellow + "55", backgroundColor: colors.yellow + "12", padding: spacing.md, gap: spacing.sm, marginTop: spacing.sm },
+  head: { flexDirection: "row", alignItems: "center", gap: 12 },
+  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.08)" },
+  title: { color: colors.yellow, fontSize: 13, fontWeight: "900", letterSpacing: 0.3 },
+  reason: { color: colors.white, fontSize: 13, fontWeight: "600", lineHeight: 18, marginTop: 3 },
+  btn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.yellow, borderRadius: 999, paddingVertical: 11 },
+  btnText: { color: "#180a0a", fontSize: 14, fontWeight: "900", letterSpacing: 0.3 },
+});
 
 // Shown when the ride finished with no telemetry from the smart trainer or
 // wearables — lets the rider enter their workout data manually so it still

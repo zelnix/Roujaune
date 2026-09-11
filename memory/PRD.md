@@ -1202,3 +1202,10 @@ User wanted an in-app rating + feedback capture (fb50-style) opened from Setting
 - **Settings**: new "PHYSIOLOGY & SAFETY" card (`app/settings.tsx`) — editable Max HR + Age steppers (`settings.maxHr`/`age`), server-persisted.
 - **BLE**: `ble/parse.ts` now extracts Pedal Power Balance (L%) from CPM for the pedal_asymmetry signal (advanced power meters, native build).
 - Engine verified via standalone run (on-target=quiet, fade+cadence=high w/ ERG spiral, safety trip, single-signal=quiet, warm-up grace, W′→0). Advanced pedal dynamics = best-effort (native build only).
+
+## Auto FTP Suggestion — one-tap re-test on repeated power fade (2026-06 fork)
+- Backend `routes/coach.py`: a rolling per-user power-fade watch (`settings` doc id `ftp_watch`, last 6 rides). On each `/coach/debrief`, `_update_ftp_watch(ride_id, struggles)` marks the ride "fade" when the struggle detector logged ≥2 power-fade moments (kinds: power_fade / w_prime_low / erg_spiral), idempotent by ride_id.
+  - `GET /coach/ftp-suggestion` → `{suggest, streak, already_scheduled, reason}`; suggests when the trailing fade streak ≥2 AND no FTP test is already upcoming/booked in the last 21 days (no nagging).
+  - `POST /coach/ftp-retest` → schedules an "FTP Test (20 min)" (defaults tomorrow) into `scheduled_workouts`, records a coach adaptation note, and clears the watch.
+- Frontend: `src/lib/coach.ts` `fetchFtpSuggestion`/`scheduleFtpRetest`; `src/lib/summary.ts` `useFtpSuggestion(ready)` hook; `app/summary.tsx` renders `FtpRetestCard` (coach avatar + reason + "Book FTP re-test" + dismiss, testIDs `ftp-retest-card`/`-book`/`-dismiss`) directly under the hero recap when `suggest` is true.
+- Verified via curl (demo account): initial false → 2 fade rides → suggest:true streak:2 with reason → clean ride breaks streak → false; booking schedules + resets; already-scheduled guard confirmed on greenlantern. Lint clean.

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { rideRecorder, RideRoute } from "./ride";
 import { getCoach, COACHES } from "./coach-persona";
+import { fetchFtpSuggestion, scheduleFtpRetest, FtpSuggestion } from "./coach";
 import { getWorkout, buildSegments, targetWatts } from "./workout-catalog";
 
 export type Zone = { z: string; time: string; pct: number; w: number };
@@ -347,6 +348,34 @@ export function useCoachDebrief(stats: SummaryStats, route: RideRoute) {
   }, [stats.duration_sec, stats.avg_power, stats.tss]);
 
   return { debrief, loading };
+}
+
+/** After a fade-heavy ride the coach can offer a one-tap FTP re-test. Fetches
+ * the suggestion once the ride is scored; `book()` schedules it and hides. */
+export function useFtpSuggestion(ready: boolean) {
+  const [suggestion, setSuggestion] = useState<FtpSuggestion | null>(null);
+  const [booked, setBooked] = useState<{ date?: string; note?: string } | null>(null);
+  const persona = COACHES[getCoach()];
+
+  useEffect(() => {
+    if (!ready) return;
+    let alive = true;
+    fetchFtpSuggestion(persona.name).then((s) => { if (alive) setSuggestion(s); });
+    return () => { alive = false; };
+  }, [ready, persona.name]);
+
+  const book = useCallback(async () => {
+    const res = await scheduleFtpRetest(persona.name);
+    if (res.ok) {
+      setBooked({ date: res.date, note: res.note });
+      setSuggestion((s) => (s ? { ...s, suggest: false } : s));
+    }
+    return res;
+  }, [persona.name]);
+
+  const dismiss = useCallback(() => setSuggestion((s) => (s ? { ...s, suggest: false } : s)), []);
+
+  return { show: !!suggestion?.suggest && !booked, suggestion, booked, book, dismiss };
 }
 
 // ---- formatting helpers ----

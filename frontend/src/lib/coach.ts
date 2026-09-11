@@ -61,6 +61,38 @@ export async function fetchCoachCue(t: Telemetry, ctx: CoachContext, timeoutMs =
   }
 }
 
+export type FtpSuggestion = { suggest: boolean; streak: number; already_scheduled: boolean; reason: string };
+
+/** Ask whether the coach should offer an FTP re-test (repeated power fade). */
+export async function fetchFtpSuggestion(coachName = "Alberto"): Promise<FtpSuggestion> {
+  try {
+    const res = await fetch(`${apiBase()}/api/coach/ftp-suggestion?coach_name=${encodeURIComponent(coachName)}`);
+    if (!res.ok) return { suggest: false, streak: 0, already_scheduled: false, reason: "" };
+    const d = await res.json();
+    return {
+      suggest: !!d?.suggest, streak: Number(d?.streak ?? 0),
+      already_scheduled: !!d?.already_scheduled, reason: (d?.reason ?? "").toString(),
+    };
+  } catch {
+    return { suggest: false, streak: 0, already_scheduled: false, reason: "" };
+  }
+}
+
+/** One-tap: schedule an FTP re-test. Returns the scheduled date + coach note. */
+export async function scheduleFtpRetest(coachName = "Alberto"): Promise<{ ok: boolean; date?: string; note?: string }> {
+  try {
+    const res = await fetch(`${apiBase()}/api/coach/ftp-retest`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ coach_name: coachName }),
+    });
+    if (!res.ok) return { ok: false };
+    return await res.json();
+  } catch {
+    return { ok: false };
+  }
+}
+
 export type ExtendPlan = {
   advice: string;
   recommend: "extend" | "finish";
