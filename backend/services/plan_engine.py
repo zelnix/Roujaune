@@ -608,9 +608,10 @@ def _ctr_plan_response(cur, ride_map, prog, weeks=None, plan_doc=None, plan_id="
     if is_ctr:
         weekly_load = [55, 70, 90, 65, 100, 115, 130, 90, 120, 140, 160, 110, 150, 170, 195, 120]
         description = "A 16-week beginner plan to build endurance, confidence and cycling skills from your very first ride to a 90-minute achievement ride."
-        goals = [{"id": "g1", "title": "Ride Three Times a Week", "description": "Build a consistent routine", "status": "incomplete"},
-                 {"id": "g2", "title": "Ride 40 Minutes Continuously", "description": "Grow your endurance base", "status": "incomplete"},
-                 {"id": "g3", "title": "Smooth Cadence & Pacing", "description": "Control your effort", "status": "incomplete"}]
+        goals = pdoc.get("goals") or [
+            {"id": "g1", "title": "Ride Three Times a Week", "description": "Build a consistent routine", "status": "incomplete"},
+            {"id": "g2", "title": "Ride 40 Minutes Continuously", "description": "Grow your endurance base", "status": "incomplete"},
+            {"id": "g3", "title": "Smooth Cadence & Pacing", "description": "Control your effort", "status": "incomplete"}]
     else:
         weekly_load = [sum(int(dd.get("tss", 0) or 0) for dd in weeks_map[n]["days"] if dd["kind"] == "cycling") for n in sorted(weeks_map)]
         description = pdoc.get("description", "")

@@ -954,6 +954,90 @@ async def _move_session(plan_id: str, src: date, dst: date) -> dict:
             "note": f"Moved '{title}' to {dst.isoformat()} (swapped with that day). Undo any time."}
 
 
+async def _set_ftp(value: int) -> dict:
+    v = max(50, min(600, int(value)))
+    await udb.settings.update_one({"id": "app"}, {"$set": {"ftp": v}}, upsert=True)
+    return {"ok": True, "ftp": v, "note": f"set your FTP to {v} W — your power zones now recalculate around it."}
+
+
+async def _add_goal(plan_id: str, title: str) -> dict:
+    import uuid as _uuid
+    t = (title or "").strip()[:120]
+    if not t:
+        return {"ok": False, "note": "Ask the rider what the goal should be."}
+    added = {"id": _uuid.uuid4().hex[:8], "title": t, "description": "", "status": "incomplete"}
+    d = await _rider_plan_def(plan_id)
+    goals = list((d or {}).get("goals") or [])
+    if not goals:
+        # Seed from the plan's currently-visible goals so defaults aren't lost.
+        try:
+            cur = await get_plan(id=plan_id)
+            goals = list(cur.get("goals") or [])
+        except Exception:
+            goals = []
+    goals.append(added)
+    if d is not None:
+        d["goals"] = goals
+        # Persist both the definition (structured plans read pdoc.goals) and the
+        # top-level doc goals (non-structured plans overlay doc.goals).
+        await udb.training_plans.update_one(
+            {"id": plan_id}, {"$set": {"id": plan_id, "definition": d, "goals": goals}}, upsert=True)
+    await udb.plan_state.update_one(
+        {"id": plan_id}, {"$set": {"goals": goals, "goals_updated_at": now_iso()}}, upsert=True)
+    return {"ok": True, "note": f"added a new goal: \u201c{t}\u201d."}
+
+
+async def _set_weekly_days(plan_id: str, days: int) -> dict:
+    d = max(1, min(7, int(days)))
+    await udb.plan_state.update_one({"id": plan_id}, {"$set": {"days_per_week_target": d}}, upsert=True)
+    return {"ok": True, "note": f"set your target to {d} training day{'s' if d > 1 else ''} a week — I'll bias your upcoming weeks toward that."}
+
+
+async def _shift_future_weeks(plan_id: str, days: int) -> bool:
+    d = await _rider_plan_def(plan_id)
+    if not d or not d.get("weeks"):
+        return False
+    await _snapshot_plan_undo(plan_id)
+    today = _ctr_today()
+    for wk in d["weeks"]:
+        try:
+            y, m, dd = (int(x) for x in str(wk.get("start_date", "")).split("-"))
+            ws = date(y, m, dd)
+        except Exception:
+            continue
+        if ws + timedelta(days=6) >= today:
+            wk["start_date"] = (ws + timedelta(days=days)).isoformat()
+    try:
+        sd = _parse_ymd(d.get("start_date"))
+        if sd and sd >= today:
+            d["start_date"] = (sd + timedelta(days=days)).isoformat()
+    except Exception:
+        pass
+    await udb.training_plans.update_one({"id": plan_id}, {"$set": {"id": plan_id, "definition": d}}, upsert=True)
+    return True
+
+
+async def _pause_plan(plan_id: str, weeks: int) -> dict:
+    weeks = max(1, min(12, int(weeks)))
+    if not await _shift_future_weeks(plan_id, weeks * 7):
+        return {"ok": False, "note": "This plan doesn't have dated weeks I can pause."}
+    await udb.plan_state.update_one({"id": plan_id}, {"$set": {"paused_weeks": weeks}}, upsert=True)
+    return {"ok": True, "can_undo": True,
+            "note": f"paused your plan for {weeks} week{'s' if weeks > 1 else ''} — upcoming sessions moved back so you can pick up refreshed."}
+
+
+async def _resume_plan(plan_id: str) -> dict:
+    st = await udb.plan_state.find_one({"id": plan_id}) or {}
+    weeks = int(st.get("paused_weeks") or 0)
+    if weeks <= 0:
+        return {"ok": False, "note": "Your plan isn't paused right now."}
+    if not await _shift_future_weeks(plan_id, -weeks * 7):
+        return {"ok": False, "note": "This plan doesn't have dated weeks to resume."}
+    await udb.plan_state.update_one({"id": plan_id}, {"$unset": {"paused_weeks": ""}}, upsert=True)
+    return {"ok": True, "can_undo": True, "note": "resumed your plan — your upcoming sessions are back on."}
+
+
+
 
 async def _reset_plan_start(plan_id: str, new_start: date) -> dict:
     """Re-anchor the plan to `new_start` and shift everything after it. If the

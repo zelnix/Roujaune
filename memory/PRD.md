@@ -1183,3 +1183,11 @@ User wanted an in-app rating + feedback capture (fb50-style) opened from Setting
 - backend: _SESSION_MOVE_RE/_REST_RE/_SCHEDULE_RE/_UNDO_RE in routes/coach.py; _parse_target_date + _parse_natural_date extended (in N days / N days from now / next week); clarify guardrail blocks missed/companion hijack. can_undo surfaced -> chat Undo button.
 - Confirmed: user changes plan start date via Plan-screen "Change start date" button AND coach chat.
 - REMAINING (user asked to enable all): FTP update/re-test, edit goals & weekly volume, pause/resume plan, change coach persona/style — next batch.
+
+## Round 37 — Completed coach action set (FTP, goals/volume, pause/resume, persona)
+- FTP: "set my FTP to 245" -> _set_ftp (settings.ftp); "let's re-test my FTP [on <day>]" -> schedules FTP Test (20 min).
+- Weekly days: "make it 4 days a week" -> plan_state.days_per_week_target.
+- Goals: "add a goal to ride 100km non-stop" -> _add_goal appends to rider def goals (seeds from visible goals so defaults kept); _ctr_plan_response prefers pdoc.goals; 'goal' excluded from schedule intent.
+- Pause/resume: "pause my plan for 2 weeks" / "resume my plan" -> _pause_plan/_resume_plan shift current+future week dates (undo-able), plan_state.paused_weeks.
+- Coach style: "be tougher/gentler/keep it simple" -> style_override (performance/calm/essential) used for reply + returned as coaching_style; CoachChatModal setCoachStyle persists it.
+- All verified via curl (greenlantern); web bundles clean; lint clean. User picks 1a-e,2b,3a,4a,5a done (rounds 36-37).

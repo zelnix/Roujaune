@@ -40,6 +40,7 @@ router = APIRouter()
 from routes.plan import (  # noqa: E402
     get_plan, WELLNESS_DATA, _reset_plan_start, _parse_ymd, _next_free_day,
     _move_session, _rest_day, _next_planned_ride,
+    _set_ftp, _add_goal, _set_weekly_days, _pause_plan, _resume_plan,
 )
 
 
@@ -436,6 +437,27 @@ def _parse_target_date(msg: str):
     return _parse_natural_date(msg)
 
 
+# FTP, goals, weekly volume, pause/resume and coaching-style intents.
+_FTP_RE = re.compile(r"\bftp\b|\bthreshold power\b|\bftp test\b")
+_GOAL_RE = re.compile(r"\b(add (a |another )?goal|new goal|set (a )?goal|my goal is|goal:|i want to be able to|i'?d like to be able to)\b")
+_DAYS_RE = re.compile(r"\b(\d)\s*days?\s*(a|per|each)\s*week\b|\b(make it|do|train|ride)\s+(\d)\s+days?\b")
+_PAUSE_RE = re.compile(r"\b(pause|freeze|put (my|the) plan on hold|take a (break|week off)|hold (my|the) plan)\b")
+_RESUME_RE = re.compile(r"\b(resume|unpause|un-?pause|pick (it|the plan|things) back up|continue (my|the) plan|start again after)\b")
+_STYLE_RE = re.compile(r"\b(tougher|harder|stricter|push me harder|be tough|gentler|easier on me|softer|calmer|more relaxed|less intense|keep it simple|minimal|no.?nonsense)\b")
+_STYLE_MAP = [
+    ("performance", ("tougher", "harder", "stricter", "push me", "be tough", "no-nonsense", "nononsense")),
+    ("calm", ("gentler", "easier on me", "softer", "calmer", "more relaxed", "less intense")),
+    ("essential", ("keep it simple", "minimal")),
+]
+
+
+def _map_style(m: str):
+    for style, keys in _STYLE_MAP:
+        if any(k in m for k in keys):
+            return style
+    return None
+
+
 
 
 # ----------------------- Rider domain moved to routes/rider.py --------------
@@ -560,6 +582,7 @@ async def coach_chat(req: CoachChatRequest):
     plan_updated = False
     can_undo = False
     clarify = ""
+    style_override = None
 
     _ml = (req.message or "").lower()
     # Reset the plan start date from chat ("restart my plan Monday", "reset the
@@ -627,7 +650,7 @@ async def coach_chat(req: CoachChatRequest):
             logging.warning("chat session-move failed")
 
     # Schedule a workout on a day ("add a recovery ride Thursday").
-    if not plan_updated and _SCHEDULE_RE.search(_ml):
+    if not plan_updated and _SCHEDULE_RE.search(_ml) and "goal" not in _ml:
         try:
             plan_id = await _active_plan_id()
             today = datetime.now(timezone.utc).date()
@@ -668,6 +691,109 @@ async def coach_chat(req: CoachChatRequest):
                 clarify = "There's no recent plan change to undo — let the rider know kindly."
         except Exception:
             logging.warning("chat undo failed")
+
+    # Set FTP or schedule an FTP re-test.
+    if not plan_updated and not clarify and _FTP_RE.search(_ml):
+        try:
+            plan_id = await _active_plan_id()
+            num = re.search(r"(\d{2,3})", _ml)
+            wants_test = any(k in _ml for k in ("test", "re-test", "retest", "re test"))
+            if num and not wants_test and any(k in _ml for k in ("set", "change", "update", "is ", "to ", "my ftp", "=")):
+                res = await _set_ftp(int(num.group(1)))
+                if res.get("ok"):
+                    plan_updated = True
+                    applied_note = res["note"]
+                    await _record_adaptation(plan_id or "none", req.coach_name, f"I {res['note']}", "FTP updated")
+            elif wants_test:
+                today = datetime.now(timezone.utc).date()
+                when = _parse_natural_date(req.message) or (today + timedelta(days=1))
+                await udb.scheduled_workouts.insert_one({
+                    "id": uuid.uuid4().hex, "type": "cycling", "workout_id": "", "title": "FTP Test (20 min)",
+                    "duration": "1h 00m", "tss": "", "zone": "Z4", "color": "red",
+                    "date": when.isoformat(), "status": "scheduled", "created_by": req.coach_name,
+                })
+                plan_updated = True
+                applied_note = f"scheduled an FTP re-test for {when.isoformat()} (20-min effort). Warm up well and go steady-hard."
+                await _record_adaptation(plan_id or "none", req.coach_name, f"I {applied_note}", "FTP re-test")
+            else:
+                clarify = "The rider mentioned FTP but didn't give a number or ask for a test — ask if they want to set a value or schedule a re-test."
+        except Exception:
+            logging.warning("chat ftp intent failed")
+
+    # Set weekly training days ("make it 4 days a week").
+    if not plan_updated and not clarify and _DAYS_RE.search(_ml):
+        try:
+            plan_id = await _active_plan_id()
+            mm = _DAYS_RE.search(_ml)
+            n = mm.group(1) or mm.group(4)
+            if plan_id and plan_id != "none" and n:
+                res = await _set_weekly_days(plan_id, int(n))
+                if res.get("ok"):
+                    plan_updated = True
+                    applied_note = res["note"]
+                    await _record_adaptation(plan_id, req.coach_name, f"I {res['note']}", "Weekly volume")
+        except Exception:
+            logging.warning("chat weekly-days intent failed")
+
+    # Add a training goal.
+    if not plan_updated and not clarify and _GOAL_RE.search(_ml):
+        try:
+            plan_id = await _active_plan_id()
+            m = re.split(r"\b(goal is|goal:|be able to|add (?:a |another )?goal(?:\s+of|\s+to)?|new goal(?:\s+of|\s+to)?)\b", req.message, maxsplit=1, flags=re.I)
+            goal_txt = m[-1].strip(" :.-\u2013") if len(m) > 1 else ""
+            if plan_id and plan_id != "none" and len(goal_txt) >= 3:
+                res = await _add_goal(plan_id, goal_txt)
+                if res.get("ok"):
+                    plan_updated = True
+                    applied_note = res["note"]
+                    await _record_adaptation(plan_id, req.coach_name, f"I {res['note']}", "Goal added")
+            else:
+                clarify = "The rider wants to set a goal but it's unclear — ask them to state the goal in a few words."
+        except Exception:
+            logging.warning("chat goal intent failed")
+
+    # Pause / resume the whole plan.
+    if not plan_updated and not clarify and _PAUSE_RE.search(_ml):
+        try:
+            plan_id = await _active_plan_id()
+            wm = re.search(r"(\d+)\s*week", _ml)
+            weeks = int(wm.group(1)) if wm else 1
+            if plan_id and plan_id != "none":
+                res = await _pause_plan(plan_id, weeks)
+                if res.get("ok"):
+                    plan_updated = True
+                    can_undo = res.get("can_undo", True)
+                    applied_note = res["note"]
+                    await _record_adaptation(plan_id, req.coach_name, f"I {res['note']}", "Plan paused")
+                else:
+                    clarify = res.get("note") or ""
+        except Exception:
+            logging.warning("chat pause intent failed")
+
+    if not plan_updated and not clarify and _RESUME_RE.search(_ml):
+        try:
+            plan_id = await _active_plan_id()
+            if plan_id and plan_id != "none":
+                res = await _resume_plan(plan_id)
+                if res.get("ok"):
+                    plan_updated = True
+                    can_undo = res.get("can_undo", True)
+                    applied_note = res["note"]
+                    await _record_adaptation(plan_id, req.coach_name, f"I {res['note']}", "Plan resumed")
+                else:
+                    clarify = res.get("note") or ""
+        except Exception:
+            logging.warning("chat resume intent failed")
+
+    # Switch coaching tone ("be tougher on me", "keep it gentler").
+    if not plan_updated and not clarify and _STYLE_RE.search(_ml):
+        st = _map_style(_ml)
+        if st:
+            style_override = st
+            plan_updated = True
+            labels = {"performance": "tougher, performance-focused", "calm": "gentler and calmer", "essential": "simple and minimal", "balanced": "balanced"}
+            applied_note = f"switched my coaching tone to {labels.get(st, st)} from now on."
+
 
 
     # Missed workout: skip or reschedule the most recent missed session.
@@ -746,7 +872,7 @@ async def coach_chat(req: CoachChatRequest):
         chat = LlmChat(
             api_key=key,
             session_id=cid,
-            system_message=coach_chat_system(req.coach_name, req.coach_gender, req.coaching_style),
+            system_message=coach_chat_system(req.coach_name, req.coach_gender, style_override or req.coaching_style),
         ).with_model("anthropic", "claude-sonnet-4-6")
         reply = await chat.send_message(UserMessage(text=prompt))
         reply = (reply or "").strip().strip('"')
@@ -769,7 +895,8 @@ async def coach_chat(req: CoachChatRequest):
         logging.warning("coach chat persist failed")
 
     return {"reply": reply, "user_message": user_msg, "coach_message": coach_msg,
-            "plan_updated": plan_updated, "plan_change": applied_note, "can_undo": can_undo}
+            "plan_updated": plan_updated, "plan_change": applied_note, "can_undo": can_undo,
+            "coaching_style": style_override}
 
 
 @router.get("/coach/weekly-note")

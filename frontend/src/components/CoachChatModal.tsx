@@ -9,6 +9,7 @@ import { C } from "./plan";
 import { CoachPersona, useCoachStyle } from "../lib/coach-persona";
 import { ChatMessage, fetchChatHistory, sendChatMessage, clearChatHistory, CHAT_SUGGESTIONS, fetchLatestRide, LatestRide } from "../lib/coach-chat";
 import { notifyPlanChanged, undoReschedule } from "../lib/plan";
+import { setCoachStyle, CoachStyle } from "../lib/coach-persona";
 import { useCoachSpeech } from "../hooks/useCoachSpeech";
 
 function TypingDots() {
@@ -64,6 +65,7 @@ export function CoachChatModal({ visible, onClose, persona, onPlanUpdated, seedM
       if (res.plan_updated) {
         setPlanNotice(res.plan_change || "Your plan was updated");
         setCanUndo(!!res.can_undo);
+        if (res.coaching_style) setCoachStyle(res.coaching_style as CoachStyle);
         notifyPlanChanged();
         onPlanUpdated?.();
       }
