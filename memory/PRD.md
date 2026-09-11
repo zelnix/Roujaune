@@ -1173,3 +1173,13 @@ User wanted an in-app rating + feedback capture (fb50-style) opened from Setting
 - MISSED WORKOUT PROMPT: MissedWorkoutBanner is now an interactive "skip or reschedule?" card (Skip / Reschedule to <suggested day>) hitting /api/rider/missed/resolve; home-notices.ts adds resolveMissed + refresh. Verified in-browser.
 - UNDO RESCHEDULE: _reset_plan_start snapshots full prev definition+state into plan_undo; POST /api/plan/undo-reschedule restores it; can_undo surfaced in /plan/start-date + coach/chat. Frontend: plan.ts resetPlanStart/undoReschedule; Undo button in CoachChatModal plan notice + Undo toast on Plan screen. Verified via curl round-trip.
 - PLAN RESET BUTTON: new "Change start date" button on Plan header -> ChangeStartDateModal (web+native-safe stepper + Tomorrow/Next Monday/In 2 weeks chips, past-date guard) -> resetPlanStart -> live re-anchor + Undo toast. Verified in-browser.
+
+## Round 36 — Coach can action single-session changes from chat
+- NEW coach chat actions on the rider's plan (all undo-able, live-refresh, ask-if-unsure guardrail):
+  - Move a planned ride to another day ("move my next workout to tomorrow / in 2 days / Friday") — swaps onto target day (routes/plan.py _move_session).
+  - Cancel / rest day ("cancel today's ride", "change my next ride to a rest day") — _rest_day.
+  - Schedule a workout ("add a recovery ride on Thursday") — inserts into scheduled_workouts.
+  - Undo ("undo that") — reverts last change.
+- backend: _SESSION_MOVE_RE/_REST_RE/_SCHEDULE_RE/_UNDO_RE in routes/coach.py; _parse_target_date + _parse_natural_date extended (in N days / N days from now / next week); clarify guardrail blocks missed/companion hijack. can_undo surfaced -> chat Undo button.
+- Confirmed: user changes plan start date via Plan-screen "Change start date" button AND coach chat.
+- REMAINING (user asked to enable all): FTP update/re-test, edit goals & weekly volume, pause/resume plan, change coach persona/style — next batch.

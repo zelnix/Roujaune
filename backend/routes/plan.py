@@ -852,6 +852,109 @@ async def _rebase_plan_def(plan_id: str, new_start: date, override_weeks: Option
     return True
 
 
+# ---- single-session edits the coach can action from chat ------------------
+_DAY_CONTENT = ("kind", "title", "focus", "workout_id", "tss", "duration", "zone")
+
+
+async def _snapshot_plan_undo(plan_id: str):
+    """Capture the rider's current plan state/definition so any single edit is
+    undoable via /plan/undo-reschedule."""
+    import copy
+    structured = plan_id in STRUCTURED_PLAN_IDS or plan_id.startswith("custom-")
+    prev_state = await udb.plan_state.find_one({"id": plan_id}) or {}
+    prev_def = await _rider_plan_def(plan_id) if structured else None
+    await udb.plan_undo.update_one({"id": plan_id}, {"$set": {
+        "id": plan_id,
+        "prev_start_date": prev_state.get("start_date"),
+        "prev_current_week": prev_state.get("current_week"),
+        "prev_duration_override": prev_state.get("duration_weeks_override"),
+        "prev_def": copy.deepcopy(prev_def) if prev_def else None,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }}, upsert=True)
+
+
+def _def_day_by_date(d: dict, iso: str):
+    for wk in d.get("weeks", []) or []:
+        try:
+            y, m, dd = (int(x) for x in str(wk.get("start_date", "")).split("-"))
+            ws = date(y, m, dd)
+        except Exception:
+            continue
+        for i, day in enumerate(wk.get("days", []) or []):
+            if (ws + timedelta(days=i)).isoformat() == iso:
+                return wk, i, day
+    return None, None, None
+
+
+def _next_cycling_day(d: dict, from_date: date):
+    best = None
+    for wk in d.get("weeks", []) or []:
+        try:
+            y, m, dd = (int(x) for x in str(wk.get("start_date", "")).split("-"))
+            ws = date(y, m, dd)
+        except Exception:
+            continue
+        for i, day in enumerate(wk.get("days", []) or []):
+            dt = ws + timedelta(days=i)
+            if day.get("kind") == "cycling" and dt >= from_date:
+                if best is None or dt < best[0]:
+                    best = (dt, wk, i, day)
+    return best
+
+
+async def _next_planned_ride(plan_id: str, from_date: date):
+    d = await _rider_plan_def(plan_id)
+    if not d:
+        return None
+    nb = _next_cycling_day(d, from_date)
+    return nb[0] if nb else None
+
+
+async def _rest_day(plan_id: str, target: date, label: str = "rest") -> dict:
+    """Convert the plan day on `target` into a rest/recovery day (cancel a ride)."""
+    d = await _rider_plan_def(plan_id)
+    if not d or not d.get("weeks"):
+        return {"ok": False, "note": "This plan doesn't have dated sessions I can change."}
+    wk, i, day = _def_day_by_date(d, target.isoformat())
+    if not day:
+        return {"ok": False, "note": f"There's no session on {target.isoformat()} to change."}
+    await _snapshot_plan_undo(plan_id)
+    was = day.get("title") or "workout"
+    day["kind"] = "rest"
+    day["title"] = "Rest & Recovery"
+    day["focus"] = "Recovery"
+    for k in ("workout_id", "tss", "duration", "zone"):
+        day.pop(k, None)
+    await udb.training_plans.update_one({"id": plan_id}, {"$set": {"id": plan_id, "definition": d}}, upsert=True)
+    verb = "Cancelled" if label == "cancel" else "Turned into a rest day"
+    return {"ok": True, "can_undo": True,
+            "note": f"{verb}: your '{was}' on {target.isoformat()} is now a rest day. Recovery is part of getting stronger."}
+
+
+async def _move_session(plan_id: str, src: date, dst: date) -> dict:
+    """Swap the session on `src` with the day on `dst` (moves a ride to another day)."""
+    d = await _rider_plan_def(plan_id)
+    if not d or not d.get("weeks"):
+        return {"ok": False, "note": "This plan doesn't have dated sessions I can move."}
+    _, _, sday = _def_day_by_date(d, src.isoformat())
+    _, _, tday = _def_day_by_date(d, dst.isoformat())
+    if not sday:
+        return {"ok": False, "note": f"There's no session on {src.isoformat()} to move."}
+    if not tday:
+        return {"ok": False, "note": f"{dst.isoformat()} is outside your plan — pick a day inside it."}
+    await _snapshot_plan_undo(plan_id)
+    title = sday.get("title") or "your session"
+    src_content = {k: sday.get(k) for k in _DAY_CONTENT}
+    dst_content = {k: tday.get(k) for k in _DAY_CONTENT}
+    for k in _DAY_CONTENT:
+        sday[k] = dst_content.get(k)
+        tday[k] = src_content.get(k)
+    await udb.training_plans.update_one({"id": plan_id}, {"$set": {"id": plan_id, "definition": d}}, upsert=True)
+    return {"ok": True, "can_undo": True,
+            "note": f"Moved '{title}' to {dst.isoformat()} (swapped with that day). Undo any time."}
+
+
+
 async def _reset_plan_start(plan_id: str, new_start: date) -> dict:
     """Re-anchor the plan to `new_start` and shift everything after it. If the
     plan has a hard event date, keep that fixed and COMPRESS the plan to fit
