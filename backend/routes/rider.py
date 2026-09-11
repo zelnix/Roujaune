@@ -420,8 +420,9 @@ async def get_rider_achievements():
 
 # ----------------------- Readiness / level / check-in -----------------------
 async def _enrich_activity(payload: dict) -> dict:
-    """Fill training load from real ride history when the client did not supply
-    it (so readiness reflects recent Roujaune activity)."""
+    """Fill training load + personal HR/HRV baseline from real ride & check-in
+    history when the client did not supply it, so readiness reflects recent
+    Roujaune activity and the rider's own trend rather than a fixed number."""
     out = dict(payload)
     if not out.get("activity"):
         try:
@@ -435,6 +436,23 @@ async def _enrich_activity(payload: dict) -> dict:
             chronic = tss_since(28) / 4.0
             if chronic > 0:
                 out["activity"] = {"acute_load": acute, "chronic_load": chronic}
+        except Exception:
+            pass
+    if not out.get("baseline"):
+        try:
+            cutoff = (date.today() - timedelta(days=14)).isoformat()
+            history = await udb.daily_checkins.find(
+                {"date": {"$gte": cutoff}, "id": {"$nin": ["latest"]}}
+            ).to_list(length=30)
+            hrvs = [float((c.get("checkin") or {})["hrv"]) for c in history if (c.get("checkin") or {}).get("hrv")]
+            rhrs = [float((c.get("checkin") or {})["resting_hr"]) for c in history if (c.get("checkin") or {}).get("resting_hr")]
+            baseline: Dict[str, float] = {}
+            if len(hrvs) >= 3:
+                baseline["hrv_7d"] = sum(hrvs) / len(hrvs)
+            if len(rhrs) >= 3:
+                baseline["resting_hr_7d"] = sum(rhrs) / len(rhrs)
+            if baseline:
+                out["baseline"] = baseline
         except Exception:
             pass
     return out
@@ -475,9 +493,24 @@ def _checkin_metrics(c: dict) -> list:
     return out
 
 
+async def _downgrade_preview_safe() -> dict:
+    """Best-effort wrapper around plan.py's readiness-downgrade preview — a
+    domain-crossing helper kept local so a plan-side failure never breaks the
+    check-in flow itself."""
+    try:
+        from routes.plan import _readiness_downgrade_preview
+        return await _readiness_downgrade_preview()
+    except Exception:
+        logging.warning("readiness downgrade preview failed")
+        return {"available": False}
+
+
 @router.post("/rider/checkin")
 async def rider_checkin(payload: dict):
-    """Store today's daily check-in and return the computed readiness score."""
+    """Store today's daily check-in, return the computed readiness score, and —
+    hybrid coaching model — surface (never auto-apply) a one-tap suggestion to
+    ease off today's session when the rider's own signals, including a
+    manually logged HRV or resting HR, are running low."""
     payload = payload or {}
     enriched = await _enrich_activity(payload)
     result = compute_readiness(enriched)
@@ -505,20 +538,27 @@ async def rider_checkin(payload: dict):
         "equipmentChanged": equipment_changed,
         "date": d,
         "at": now_iso(),
+        # Reset per-day so a stale accept/dismiss from a previous check-in
+        # never carries forward and silently hides today's suggestion.
+        "downgrade_applied": False,
+        "downgrade_dismissed": False,
     }
     try:
         await udb.daily_checkins.update_one({"id": "latest"}, {"$set": {**doc, "id": "latest"}}, upsert=True)
         await udb.daily_checkins.update_one({"id": d}, {"$set": {**doc, "id": d}}, upsert=True)
     except Exception:
         logging.warning("checkin persist failed")
-    return {**result, "date": d}
+    downgrade = await _downgrade_preview_safe()
+    return {**result, "date": d, "downgrade": downgrade}
 
 
 @router.get("/rider/readiness/today")
 async def rider_readiness_today():
-    """Return the latest stored daily check-in readiness (or unavailable)."""
+    """Return the latest stored daily check-in readiness (or unavailable),
+    plus today's coach downgrade suggestion, if any."""
     doc = await udb.daily_checkins.find_one({"id": "latest"})
     if not doc:
         return {"available": False}
     doc.pop("_id", None)
-    return {"available": True, **doc}
+    downgrade = await _downgrade_preview_safe()
+    return {"available": True, **doc, "downgrade": downgrade}

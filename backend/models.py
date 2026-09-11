@@ -246,7 +246,9 @@ class MoveSessionRequest(BaseModel):
 
 
 class StartDateRequest(BaseModel):
-    start_date: str  # YYYY-MM-DD — new anchor day for the plan
+    # Optional because /plan/undo-reschedule reuses this model but only needs
+    # plan_id — /plan/start-date (which actually reschedules) always sends it.
+    start_date: str = ""  # YYYY-MM-DD — new anchor day for the plan
     plan_id: str = ""
 
 

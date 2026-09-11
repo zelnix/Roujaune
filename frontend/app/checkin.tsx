@@ -6,7 +6,7 @@ import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { colors, radius, spacing } from "@/src/theme";
-import { submitCheckin, readinessTone, ReadinessResult } from "@/src/lib/checkin";
+import { submitCheckin, readinessTone, ReadinessResult, acceptReadinessDowngrade, dismissReadinessDowngrade } from "@/src/lib/checkin";
 import { useCoach } from "@/src/lib/coach-persona";
 
 const SCALE_LABELS: Record<string, [string, string]> = {
@@ -78,6 +78,11 @@ export default function CheckinScreen() {
   const [flags, setFlags] = React.useState<Record<string, boolean>>({});
   const [saving, setSaving] = React.useState(false);
   const [result, setResult] = React.useState<ReadinessResult | null>(null);
+  const [showHrv, setShowHrv] = React.useState(false);
+  const [hrv, setHrv] = React.useState<number | null>(null);
+  const [restingHr, setRestingHr] = React.useState<number | null>(null);
+  const [downgradeChoice, setDowngradeChoice] = React.useState<"accept" | "keep" | null>(null);
+  const [downgradeBusy, setDowngradeBusy] = React.useState(false);
 
   const toggleSymptom = (k: string) => setSymptoms((s) => ({ ...s, [k]: !s[k] }));
   const toggleFlag = (k: string) => setFlags((f) => ({ ...f, [k]: !f[k] }));
@@ -95,6 +100,8 @@ export default function CheckinScreen() {
           soreness: ((soreness - 1) / 4) * 10,
           stress: ((stress - 1) / 4) * 10,
           motivation: motivation * 2,
+          ...(hrv != null ? { hrv } : {}),
+          ...(restingHr != null ? { resting_hr: restingHr } : {}),
         },
         symptoms: activeSymptoms,
         flags: activeFlags,
@@ -103,6 +110,30 @@ export default function CheckinScreen() {
       setResult(r);
     } catch {
       setSaving(false);
+    }
+  };
+
+  const onAcceptDowngrade = async () => {
+    setDowngradeBusy(true);
+    try {
+      await acceptReadinessDowngrade();
+      setDowngradeChoice("accept");
+    } catch {
+      /* keep the offer visible so the rider can retry */
+    } finally {
+      setDowngradeBusy(false);
+    }
+  };
+
+  const onKeepPlanned = async () => {
+    setDowngradeBusy(true);
+    try {
+      await dismissReadinessDowngrade();
+    } catch {
+      /* non-critical — banner just won't be re-suppressed */
+    } finally {
+      setDowngradeChoice("keep");
+      setDowngradeBusy(false);
     }
   };
 
@@ -141,6 +172,40 @@ export default function CheckinScreen() {
               {result.safetyOverride ? (
                 <Text style={styles.safetyNote}>You reported a symptom that needs care. Please rest today and consider speaking with a medical professional before training.</Text>
               ) : null}
+
+              {result.downgrade?.available && downgradeChoice === null ? (
+                <View style={styles.suggestCard} testID="downgrade-suggestion">
+                  <View style={styles.suggestHeader}>
+                    <Ionicons name="sparkles" size={15} color={colors.yellow} />
+                    <Text style={styles.suggestTitle}>{coach.name}&apos;s suggestion</Text>
+                  </View>
+                  <Text style={styles.suggestBody}>
+                    Swap today&apos;s <Text style={styles.suggestStrong}>{result.downgrade.current?.title}</Text> for a{" "}
+                    <Text style={styles.suggestStrong}>{result.downgrade.suggested?.title}</Text> ({result.downgrade.suggested?.duration})? {result.downgrade.reason}
+                  </Text>
+                  <View style={styles.suggestActions}>
+                    <Pressable testID="downgrade-accept" onPress={onAcceptDowngrade} disabled={downgradeBusy} style={[styles.suggestAcceptBtn, downgradeBusy && { opacity: 0.6 }]}>
+                      {downgradeBusy ? <ActivityIndicator color="#241B00" /> : <Text style={styles.suggestAcceptText}>Yes, ease off today</Text>}
+                    </Pressable>
+                    <Pressable testID="downgrade-keep" onPress={onKeepPlanned} disabled={downgradeBusy} style={styles.suggestKeepBtn}>
+                      <Text style={styles.suggestKeepText}>Keep as planned</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : null}
+              {downgradeChoice === "accept" ? (
+                <View style={styles.suggestConfirm} testID="downgrade-confirm-accept">
+                  <Ionicons name="checkmark-circle" size={16} color={colors.green} />
+                  <Text style={styles.suggestConfirmText}>Done — today&apos;s ride is now a Recovery Spin.</Text>
+                </View>
+              ) : null}
+              {downgradeChoice === "keep" ? (
+                <View style={styles.suggestConfirm} testID="downgrade-confirm-keep">
+                  <Ionicons name="checkmark-circle-outline" size={16} color={colors.textDim} />
+                  <Text style={styles.suggestConfirmText}>Got it — keeping today&apos;s session as planned.</Text>
+                </View>
+              ) : null}
+
               <Pressable testID="checkin-done" onPress={goBack} style={styles.primaryBtn}>
                 <Text style={styles.primaryBtnText}>Done</Text>
               </Pressable>
@@ -175,6 +240,50 @@ export default function CheckinScreen() {
                 <Scale label="Leg soreness" hint={SCALE_LABELS.soreness} value={soreness} onChange={setSoreness} />
                 <Scale label="Stress" hint={SCALE_LABELS.stress} value={stress} onChange={setStress} />
               </View>
+            </View>
+
+            {/* Optional manual HRV / resting HR for riders without a wearable */}
+            <View style={styles.field}>
+              <Pressable
+                testID="hrv-toggle"
+                onPress={() => setShowHrv((v) => !v)}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: showHrv }}
+                style={styles.hrvToggle}
+              >
+                <Ionicons name={showHrv ? "chevron-up" : "pulse-outline"} size={16} color={colors.yellow} />
+                <Text style={styles.hrvToggleText}>{showHrv ? "Hide HRV & resting HR" : "I know my HRV / resting HR"}</Text>
+              </Pressable>
+              {showHrv ? (
+                <View style={styles.hrvRow}>
+                  <View style={styles.hrvCol}>
+                    <Text style={styles.fieldLabel}>HRV (ms)</Text>
+                    <View style={styles.stepper}>
+                      <Pressable testID="hrv-minus" onPress={() => setHrv((h) => Math.max(15, (h ?? 55) - 1))} style={styles.stepBtn}>
+                        <Ionicons name="remove" size={20} color={colors.white} />
+                      </Pressable>
+                      <Text style={styles.stepValueSm}>{hrv ?? "—"}</Text>
+                      <Pressable testID="hrv-plus" onPress={() => setHrv((h) => Math.min(150, (h ?? 55) + 1))} style={styles.stepBtn}>
+                        <Ionicons name="add" size={20} color={colors.white} />
+                      </Pressable>
+                    </View>
+                  </View>
+                  <View style={styles.hrvCol}>
+                    <Text style={styles.fieldLabel}>Resting HR (bpm)</Text>
+                    <View style={styles.stepper}>
+                      <Pressable testID="rhr-minus" onPress={() => setRestingHr((h) => Math.max(35, (h ?? 60) - 1))} style={styles.stepBtn}>
+                        <Ionicons name="remove" size={20} color={colors.white} />
+                      </Pressable>
+                      <Text style={styles.stepValueSm}>{restingHr ?? "—"}</Text>
+                      <Pressable testID="rhr-plus" onPress={() => setRestingHr((h) => Math.min(110, (h ?? 60) + 1))} style={styles.stepBtn}>
+                        <Ionicons name="add" size={20} color={colors.white} />
+                      </Pressable>
+                    </View>
+                  </View>
+                </View>
+              ) : (
+                <Text style={styles.flagHint}>No wearable? No problem — leave this and {coach.name} will use the rest of your answers.</Text>
+              )}
             </View>
 
             {/* Safety symptoms */}
@@ -252,6 +361,12 @@ const styles = StyleSheet.create({
   stepper: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   stepBtn: { width: 52, height: 48, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
   stepValue: { color: colors.white, fontSize: 22, fontWeight: "800" },
+  stepValueSm: { color: colors.white, fontSize: 18, fontWeight: "800", minWidth: 36, textAlign: "center" },
+
+  hrvToggle: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 44 },
+  hrvToggleText: { color: colors.white, fontSize: 13.5, fontWeight: "700" },
+  hrvRow: { flexDirection: "row", gap: 14, marginTop: 10 },
+  hrvCol: { flex: 1 },
 
   symptomWrap: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   symptomChip: { flexDirection: "row", alignItems: "center", gap: 7, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: colors.border, minHeight: 44 },
@@ -279,4 +394,17 @@ const styles = StyleSheet.create({
   factorRow: { flexDirection: "row", alignItems: "center", gap: 9 },
   factorText: { color: colors.white, fontSize: 13.5, fontWeight: "600", flex: 1 },
   safetyNote: { color: colors.textDim, fontSize: 13, lineHeight: 19, textAlign: "center", marginVertical: 6 },
+
+  suggestCard: { alignSelf: "stretch", backgroundColor: "rgba(245,179,1,0.08)", borderWidth: 1, borderColor: colors.yellow, borderRadius: radius.md, padding: spacing.md, marginVertical: 6, gap: 10 },
+  suggestHeader: { flexDirection: "row", alignItems: "center", gap: 7 },
+  suggestTitle: { color: colors.yellow, fontSize: 13, fontWeight: "800" },
+  suggestBody: { color: colors.white, fontSize: 13.5, lineHeight: 19 },
+  suggestStrong: { fontWeight: "800" },
+  suggestActions: { flexDirection: "row", gap: 10, flexWrap: "wrap" },
+  suggestAcceptBtn: { flex: 1, minWidth: 140, minHeight: 44, borderRadius: 11, backgroundColor: colors.yellow, alignItems: "center", justifyContent: "center", paddingHorizontal: 12 },
+  suggestAcceptText: { color: "#241B00", fontSize: 13, fontWeight: "800" },
+  suggestKeepBtn: { flex: 1, minWidth: 120, minHeight: 44, borderRadius: 11, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center", paddingHorizontal: 12 },
+  suggestKeepText: { color: colors.white, fontSize: 13, fontWeight: "700" },
+  suggestConfirm: { flexDirection: "row", alignItems: "center", gap: 8, alignSelf: "stretch", justifyContent: "center", marginVertical: 4 },
+  suggestConfirmText: { color: colors.textDim, fontSize: 12.5, fontWeight: "600" },
 });

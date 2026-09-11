@@ -1,0 +1,73 @@
+{
+  "summary": "Tested the new Pre-Ride Readiness Check / downgrade-suggestion feature end-to-end via backend pytest + live UI (demo@roujaune.app). Found a CRITICAL root-cause bug: the downgrade suggestion can NEVER trigger for any real rider/plan combination in the app as currently seeded, because of a zone-label + data-shape mismatch between _readiness_downgrade_preview() and the actual plan definitions. All other pieces (HRV/RHR steppers, checkin UI, safety-override precedence, ReadinessGate rendering, accept/dismiss/undo wiring) work correctly in isolation but are unreachable in practice.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "services/routes/plan.py::_readiness_downgrade_preview (feeds /api/rider/checkin, /api/rider/readiness/today, /api/plan/readiness-suggestion, ReadinessGate)",
+        "issue": "Downgrade suggestion is unreachable for every plan in the app: (1) The demo rider's assigned plan 'build-and-climb' (BUILD_AND_CLIMB in plan_engine.py) has NO 'weeks' key with dated days at all — it only has a static 'workouts' list and a hardcoded, date-frozen CALENDAR_WEEK fixture (2025-05-12..18) used purely for display. `_def_day_by_date(d, today_iso)` therefore always returns None for this plan, so `_readiness_downgrade_preview()` always returns available:false regardless of readiness score. (2) The 3 plans that DO have dated 'weeks' (couch-to-road, ride-stronger, ride-beyond — see their .json files) exclusively use 'RPE 1-N' zone labels for every ride, never 'Z1'..'Z5'. `_HARD_ZONES = {'Z3','Z4','Z5'}` in plan.py never matches an RPE label, so `zone not in _HARD_ZONES` is always True and the function bails out with available:false there too. Net effect: for demo (build-and-climb), couch-to-road, ride-stronger and ride-beyond alike, a rider can submit an arbitrarily low readiness score (verified score=19 and score=29 in testing) on a day their calendar clearly shows a hard ride (e.g. Threshold Climb Z4 92TSS for demo), and the coach NEVER offers the swap. Confirmed via curl + pytest + live Playwright run: checkin response, /api/rider/readiness/today, /api/plan/readiness-suggestion and the ReadinessGate banner all consistently show downgrade.available=false in every real scenario tried.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "POST /api/plan/undo-reschedule",
+        "issue": "Requires a StartDateRequest body with a mandatory `start_date` field even though undo-reschedule doesn't use a date (it just restores the last plan_undo snapshot). Passing {} returns 422; passing {\"start_date\": \"\"} works around it. Minor API ergonomics issue — the review_request's own step referred to this as a GET, but it's actually POST with a required-but-unused field. Not blocking, but confusing for any client (including the review_request author) that calls it without a body."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Check-in result screen downgrade suggestion (checkin.tsx)",
+        "issue": "downgrade-suggestion card never renders for the demo account (or any structured-plan account) because the backend preview never returns available:true — see backend critical issue above. Frontend code itself is correctly wired (verified `result.downgrade?.available` gating logic renders the card when the flag is true).",
+        "affected_testIDs": ["downgrade-suggestion", "downgrade-accept", "downgrade-keep", "downgrade-confirm-accept", "downgrade-confirm-keep"]
+      },
+      {
+        "flow": "ReadinessGate swap banner on Today screen",
+        "issue": "Same root cause — readiness-gate banner correctly appears for low readiness (verified 'Recovery recommended today', Readiness 29) but never shows the swap-specific copy/buttons since readiness.downgrade.available is always false in practice.",
+        "affected_testIDs": ["gate-swap-accept", "gate-swap-keep"]
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "Today / global layout at 390px mobile viewport",
+        "issues": [
+          "At a 390x844 mobile viewport the app still renders the full desktop left sidebar (Today/Workouts/Virtual Routes/Benchmark/Training Plan/etc. icon rail) instead of a mobile-appropriate layout, squeezing the main content column and causing visible text/image overlap (e.g. coach photo overlapping 'Build & Climb' hero text, see today_screen.png / today_gate.png screenshots). This is a pre-existing layout issue unrelated to the new feature but worth flagging since it affects visibility of the readiness banner area."
+        ]
+      }
+    ],
+    "react_native_issues": []
+  },
+  "verified_working": [
+    "Login with demo@roujaune.app / demo9900 works; Today screen loads and shows a scheduled hard 'Threshold Climb' Z4 92TSS ride for 2025-05-13 (demo's frozen showcase date).",
+    "checkin.tsx new collapsible 'I know my HRV / resting HR' section (hrv-toggle) expands/collapses correctly and reveals hrv-minus/hrv-plus and rhr-minus/rhr-plus steppers (verified via screenshot + testID counts).",
+    "Low readiness check-in (sleep/energy/motivation=1, soreness/stress=5) correctly computes and displays score 29 / 'Rest and Reassess' with correct mainFactors.",
+    "GET /api/rider/readiness/today and POST /api/rider/checkin both include a 'downgrade' object in the response shape as required (always {available:false} in practice, per critical bug above, but the field is present).",
+    "Safety-override precedence regression confirmed via API: submitting a low check-in with symptoms.chest_pain=true returns safetyOverride:true AND downgrade.available:false, and the ReadinessGate/checkin UI shows the 'Please rest today' / safety note instead of any swap suggestion — safety correctly takes precedence.",
+    "Good readiness check-in (all 5s) correctly returns downgrade.available:false and no ReadinessGate banner appears.",
+    "Backend logic itself (zone check, score<55 check, date match, safety/applied/dismissed short-circuits) is internally consistent and would work correctly IF a plan existed with dated weeks using Z3/Z4/Z5 zone labels — verified by code reading of _readiness_downgrade_preview/_apply_readiness_downgrade/_dismiss_readiness_downgrade in plan.py.",
+    "/api/plan/undo-reschedule correctly restores a previous plan_undo snapshot when one exists (200, ok:true) and 404s when none exists."
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_readiness_downgrade.py",
+    "/app/test_reports/pytest/iter_readiness_downgrade.xml"
+  ],
+  "action_items": [
+    "CRITICAL: Fix the zone-label mismatch — either (a) extend _HARD_ZONES / add a parallel RPE-based hard-ride threshold (e.g. RPE 6+) so couch-to-road/ride-stronger/ride-beyond hard days are detected, and/or (b) give 'build-and-climb' a real dated 'weeks' structure (or make _readiness_downgrade_preview fall back to CALENDAR_WEEK-style lookups for build-and-climb specifically) so the demo account — the primary QA/review account per test_credentials.md — can actually exercise this flagship feature.",
+    "Re-run the full review_request test matrix (accept -> plan swap -> undo -> dismiss -> re-check /plan/readiness-suggestion -> ReadinessGate accept) end-to-end once a real hard-ride day is reachable; this agent could only prove the downgrade path works via code review since no live account could reach downgrade.available:true.",
+    "Minor: make /api/plan/undo-reschedule's start_date field optional (Optional[str]) since the endpoint doesn't use it.",
+    "Consider a responsive layout fix for the sidebar navigation on narrow (< 480px) viewports (pre-existing issue, not part of this feature)."
+  ],
+  "critical_code_review_comments": [
+    "_HARD_ZONES = {\"Z3\",\"Z4\",\"Z5\"} in routes/plan.py silently assumes all rider plans use the Z-notation zone scale used only by the non-dated 'build-and-climb' demo plan; the three plans that actually have per-day dates (couch-to-road, ride-stronger, ride-beyond) use an entirely different RPE-range zone label scheme, so this constant never matches real data — a classic 'worked for the one plan I tested with, never touched the others' regression.",
+    "_readiness_downgrade_preview's hard dependency on _rider_plan_def(plan_id).get('weeks') means it silently returns unavailable for any plan lacking a dated weeks[] array (which is exactly the demo/showcase plan) rather than raising or logging a warning — makes this class of bug invisible without directly querying the plan definition."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "78% (7/9 pytest cases passed; 3 skipped due to the critical bug above; 1 pre-existing failure on undo when accept-path was skipped)", "frontend": "core check-in/HRV/safety flows: 100% working; downgrade-suggestion/gate-swap UI: 0% reachable (blocked by backend bug)"},
+  "seed_data_creation": "Created disposable TEST_ registered users during backend probing (ride-stronger/ride-beyond/couch-to-road zone verification) — no persistent seed data added.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Do NOT retest the downgrade-suggestion UI flow until the backend zone/plan-shape mismatch is fixed — it is currently impossible to reach downgrade.available:true with any seeded account (demo, greenlantern, or a fresh registered user on any of the 4 plans). Once fixed, re-use /app/backend/tests/test_readiness_downgrade.py (already has the full accept/undo/dismiss/safety-override coverage) and re-run the Playwright checks used here (login -> /checkin -> submit low readiness -> look for [data-testid=downgrade-suggestion]).",
+  "rca_of_issue": "Root cause: the new downgrade feature was built assuming today's plan day always exposes a 'Z1'-'Z5' style zone field inside a dated weeks[] structure retrievable via _rider_plan_def(). In reality the app has two disjoint plan representations: (1) the demo 'build-and-climb' plan, which is undated/static and only rendered via a separate hardcoded CALENDAR_WEEK fixture, and (2) the three dated structured plans (couch-to-road/ride-stronger/ride-beyond), which do have a dated weeks[] but use an 'RPE 1-N' zone scale, not Z-notation. The new code only correctly targets a plan shape that doesn't exist in the seeded data. Reproduction: log in as demo@roujaune.app, confirm Today shows 'Threshold Climb' Z4 today, submit a very low check-in (sleep/energy/motivation=1, soreness/stress=5) — readinessScore comes back well under 55 (score 29 observed) but downgrade.available is false. Same result for couch-to-road/ride-stronger/ride-beyond test accounts (checked their today's ride zone is always 'RPE x-y')."
+}

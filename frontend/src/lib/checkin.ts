@@ -14,6 +14,18 @@ export type CheckinInput = {
   soreness: number;      // 0–10 (higher = more sore)
   stress: number;        // 0–10 (higher = more stressed)
   motivation: number;    // 0–10
+  hrv?: number;           // ms, optional manual entry
+  resting_hr?: number;    // bpm, optional manual entry
+};
+
+export type DowngradeSuggestion = {
+  available: boolean;
+  reason?: string;
+  score?: number;
+  status?: string;
+  date?: string;
+  current?: { title?: string; zone?: string; tss?: string; duration?: string };
+  suggested?: { title: string; zone: string; tss: string; duration: string; workout_id: string };
 };
 
 export type ReadinessResult = {
@@ -23,6 +35,7 @@ export type ReadinessResult = {
   confidence: string;
   mainFactors: string[];
   date?: string;
+  downgrade?: DowngradeSuggestion;
 };
 
 export type TodayReadiness = {
@@ -35,6 +48,7 @@ export type TodayReadiness = {
   confidence?: string;
   date?: string;
   metrics?: { key: string; label: string; value: number; display: string }[];
+  downgrade?: DowngradeSuggestion;
 };
 
 export async function submitCheckin(payload: {
@@ -92,4 +106,20 @@ export function readinessTone(score?: number, safety?: boolean): Tone {
 /** Whether today's readiness should soften/gate the planned session. */
 export function shouldGate(r: TodayReadiness): boolean {
   return !!r.available && (!!r.safetyOverride || (r.score != null && r.score < 55));
+}
+
+/** One-tap accept: swap today's hard session for the coach's easy recovery
+ * spin suggestion. Hybrid model — this is only ever called after the rider
+ * explicitly taps "accept". */
+export async function acceptReadinessDowngrade(): Promise<{ ok: boolean; note?: string }> {
+  const res = await fetch(`${base()}/api/plan/readiness-suggestion/accept`, { method: "POST" });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return await res.json();
+}
+
+/** Rider chose to keep today's session as planned — stop suggesting it again today. */
+export async function dismissReadinessDowngrade(): Promise<{ ok: boolean }> {
+  const res = await fetch(`${base()}/api/plan/readiness-suggestion/dismiss`, { method: "POST" });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return await res.json();
 }

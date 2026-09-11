@@ -858,11 +858,12 @@ _DAY_CONTENT = ("kind", "title", "focus", "workout_id", "tss", "duration", "zone
 
 async def _snapshot_plan_undo(plan_id: str):
     """Capture the rider's current plan state/definition so any single edit is
-    undoable via /plan/undo-reschedule."""
+    undoable via /plan/undo-reschedule. Captures the definition for ANY plan
+    shape that resolves one (dated week/day plans and flat 'workouts[]'
+    showcase plans alike) — not just the three admin-authored structured plans."""
     import copy
-    structured = plan_id in STRUCTURED_PLAN_IDS or plan_id.startswith("custom-")
     prev_state = await udb.plan_state.find_one({"id": plan_id}) or {}
-    prev_def = await _rider_plan_def(plan_id) if structured else None
+    prev_def = await _rider_plan_def(plan_id)
     await udb.plan_undo.update_one({"id": plan_id}, {"$set": {
         "id": plan_id,
         "prev_start_date": prev_state.get("start_date"),
@@ -952,6 +953,163 @@ async def _move_session(plan_id: str, src: date, dst: date) -> dict:
     await udb.training_plans.update_one({"id": plan_id}, {"$set": {"id": plan_id, "definition": d}}, upsert=True)
     return {"ok": True, "can_undo": True,
             "note": f"Moved '{title}' to {dst.isoformat()} (swapped with that day). Undo any time."}
+
+
+# ---- Pre-ride readiness downgrade — hybrid model: the coach only ever
+# *suggests* this, the rider always taps to accept. -------------------------
+_LEVEL_FOR_CAPABILITY = {"beginner": "Foundation", "intermediate": "Development", "advanced": "Performance"}
+_RECOVERY_SPIN_BY_LEVEL = {
+    "Foundation": {"workout_id": "recovery-spin-foundation", "duration": "25 min", "tss": 9},
+    "Development": {"workout_id": "recovery-spin-development", "duration": "35 min", "tss": 13},
+    "Performance": {"workout_id": "recovery-spin-performance", "duration": "43 min", "tss": 18},
+}
+_HARD_KEYWORDS = ("threshold", "vo2", "vo\u2082", "interval", "sweet spot", "tempo")
+
+
+def _zone_is_hard(zone: Optional[str], title: Optional[str] = "") -> bool:
+    """True for a demanding day, across every zone-labelling scheme our plans
+    use: numeric Z-scale ("Z3"/"Z4"), RPE ranges ("RPE 1\u20138" \u2014 the upper bound
+    is what matters), or — if the label doesn't parse — a hard-effort keyword
+    in the title (Threshold, VO2, Sweet Spot, Tempo, Interval)."""
+    z = str(zone or "").strip().upper()
+    m = re.match(r"^Z(\d+)$", z)
+    if m:
+        return int(m.group(1)) >= 3
+    nums = re.findall(r"\d+", z)
+    if nums:
+        return int(nums[-1]) >= 7
+    return any(k in str(title or "").lower() for k in _HARD_KEYWORDS)
+
+
+def _easy_zone_label(current_zone: Optional[str]) -> str:
+    """Mirror the plan's own zone-labelling scheme for the swapped-in easy day."""
+    return "RPE 1\u20132" if str(current_zone or "").upper().startswith("RPE") else "Z1"
+
+
+async def _readiness_downgrade_preview() -> dict:
+    """If this morning's check-in is low and today's plan holds a hard ride,
+    build a one-tap 'swap for an easy recovery spin' suggestion. This is a
+    preview only — nothing is changed on the plan until the rider accepts.
+    Handles both dated week/day plans (Couch-to-Road, Ride Stronger, Ride
+    Beyond, custom plans) and flat 'featured workout' showcase plans (Build &
+    Climb) where the Today screen always surfaces workouts[0]."""
+    today_iso = date.today().isoformat()
+    doc = await udb.daily_checkins.find_one({"id": "latest"})
+    if not doc or doc.get("date") != today_iso or doc.get("safetyOverride"):
+        return {"available": False}
+    if doc.get("downgrade_applied") or doc.get("downgrade_dismissed"):
+        return {"available": False}
+    score = doc.get("score")
+    if score is None or score >= 55:
+        return {"available": False}
+    plan_id = await _active_plan_id()
+    if not plan_id or plan_id == "none":
+        return {"available": False}
+    d = await _rider_plan_def(plan_id)
+    if not d:
+        return {"available": False}
+
+    current = None
+    if d.get("weeks"):
+        _, _, day = _def_day_by_date(d, today_iso)
+        if day and day.get("kind") == "cycling":
+            current = {"title": day.get("title"), "zone": day.get("zone"), "tss": day.get("tss"), "duration": day.get("duration")}
+    elif d.get("workouts"):
+        featured = d["workouts"][0] if d["workouts"] else None
+        if featured and featured.get("kind", "cycling") == "cycling":
+            current = {"title": featured.get("title"), "zone": featured.get("zone"), "tss": featured.get("tss"), "duration": featured.get("duration")}
+    if not current or not _zone_is_hard(current.get("zone"), current.get("title")):
+        return {"available": False}
+
+    rider = await _rider_doc()
+    level = _LEVEL_FOR_CAPABILITY.get(rider.get("capability"), "Development")
+    rec = _RECOVERY_SPIN_BY_LEVEL[level]
+    factors = doc.get("mainFactors") or []
+    reason = next(
+        (f for f in factors if any(k in f.lower() for k in ("hrv", "hr &", "sleep", "fatigue", "energy"))),
+        None,
+    ) or (factors[0] if factors else "Your readiness signals are low this morning.")
+    return {
+        "available": True,
+        "score": score,
+        "status": doc.get("status"),
+        "reason": reason,
+        "date": today_iso,
+        "current": current,
+        "suggested": {
+            "title": "Recovery Spin", "zone": _easy_zone_label(current.get("zone")),
+            "duration": rec["duration"], "tss": f"{rec['tss']} TSS", "workout_id": rec["workout_id"],
+        },
+    }
+
+
+async def _apply_readiness_downgrade() -> dict:
+    """Accept the coach's suggestion: swap today's hard session for the easy
+    recovery spin, snapshotting the plan first so it's undoable."""
+    preview = await _readiness_downgrade_preview()
+    if not preview.get("available"):
+        raise HTTPException(status_code=400, detail="No readiness-based suggestion is available right now.")
+    plan_id = await _active_plan_id()
+    d = await _rider_plan_def(plan_id)
+    if not d:
+        raise HTTPException(status_code=404, detail="Today's session could not be found.")
+    rider = await _rider_doc()
+    level = _LEVEL_FOR_CAPABILITY.get(rider.get("capability"), "Development")
+    rec = _RECOVERY_SPIN_BY_LEVEL[level]
+    zone = _easy_zone_label(preview["current"].get("zone"))
+    was_title = preview["current"].get("title") or "your session"
+
+    target = None
+    is_flat = False
+    if d.get("weeks"):
+        _, _, target = _def_day_by_date(d, preview["date"])
+    elif d.get("workouts"):
+        target = d["workouts"][0] if d["workouts"] else None
+        is_flat = True
+    if not target:
+        raise HTTPException(status_code=404, detail="Today's session could not be found.")
+
+    await _snapshot_plan_undo(plan_id)
+    target["title"] = "Recovery Spin"
+    target["focus"] = "Active recovery"
+    target["zone"] = zone
+    target["duration"] = rec["duration"]
+    target["workout_id"] = rec["workout_id"]
+    # Flat showcase plans (Build & Climb) store TSS pre-formatted as "N TSS";
+    # dated plans store it as a raw number formatted at response time.
+    target["tss"] = f"{rec['tss']} TSS" if is_flat else rec["tss"]
+
+    await udb.training_plans.update_one({"id": plan_id}, {"$set": {"id": plan_id, "definition": d}}, upsert=True)
+    await udb.daily_checkins.update_one({"id": "latest"}, {"$set": {"downgrade_applied": True}})
+    await udb.daily_checkins.update_one({"id": preview["date"]}, {"$set": {"downgrade_applied": True}})
+    return {
+        "ok": True, "can_undo": True, "applied": preview["suggested"],
+        "note": f"Swapped '{was_title}' for a Recovery Spin today — recovery matters as much as the hard days. Undo any time.",
+    }
+
+
+async def _dismiss_readiness_downgrade() -> dict:
+    today_iso = date.today().isoformat()
+    await udb.daily_checkins.update_one({"id": "latest"}, {"$set": {"downgrade_dismissed": True}})
+    await udb.daily_checkins.update_one({"id": today_iso}, {"$set": {"downgrade_dismissed": True}})
+    return {"ok": True}
+
+
+@router.get("/plan/readiness-suggestion")
+async def readiness_suggestion():
+    """Preview today's coach suggestion to swap a hard ride for an easy spin,
+    based on this morning's check-in. Hybrid model — never auto-applied."""
+    return await _readiness_downgrade_preview()
+
+
+@router.post("/plan/readiness-suggestion/accept")
+async def accept_readiness_suggestion():
+    return await _apply_readiness_downgrade()
+
+
+@router.post("/plan/readiness-suggestion/dismiss")
+async def dismiss_readiness_suggestion():
+    return await _dismiss_readiness_downgrade()
 
 
 async def _set_ftp(value: int) -> dict:
