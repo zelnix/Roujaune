@@ -16,12 +16,16 @@ export type Telemetry = {
 };
 
 const DEFAULTS: Telemetry = {
-  elapsed: 1477,
+  // Elapsed starts at 0 — a freshly-mounted ride hasn't started yet. Any
+  // non-zero placeholder here would immediately exceed a short workout's
+  // total duration before the first real telemetry frame arrives, tripping
+  // the "workout complete" check the instant the screen mounts.
+  elapsed: 0,
   power: 251,
   cadence: 88,
   hr: 162,
   speed: 26.4,
-  distance: 24.6,
+  distance: 0,
   gradient: 7.8,
   erg: 100,
   paused: false,

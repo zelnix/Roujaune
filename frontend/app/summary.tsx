@@ -23,6 +23,14 @@ import {
   IntervalTargetsCard, StravaPushButton,
 } from "@/src/components/summary";
 
+// Today's real date, formatted to match the header's design (e.g. "Wednesday, 12 May 2025").
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+function fmtTodayLong(): string {
+  const d = new Date();
+  return `${WEEKDAYS[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+
 // Build a shareable caption from the ride's stats + route.
 function rideStatParts(stats: any, route: any): string[] {
   const s = stats || {};
@@ -85,7 +93,7 @@ export default function WorkoutComplete() {
   const rightW = compact ? 300 : 344;
   const pad = phone ? spacing.sm : compact ? spacing.md : spacing.lg;
 
-  const { stats, route, needsManual, saved, submitManual, recordedElapsed, adjustments, struggles } = useSummary();
+  const { stats, route, needsManual, saved, submitManual, recordedElapsed, adjustments, struggles, title } = useSummary();
   const { debrief, loading: debriefLoading } = useCoachDebrief(stats, route);
   const ftpSuggest = useFtpSuggestion(!debriefLoading && !needsManual);
   const { intervals, overall: intervalOverall, hasData: intervalHasData, ftp: intervalFtp } = useIntervals();
@@ -153,7 +161,7 @@ export default function WorkoutComplete() {
       <SafeAreaView style={styles.backdrop} edges={["top", "bottom", "left", "right"]}>
         <View ref={cardRef} collapsable={false} style={[styles.modalCard, { padding: pad }]} testID="summary-modal">
           <View style={styles.modalHead}>
-            <SummaryHeader brandWidth={navW} phone={phone} onToast={showToast} />
+            <SummaryHeader brandWidth={navW} phone={phone} onToast={showToast} title={title} date={fmtTodayLong()} />
             <Pressable testID="summary-close" onPress={onClose} style={styles.closeBtn} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close summary">
               <Ionicons name="close" size={22} color={colors.white} />
             </Pressable>
@@ -186,7 +194,7 @@ export default function WorkoutComplete() {
                 <IntervalTargetsCard intervals={intervals} overall={intervalOverall} hasData={intervalHasData} compact={phone} />
                 <ChartsRow stats={stats} width={mainW} vertical={phone} />
                 <KmSplitsCard splits={kmSplits} />
-                {phone && <RightColumn score={78} phone route={route} />}
+                {phone && <RightColumn phone route={route} stats={stats} />}
                 <StravaPushButton rideId={stats?.id} coachSummary={debriefLoading ? undefined : debrief} onToast={showToast} />
                 <RidePhotos rideId={stats?.id} onToast={showToast} />
                 <SyncExportRow onToast={showToast} compact={phone} />
@@ -194,9 +202,9 @@ export default function WorkoutComplete() {
 
               {!phone && (
                 <View style={[styles.rightCol, { width: rightW }]}>
-                  <RouteSummaryCard route={route} />
+                  <RouteSummaryCard route={route} stats={stats} />
                   <AchievementsCard />
-                  <RecoveryCard score={78} />
+                  <RecoveryCard />
                 </View>
               )}
               </>
@@ -247,12 +255,12 @@ export default function WorkoutComplete() {
 }
 
 // On phone landscape the right-hand cards flow below the main content in a wrap row.
-function RightColumn({ score, phone, route }: { score: number; phone: boolean; route?: React.ComponentProps<typeof RouteSummaryCard>["route"] }) {
+function RightColumn({ phone, route, stats }: { phone: boolean; route?: React.ComponentProps<typeof RouteSummaryCard>["route"]; stats?: React.ComponentProps<typeof RouteSummaryCard>["stats"] }) {
   return (
     <View style={phone ? styles.rightWrap : undefined}>
-      <View style={phone && styles.rightWrapItemWide}><RouteSummaryCard route={route} /></View>
+      <View style={phone && styles.rightWrapItemWide}><RouteSummaryCard route={route} stats={stats} /></View>
       <View style={phone && styles.rightWrapItem}><AchievementsCard /></View>
-      <View style={phone && styles.rightWrapItem}><RecoveryCard score={score} /></View>
+      <View style={phone && styles.rightWrapItem}><RecoveryCard /></View>
     </View>
   );
 }

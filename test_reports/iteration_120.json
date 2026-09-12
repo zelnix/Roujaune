@@ -1,0 +1,40 @@
+{
+  "summary": "Retested ONLY Bug 1 (Welcome Ride instant-complete) after the backend fix (backend/server.py TrainerSim.__init__ self.elapsed/self.distance changed from 1477.0/24.6 to 0.0/0.0, matching frontend useTelemetry.ts DEFAULTS). Confirmed the backend code change is in place and both backend+expo services show fresh restart uptimes. Ran 'Welcome Ride' (ctr-ride-1, 20 min / 1200s) via greenlantern@roujaune.app 3 FRESH times (localStorage/sessionStorage cleared before each attempt) navigating into the live workout screen: ALL 3 attempts now start at ELAPSED 0:00/0:01/0:02 and tick up normally (verified up to 0:14-0:17s of continuous ticking each time) with NO 'Workout Complete' modal appearing. This is a full reversal of the iteration_119 finding (which reproduced instant-complete 3/3 times pre-fix). Also verified a shorter/medium workout (FB50 Post-Ride Mobility, 18 min / 1080s -- no catalog entry existed under 10 min so used the shortest available) starts and ticks normally with no premature completion, and re-confirmed the previously-tested longer workout (Threshold Intervals Foundation, 34 min / 2040s) still starts and ticks normally (no regression). No backend errors observed in supervisor logs during any of the runs. Bug 1 is now VERIFIED FIXED.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Today screen (Home) 'From Couch to Road' plan card / NEXT WORKOUTS list, mobile viewport 390x844",
+        "issues": ["Pre-existing, unrelated to Bug 1: the plan summary card and 'NEXT WORKOUTS' list content overflow/renders vertically one-character-per-line in places (e.g. 'From Couch to Road', 'Beginner Cycling Strength'), and workout cards like 'Welcome Ride' inside this section render off-screen horizontally / partially outside the viewport making them unclickable via normal tap without scrolling into a hidden horizontal carousel. Had to use direct URL navigation (workoutId param) to reach the live workout screen for testing instead of tapping through the UI. This matches the /plan layout issue already flagged in iteration_119.json and appears to also affect the Today/Home screen's plan widget -- worth a wider look at this card's responsive layout on mobile."]
+      }
+    ],
+    "react_native_issues": []
+  },
+  "verified_working": [
+    "BUG 1 FIX CONFIRMED: 'Welcome Ride' (ctr-ride-1, 20 min) started fresh 3/3 times (cache cleared each time) via greenlantern@roujaune.app -- elapsed starts at 0:00-0:02 and ticks up normally, NO premature 'Workout Complete' modal in any of the 3 runs.",
+    "Shorter/medium workout regression check: FB50 Post-Ride Mobility (18 min) starts and ticks normally, no premature completion.",
+    "Longer workout regression check: Threshold Intervals Foundation (34 min) starts and ticks normally, no premature completion (consistent with prior passing result).",
+    "backend/server.py TrainerSim.__init__ confirmed at self.elapsed = 0.0 / self.distance = 0.0 (line 95-96), and frontend/src/hooks/useTelemetry.ts DEFAULTS.elapsed/distance also 0 -- both sides of the original root cause are now consistent.",
+    "No backend errors/tracebacks in supervisor backend logs during any of the test runs."
+  ],
+  "test_report_links": [],
+  "action_items": [
+    "None required for Bug 1 -- fix is verified working end-to-end.",
+    "Optional/low priority (not part of this retest scope, carried over from iteration_119): /plan screen and the Today/Home 'From Couch to Road' plan card both show a horizontal-overflow/vertical-character-wrap layout issue on 390px mobile viewport that prevents normal tap-navigation into some workout cards (worked around via direct URL nav for this test)."
+  ],
+  "critical_code_review_comments": [
+    "Fix verified complete: both backend/server.py TrainerSim defaults (elapsed, distance) and frontend/src/hooks/useTelemetry.ts DEFAULTS now consistently default to 0, eliminating the race where the WS stream's first frame(s) carried a stale placeholder value before the client's init message round-tripped."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (Bug 1 root cause fix confirmed in code and via live behavior, no errors in logs)", "frontend": "100% (3/3 fresh Welcome Ride attempts + short + long workout all ticked normally with no premature completion)"},
+  "seed_data_creation": "None. Reset greenlantern@roujaune.app's billing doc (deleted from `billing` collection, user_id=user_greenlantern) 3 times during this test session to restore free-ride credits consumed by repeated live-workout test runs, per test_credentials.md guidance ('Reset a rider's counter by deleting their doc in the billing collection'). Account now has some free rides consumed again from this round's 5 live workout starts (Welcome Ride x3, FB50 Mobility x1, Threshold Intervals x1) -- may need another reset if further live-ride testing on this account is needed next round.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Bug 1 (Welcome Ride / short-workout instant-complete) is now VERIFIED FIXED after the backend/server.py TrainerSim.elapsed/distance defaults were changed from 1477.0/24.6 to 0.0/0.0 (matching the earlier frontend useTelemetry.ts fix). Confirmed via 3 fresh attempts on Welcome Ride plus one short (18 min) and one long (34 min) workout -- all tick normally from 0:00 with no premature completion modal. Bug 2 (Summary screen real data) was already verified fixed in iteration_119 and not retested this round per instructions. Remaining open item (not part of this bug, carried over, low priority): Today/Home screen plan card and /plan screen have a mobile-viewport horizontal-overflow/vertical-text-wrap layout bug that blocks normal tap navigation into some workout cards. The greenlantern@roujaune.app test account's free-ride counter was reset via direct DB deletion of its billing doc multiple times during this test session (documented in test_credentials.md as the correct way to do this) -- if the account shows 'used all 3 free rides' in a future test round, repeat this reset or use IAP_DEV_TRUST=1 grant.",
+  "rca_of_issue": "N/A - this is a fix re-verification, not a new bug. See iteration_119.json rca_of_issue for the original root cause analysis (backend TrainerSim.elapsed defaulting to 1477.0 racing against the client's init message over the WS)."
+}

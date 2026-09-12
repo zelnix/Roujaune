@@ -92,8 +92,8 @@ class TrainerSim:
         self.paused = False
         self.mode = "live"  # "live" = only real sensor data; "demo" = simulate
         self.dropout_until = 0.0
-        self.elapsed = 1477.0  # 00:24:37
-        self.distance = 24.6
+        self.elapsed = 0.0
+        self.distance = 0.0
         self.base_target = 251.0  # target watts driven by the chosen workout's segment
         self.power = 251.0
         self.cadence = 88.0

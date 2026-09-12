@@ -7,11 +7,13 @@ import MaterialCommunityIcons from "@react-native-vector-icons/material-design-i
 import Svg, {
   Rect, Path, Polyline, Circle, Line, Defs, LinearGradient as SvgGradient, Stop,
 } from "react-native-svg";
+import { useRouter } from "expo-router";
 import { colors, radius, spacing, shadow, textShadow } from "../theme";
 import { Touchable, SectionLabel } from "./ui";
 import { summaryContent as C, SummaryStats, IntervalScore, fmtDuration } from "../lib/summary";
 import { useCoach } from "../lib/coach-persona";
-import { useRouter } from "expo-router";
+import { useRiderAchievements } from "../lib/rider-profile";
+import { useTodayReadiness, readinessTone } from "../lib/checkin";
 import { pushRideToStrava, stravaRideStatus } from "../lib/ridesync";
 
 const glyph = require("../../assets/images/logo_glyph_t.png");
@@ -20,7 +22,7 @@ const heroImg = require("../../assets/images/hero_cyclist_b2.jpg");
 const ZONE_COLORS = ["#43C65A", "#9ACD32", colors.yellow, "#E8631C", colors.red];
 
 /* ======================= HEADER ======================= */
-export function SummaryHeader({ brandWidth, phone = false, onToast }: { brandWidth: number; phone?: boolean; onToast: (m: string) => void }) {
+export function SummaryHeader({ brandWidth, phone = false, onToast, title, date }: { brandWidth: number; phone?: boolean; onToast: (m: string) => void; title?: string; date?: string }) {
   return (
     <View style={styles.headerRow} testID="summary-header">
       <View style={[styles.brandCol, { width: brandWidth }]}>
@@ -45,7 +47,7 @@ export function SummaryHeader({ brandWidth, phone = false, onToast }: { brandWid
           </View>
           <Sparkle x={8} y={-4} />
         </View>
-        <Text style={[styles.subtitle, phone && { fontSize: 11 }]}>{C.title}  •  {C.date}</Text>
+        <Text style={[styles.subtitle, phone && { fontSize: 11 }]} numberOfLines={1}>{title ?? C.title}  •  {date ?? C.date}</Text>
       </View>
 
       <View style={styles.statusCol}>
@@ -187,7 +189,7 @@ export function MetricsGrid({ stats, compact = false, routeName }: { stats: Summ
     { icon: <Ionicons name="heart" size={14} color={r} />, label: "AVG HEART RATE", value: String(stats.avg_hr), unit: "bpm" },
     { icon: <Ionicons name="flame" size={14} color={r} />, label: "CALORIES", value: stats.calories.toLocaleString(), unit: "kcal" },
     { icon: <MaterialCommunityIcons name="speedometer" size={14} color={r} />, label: "TSS TRAINING LOAD", value: String(stats.tss), unit: "TSS" },
-    { icon: <Ionicons name="location" size={14} color={y} />, label: "ROUTE", value: routeName ?? C.route.name },
+    { icon: <Ionicons name="location" size={14} color={y} />, label: "ROUTE", value: routeName ?? "Manual Entry" },
   ];
   return (
     <View style={styles.metricsCard} testID="metrics-grid">
@@ -577,27 +579,48 @@ export function SyncExportRow({ onToast, compact = false }: { onToast: (m: strin
 }
 
 /* ======================= RIGHT COLUMN ======================= */
-export function RouteSummaryCard({ route }: { route?: { name: string; place: string; distance: string; elevation: string; tag: string } }) {
-  const name = route?.name ?? C.route.name;
-  const stat = route ? `${route.distance}  •  ${route.elevation} climb` : C.route.stat;
-  const place = route?.place;
+export function RouteSummaryCard({ route, stats }: { route?: { name: string; place: string; distance: string; elevation: string; tag: string }; stats?: SummaryStats }) {
+  // No scenic/video route was ridden — e.g. a manually logged session. Show an
+  // honest "logged manually" state instead of a fake route (was always
+  // "Alpe d'Huez" regardless of what the rider actually did).
+  if (!route) {
+    const dist = stats?.distance_km ? `${stats.distance_km} km` : null;
+    const elev = stats?.elevation_m ? `${Math.round(stats.elevation_m)} m climb` : null;
+    const line = [dist, elev].filter(Boolean).join("  •  ");
+    return (
+      <View style={styles.rightCard} testID="route-summary-card">
+        <View style={styles.mHead}><MaterialCommunityIcons name="terrain" size={14} color={colors.yellow} /><Text style={styles.rightHeadLabel}>ROUTE SUMMARY</Text></View>
+        <View style={{ alignItems: "center", paddingVertical: spacing.md, gap: 6 }}>
+          <Ionicons name="create-outline" size={26} color={colors.textDim} />
+          <Text style={[styles.routeName, { fontSize: 16 }]}>Logged manually</Text>
+          <Text style={[styles.routeStat, { textAlign: "center" }]}>{line || "No route was recorded for this ride."}</Text>
+        </View>
+        <View style={styles.savedRow}>
+          <Ionicons name="checkmark-circle-outline" size={15} color={colors.green} />
+          <Text style={styles.savedText}>Saved to History</Text>
+        </View>
+      </View>
+    );
+  }
+  const elevNum = parseFloat(String(route.elevation).replace(/[^0-9.]/g, "")) || 0;
+  const stat = `${route.distance}  •  ${route.elevation} climb`;
   return (
     <View style={styles.rightCard} testID="route-summary-card">
       <View style={styles.mHead}><MaterialCommunityIcons name="terrain" size={14} color={colors.yellow} /><Text style={styles.rightHeadLabel}>ROUTE SUMMARY</Text></View>
-      <Text style={styles.routeName}>{name}</Text>
-      <Text style={styles.routeStat}>{place ? `${place}  ·  ${stat}` : stat}</Text>
+      <Text style={styles.routeName}>{route.name}</Text>
+      <Text style={styles.routeStat}>{route.place ? `${route.place}  ·  ${stat}` : stat}</Text>
       <View style={styles.routeCompleted}>
         <Ionicons name="checkmark-circle" size={14} color={colors.green} />
-        <Text style={styles.routeCompletedText}>{C.route.status}</Text>
+        <Text style={styles.routeCompletedText}>Route Completed</Text>
       </View>
       <RouteElevationMap />
       <View style={styles.routeAxis}>
-        <Text style={styles.axisLabel}>{C.route.low}</Text>
-        <Text style={styles.axisLabel}>{C.route.high}</Text>
+        <Text style={styles.axisLabel}>0 m</Text>
+        <Text style={styles.axisLabel}>{elevNum ? `${Math.round(elevNum).toLocaleString()} m` : route.elevation}</Text>
       </View>
       <View style={styles.savedRow}>
         <Ionicons name="checkmark-circle-outline" size={15} color={colors.green} />
-        <Text style={styles.savedText}>{C.route.saved}</Text>
+        <Text style={styles.savedText}>Saved to History</Text>
       </View>
     </View>
   );
@@ -632,51 +655,100 @@ function RouteElevationMap() {
 }
 
 export function AchievementsCard() {
+  const list = useRiderAchievements(); // null = loading, [] = none unlocked yet
+  const shown = (list ?? []).slice(-4).reverse(); // most-recently-unlocked first
   return (
     <View style={styles.rightCard} testID="achievements-card">
       <View style={styles.mHead}><Ionicons name="trophy" size={14} color={colors.yellow} /><Text style={styles.rightHeadLabel}>ACHIEVEMENTS</Text></View>
-      <View style={{ gap: 12, marginTop: 10 }}>
-        {C.achievements.map((a, i) => (
-          <View key={i} style={styles.achRow}>
-            {a.badge ? (
-              <LinearGradient colors={[colors.red, "#6E1116"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.achBadge}>
-                <MaterialCommunityIcons name="run-fast" size={18} color="#fff" />
-              </LinearGradient>
-            ) : (
-              <View style={styles.achIcon}><MaterialCommunityIcons name={a.icon === "trending-up" ? "chart-line-variant" : "fire"} size={18} color={a.color} /></View>
-            )}
-            <View style={{ flex: 1 }}>
-              <Text style={styles.achTitle}>{a.title}</Text>
-              <Text style={styles.achDetail}>{a.detail}</Text>
+      {list === null ? (
+        <View style={{ paddingVertical: spacing.md, alignItems: "center" }}>
+          <ActivityIndicator size="small" color={colors.textDim} />
+        </View>
+      ) : shown.length === 0 ? (
+        <Text style={[styles.achDetail, { marginTop: 10, textAlign: "center" }]}>Keep riding to unlock your first badge.</Text>
+      ) : (
+        <View style={{ gap: 12, marginTop: 10 }}>
+          {shown.map((a, i) => (
+            <View key={a.label} style={styles.achRow}>
+              {i === 0 ? (
+                <LinearGradient colors={[colors.red, "#6E1116"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.achBadge}>
+                  <Ionicons name={a.icon as any} size={18} color="#fff" />
+                </LinearGradient>
+              ) : (
+                <View style={styles.achIcon}><Ionicons name={a.icon as any} size={18} color={a.color} /></View>
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={styles.achTitle}>{a.label}</Text>
+                <Text style={styles.achDetail}>{a.sub}</Text>
+              </View>
             </View>
-          </View>
-        ))}
-      </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
 
-export function RecoveryCard({ score }: { score: number }) {
-  const rec = C.recovery;
+// Post-ride recovery guidance — pulled from the rider's real morning readiness
+// check-in (HRV/sleep/energy), not a fixed 78% shown on every single ride.
+export function RecoveryCard() {
+  const router = useRouter();
+  const { readiness, loading } = useTodayReadiness();
+
+  if (loading) {
+    return (
+      <View style={styles.rightCard} testID="recovery-card">
+        <View style={styles.mHead}><Ionicons name="leaf" size={14} color={colors.green} /><Text style={styles.rightHeadLabel}>RECOVERY & NEXT STEPS</Text></View>
+        <View style={{ paddingVertical: spacing.lg, alignItems: "center" }}>
+          <ActivityIndicator size="small" color={colors.textDim} />
+        </View>
+      </View>
+    );
+  }
+
+  if (!readiness.available) {
+    return (
+      <View style={styles.rightCard} testID="recovery-card">
+        <View style={styles.mHead}><Ionicons name="leaf" size={14} color={colors.green} /><Text style={styles.rightHeadLabel}>RECOVERY & NEXT STEPS</Text></View>
+        <Text style={[styles.recRecoText, { marginTop: 10 }]}>Log a morning check-in (sleep, energy, HRV) to see a personalised recovery score here.</Text>
+        <Pressable testID="recovery-checkin-cta" onPress={() => router.push("/checkin")} style={({ hovered }: any) => [styles.recItem, { borderTopWidth: 0, marginTop: 4 }, hovered && { opacity: 0.85 }]}>
+          <View style={styles.recItemIcon}><Ionicons name="add-circle-outline" size={15} color={colors.yellow} /></View>
+          <Text style={[styles.recItemLabel, { flex: 1 }]}>Do today&apos;s check-in</Text>
+          <Ionicons name="chevron-forward" size={15} color={colors.textDim} />
+        </Pressable>
+      </View>
+    );
+  }
+
+  const score = readiness.score ?? 0;
+  const tone = readinessTone(score, readiness.safetyOverride);
+  const factorsText = readiness.mainFactors && readiness.mainFactors.length ? readiness.mainFactors.slice(0, 2).join(" · ") : "Based on today's check-in.";
+  const low = score < 55 || readiness.safetyOverride;
+  const items = low
+    ? [
+        { icon: "body", label: "FB50 Recommendation", value: "Post-Ride Mobility  •  10 min" },
+        { icon: "bicycle", label: "Recovery ride", value: "Easy spin tomorrow  •  30 min" },
+      ]
+    : [{ icon: "checkmark-circle", label: "Keep going", value: "Continue your plan as scheduled" }];
+
   return (
     <View style={styles.rightCard} testID="recovery-card">
       <View style={styles.mHead}><Ionicons name="leaf" size={14} color={colors.green} /><Text style={styles.rightHeadLabel}>RECOVERY & NEXT STEPS</Text></View>
       <View style={styles.recoveryTop}>
-        <Ring size={76} stroke={8} pct={score} color={colors.green} big={`${score}%`} small={"RECOVERY\nSCORE"} />
+        <Ring size={76} stroke={8} pct={score} color={tone.color} big={`${score}%`} small={"RECOVERY\nSCORE"} />
         <View style={{ flex: 1 }}>
-          <Text style={styles.recRecoTitle}>{rec.recTitle}</Text>
-          <Text style={styles.recRecoText}>{rec.rec}</Text>
+          <Text style={[styles.recRecoTitle, { color: tone.color }]}>{tone.label}</Text>
+          <Text style={styles.recRecoText}>{factorsText}</Text>
         </View>
       </View>
       <View style={{ marginTop: 6 }}>
-        {rec.items.map((it, i) => (
+        {items.map((it, i) => (
           <View key={i} style={styles.recItem}>
             <View style={styles.recItemIcon}><Ionicons name={it.icon as any} size={15} color={colors.yellow} /></View>
             <View style={{ flex: 1 }}>
               <Text style={styles.recItemLabel}>{it.label}</Text>
             </View>
             <Text style={styles.recItemVal}>{it.value}</Text>
-            {it.chevron && <Ionicons name="chevron-forward" size={15} color={colors.textDim} style={{ marginLeft: 4 }} />}
           </View>
         ))}
       </View>

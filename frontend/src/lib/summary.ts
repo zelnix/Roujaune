@@ -232,6 +232,11 @@ export function useSummary() {
   const [needsManual, setNeedsManual] = useState(false);
   const [saved, setSaved] = useState(false);
   const [recordedElapsed] = useState<number>(() => rideRecorder.snapshot().elapsed);
+  // Real ride/workout title for the header — never the design-mock placeholder.
+  const [title] = useState<string>(() => {
+    const rec = rideRecorder.snapshot();
+    return (rec.workout && rec.workout.trim()) || rec.route?.name || "Ride Summary";
+  });
 
   const post = useCallback(async (manual?: Record<string, any>) => {
     const rec = rideRecorder.snapshot();
@@ -282,7 +287,7 @@ export function useSummary() {
     return () => { alive = false; };
   }, [post]);
 
-  return { stats, loading, route, adjustments, struggles, needsManual, saved, recordedElapsed, submitManual: (fields: Record<string, any>) => post(fields) };
+  return { stats, loading, route, adjustments, struggles, needsManual, saved, recordedElapsed, title, submitManual: (fields: Record<string, any>) => post(fields) };
 }
 
 /** Fetch Alberto's AI post-ride debrief once the ride stats are computed.
