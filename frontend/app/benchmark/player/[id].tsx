@@ -14,6 +14,8 @@ import {
   simulateReadings, RAMP_STEP_OPTIONS, effortBaseWatts, type WorkoutState,
 } from "@/src/lib/benchmark/player";
 import { computeResult, assembleCapture, type IntervalCapture } from "@/src/lib/benchmark/calc";
+import { useBleSensors } from "@/src/hooks/useBleSensors";
+import { BleSensorsPanel } from "@/src/components/BleSensorsPanel";
 
 function apiBase() { return (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, ""); }
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
@@ -129,6 +131,25 @@ export default function WorkoutPlayerScreen() {
   const [weightKg, setWeightKg] = React.useState<number | undefined>(undefined);
   const running = ["warmup", "main", "recovery", "cooldown"].includes(runState);
 
+  // A benchmark test defaults to SIMULATED data so it can be tried without any
+  // hardware. Any connected BLE sensor's readings take over per-metric — a
+  // power/cadence sensor counts as a trainer, a HR strap as a wearable —
+  // exactly mirroring the live workout screen's convention. Once at least one
+  // real sensor is connected the test is no longer "sim", which also makes
+  // its result eligible to update the rider's real FTP profile (the backend
+  // never applies a result flagged `isDevData` to the profile).
+  const [showBle, setShowBle] = React.useState(false);
+  const ble = useBleSensors(settings.wheelCircumference);
+  const bleTrainer = ble.connected.length > 0 && (ble.readings.power != null || ble.readings.cadence != null);
+  const bleWearable = ble.connected.length > 0 && ble.readings.hr != null;
+  const usingSim = !bleTrainer && !bleWearable;
+  const [finishedIsDev, setFinishedIsDev] = React.useState<boolean | null>(null);
+  const showDevNote = finishedIsDev ?? usingSim;
+  const bleReadingsRef = React.useRef(ble.readings); bleReadingsRef.current = ble.readings;
+  const bleTrainerRef = React.useRef(bleTrainer); bleTrainerRef.current = bleTrainer;
+  const bleWearableRef = React.useRef(bleWearable); bleWearableRef.current = bleWearable;
+  const usingSimRef = React.useRef(usingSim); usingSimRef.current = usingSim;
+
   // Metric relevance
   const powerTest = !!test && (POWER_REQUIRED.has(test.id) || POWER_PREFERRED.has(test.id));
   const primary: "power" | "hr" | "cadence" = test?.id === "cadence_control" ? "cadence" : test?.id === "recovery_response" ? "hr" : "power";
@@ -163,7 +184,7 @@ export default function WorkoutPlayerScreen() {
     if (!session) return;
     fetch(`${apiBase()}/api/benchmark/sessions/${session}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status, usingDevData: true, ...extra }),
+      body: JSON.stringify({ status, usingDevData: usingSimRef.current, ...extra }),
     }).catch(() => {});
   }, [session]);
 
@@ -205,13 +226,14 @@ export default function WorkoutPlayerScreen() {
   // to the result page. Simulated data is flagged and never touches the profile.
   const finishRun = React.useCallback(async (status: string, stoppedReason: string | null, rampFinalWatts?: number) => {
     if (!test) return;
+    setFinishedIsDev(usingSimRef.current);
     const capture = assembleCapture(test, logRef.current, {
       totalElapsed: totalRef.current,
       pauseCount: pauseCountRef.current,
       rampFinalWatts,
       rampStep: rampStepRef.current,
       sensorLevel: sensorLevelRef.current,
-      isDevData: true,
+      isDevData: usingSimRef.current,
       rpe: rpeRef.current,
       weightKg: weightRef.current,
       ftp: ftpRef.current,
@@ -241,9 +263,17 @@ export default function WorkoutPlayerScreen() {
           const stepSec = cur.iv.rampStepSec || 60;
           if (ne % stepSec === 0) setRampTarget((rt) => rt + rampStep);
         }
-        // simulate telemetry
+        // simulate telemetry, but let a connected REAL BLE sensor take over
+        // per-metric (trainer → power/cadence, wearable → heart rate) — same
+        // priority rule as the live workout screen.
         const tgt = cur.isRamp ? rampTargetRef.current : (cur.simBase ?? cur.target);
-        const r = simulateReadings(tgt, cur.state, cur.cadenceTarget, fadeRef.current);
+        const sim = simulateReadings(tgt, cur.state, cur.cadenceTarget, fadeRef.current);
+        const br = bleReadingsRef.current;
+        const r = {
+          power: bleTrainerRef.current && br.power != null ? br.power : sim.power,
+          cadence: bleTrainerRef.current && br.cadence != null ? br.cadence : sim.cadence,
+          hr: bleWearableRef.current && br.hr != null ? br.hr : sim.hr,
+        };
         setReadings(r);
         pRoll.current = [...pRoll.current, r.power].slice(-3);
         setP3(Math.round(pRoll.current.reduce((a, b) => a + b, 0) / pRoll.current.length));
@@ -352,7 +382,15 @@ export default function WorkoutPlayerScreen() {
       <View style={s.topBar}>
         <Text style={s.testName} numberOfLines={1}>{test.name}</Text>
         <View style={s.stateChip}><Text style={s.stateChipText}>{STATE_LABEL[runState]}</Text></View>
-        <View style={s.devBadge}><Text style={s.devText}>SIM DATA</Text></View>
+        {usingSim ? (
+          <Pressable testID="ble-open" onPress={() => setShowBle(true)} style={s.devBadge}>
+            <Text style={s.devText}>SIM DATA</Text>
+          </Pressable>
+        ) : (
+          <Pressable testID="ble-open" onPress={() => setShowBle(true)} style={s.liveBadge}>
+            <View style={s.liveDot} /><Text style={s.liveText}>LIVE</Text>
+          </Pressable>
+        )}
       </View>
       <View style={s.progressTrack}><View style={[s.progressFill, { width: `${progress * 100}%` }]} /></View>
 
@@ -374,6 +412,14 @@ export default function WorkoutPlayerScreen() {
             </View>
           )}
           <Pressable testID="player-begin" onPress={begin} style={s.beginBtn}><Ionicons name="play" size={20} color="#fff" /><Text style={s.beginText}>Begin</Text></Pressable>
+          <Pressable testID="player-connect-devices" onPress={() => setShowBle(true)} style={s.connectBtn}>
+            <Ionicons name="bluetooth" size={16} color={bleTrainer || bleWearable ? "#7FD98A" : CC.rouge} />
+            <Text style={s.connectText}>
+              {bleTrainer || bleWearable
+                ? `${ble.connected.length} sensor${ble.connected.length > 1 ? "s" : ""} connected`
+                : "Connect devices"}
+            </Text>
+          </Pressable>
         </ScrollView>
       ) : runState === "completed" || runState === "stopped_early" ? (
         <ScrollView contentContainerStyle={s.readyWrap}>
@@ -387,7 +433,7 @@ export default function WorkoutPlayerScreen() {
             <Text style={s.sumLine}>Elapsed: {fmt(totalElapsed)}</Text>
             <Text style={s.sumLine}>Avg power (last interval): {avgIv} W</Text>
             {stoppedReason && <Text style={s.sumLine}>Reason: {STOP_REASONS.find((r) => r.id === stoppedReason)?.label}</Text>}
-            <Text style={s.devInline}>Recorded from simulated development data — not added to your real profile.</Text>
+            {showDevNote && <Text style={s.devInline}>Recorded from simulated development data — not added to your real profile.</Text>}
           </View>
           <View style={s.noteCard}><Text style={s.dim}>Your session has been saved. Your recorded data is preserved.</Text></View>
           <Pressable testID="player-return" onPress={() => router.replace("/benchmark")} style={s.beginBtn}><Text style={s.beginText}>Return to Benchmark Workouts</Text></Pressable>
@@ -428,6 +474,16 @@ export default function WorkoutPlayerScreen() {
 
           {/* Coaching prompt */}
           {!!cue && <View style={s.coachCard}><Ionicons name="chatbubble-ellipses-outline" size={16} color={CC.rouge} /><Text style={s.coachText}>{cue}</Text></View>}
+
+          {/* Sensor connection status / quick access while riding */}
+          <Pressable testID="run-connect-devices" onPress={() => setShowBle(true)} style={s.connectBtn}>
+            <Ionicons name="bluetooth" size={16} color={bleTrainer || bleWearable ? "#7FD98A" : CC.dim} />
+            <Text style={s.connectText}>
+              {bleTrainer || bleWearable
+                ? `${ble.connected.length} sensor${ble.connected.length > 1 ? "s" : ""} connected`
+                : "No devices connected — using simulated data"}
+            </Text>
+          </Pressable>
 
           {/* Dev inject controls */}
           <View style={s.injectBox}>
@@ -493,6 +549,27 @@ export default function WorkoutPlayerScreen() {
           <Pressable testID="rec-end" onPress={endSaved} style={s.ghost}><Text style={s.ghostText}>End Session</Text></Pressable>
         </View></View>
       </Modal>
+
+      {showBle && (
+        <BleSensorsPanel
+          supported={ble.supported}
+          poweredOn={ble.poweredOn}
+          scanning={ble.scanning}
+          devices={ble.devices}
+          connected={ble.connected}
+          readings={ble.readings}
+          battery={ble.battery}
+          reconnecting={ble.reconnecting}
+          permissionStatus={ble.permissionStatus}
+          error={ble.error}
+          onScan={ble.startScan}
+          onStopScan={ble.stopScan}
+          onConnect={ble.connect}
+          onDisconnect={ble.disconnect}
+          onClose={() => setShowBle(false)}
+          units={settings.units}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -509,6 +586,11 @@ const s = StyleSheet.create({
   stateChipText: { color: CC.rouge, fontSize: 11.5, fontWeight: "800" },
   devBadge: { backgroundColor: "rgba(255,194,10,0.12)", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
   devText: { color: CC.yellow, fontSize: 9.5, fontWeight: "800" },
+  liveBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(127,217,138,0.12)", borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#7FD98A" },
+  liveText: { color: "#7FD98A", fontSize: 9.5, fontWeight: "800" },
+  connectBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1, borderColor: CC.border, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14, backgroundColor: "rgba(255,255,255,0.03)", minHeight: 44, width: "100%" },
+  connectText: { color: CC.white, fontSize: 13, fontWeight: "700" },
   progressTrack: { height: 5, backgroundColor: "rgba(255,255,255,0.08)", marginTop: 10 },
   progressFill: { height: 5, backgroundColor: CC.rouge },
 
