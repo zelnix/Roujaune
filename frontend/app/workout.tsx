@@ -750,9 +750,13 @@ export default function LiveWorkout() {
   }, [telemetry.power, telemetry.cadence, paused, generateCue]);
 
   // ---- Live struggle detection + auto-ease intervention ----
-  // Watches multi-variable telemetry (cadence/HR/power, W′ balance, ERG spiral,
-  // pedal balance) and, when the rider starts to struggle, drops the ERG target
-  // ~8% and has the coach cue them; a safety trip eases them into recovery.
+  // Watches multi-variable telemetry (cadence/HR/power, W′ balance, pedal
+  // balance) and, when the rider starts to struggle, eases the ERG target and
+  // has the coach cue them; a safety trip eases them into recovery.
+  // Priority 1 gate — ERG Mechanical Failure ("spiral of death"): power holds
+  // 10%+ under target for the full 10s window AND cadence sits under a 75rpm
+  // floor AND the stroke is erratic (cadence CV > 10%) — this alone commands
+  // a precise 5% ERG resistance drop, independent of any other signal.
   const struggleMon = useStruggleMonitor({
     power: telemetry.power, cadence: telemetry.cadence, hr: telemetry.hr,
     elapsed: telemetry.elapsed, source: telemetry.source,
@@ -760,21 +764,27 @@ export default function LiveWorkout() {
     targetW, ftp, maxHr: settings.maxHr, age: settings.age,
     cadLow: CAD_LOW, cadHigh: CAD_HIGH, ergMode, trainerOn, wearableOn, paused,
     onStruggle: (s: StruggleState) => {
-      setStruggleEase(0.92);
+      const pct = Math.round(s.easePct * 100) || 8;
+      setStruggleEase(1 - s.easePct);
       const label = REASON_LABEL[(s.primary ?? s.reasons[0]) as keyof typeof REASON_LABEL] ?? "you're straining";
-      showToast(`${persona.name} eased your target −8% · ${label}`);
-      logControl(`Coach eased −8% (${s.primary ?? "struggle"})`);
+      const mechanical = s.primary === "erg_spiral";
+      showToast(
+        mechanical
+          ? `Trainer eased ERG −${pct}% · cadence + power collapsing`
+          : `${persona.name} eased your target −${pct}% · ${label}`
+      );
+      logControl(`${mechanical ? "Mechanical-failure" : "Coach"} eased −${pct}% (${s.primary ?? "struggle"})`);
       generateCue("struggle", {
         struggle_reasons: s.reasons, struggle_primary: s.primary,
         struggle_severity: s.severity, struggle_safety: false,
         power_deficit_pct: Math.round(s.powerDeficitPct * 100) / 100,
         w_prime_pct: Math.round(s.wPrimePct * 100) / 100,
         near_max_hr_pct: Math.round(s.nearMaxHrPct * 100) / 100,
-        place: vroute.place, eased_pct: 8,
+        place: vroute.place, eased_pct: pct,
       });
     },
     onSafety: (s: StruggleState) => {
-      setStruggleEase(0.55);
+      setStruggleEase(1 - (s.easePct || 0.45));
       showToast(`${persona.name} eased you into active recovery — heart rate near your max`);
       logControl("Safety ease → active recovery");
       generateCue("safety", {

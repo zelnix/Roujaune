@@ -168,7 +168,7 @@ async def coach_cue(req: CoachCueRequest):
             "power_fade": f"their power has faded roughly {round(req.power_deficit_pct * 100)}% below the {req.power_target} W target",
             "power_variability": "their pedal stroke has turned choppy and uneven",
             "w_prime_low": "their anaerobic reserve (W-prime) is almost empty",
-            "erg_spiral": "they are sliding into an ERG spiral of death — cadence collapsing while resistance climbs",
+            "erg_spiral": "the smart trainer's ERG resistance has bogged them down — power and cadence collapsing together (mechanical failure)",
             "pedal_asymmetry": "their pedal stroke has gone one-sided, a sign of muscular fatigue",
         }
         signs = "; ".join(_RLABEL.get(r, r) for r in (req.struggle_reasons or [])) or "they are clearly straining"

@@ -35,7 +35,7 @@ export const REASON_LABEL: Record<StruggleReason, string> = {
   power_fade: "power fading below target",
   power_variability: "choppy, uneven power",
   w_prime_low: "anaerobic tank nearly empty",
-  erg_spiral: "ERG spiral of death",
+  erg_spiral: "ERG mechanical failure — power + cadence collapsing",
   pedal_asymmetry: "pedal stroke going one-sided",
 };
 
@@ -69,15 +69,18 @@ export type StruggleState = {
   primary: StruggleReason | null;
   wPrimePct: number;        // 0..1 of anaerobic reserve remaining
   powerDeficitPct: number;  // fraction below target (0.12 = 12% under)
+  cadenceVariancePct: number; // coefficient of variation of cadence over the window (0.11 = 11%)
   power: number;            // 10s rolling avg
   cadence: number;          // 10s rolling avg
   hr: number;               // 10s rolling avg
   nearMaxHrPct: number;     // hr / maxHr
+  easePct: number;          // recommended ERG target reduction for this state (0.05 = 5%)
 };
 
 const IDLE: StruggleState = {
   active: false, severity: "none", safety: false, reasons: [], primary: null,
-  wPrimePct: 1, powerDeficitPct: 0, power: 0, cadence: 0, hr: 0, nearMaxHrPct: 0,
+  wPrimePct: 1, powerDeficitPct: 0, cadenceVariancePct: 0, power: 0, cadence: 0, hr: 0, nearMaxHrPct: 0,
+  easePct: 0,
 };
 
 const WINDOW_SEC = 10;   // rolling analysis window
@@ -183,6 +186,7 @@ export class StruggleEngine {
     const avgHr = hrs.length ? mean(hrs) : 0;
     const nearMaxHrPct = maxHr > 0 && avgHr > 0 ? avgHr / maxHr : 0;
     const powerDeficitPct = target > 0 && avgPower > 0 ? Math.max(0, (target - avgPower) / target) : 0;
+    const cadenceVariancePct = avgCad > 0 && cads.length >= 6 ? std(cads, avgCad) / avgCad : 0;
 
     const reasons: StruggleReason[] = [];
 
@@ -190,7 +194,7 @@ export class StruggleEngine {
     const cadFloor = Math.min(cadLow - 15, cadLow * 0.83, 75);
     if (trainerOn && avgCad > 0 && avgCad < cadFloor) reasons.push("cadence_decay");
 
-    // 2) Power fade — actual rolling power 10%+ under target.
+    // 2) Power fade — actual rolling power 10%+ under target (FTP-based target).
     if (trainerOn && target > 0 && powerDeficitPct > 0.1) reasons.push("power_fade");
 
     // 3) HR near max — sub-maximal work but HR pinned high.
@@ -215,9 +219,14 @@ export class StruggleEngine {
     // 6) W′ balance depletion — anaerobic tank nearly empty.
     if (trainerOn && this.wPrimePct() < 0.15) reasons.push("w_prime_low");
 
-    // 7) ERG spiral of death — in ERG, cadence collapsing on a high target while
-    //    power fades (resistance climbs to hold watts → rider gets bogged down).
-    if (ergMode && trainerOn && avgCad > 0 && avgCad < 70 && target >= ftp * 0.85 && powerDeficitPct > 0.08) {
+    // 7) ERG mechanical failure — the "spiral of death": resistance holds the
+    //    watts target so cadence collapses instead. Standalone trigger (does
+    //    not need any other signal): sustained power deficit for the whole 10s
+    //    window, cadence under a fixed 75 rpm mechanical floor, AND an erratic
+    //    (high-variance) stroke — i.e. the rider is genuinely bogged down, not
+    //    just briefly soft-pedalling.
+    if (ergMode && trainerOn && avgCad > 0 && cads.length >= 6 &&
+        powerDeficitPct > 0.10 && avgCad < 75 && cadenceVariancePct > 0.10) {
       reasons.push("erg_spiral");
     }
 
@@ -235,12 +244,14 @@ export class StruggleEngine {
 
     if (nowT < WARMUP_SEC && !safety) {
       return {
-        ...IDLE, wPrimePct: this.wPrimePct(), powerDeficitPct,
+        ...IDLE, wPrimePct: this.wPrimePct(), powerDeficitPct, cadenceVariancePct,
         power: Math.round(avgPower), cadence: Math.round(avgCad), hr: Math.round(avgHr), nearMaxHrPct,
       };
     }
 
-    const active = safety || reasons.length >= 2;
+    // ERG mechanical failure is decisive on its own — it doesn't need a second
+    // signal to justify dropping the trainer's resistance.
+    const active = safety || reasons.includes("erg_spiral") || reasons.length >= 2;
     let severity: StruggleState["severity"] = "none";
     if (active) {
       const heavy = safety || reasons.length >= 3 ||
@@ -250,10 +261,18 @@ export class StruggleEngine {
     }
     const primary = active ? (REASON_PRIORITY.find((r) => reasons.includes(r)) ?? reasons[0]) : null;
 
+    // Recommended ERG target reduction — the mechanical-failure gate calls for
+    // a smaller, precise 5% trim (it fires fast, on a clean signal); the more
+    // general multi-signal struggle keeps the gentler 8%; a safety trip is a
+    // deeper 45% drop into active recovery.
+    let easePct = 0;
+    if (active) easePct = safety ? 0.45 : primary === "erg_spiral" ? 0.05 : 0.08;
+
     return {
       active, severity, safety, reasons, primary,
-      wPrimePct: this.wPrimePct(), powerDeficitPct,
+      wPrimePct: this.wPrimePct(), powerDeficitPct, cadenceVariancePct,
       power: Math.round(avgPower), cadence: Math.round(avgCad), hr: Math.round(avgHr), nearMaxHrPct,
+      easePct,
     };
   }
 }
