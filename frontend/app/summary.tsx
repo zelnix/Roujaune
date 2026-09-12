@@ -441,7 +441,7 @@ function FullAnalysisModal({ stats, intervals, overall, hasData, ftp, adjustment
 const STRUGGLE_LABEL: Record<string, string> = {
   cadence_decay: "Cadence dropped", hr_decoupling: "HR decoupling", hr_near_max: "HR near max",
   power_fade: "Power faded", power_variability: "Choppy power", w_prime_low: "Tank near empty",
-  erg_spiral: "ERG spiral", pedal_asymmetry: "One-sided stroke",
+  erg_spiral: "ERG spiral", pedal_asymmetry: "One-sided stroke", systemic_fatigue: "HR drift (hydration)",
 };
 
 // Coach's one-tap FTP re-test prompt — shown when the struggle detector keeps

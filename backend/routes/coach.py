@@ -169,6 +169,7 @@ async def coach_cue(req: CoachCueRequest):
             "power_variability": "their pedal stroke has turned choppy and uneven",
             "w_prime_low": "their anaerobic reserve (W-prime) is almost empty",
             "erg_spiral": "the smart trainer's ERG resistance has bogged them down — power and cadence collapsing together (mechanical failure)",
+            "systemic_fatigue": "their heart rate has been drifting up for a long stretch while their power output holds steady — a sign of heat, dehydration or deep fatigue, not a hard effort",
             "pedal_asymmetry": "their pedal stroke has gone one-sided, a sign of muscular fatigue",
         }
         signs = "; ".join(_RLABEL.get(r, r) for r in (req.struggle_reasons or [])) or "they are clearly straining"
@@ -192,6 +193,13 @@ async def coach_cue(req: CoachCueRequest):
                     f"it will hit zero BEFORE this interval ends{ttd} — you are acting now, before they blow up, not after. "
                     f"In one short, confident, {urgency} sentence, tell them you're easing the target slightly right now "
                     "so they can hold something respectable to the end of the interval instead of collapsing mid-way." + eased
+                )
+            elif "systemic_fatigue" in (req.struggle_reasons or []):
+                instruction = (
+                    f"HYDRATION / HEAT CALL{where}: their heart rate has been climbing steadily for the last several "
+                    "minutes while their power output has held steady — this is heat, dehydration or deep-fatigue drift, "
+                    "not a hard effort they can just push through. In one short, calm, caring sentence, remind them to "
+                    "sip water right now, and mention you've capped their target a touch to protect the rest of the session." + eased
                 )
             else:
                 instruction = (
@@ -378,6 +386,7 @@ async def coach_debrief(req: CoachDebriefRequest):
             "hr_near_max": "HR near max", "power_fade": "power fading",
             "power_variability": "choppy power", "w_prime_low": "anaerobic tank empty",
             "erg_spiral": "ERG spiral", "pedal_asymmetry": "one-sided stroke",
+            "systemic_fatigue": "HR drift while power held (hydration/heat)",
         }
         n = len(req.struggles)
         had_safety = any(s.get("safety") for s in req.struggles)

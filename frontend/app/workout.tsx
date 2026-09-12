@@ -761,6 +761,10 @@ export default function LiveWorkout() {
   // divided by current power minus CP) is compared against the time left in
   // the interval. If the tank will hit zero before the interval ends, the
   // coach intervenes NOW — predicting the blow-up instead of reacting to it.
+  // Priority 3 gate — Systemic Fatigue: heart rate drifting up 5%+ over a
+  // ~15 minute horizon while power holds steady signals heat/dehydration or
+  // deep fatigue, not a hard effort — the response is a hydration reminder
+  // and a firm cap on target, not encouragement to dig in.
   const struggleMon = useStruggleMonitor({
     power: telemetry.power, cadence: telemetry.cadence, hr: telemetry.hr,
     elapsed: telemetry.elapsed, source: telemetry.source,
@@ -773,15 +777,18 @@ export default function LiveWorkout() {
       setStruggleEase(1 - s.easePct);
       const label = REASON_LABEL[(s.primary ?? s.reasons[0]) as keyof typeof REASON_LABEL] ?? "you're straining";
       const mechanical = s.primary === "erg_spiral";
+      const fatigued = s.primary === "systemic_fatigue";
       showToast(
         mechanical
           ? `Trainer eased ERG −${pct}% · cadence + power collapsing`
           : s.preemptive
           ? `${persona.name} eased −${pct}% now — you'd run out of gas before this interval ends`
+          : fatigued
+          ? `Hydration check — heart rate drifting while power holds. Target capped −${pct}%.`
           : `${persona.name} eased your target −${pct}% · ${label}`
       );
       logControl(
-        `${mechanical ? "Mechanical-failure" : s.preemptive ? "Pre-emptive W-prime" : "Coach"} eased −${pct}% ` +
+        `${mechanical ? "Mechanical-failure" : s.preemptive ? "Pre-emptive W-prime" : fatigued ? "Systemic-fatigue" : "Coach"} eased −${pct}% ` +
         `(${s.primary ?? "struggle"})${s.preemptive ? ` · ${s.wBalKj}/${s.wPrimeKj} kJ, ${Math.round(s.timeToDepletionSec ?? 0)}s to empty` : ""}`
       );
       generateCue("struggle", {

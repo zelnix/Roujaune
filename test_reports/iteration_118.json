@@ -1,0 +1,59 @@
+{
+  "summary": "Tested Priority 3's live-ride gate (Systemic Fatigue: HR drift >5% over 15min while power holds steady -> hydration protocol + target cap). Backend: existing regression suite test_iter112_struggle_and_debrief.py re-confirmed 4/4 PASS against the public preview URL. New test_iter118_systemic_fatigue.py (2/2 PASS) covers: POST /api/coach/cue cue_kind='struggle', struggle_reasons=['systemic_fatigue'], eased_pct=10 -> 200 with a valid, calm hydration cue (lexically checked it does NOT read like a 'push harder' cue) exercising the new instruction branch; and struggle_reasons=['power_fade'] (no systemic_fatigue) -> 200, unchanged generic struggle branch. Code review of struggle.ts confirms systemicFatigue() gate math matches spec exactly: 15-min longBuf (LONG_WINDOW_SEC), gated on >=13min of data (LONG_WINDOW_MIN_SEC), powerStable = |p2-p1|<=8% of p1, hrDrift = (h2-h1)/h1 > 0.05, standalone trigger (active = ... || reasons.includes('systemic_fatigue')), 10% ease (easePct = primary==='systemic_fatigue' ? 0.10 : ...), REASON_PRIORITY correctly orders it above hr_near_max/power_fade. workout.tsx onStruggle correctly branches on s.primary==='systemic_fatigue' for hydration-specific toast/log wording and passes remainingIntervalSec/age/systemic fields through unchanged. summary.tsx STRUGGLE_LABEL map has the new systemic_fatigue -> 'HR drift (hydration)' entry, code path reviewed and will not crash if present in ride data. Frontend: logged in as demo@roujaune.app, started 'Threshold Intervals' live workout -> HUD loaded, telemetry ticked (elapsed/calories/interval countdown), bc-erg testID present, End-ride dialog (Save Ride/Abandon/Resume) worked, Save Ride -> /summary rendered cleanly with no crash/red-screen (needsManual manual-entry card shown correctly since the short simulated session had <30 samples). As flagged in the review request, forcing the actual 13-15min sustained HR-drift-while-power-stable gate through simulated web-preview telemetry within a short automated test window was not achievable -- reported as untestable via current tooling, consistent with the prior two rounds' hardest-to-trigger gates (ERG spiral, pre-emptive W').",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "workout.tsx / workout-catalog (catalog item ctr-ride-1 'Welcome Ride')",
+        "issue": "Starting the specific catalog workout 'Welcome Ride' (workoutId=ctr-ride-1, Endurance > Beginner) immediately (within 1-4 seconds of elapsed time) shows the 'Workout Complete' popup and, after acknowledging, routes straight to /summary -- reproducible even with localStorage/sessionStorage cleared first (ruling out stale test-session cache). Root cause appears to be in the segTotalSec/segments duration computation for this specific catalog entry (workout.tsx lines ~600-636: 'if (segTotalSec > 0 && telemetry.elapsed >= segTotalSec)') -- segTotalSec is likely resolving to a near-zero value for this workout's segment definition. NOT caused by this round's diff (git diff confirms only struggle.ts/onStruggle/coach.py/summary.tsx STRUGGLE_LABEL changed this round; the completion-detection code is untouched). Verified other catalog workouts (e.g. 'Threshold Intervals', workoutId=threshold-intervals-foundation) run normally with correctly-ticking telemetry and no premature completion, so this is isolated to this one catalog item, not a general regression of the live-ride flow.",
+        "testID": "workout-ctr-ride-1 / start-workout",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "summary.tsx (SummaryHeader)",
+        "issues": ["When a ride ends with too little/no telemetry (needsManual=true path, e.g. a very short session), the Summary header still displays the hardcoded design-mock content from summaryContent (title 'Threshold Climb', date 'Wednesday, 12 May 2025' -- src/lib/summary.ts lines 63-97) rather than the actual just-ridden workout's name and today's date. Confirmed unrelated to this round's Priority 3 diff (summary.ts/SummaryHeader untouched this round); pre-existing mock-data leak in the manual-entry fallback path, low priority since the manual-entry card itself (workout name, save flow) works correctly."]
+      }
+    ],
+    "react_native_issues": []
+  },
+  "verified_working": [
+    "pytest /app/backend/tests/test_iter112_struggle_and_debrief.py -> 4/4 PASSED against https://scenic-trainer.preview.emergentagent.com (unchanged contract).",
+    "NEW pytest /app/backend/tests/test_iter118_systemic_fatigue.py -> 2/2 PASSED: struggle cue with struggle_reasons=['systemic_fatigue'] returns 200 with a calm, hydration-worded cue (lexically confirmed no 'push harder'/'dig in'/'dig deep' language); struggle cue with struggle_reasons=['power_fade'] only (no systemic_fatigue) still returns 200 via the unchanged generic struggle branch.",
+    "Code review: struggle.ts systemicFatigue() gate -- 15-min longBuf, >=13min data-gate, powerStable (<=8% delta), hrDrift>5%, standalone trigger, 10% ease, REASON_PRIORITY ordering -- all match the Priority 3 spec exactly.",
+    "Code review: routes/coach.py new hydration/heat instruction branch is correctly gated on 'systemic_fatigue' in req.struggle_reasons, falls back to the old generic struggle instruction otherwise (verified by test).",
+    "Code review: summary.tsx STRUGGLE_LABEL map includes the new systemic_fatigue -> 'HR drift (hydration)' entry; existing labels (ERG spiral, Tank near empty, etc.) unchanged.",
+    "Live indoor workout (web preview, simulated telemetry, workout='Threshold Intervals'): loads correctly, ELAPSED/CALORIES/INTERVAL countdown tick, ERG testID (bc-erg) present, End-ride dialog (Save Ride/Abandon Ride/Resume) works, Save Ride -> Workout Summary screen renders cleanly with no crash/red-screen."
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_iter112_struggle_and_debrief.py",
+    "/app/backend/tests/test_iter118_systemic_fatigue.py",
+    "/app/test_reports/pytest/iter118_systemic_fatigue.xml"
+  ],
+  "action_items": [
+    "Investigate the 'Welcome Ride' (ctr-ride-1) catalog entry's segment/duration data -- it triggers instant Workout Complete within a few seconds of starting, unlike other catalog workouts which run normally. Not a Priority 3 regression (unrelated code path), but worth a quick fix since it blocks that specific catalog item from being ridden at all.",
+    "Optional/low priority: SummaryHeader shows hardcoded mock title/date ('Threshold Climb' / 'Wednesday, 12 May 2025') instead of the actual ridden workout+date when the manual-entry (needsManual) path is shown -- pre-existing, unrelated to this round.",
+    "The Systemic Fatigue live gate (13-15 min sustained HR drift >5% while power holds steady) could not be forced through the simulated web-preview telemetry in the available test window -- same limitation as the Priority 1/2 hardest-to-trigger gates in prior rounds; reported as untestable via current tooling, not a failure. User's own Node-script math verification (1 firing case + 3 negative controls, all correct) is a reasonable substitute given this constraint."
+  ],
+  "critical_code_review_comments": [
+    "struggle.ts: systemicFatigue() correctly requires both wearableOn AND trainerOn AND lb.length>=10 before evaluating, avoiding false positives when either sensor is missing.",
+    "struggle.ts: the 15-min longBuf is independent of and does not interfere with the existing 10s WINDOW_SEC buffer used for the other struggle signals -- no shared mutable state between the two horizons other than the same push() call.",
+    "routes/coach.py: the new hydration instruction branch is placed correctly ahead of the generic 'else' struggle branch and after the preemptive w_prime_low branch, so priority ordering (preemptive > systemic_fatigue > generic) matches struggle.ts's REASON_PRIORITY array (erg_spiral > w_prime_low > systemic_fatigue > hr_near_max > ...).",
+    "New CoachCueRequest usage is additive (struggle_reasons=['systemic_fatigue'] is just a new value in an existing list field) -- no schema change needed, confirmed backward compatible by test.",
+    "Minor, unrelated to this round: the instant-complete bug on 'Welcome Ride' and the SummaryHeader mock-data leak (see ui_bugs/design_issues) are both pre-existing issues surfaced incidentally during this round's regression pass, not introduced by the Priority 3 diff."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter118_systemic_fatigue.py (new)"
+  ],
+  "success_rate": {"backend": "100% (4/4 existing regression + 2/2 new tests passed)", "frontend": "100% of reachable flows passed (live workout load/telemetry/ERG/end-ride/summary using 'Threshold Intervals'); systemic-fatigue visual trigger untestable via current simulated-telemetry tooling (expected per review_request, same as prior rounds' hardest gates); found 1 pre-existing, Priority-3-unrelated bug (instant-complete on 'Welcome Ride' catalog item) and 1 pre-existing, Priority-3-unrelated minor design issue (SummaryHeader mock text on the manual-entry path)"},
+  "seed_data_creation": "None. No residual test data left behind; test rides were short (a few seconds) manual-entry-path rides that were not submitted (manual entry form was not filled/saved).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Priority 3's live-ride gate (Systemic Fatigue) is verified correct at the backend-contract and code-review level; the coach/cue hydration instruction branch is additive and non-breaking. Two PRE-EXISTING, Priority-3-unrelated issues were surfaced incidentally this round and reported above: (1) the 'Welcome Ride' catalog workout instantly completes on start (likely a segment-duration data bug specific to that one catalog entry -- other workouts like 'Threshold Intervals' run fine), and (2) the Summary screen's manual-entry (needsManual) path shows hardcoded mock header text instead of the real workout/date. Neither blocks Priority 3 sign-off since the general live-workout regression flow (using a different catalog item) and the Summary struggle-log rendering path (code-reviewed, STRUGGLE_LABEL map correct) both check out. If any further physiological-model work follows, re-run test_iter112_struggle_and_debrief.py + test_iter117_wprime_predictive.py + test_iter118_systemic_fatigue.py together as the standing regression baseline for the struggle/coach-cue contract.",
+  "rca_of_issue": "No bug found in the Priority 3 feature itself. This is an additive feature (new struggle reason type 'systemic_fatigue' + new hydration-focused instruction branch in the struggle/safety cue prompt builder + new 15-min longBuf/systemicFatigue() gate in struggle.ts + new STRUGGLE_LABEL entry in summary.tsx). All changed files reviewed line-by-line match the Priority 3 spec exactly (15-min HR-drift-while-power-stable gate, standalone trigger, 10% ease, hydration-not-push-harder cue wording), and backward compatibility for the existing struggle/safety/live cue contract is confirmed by the unmodified regression suite still passing 4/4. Two unrelated pre-existing bugs were found incidentally during regression testing and are documented separately above for the main agent's awareness/backlog, not attributable to this round's diff (confirmed via git diff scoping)."
+}

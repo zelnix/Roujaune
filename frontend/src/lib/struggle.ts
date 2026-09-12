@@ -27,6 +27,7 @@ export type StruggleReason =
   | "power_variability"
   | "w_prime_low"
   | "erg_spiral"
+  | "systemic_fatigue"
   | "pedal_asymmetry";
 
 export const REASON_LABEL: Record<StruggleReason, string> = {
@@ -37,6 +38,7 @@ export const REASON_LABEL: Record<StruggleReason, string> = {
   power_variability: "choppy, uneven power",
   w_prime_low: "anaerobic tank nearly empty",
   erg_spiral: "ERG mechanical failure — power + cadence collapsing",
+  systemic_fatigue: "heart rate drifting while power holds — heat / hydration",
   pedal_asymmetry: "pedal stroke going one-sided",
 };
 
@@ -44,6 +46,7 @@ export const REASON_LABEL: Record<StruggleReason, string> = {
 const REASON_PRIORITY: StruggleReason[] = [
   "erg_spiral",
   "w_prime_low",
+  "systemic_fatigue",
   "hr_near_max",
   "power_fade",
   "hr_decoupling",
@@ -92,6 +95,8 @@ const IDLE: StruggleState = {
 
 const WINDOW_SEC = 10;   // rolling analysis window
 const WARMUP_SEC = 60;   // grace period — never flag a struggle in the first minute
+const LONG_WINDOW_SEC = 15 * 60;      // systemic-fatigue horizon: HR drift over the ride
+const LONG_WINDOW_MIN_SEC = 13 * 60;  // don't judge drift until we have most of the window
 
 /** Estimate max heart rate: prefer a measured value, else 220 − age, else 190. */
 export function resolveMaxHr(maxHr?: number, age?: number): number {
@@ -118,6 +123,7 @@ function std(xs: number[], m: number): number {
 
 export class StruggleEngine {
   private buf: StruggleSample[] = [];
+  private longBuf: { t: number; power: number; hr: number }[] = []; // 15-min systemic-fatigue horizon
   private cfg: StruggleConfig;
   private wPrime: number;
   private wBal: number;
@@ -145,6 +151,7 @@ export class StruggleEngine {
 
   reset() {
     this.buf = [];
+    this.longBuf = [];
     this.wBal = this.wPrime;
     this.lastT = -1;
   }
@@ -182,6 +189,10 @@ export class StruggleEngine {
     this.buf.push(s);
     const cutoff = s.t - WINDOW_SEC;
     while (this.buf.length > 2 && this.buf[0].t < cutoff) this.buf.shift();
+
+    this.longBuf.push({ t: s.t, power: s.power, hr: s.hr });
+    const longCutoff = s.t - LONG_WINDOW_SEC;
+    while (this.longBuf.length > 2 && this.longBuf[0].t < longCutoff) this.longBuf.shift();
   }
 
   wPrimePct(): number {
@@ -196,6 +207,29 @@ export class StruggleEngine {
   /** Total W′ (anaerobic work capacity), in kilojoules. */
   wPrimeKj(): number {
     return Math.round((this.wPrime / 1000) * 10) / 10;
+  }
+
+  /**
+   * Systemic Fatigue (long-form, over the whole ride so far, not the 10s
+   * window): heart rate creeping up over a ~15 minute horizon while power
+   * output holds steady is a sign of building heat load / dehydration /
+   * deep fatigue rather than a hard effort — the fix is water and a cap on
+   * how hard we let them push, not a pep talk about digging in.
+   */
+  private systemicFatigue(): boolean {
+    const lb = this.longBuf;
+    if (!this.cfg.wearableOn || !this.cfg.trainerOn || lb.length < 10) return false;
+    const span = lb[lb.length - 1].t - lb[0].t;
+    if (span < LONG_WINDOW_MIN_SEC) return false;
+    const half = Math.floor(lb.length / 2);
+    const p1 = mean(lb.slice(0, half).map((b) => b.power));
+    const p2 = mean(lb.slice(half).map((b) => b.power));
+    const h1 = mean(lb.slice(0, half).map((b) => b.hr).filter((h) => h > 0));
+    const h2 = mean(lb.slice(half).map((b) => b.hr).filter((h) => h > 0));
+    if (p1 <= 0 || h1 <= 0 || h2 <= 0) return false;
+    const powerStable = Math.abs(p2 - p1) <= p1 * 0.08;   // power holds — not a fade, not a surge
+    const hrDrift = (h2 - h1) / h1;
+    return powerStable && hrDrift > 0.05;                  // HR up 5%+ for the same output
   }
 
   evaluate(): StruggleState {
@@ -239,6 +273,11 @@ export class StruggleEngine {
       const h2 = mean(buf.slice(half).map((b) => b.hr).filter((h) => h > 0));
       if (p1 > 0 && h1 > 0 && p2 < p1 * 0.95 && h2 > h1 * 1.05) reasons.push("hr_decoupling");
     }
+
+    // 4b) Systemic fatigue — long-form (~15 min) HR drift while power holds
+    //     steady: heat / hydration / deep fatigue, not a hard effort. Standalone
+    //     trigger — it's already a well-established trend by the time it fires.
+    if (this.systemicFatigue()) reasons.push("systemic_fatigue");
 
     // 5) Power variability — choppy, spiky stroke (high CV) while working hard.
     if (trainerOn && avgPower > ftp * 0.5 && powers.length >= 6) {
@@ -292,13 +331,14 @@ export class StruggleEngine {
       };
     }
 
-    // ERG mechanical failure and a predicted W′ blow-out are both decisive on
-    // their own — neither needs a second signal to justify intervening.
-    const active = safety || reasons.includes("erg_spiral") || preemptive || reasons.length >= 2;
+    // ERG mechanical failure, a predicted W′ blow-out, and long-form systemic
+    // fatigue are all decisive on their own — none need a second signal to
+    // justify intervening.
+    const active = safety || reasons.includes("erg_spiral") || reasons.includes("systemic_fatigue") || preemptive || reasons.length >= 2;
     let severity: StruggleState["severity"] = "none";
     if (active) {
-      const heavy = safety || preemptive || reasons.includes("erg_spiral") || reasons.length >= 3 ||
-        (reasons.includes("hr_near_max") && reasons.length >= 2);
+      const heavy = safety || preemptive || reasons.includes("erg_spiral") || reasons.includes("systemic_fatigue") ||
+        reasons.length >= 3 || (reasons.includes("hr_near_max") && reasons.length >= 2);
       severity = heavy ? "high" : "mild";
     }
     const primary = active ? (REASON_PRIORITY.find((r) => reasons.includes(r)) ?? reasons[0]) : null;
@@ -306,11 +346,16 @@ export class StruggleEngine {
     // Recommended ERG target reduction: mechanical failure gets a small, precise
     // 5% trim (it fires fast, on a clean signal); a predicted W′ blow-out before
     // the interval ends gets a firmer 12% (protect the rest of the effort without
-    // fully bailing); general multi-signal struggle keeps the gentler 8%; a
-    // safety trip is a deep 45% drop into active recovery.
+    // fully bailing); systemic fatigue caps effort ~10% (protect against heat/
+    // dehydration climbing further); general multi-signal struggle keeps the
+    // gentler 8%; a safety trip is a deep 45% drop into active recovery.
     let easePct = 0;
     if (active) {
-      easePct = safety ? 0.45 : primary === "erg_spiral" ? 0.05 : preemptive ? 0.12 : 0.08;
+      easePct = safety ? 0.45
+        : primary === "erg_spiral" ? 0.05
+        : preemptive ? 0.12
+        : primary === "systemic_fatigue" ? 0.10
+        : 0.08;
     }
 
     return {
