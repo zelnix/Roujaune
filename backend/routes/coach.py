@@ -185,11 +185,20 @@ async def coach_cue(req: CoachCueRequest):
                 f" You have quietly dropped their target about {req.eased_pct}% to help them hold on — do not dwell on it."
                 if req.eased_pct else ""
             )
-            instruction = (
-                f"The rider is STARTING TO STRUGGLE{where}: {signs}. "
-                f"Give ONE short, specific, actionable cue {urgency} to help them dig in and hold form right now "
-                "(e.g. lift the cadence, relax the shoulders, breathe, smooth the stroke)." + eased
-            )
+            if req.preemptive and "w_prime_low" in (req.struggle_reasons or []):
+                ttd = f" (about {round(req.time_to_depletion_sec)}s at this pace)" if req.time_to_depletion_sec else ""
+                instruction = (
+                    f"PREDICTIVE CALL{where}: their anaerobic reserve (W-prime) is nearly empty, and at the current pace "
+                    f"it will hit zero BEFORE this interval ends{ttd} — you are acting now, before they blow up, not after. "
+                    f"In one short, confident, {urgency} sentence, tell them you're easing the target slightly right now "
+                    "so they can hold something respectable to the end of the interval instead of collapsing mid-way." + eased
+                )
+            else:
+                instruction = (
+                    f"The rider is STARTING TO STRUGGLE{where}: {signs}. "
+                    f"Give ONE short, specific, actionable cue {urgency} to help them dig in and hold form right now "
+                    "(e.g. lift the cadence, relax the shoulders, breathe, smooth the stroke)." + eased
+                )
     else:
         instruction = "Give the rider one short coaching cue right now."
     prompt = (

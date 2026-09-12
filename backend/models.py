@@ -96,6 +96,8 @@ class CoachCueRequest(BaseModel):
     near_max_hr_pct: float = 0
     place: Optional[str] = None
     eased_pct: int = 0
+    preemptive: bool = False               # predicted W′ blow-out before the interval ends
+    time_to_depletion_sec: Optional[float] = None
 
 
 class ExtendAdviceRequest(BaseModel):

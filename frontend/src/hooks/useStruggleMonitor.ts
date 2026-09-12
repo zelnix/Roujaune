@@ -20,6 +20,7 @@ export type StruggleMonitorOpts = {
   trainerOn: boolean;
   wearableOn: boolean;
   paused: boolean;
+  remainingIntervalSec?: number;   // seconds left in the current interval — powers the predictive W′ gate
   onStruggle: (s: StruggleState) => void; // fired once per struggle onset
   onSafety: (s: StruggleState) => void;   // fired once when a safety override trips
   onRecover: () => void;                   // fired once when the rider recovers
@@ -52,12 +53,12 @@ export function useStruggleMonitor(o: StruggleMonitorOpts) {
   const maxHrResolved = resolveMaxHr(o.maxHr, o.age);
   React.useEffect(() => {
     const cfg: StruggleConfig = {
-      ftp: o.ftp, maxHr: maxHrResolved, cadLow: o.cadLow, cadHigh: o.cadHigh,
+      ftp: o.ftp, maxHr: maxHrResolved, age: o.age, cadLow: o.cadLow, cadHigh: o.cadHigh,
       ergMode: o.ergMode, trainerOn: o.trainerOn, wearableOn: o.wearableOn,
     };
     if (!engineRef.current) engineRef.current = new StruggleEngine(cfg);
     else engineRef.current.setConfig(cfg);
-  }, [o.ftp, maxHrResolved, o.cadLow, o.cadHigh, o.ergMode, o.trainerOn, o.wearableOn]);
+  }, [o.ftp, maxHrResolved, o.age, o.cadLow, o.cadHigh, o.ergMode, o.trainerOn, o.wearableOn]);
 
   React.useEffect(() => {
     const eng = engineRef.current;
@@ -71,7 +72,7 @@ export function useStruggleMonitor(o: StruggleMonitorOpts) {
 
     eng.push({
       t: opt.elapsed, power: opt.power, cadence: opt.cadence, hr: opt.hr,
-      target: opt.targetW, balance: opt.balance ?? null,
+      target: opt.targetW, balance: opt.balance ?? null, remainingSec: opt.remainingIntervalSec ?? 0,
     });
     const s = eng.evaluate();
     setState(s);

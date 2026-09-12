@@ -16,6 +16,7 @@ export type StruggleSample = {
   hr: number;              // bpm (0 if no wearable)
   target: number;          // current interval target watts
   balance?: number | null; // left-pedal power balance % (advanced power meters)
+  remainingSec?: number;   // seconds left in the current interval (0/undefined if unknown)
 };
 
 export type StruggleReason =
@@ -54,6 +55,7 @@ const REASON_PRIORITY: StruggleReason[] = [
 export type StruggleConfig = {
   ftp: number;
   maxHr: number;
+  age?: number;          // rider age — used to age-adjust W′ recovery (G50 FIT)
   cadLow: number;
   cadHigh: number;
   ergMode: boolean;
@@ -68,6 +70,10 @@ export type StruggleState = {
   reasons: StruggleReason[];
   primary: StruggleReason | null;
   wPrimePct: number;        // 0..1 of anaerobic reserve remaining
+  wBalKj: number;           // W′ balance remaining, in kilojoules
+  wPrimeKj: number;         // total W′ (anaerobic) capacity, in kilojoules
+  timeToDepletionSec: number | null; // seconds until W′bal hits 0 at the current power (null when not depleting)
+  preemptive: boolean;      // predicted to run out of W′ before the interval ends — urgent
   powerDeficitPct: number;  // fraction below target (0.12 = 12% under)
   cadenceVariancePct: number; // coefficient of variation of cadence over the window (0.11 = 11%)
   power: number;            // 10s rolling avg
@@ -79,7 +85,8 @@ export type StruggleState = {
 
 const IDLE: StruggleState = {
   active: false, severity: "none", safety: false, reasons: [], primary: null,
-  wPrimePct: 1, powerDeficitPct: 0, cadenceVariancePct: 0, power: 0, cadence: 0, hr: 0, nearMaxHrPct: 0,
+  wPrimePct: 1, wBalKj: 0, wPrimeKj: 0, timeToDepletionSec: null, preemptive: false,
+  powerDeficitPct: 0, cadenceVariancePct: 0, power: 0, cadence: 0, hr: 0, nearMaxHrPct: 0,
   easePct: 0,
 };
 
@@ -142,14 +149,27 @@ export class StruggleEngine {
     this.lastT = -1;
   }
 
-  /** Skiba W′-balance model: deplete above CP, recover (bi-exponential) below. */
-  private updateWbal(power: number, dt: number) {
+  /**
+   * Skiba W′-balance model: deplete above CP, recover (bi-exponential) below.
+   * Age-adjusted decay (G50 FIT): the base recovery time constant (tau) is
+   * scaled up — i.e. recovery slowed — the further into the ride we are
+   * (accumulated fatigue makes reconstitution less efficient bout-to-bout)
+   * and, additively, for riders over 50 (reduced recovery capacity). This
+   * prevents the model from ever OVER-estimating remaining anaerobic
+   * capacity deep into a session or for a masters athlete.
+   */
+  private updateWbal(power: number, dt: number, elapsedSec: number) {
     if (dt <= 0 || dt > 5) return;
     if (power > this.cp) {
       this.wBal -= (power - this.cp) * dt;
     } else {
       const dcp = this.cp - power;
-      const tau = 546 * Math.exp(-0.01 * dcp) + 316;
+      const baseTau = 546 * Math.exp(-0.01 * dcp) + 316;
+      const elapsedMin = Math.max(0, elapsedSec) / 60;
+      const progressMult = 1 + Math.min(0.8, elapsedMin / 60);          // up to +80% by ~60 min in
+      const age = this.cfg.age ?? 0;
+      const ageMult = age >= 50 ? 1 + Math.min(0.5, (age - 50) * 0.02) : 1; // up to +50% at 75+
+      const tau = baseTau * progressMult * ageMult;
       this.wBal += (this.wPrime - this.wBal) * (1 - Math.exp(-dt / tau));
     }
     this.wBal = Math.max(0, Math.min(this.wPrime, this.wBal));
@@ -158,7 +178,7 @@ export class StruggleEngine {
   push(s: StruggleSample) {
     const dt = this.lastT < 0 ? 0 : s.t - this.lastT;
     this.lastT = s.t;
-    if (this.cfg.trainerOn) this.updateWbal(s.power, dt);
+    if (this.cfg.trainerOn) this.updateWbal(s.power, dt, s.t);
     this.buf.push(s);
     const cutoff = s.t - WINDOW_SEC;
     while (this.buf.length > 2 && this.buf[0].t < cutoff) this.buf.shift();
@@ -168,12 +188,22 @@ export class StruggleEngine {
     return this.wPrime > 0 ? this.wBal / this.wPrime : 1;
   }
 
+  /** W′ balance remaining, in kilojoules. */
+  wBalKj(): number {
+    return Math.round((this.wBal / 1000) * 10) / 10;
+  }
+
+  /** Total W′ (anaerobic work capacity), in kilojoules. */
+  wPrimeKj(): number {
+    return Math.round((this.wPrime / 1000) * 10) / 10;
+  }
+
   evaluate(): StruggleState {
     const buf = this.buf;
-    if (buf.length < 5) return { ...IDLE, wPrimePct: this.wPrimePct() };
+    if (buf.length < 5) return { ...IDLE, wPrimePct: this.wPrimePct(), wBalKj: this.wBalKj(), wPrimeKj: this.wPrimeKj() };
     const nowT = buf[buf.length - 1].t;
     const span = nowT - buf[0].t;
-    if (span < WINDOW_SEC * 0.7) return { ...IDLE, wPrimePct: this.wPrimePct() };
+    if (span < WINDOW_SEC * 0.7) return { ...IDLE, wPrimePct: this.wPrimePct(), wBalKj: this.wBalKj(), wPrimeKj: this.wPrimeKj() };
 
     const { ftp, maxHr, cadLow, cadHigh, ergMode, trainerOn, wearableOn } = this.cfg;
     const powers = buf.map((b) => b.power);
@@ -216,8 +246,20 @@ export class StruggleEngine {
       if (cv > 0.2) reasons.push("power_variability");
     }
 
-    // 6) W′ balance depletion — anaerobic tank nearly empty.
-    if (trainerOn && this.wPrimePct() < 0.15) reasons.push("w_prime_low");
+    // 6) W′ balance depletion — anaerobic tank nearly empty. Also compute the
+    //    Time-to-Depletion equation (remaining W′bal ÷ (current power − CP))
+    //    so we can tell a merely-low tank apart from one that's about to hit
+    //    zero *before this interval is even over* — that's the case the coach
+    //    needs to act on predictively, before cadence mechanically locks up.
+    const curPower = buf[buf.length - 1].power;
+    const wattsAboveCp = curPower - this.cp;
+    const timeToDepletionSec = wattsAboveCp > 1 ? this.wBal / wattsAboveCp : null;
+    const remainingIntervalSec = buf[buf.length - 1].remainingSec ?? 0;
+    const lowWPrime = trainerOn && this.wPrimePct() < 0.15;
+    if (lowWPrime) reasons.push("w_prime_low");
+    const preemptive =
+      lowWPrime && timeToDepletionSec != null && remainingIntervalSec > 0 &&
+      timeToDepletionSec < remainingIntervalSec;
 
     // 7) ERG mechanical failure — the "spiral of death": resistance holds the
     //    watts target so cadence collapses instead. Standalone trigger (does
@@ -244,33 +286,38 @@ export class StruggleEngine {
 
     if (nowT < WARMUP_SEC && !safety) {
       return {
-        ...IDLE, wPrimePct: this.wPrimePct(), powerDeficitPct, cadenceVariancePct,
+        ...IDLE, wPrimePct: this.wPrimePct(), wBalKj: this.wBalKj(), wPrimeKj: this.wPrimeKj(),
+        timeToDepletionSec, powerDeficitPct, cadenceVariancePct,
         power: Math.round(avgPower), cadence: Math.round(avgCad), hr: Math.round(avgHr), nearMaxHrPct,
       };
     }
 
-    // ERG mechanical failure is decisive on its own — it doesn't need a second
-    // signal to justify dropping the trainer's resistance.
-    const active = safety || reasons.includes("erg_spiral") || reasons.length >= 2;
+    // ERG mechanical failure and a predicted W′ blow-out are both decisive on
+    // their own — neither needs a second signal to justify intervening.
+    const active = safety || reasons.includes("erg_spiral") || preemptive || reasons.length >= 2;
     let severity: StruggleState["severity"] = "none";
     if (active) {
-      const heavy = safety || reasons.length >= 3 ||
-        reasons.includes("w_prime_low") || reasons.includes("erg_spiral") ||
+      const heavy = safety || preemptive || reasons.includes("erg_spiral") || reasons.length >= 3 ||
         (reasons.includes("hr_near_max") && reasons.length >= 2);
       severity = heavy ? "high" : "mild";
     }
     const primary = active ? (REASON_PRIORITY.find((r) => reasons.includes(r)) ?? reasons[0]) : null;
 
-    // Recommended ERG target reduction — the mechanical-failure gate calls for
-    // a smaller, precise 5% trim (it fires fast, on a clean signal); the more
-    // general multi-signal struggle keeps the gentler 8%; a safety trip is a
-    // deeper 45% drop into active recovery.
+    // Recommended ERG target reduction: mechanical failure gets a small, precise
+    // 5% trim (it fires fast, on a clean signal); a predicted W′ blow-out before
+    // the interval ends gets a firmer 12% (protect the rest of the effort without
+    // fully bailing); general multi-signal struggle keeps the gentler 8%; a
+    // safety trip is a deep 45% drop into active recovery.
     let easePct = 0;
-    if (active) easePct = safety ? 0.45 : primary === "erg_spiral" ? 0.05 : 0.08;
+    if (active) {
+      easePct = safety ? 0.45 : primary === "erg_spiral" ? 0.05 : preemptive ? 0.12 : 0.08;
+    }
 
     return {
       active, severity, safety, reasons, primary,
-      wPrimePct: this.wPrimePct(), powerDeficitPct, cadenceVariancePct,
+      wPrimePct: this.wPrimePct(), wBalKj: this.wBalKj(), wPrimeKj: this.wPrimeKj(),
+      timeToDepletionSec, preemptive,
+      powerDeficitPct, cadenceVariancePct,
       power: Math.round(avgPower), cadence: Math.round(avgCad), hr: Math.round(avgHr), nearMaxHrPct,
       easePct,
     };

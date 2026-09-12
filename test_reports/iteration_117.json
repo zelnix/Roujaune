@@ -1,0 +1,51 @@
+{
+  "summary": "Tested Priority 2 (Critical Power / W' Balance, age-adjusted decay + pre-emptive intervention). Backend: existing regression suite test_iter112_struggle_and_debrief.py re-confirmed 4/4 PASS against the public preview URL. New test_iter117_wprime_predictive.py (5/5 PASS) covers: POST /api/coach/cue with cue_kind='struggle', struggle_reasons=['w_prime_low'], preemptive=true, time_to_depletion_sec=45 -> 200 valid cue (new predictive branch); the same struggle cue WITHOUT the two new optional fields -> still 200 (backward compat); a minimal/legacy live cue with no struggle fields at all -> still 200; Age persistence via PUT/GET /api/rider/profile; Max HR persistence via POST/GET /api/activities/ftp. Frontend: logged in as demo@roujaune.app, started a live 'Threshold Intervals' workout -> HUD loaded with ticking ELAPSED/CALORIES/DISTANCE telemetry, ERG testIDs (bc-erg, bc-erg-up, bc-erg-down) present and tappable, pause/end controls present, ended the ride via the 'End this ride?' dialog (Save Ride) -> Workout Summary screen rendered cleanly with no red-screen/crash. Sanity-checked Profile screen: Age (62) displays correctly and is editable via the 'Edit rider profile' modal, matching the backend value confirmed by the persistence test. Code review of struggle.ts/useStruggleMonitor.ts/workout.tsx confirms remainingIntervalSec (activeSeg.remaining) and age are correctly threaded into the engine, and onStruggle correctly branches on s.preemptive to build the coach payload (preemptive + time_to_depletion_sec). As flagged in the review request, forcing the actual pre-emptive W' trigger (sustained power > CP long enough to drop W'bal < 15% AND predict zero before interval end) through the simulated web-preview telemetry within a short test window was not achievable -- reported as untestable via current tooling (not a failure), consistent with the same limitation noted for the Priority 1 ERG-failure gate in the prior round.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Profile / Settings / Benchmark Workouts",
+        "issues": ["Max HR does not appear to have a dedicated, rider-facing input anywhere in the explored screens (Profile 'Edit rider profile' modal only has Weight/Age/Gender/capability/location; Settings has coach/equipment/wheel prefs; Benchmark Workouts shows benchmark test results but no direct Max HR field). The backend setting (settings.app.max_hr, read/written via /api/activities/ftp) works correctly and persists, but there is no visible UI to set it directly -- it may only ever be set by an FTP/HR benchmark test result. This is a pre-existing gap unrelated to this PR (age is the field actually used by the new W' age-adjustment math in struggle.ts, not max_hr, so this does not block Priority 2), but worth flagging since the review's sanity-check line mentioned 'Max HR and Age' together."]
+      }
+    ],
+    "react_native_issues": []
+  },
+  "verified_working": [
+    "pytest /app/backend/tests/test_iter112_struggle_and_debrief.py -> 4/4 PASSED against https://scenic-trainer.preview.emergentagent.com (unchanged contract).",
+    "NEW pytest /app/backend/tests/test_iter117_wprime_predictive.py -> 5/5 PASSED: preemptive struggle cue with new fields (200 + valid cue), struggle cue WITHOUT new optional fields (200, backward compatible), minimal legacy live cue (200), age persists via PUT/GET /api/rider/profile, max_hr persists via POST/GET /api/activities/ftp.",
+    "Code review: struggle.ts updateWbal() age-adjustment reads exactly per spec -- baseTau scaled by progressMult (up to +80% by ~60min) and ageMult (+2%/yr over 50, capped +50% at 75+), recovery slowed (never sped up) as ride progresses / for older riders -- matches the 'aggressively slow down W' reconstitution' requirement.",
+    "Code review: timeToDepletionSec = wBal / (curPower - cp) when curPower>cp else null; preemptive = lowWPrime (wPrimePct<0.15) && timeToDepletionSec!=null && remainingIntervalSec>0 && timeToDepletionSec<remainingIntervalSec -- matches the exact spec equation and the 15%/interval-end gate.",
+    "Code review: useStruggleMonitor.ts threads o.age into StruggleConfig and o.remainingIntervalSec into each pushed sample; workout.tsx passes remainingIntervalSec: activeSeg?.remaining ?? 0 and branches onStruggle on s.preemptive (message text + coach cue payload with preemptive/time_to_depletion_sec) exactly as described in the review's file references.",
+    "Live indoor workout (web preview, simulated telemetry): loads correctly, ELAPSED/CALORIES/DISTANCE tick upward, ERG testIDs (bc-erg, bc-erg-up, bc-erg-down) present and tappable (ERG intensity panel shows 100%), pause/end controls present, End-ride dialog (Save Ride/Abandon Ride/Resume) works, Save Ride -> Workout Summary screen renders cleanly with no crash/red-screen.",
+    "Profile screen: Age field (62) displays and is editable via 'Edit rider profile' modal, consistent with the backend-persisted value verified in the pytest run."
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_iter112_struggle_and_debrief.py",
+    "/app/backend/tests/test_iter117_wprime_predictive.py",
+    "/app/test_reports/pytest/iter117_p2_wprime.xml"
+  ],
+  "action_items": [
+    "None blocking. Optional/nice-to-have: consider exposing a direct Max HR input in Profile/Settings (currently only settable server-side via /api/activities/ftp, no UI found) -- low priority since the new W' age-adjustment math itself only consumes rider age, not max_hr.",
+    "The pre-emptive W' intervention (power sustained above CP long enough to drop W'bal<15% AND predict zero before interval end) could not be forced through the simulated web-preview telemetry in the available test window -- same limitation as the Priority 1 mechanical-failure gate; reported as untestable via current tooling, not a failure. User's own Node-script math verification (age/progression-scaled tau + 3 time-to-depletion scenarios) is a reasonable substitute given this constraint."
+  ],
+  "critical_code_review_comments": [
+    "struggle.ts: CP is correctly kept equal to FTP as documented scope note (this.cp = cfg.ftp || 250; updated on setConfig when ftp changes) -- no separate CP-testing protocol introduced, matching the stated out-of-scope note.",
+    "New CoachCueRequest fields (preemptive: bool=False, time_to_depletion_sec: Optional[float]=None) are additive with safe defaults -- confirmed via test that omitting them entirely still returns 200, so no breaking change for older clients/tests.",
+    "routes/coach.py predictive-W' instruction branch is correctly gated on req.preemptive AND 'w_prime_low' in req.struggle_reasons, falling back to the existing general-struggle wording otherwise -- clean, non-overlapping branch logic.",
+    "Minor: estimateWPrime() uses a flat 70x FTP heuristic with a 9000J floor -- reasonable placeholder since no dedicated W' testing protocol exists yet (consistent with the CP=FTP proxy scope note)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter117_wprime_predictive.py (new)"
+  ],
+  "success_rate": {"backend": "100% (4/4 existing regression + 5/5 new tests passed)", "frontend": "100% of reachable flows passed (live workout load/telemetry/ERG toggle/end-ride/summary, Age display+persistence); pre-emptive W' visual trigger untestable via current simulated-telemetry tooling (expected per review_request, same as prior round's ERG gate)"},
+  "seed_data_creation": "None. Test-modified rider age/max_hr values were restored to their original values within the same test run (no residual test data left behind).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Priority 2 (CP/W' balance, age-adjusted decay, pre-emptive intervention) is verified correct at the backend-contract and code-review level; live-workout and Priority-1 regressions are unaffected. The only remaining gap is visually observing the actual pre-emptive 'urgent audio encouragement' toast firing live in the UI, which requires either a way to inject a precise synthetic power-above-CP stream sustained long enough to deplete W'bal<15% with a predicted zero-crossing before interval end, or a native/BLE-simulator rig -- not available in the current web-preview tooling. If Priority 3 of the physiological model is implemented next, re-run backend/tests/test_iter117_wprime_predictive.py and test_iter112_struggle_and_debrief.py together as the standing regression baseline for the struggle/coach-cue contract.",
+  "rca_of_issue": "No bug found. This is an additive feature (new optional CoachCueRequest fields + new predictive branch in the struggle/safety prompt builder + age-adjusted W' recovery tau in struggle.ts). All changed files reviewed line-by-line match the Priority 2 spec (age-adjusted decay formula, Time-to-Depletion equation, 15%-and-predicted-before-interval-end gate) exactly, and backward compatibility for older payloads (missing preemptive/time_to_depletion_sec) is confirmed by test. No RCA needed."
+}

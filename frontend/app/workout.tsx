@@ -757,12 +757,17 @@ export default function LiveWorkout() {
   // 10%+ under target for the full 10s window AND cadence sits under a 75rpm
   // floor AND the stroke is erratic (cadence CV > 10%) — this alone commands
   // a precise 5% ERG resistance drop, independent of any other signal.
+  // Priority 2 gate — Pre-Emptive W′ Intervention: Time-to-Depletion (W′bal
+  // divided by current power minus CP) is compared against the time left in
+  // the interval. If the tank will hit zero before the interval ends, the
+  // coach intervenes NOW — predicting the blow-up instead of reacting to it.
   const struggleMon = useStruggleMonitor({
     power: telemetry.power, cadence: telemetry.cadence, hr: telemetry.hr,
     elapsed: telemetry.elapsed, source: telemetry.source,
     balance: (ble.readings as any)?.balance ?? null,
     targetW, ftp, maxHr: settings.maxHr, age: settings.age,
     cadLow: CAD_LOW, cadHigh: CAD_HIGH, ergMode, trainerOn, wearableOn, paused,
+    remainingIntervalSec: activeSeg?.remaining ?? 0,
     onStruggle: (s: StruggleState) => {
       const pct = Math.round(s.easePct * 100) || 8;
       setStruggleEase(1 - s.easePct);
@@ -771,9 +776,14 @@ export default function LiveWorkout() {
       showToast(
         mechanical
           ? `Trainer eased ERG −${pct}% · cadence + power collapsing`
+          : s.preemptive
+          ? `${persona.name} eased −${pct}% now — you'd run out of gas before this interval ends`
           : `${persona.name} eased your target −${pct}% · ${label}`
       );
-      logControl(`${mechanical ? "Mechanical-failure" : "Coach"} eased −${pct}% (${s.primary ?? "struggle"})`);
+      logControl(
+        `${mechanical ? "Mechanical-failure" : s.preemptive ? "Pre-emptive W-prime" : "Coach"} eased −${pct}% ` +
+        `(${s.primary ?? "struggle"})${s.preemptive ? ` · ${s.wBalKj}/${s.wPrimeKj} kJ, ${Math.round(s.timeToDepletionSec ?? 0)}s to empty` : ""}`
+      );
       generateCue("struggle", {
         struggle_reasons: s.reasons, struggle_primary: s.primary,
         struggle_severity: s.severity, struggle_safety: false,
@@ -781,6 +791,7 @@ export default function LiveWorkout() {
         w_prime_pct: Math.round(s.wPrimePct * 100) / 100,
         near_max_hr_pct: Math.round(s.nearMaxHrPct * 100) / 100,
         place: vroute.place, eased_pct: pct,
+        preemptive: s.preemptive, time_to_depletion_sec: s.timeToDepletionSec ?? undefined,
       });
     },
     onSafety: (s: StruggleState) => {
