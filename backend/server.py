@@ -456,9 +456,28 @@ logger = logging.getLogger(__name__)
 
 @app.on_event("startup")
 async def _seed_plans_on_startup():
-    """Move plan DEFINITIONS into MongoDB (non-destructive) and refresh the
-    couch-to-road cache from the DB so edits made via plans_admin take effect."""
+    """Register plan definitions in-memory (cheap, no I/O) immediately, then
+    hand off ALL the slower Mongo-dependent seeding/backfill/index/admin
+    bootstrap work to a background task instead of `await`-ing it here.
+
+    Uvicorn does not start accepting connections on its socket until this
+    startup handler returns (it logs "Application startup complete." BEFORE
+    "Uvicorn running on ..."). In this sandbox (local Mongo) the full seeding
+    chain below only takes ~9s, but against a remote MongoDB Atlas cluster in
+    production (TLS handshake + network round-trip per query, multiplied
+    across dozens of sequential awaits) it can take much longer — long enough
+    to blow past the deployment platform's readiness/health-check window and
+    fail the rollout, even though the app itself is fine. Running it in the
+    background lets `/health` (and Uvicorn's listening socket) become
+    available immediately, independent of how slow the DB seeding is."""
     plans_admin.init(db, on_change=_on_plan_change, on_audit=_admin_audit_write)
+    asyncio.create_task(_background_seed())
+
+
+async def _background_seed():
+    """Slow, Mongo-dependent startup seeding — runs AFTER the server has
+    already started accepting connections (see `_seed_plans_on_startup`
+    above for why this must not block Uvicorn's socket bind)."""
     # Apply any admin-configured benchmark thresholds persisted in admin_config.
     try:
         cfg = await db.admin_config.find_one({"_id": "benchmark"})
