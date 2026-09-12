@@ -1125,17 +1125,49 @@ async def coach_weekly_note(coach_name: str = "Alberto", coach_gender: str = "ma
     this_wk = _bucket(wk_start, now)
     last_wk = _bucket(prev_start, wk_start)
 
+    # Pull the longer-term adaptation signal (EF/decoupling/HRR/W'/TSB — the
+    # metrics engine already computes) so the recap can speak to *trends*, not
+    # just this week's raw volume, when that's the more useful story.
+    adapt_txt = ""
+    highlight: Optional[dict] = None
+    try:
+        from routes.analysis import adaptation as _adaptation_fn
+        adapt = await _adaptation_fn(weeks=8)
+    except Exception:
+        adapt = {}
+    if adapt.get("has_data"):
+        callouts = adapt.get("callouts") or []
+        load = adapt.get("load") or {}
+        confirm_items = (adapt.get("coach_actions") or {}).get("confirm") or []
+        parts = []
+        if callouts:
+            parts.append("Longer-term trend (last 8 weeks): " + " ".join(c["text"] for c in callouts[:2]))
+            highlight = {"kind": callouts[0]["kind"], "good": callouts[0]["good"]}
+        if load.get("ctl") is not None:
+            parts.append(
+                f"Current Fitness (CTL) {load.get('ctl')}, Form (TSB) {load.get('tsb')} "
+                f"({load.get('form_state')}), 7-day ramp {load.get('ramp_rate')}/wk."
+            )
+        if confirm_items:
+            parts.append("Also worth a gentle mention (don't decide for them, just flag it): " + confirm_items[0]["text"])
+        if parts:
+            adapt_txt = (
+                "\n" + " ".join(parts) + " Use whichever of this longer-term trend or the weekly volume numbers "
+                "makes for the most specific, useful note and focus — you don't need to mention everything."
+            )
+
     rider = await _rider_line()
     workouts_txt = ("; ".join(this_wk["names"][:6]) or "no named workouts")
     prompt = (
         f"{rider}\n"
         f"This is the rider's WEEKLY recap. This week: {this_wk['rides']} rides, {this_wk['tss']} TSS, "
         f"{this_wk['hours']} h, {this_wk['distance_km']} km (sessions: {workouts_txt}). "
-        f"Last week for comparison: {last_wk['rides']} rides, {last_wk['tss']} TSS, {last_wk['hours']} h.\n"
+        f"Last week for comparison: {last_wk['rides']} rides, {last_wk['tss']} TSS, {last_wk['hours']} h.{adapt_txt}\n"
         "Write a short spoken weekly recap for the rider. Reply with ONLY valid minified JSON (no markdown, no code fences) "
         'of the shape {"note": string, "focus": string}. '
-        "\"note\": 2 warm sentences recapping the week (praise the effort, reference the numbers or the trend vs last week). "
-        "\"focus\": ONE short, concrete focus for next week (a single actionable sentence). "
+        "\"note\": 2 warm sentences recapping the week (praise the effort, reference whichever is more meaningful — this "
+        "week's numbers vs last week, or the longer-term trend if it's the more useful story). "
+        "\"focus\": ONE short, concrete focus for next week (a single actionable sentence), informed by the same signals. "
         f"Speak as {coach_name}, first person, no emojis, no quotation marks inside the strings."
     )
 
@@ -1156,7 +1188,7 @@ async def coach_weekly_note(coach_name: str = "Alberto", coach_gender: str = "ma
         focus = str(data_json.get("focus", "")).strip().strip('"')
         if not note:
             raise ValueError("empty note")
-        data = {"note": note, "focus": focus, "has_activity": this_wk["rides"] > 0}
+        data = {"note": note, "focus": focus, "has_activity": this_wk["rides"] > 0, "highlight": highlight}
         try:
             await udb.settings.update_one(
                 {"id": "weekly_note"}, {"$set": {ckey: {"week": wk, "data": data}}}, upsert=True)

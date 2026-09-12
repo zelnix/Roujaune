@@ -387,12 +387,18 @@ export function FormTargetCard({ target, onChanged }: { target: FormTarget | nul
   );
 }
 
+/** Friendly labels for the longer-term metric a weekly note is highlighting. */
+const HIGHLIGHT_LABELS: Record<string, string> = {
+  ef: "Aerobic efficiency", decoupling: "Aerobic decoupling", hrr: "Heart-rate recovery", w_prime: "Anaerobic reserve",
+};
+
 /** Coach Weekly Note — a short spoken recap + one focus, in the coach's voice. */
 export function CoachWeeklyNote({ note, loading, onRefresh }: { note: WeeklyNote | null; loading: boolean; onRefresh: () => void }) {
   const coach = useCoach();
   const { speak, speakingId } = useCoachSpeech(coach.id);
   const speaking = speakingId === "weekly-note";
   const full = note ? `${note.note} ${note.focus ? "This week's focus: " + note.focus : ""}` : "";
+  const highlightLabel = note?.highlight ? HIGHLIGHT_LABELS[note.highlight.kind] : null;
   return (
     <View>
       {loading ? (
@@ -409,6 +415,12 @@ export function CoachWeeklyNote({ note, loading, onRefresh }: { note: WeeklyNote
               <Text style={s.playBtnT}>{speaking ? "Stop" : "Listen"}</Text>
             </Pressable>
           </View>
+          {highlightLabel ? (
+            <View style={s.trendBadge} testID="weekly-note-highlight">
+              <Ionicons name={note!.highlight!.good ? "trending-up" : "alert-circle"} size={12} color={note!.highlight!.good ? (colors.green ?? "#37B24D") : colors.yellow} />
+              <Text style={s.trendBadgeT}>Based on your 8-week {highlightLabel.toLowerCase()} trend</Text>
+            </View>
+          ) : null}
           <Text style={s.noteText}>{note.note}</Text>
           {note.focus ? (
             <View style={s.focusBox}>
@@ -696,6 +708,8 @@ const s = StyleSheet.create({
   playBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.yellow, borderRadius: radius.pill, paddingVertical: 7, paddingHorizontal: 14 },
   playBtnT: { color: "#241B00", fontSize: 12.5, fontWeight: "800" },
   noteText: { color: colors.textDim, fontSize: 14, lineHeight: 21 },
+  trendBadge: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", marginBottom: 9 },
+  trendBadgeT: { color: colors.textFaint, fontSize: 11, fontWeight: "700" },
   focusBox: { flexDirection: "row", gap: 8, alignItems: "flex-start", backgroundColor: "rgba(255,194,10,0.08)", borderRadius: radius.md, padding: 12, marginTop: 12 },
   focusText: { color: colors.textDim, fontSize: 13, lineHeight: 19, flex: 1 },
   refreshLink: { flexDirection: "row", alignItems: "center", gap: 5, alignSelf: "flex-start", marginTop: 12, paddingVertical: 4 },

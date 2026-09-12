@@ -49,7 +49,7 @@ export type ClimbDetailPoint = { d: number; ele?: number; speed?: number | null;
 export type ClimbDetailAttempt = { activity_id: string; name: string; date: string; time_s: number | null; avg_speed_kmh: number | null; pr: boolean; gap_s: number | null; series: ClimbDetailPoint[] };
 export type ClimbDetail = { found: boolean; id?: string; name?: string; gain_m?: number; length_m?: number; grad_pct?: number | null; count?: number; path?: [number, number][]; profile?: ClimbDetailPoint[]; splits?: ClimbSplit[]; recent_split_prs?: SplitPr[]; recent_activity_id?: string; attempts?: ClimbDetailAttempt[] };
 export type FormTarget = { has_event: boolean; event_date?: string; event_name?: string; days_out?: number; past?: boolean; projected_form?: number; projected_fitness?: number; state?: string; fresh?: boolean; current_form?: number; current_fitness?: number };
-export type WeeklyNote = { note: string; focus: string; has_activity: boolean };
+export type WeeklyNote = { note: string; focus: string; has_activity: boolean; highlight?: { kind: string; good: boolean } | null };
 
 export async function fetchPmc(days = 90, forecastDays = 14): Promise<Pmc | null> {
   const r = await fetch(`${API}/analysis/pmc?days=${days}&forecast_days=${forecastDays}`);

@@ -1,0 +1,40 @@
+{
+  "summary": "Tested the enriched Coach's Weekly Note feature (adaptation trend highlight badge) via backend pytest (6/6 passed) and live Playwright UI on both demo@roujaune.app and greenlantern@roujaune.app. Confirmed backend is correct and gracefully returns highlight:null on both accounts because GET /api/analysis/adaptation returns has_data:true but an empty callouts[] array for both (their ride history doesn't meet the EF/decoupling/HRR/W'-prime trend thresholds in analysis.py) — this matches the dev's own finding, so the highlight badge could NOT be visually confirmed on any currently-seeded account. Everything else (card render, Regenerate, Listen/TTS, rest of Fitness Trends screen) works correctly with no crashes.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "verified_working": [
+    "GET /api/coach/weekly-note returns 200 with valid {note, focus, has_activity, highlight} JSON for both demo and greenlantern accounts; highlight is null in both cases and no exceptions raised.",
+    "GET /api/coach/weekly-note?refresh=true forces regeneration (cached:false) without errors for both accounts.",
+    "Cross-check: GET /api/analysis/adaptation (weeks=8) returns has_data:true but callouts:[] for both accounts — confirming there is currently NO seeded account where a highlight callout can trigger. Backend correctly falls back to highlight:null in this case (verified programmatically: when callouts is empty, weekly-note highlight is always null; the logic 'if callouts: highlight = {...}' is correctly gated).",
+    "UI: Coach's Weekly Note card renders correctly on /fitness for both accounts — coach chip (Alberto), note text, 'This week:' focus box, Listen and Regenerate buttons all render; no highlight badge shown (expected/correct given no triggering callout), no crash or empty state.",
+    "UI: Tapping 'Regenerate' (weekly-note-refresh) shows a brief loading spinner then displays a new, different note+focus text without crashing (verified via screenshot before/after — note text changed).",
+    "UI: Tapping 'Listen' (weekly-note-play) starts playback — button toggles from 'Listen' to 'Stop' with no console errors, confirming TTS request/response cycle completes without crashing the app.",
+    "Regression: rest of Fitness Trends screen renders normally on both accounts — This Week digest, Consistency Streak, 2026 Season recap, Form Target, Fitness/Fatigue/Form (CTL/ATL/TSB) numbers, Performance Management chart, Personal Records all visible with correct layout at 390px mobile viewport; no layout breakage from this change.",
+    "No React Native red-screen errors or unhandled exceptions observed in console during any of the above flows (only pre-existing, unrelated 401 console noise seen once during initial app boot before auth, not tied to this feature)."
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_coach_weekly_note.py",
+    "/app/test_reports/pytest/pytest_weekly_note.xml"
+  ],
+  "action_items": [
+    "No code fixes needed — feature works as designed and matches the dev's own pre-verification. The highlight badge (weekly-note-highlight) itself was never visually observed because no seeded account (demo or greenlantern) currently has ride_history data that triggers any of the 4 adaptation callout thresholds in routes/analysis.py::adaptation() (EF trend >=3%/-4%, decoupling drift, HRR +8%, W'-prime late>early+4). If visual confirmation of the badge is desired, seed a rider with a ride_history sequence engineered to produce one of these trend deltas (e.g. ef values rising ~5%+ across 8+ rides over 8 weeks) and re-run the same Playwright script against [data-testid=\"weekly-note-highlight\"]."
+  ],
+  "critical_code_review_comments": [
+    "coach.py::coach_weekly_note correctly gates highlight population only on callouts[0] and safely defaults to None otherwise — no risk of KeyError since callouts list is checked truthy first.",
+    "Minor nit (non-blocking): only the FIRST callout's kind/good is surfaced as highlight even when adapt_txt mentions up to 2 callouts in the LLM prompt — acceptable per spec (badge is meant to be a single short callout) but worth noting the UI badge and the LLM-generated note text could reference different metrics if 2 callouts exist (LLM sees both, badge shows only callouts[0])."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (6/6 pytest tests passed)", "frontend": "100% of testable flows passed; highlight badge visual state not reachable with current seed data (expected/acceptable per review_request)"},
+  "seed_data_creation": "None — created /app/backend/tests/test_coach_weekly_note.py as a reusable regression test file (login + weekly-note shape + refresh + adaptation cross-check for both credentialed accounts).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "This feature is fully verified end-to-end (backend + UI) on both demo and greenlantern accounts. The ONLY thing not visually confirmed is the weekly-note-highlight badge itself, purely due to lack of seed data that meets the adaptation() callout thresholds — not a bug. If a future task seeds richer ride_history with a clear EF/decoupling/HRR/W'-prime trend, re-run /app/backend/tests/test_coach_weekly_note.py (test_adaptation_callouts_inspection) to confirm the highlight then reachable, and revisit the Playwright script here to screenshot the badge."
+}
