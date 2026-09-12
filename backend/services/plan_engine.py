@@ -365,12 +365,25 @@ async def _ctr_completions(ride_prefix="ctr-ride-"):
     return ride_map, supp_dates
 
 
-def _ctr_week_complete(week, ride_ids, supp_dates, today):
+async def _plan_skips(plan_id: str) -> set:
+    """Workout ids the rider explicitly Skipped or Rescheduled out of a
+    structured-plan slot (from the missed-workout prompt) — so that slot no
+    longer nags forever and its week can still progress."""
+    try:
+        docs = await udb.plan_skips.find({"plan_id": plan_id}).to_list(1000)
+    except Exception:
+        docs = []
+    return {d.get("workout_id") for d in docs if d.get("workout_id")}
+
+
+def _ctr_week_complete(week, ride_ids, supp_dates, today, skipped_ids=None):
+    skipped_ids = skipped_ids or set()
     for i, day in enumerate(week["days"]):
         dt = _ctr_day_date(week, i)
         kind = day["kind"]
         if kind == "cycling":
-            if day.get("workout_id") not in ride_ids:
+            wid = day.get("workout_id")
+            if wid not in ride_ids and wid not in skipped_ids:
                 return False
         elif kind == "rest":
             if dt >= today:   # a rest day only auto-completes once it has passed
@@ -381,7 +394,7 @@ def _ctr_week_complete(week, ride_ids, supp_dates, today):
     return True
 
 
-def _plan_done(weeks_map, cur, dw, ride_map, supp_dates):
+def _plan_done(weeks_map, cur, dw, ride_map, supp_dates, skipped_ids=None):
     """True once the rider is on the final week and that week is fully complete —
     i.e. the whole structured plan has been finished."""
     if cur < dw:
@@ -389,7 +402,7 @@ def _plan_done(weeks_map, cur, dw, ride_map, supp_dates):
     wk = weeks_map.get(cur)
     if not wk:
         return False
-    return _ctr_week_complete(wk, set(ride_map.keys()), supp_dates, _ctr_today())
+    return _ctr_week_complete(wk, set(ride_map.keys()), supp_dates, _ctr_today(), skipped_ids)
 
 
 async def _ctr_state(weeks=None, duration_weeks=None, plan_id="couch-to-road", ride_prefix="ctr-ride-"):
@@ -398,13 +411,14 @@ async def _ctr_state(weeks=None, duration_weeks=None, plan_id="couch-to-road", r
     weeks = weeks or CTR_WEEKS
     duration_weeks = duration_weeks or CTR_PLAN["duration_weeks"]
     ride_map, supp_dates = await _ctr_completions(ride_prefix)
+    skipped_ids = await _plan_skips(plan_id)
     ride_ids = set(ride_map.keys())
     today = _ctr_today()
     state = await udb.plan_state.find_one({"id": plan_id})
     cur = int(state["current_week"]) if state and state.get("current_week") else 1
     cur = max(1, min(cur, duration_weeks))
     changed = state is None
-    while cur < duration_weeks and _ctr_week_complete(weeks[cur], ride_ids, supp_dates, today):
+    while cur < duration_weeks and _ctr_week_complete(weeks[cur], ride_ids, supp_dates, today, skipped_ids):
         cur += 1
         changed = True
     if changed:
@@ -447,8 +461,9 @@ def _ctr_readiness(score=80):
         {"key": "sleep", "label": "Sleep", "value": min(100, score + 4), "display": "7h 50m"}]}
 
 
-def _ctr_calendar_week(week, ride_map, supp_dates, today):
+def _ctr_calendar_week(week, ride_map, supp_dates, today, skipped_ids=None):
     from datetime import date, timedelta
+    skipped_ids = skipped_ids or set()
     y, m, d = (int(x) for x in week["start_date"].split("-"))
     start = date(y, m, d)
     ride_ids = set(ride_map.keys())
@@ -463,8 +478,9 @@ def _ctr_calendar_week(week, ride_map, supp_dates, today):
         kind = day["kind"]
         if kind == "cycling":
             done = day.get("workout_id") in ride_ids
+            skipped = (not done) and day.get("workout_id") in skipped_ids
             act = ride_map.get(day.get("workout_id")) or {}
-            status = "completed" if done else ("today" if dt == today else "planned")
+            status = "completed" if done else ("skipped" if skipped else ("today" if dt == today else "planned"))
             dur = f"{round(act['duration_sec'] / 60)} min" if done and act.get("duration_sec") else day.get("duration", "")
             tssv = f"{act['tss']} TSS" if done and act.get("tss") is not None else (f"{day['tss']} TSS" if day.get("tss") else "")
             entry["cycling"] = {"type": "cycling", "title": day["title"], "workout_id": day.get("workout_id"), "duration": dur,

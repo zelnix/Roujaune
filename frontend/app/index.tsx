@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, Animated, useWindowDimensions, Platform } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Animated, useWindowDimensions, Platform, Pressable } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -27,15 +27,18 @@ import { useBenchmarkNudge } from "@/src/lib/benchmark/api";
 import { useLiveNotifications, useNotificationReadState } from "@/src/lib/notifications";
 import { CoachChatModal } from "@/src/components/CoachChatModal";
 import { NotificationsModal } from "@/src/components/NotificationsModal";
+import { undoReschedule } from "@/src/lib/plan";
 
-function Toast({ message }: { message: { id: number; text: string } | null }) {
+type ToastMsg = { id: number; text: string; undo?: () => void };
+
+function Toast({ message, onUndo }: { message: ToastMsg | null; onUndo?: () => void }) {
   const anim = React.useRef(new Animated.Value(0)).current;
   React.useEffect(() => {
     if (!message) return;
     Animated.spring(anim, { toValue: 1, useNativeDriver: Platform.OS !== "web", speed: 18, bounciness: 6 }).start();
     const t = setTimeout(() => {
       Animated.timing(anim, { toValue: 0, duration: 220, useNativeDriver: Platform.OS !== "web" }).start();
-    }, 1900);
+    }, message.undo ? 4500 : 1900);
     return () => clearTimeout(t);
   }, [message, anim]);
 
@@ -46,11 +49,18 @@ function Toast({ message }: { message: { id: number; text: string } | null }) {
       style={[
         styles.toast,
         shadow.glow,
-        { pointerEvents: "none", opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] }) }] },
+        { opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] }) }] },
       ]}
+      pointerEvents={message.undo ? "box-none" : "none"}
     >
       <Ionicons name="checkmark-circle" size={18} color={colors.yellow} />
-      <Text style={styles.toastText}>{message.text}</Text>
+      <Text style={styles.toastText} numberOfLines={2}>{message.text}</Text>
+      {message.undo ? (
+        <Pressable testID="toast-undo" onPress={onUndo} hitSlop={10} style={styles.toastUndoBtn} accessibilityRole="button" accessibilityLabel="Undo plan change">
+          <Ionicons name="arrow-undo" size={14} color={colors.yellow} />
+          <Text style={styles.toastUndoText}>Undo</Text>
+        </Pressable>
+      ) : null}
     </Animated.View>
   );
 }
@@ -82,10 +92,10 @@ export default function Dashboard() {
   const [active, setActive] = React.useState("home");
   const [showChat, setShowChat] = React.useState(false);
   const [showNotifs, setShowNotifs] = React.useState(false);
-  const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
+  const [toast, setToast] = React.useState<ToastMsg | null>(null);
 
-  const showToast = React.useCallback((text: string) => {
-    setToast({ id: Date.now(), text });
+  const showToast = React.useCallback((text: string, undo?: () => void) => {
+    setToast({ id: Date.now(), text, undo });
   }, []);
 
   const onSelectNav = (key: string) => {
@@ -176,8 +186,24 @@ export default function Dashboard() {
         </View>
       </SafeAreaView>
 
-      <Toast message={toast} />
-      <CoachChatModal visible={showChat} onClose={() => setShowChat(false)} persona={persona} />
+      <Toast message={toast} onUndo={toast?.undo} />
+      <CoachChatModal
+        visible={showChat}
+        onClose={() => setShowChat(false)}
+        persona={persona}
+        onPlanUpdated={(info) => {
+          showToast(
+            info.message,
+            info.canUndo
+              ? () => {
+                  undoReschedule().then((ok) => {
+                    showToast(ok ? "Reverted to your previous schedule" : "Couldn't undo — try again");
+                  });
+                }
+              : undefined
+          );
+        }}
+      />
       <NotificationsModal visible={showNotifs} onClose={() => setShowNotifs(false)} nudge={benchmarkNudge} />
     </GestureHandlerRootView>
   );
@@ -200,7 +226,10 @@ const styles = StyleSheet.create({
   toast: {
     position: "absolute",
     top: 24,
+    left: spacing.lg,
+    right: spacing.lg,
     alignSelf: "center",
+    maxWidth: 480,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
@@ -211,5 +240,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 11,
   },
-  toastText: { color: colors.white, fontWeight: "700", fontSize: 14 },
+  toastText: { color: colors.white, fontWeight: "700", fontSize: 14, flexShrink: 1 },
+  toastUndoBtn: { flexDirection: "row", alignItems: "center", gap: 4, marginLeft: 4, paddingVertical: 4, paddingHorizontal: 10, borderRadius: radius.pill, borderWidth: 1, borderColor: "rgba(255,194,10,0.4)" },
+  toastUndoText: { color: colors.yellow, fontWeight: "800", fontSize: 13 },
 });

@@ -50,9 +50,16 @@ export type ClimbDetailAttempt = { activity_id: string; name: string; date: stri
 export type ClimbDetail = { found: boolean; id?: string; name?: string; gain_m?: number; length_m?: number; grad_pct?: number | null; count?: number; path?: [number, number][]; profile?: ClimbDetailPoint[]; splits?: ClimbSplit[]; recent_split_prs?: SplitPr[]; recent_activity_id?: string; attempts?: ClimbDetailAttempt[] };
 export type FormTarget = { has_event: boolean; event_date?: string; event_name?: string; days_out?: number; past?: boolean; projected_form?: number; projected_fitness?: number; state?: string; fresh?: boolean; current_form?: number; current_fitness?: number };
 export type WeeklyNote = { note: string; focus: string; has_activity: boolean; highlight?: { kind: string; good: boolean } | null };
+export type StruggleWeek = { week: string; rides: number; struggles: number; per_ride: number; top_type: string | null };
+export type StruggleTrend = { weeks: StruggleWeek[]; recent_avg: number; prior_avg: number | null; trend: "improving" | "flat" | "rising" };
 
 export async function fetchPmc(days = 90, forecastDays = 14): Promise<Pmc | null> {
   const r = await fetch(`${API}/analysis/pmc?days=${days}&forecast_days=${forecastDays}`);
+  return r.ok ? await r.json() : null;
+}
+
+export async function fetchStruggleTrend(weeks = 8): Promise<StruggleTrend | null> {
+  const r = await fetch(`${API}/analysis/struggle-trend?weeks=${weeks}`);
   return r.ok ? await r.json() : null;
 }
 

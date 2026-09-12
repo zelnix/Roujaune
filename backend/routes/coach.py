@@ -733,6 +733,17 @@ async def _build_rider_context(plan_id: str = "") -> str:
     except Exception:
         logging.warning("rider context: readiness lookup failed")
 
+    try:
+        recent_reasons = []
+        skips = await udb.plan_skips.find({"action": "skipped", "reason": {"$nin": ["", None]}}).sort("created_at", -1).to_list(3)
+        recent_reasons += [s["reason"] for s in skips]
+        adhoc = await udb.scheduled_workouts.find({"status": "skipped", "skip_reason": {"$nin": ["", None]}}).sort("date", -1).to_list(3)
+        recent_reasons += [s["skip_reason"] for s in adhoc]
+        if recent_reasons:
+            lines.append("Reasons the rider recently gave for skipping a session: " + "; ".join(recent_reasons[:3]) + ".")
+    except Exception:
+        logging.warning("rider context: skip-reason lookup failed")
+
     if not lines:
         return ""
     return (
@@ -781,26 +792,62 @@ async def coach_chat(req: CoachChatRequest):
     can_undo = False
     clarify = ""
     style_override = None
+    confirm_prompt = ""
 
     _ml = (req.message or "").lower()
+
+    # ---- Big-change confirmation gate --------------------------------------
+    # Re-anchoring the whole plan or a sizeable FTP jump gets asked to confirm
+    # first; small day-to-day tweaks (rest a day, move one session, add a
+    # workout) still auto-apply exactly as before.
+    _AFFIRM_RE = re.compile(r"^\s*(yes|yeah|yep|yup|sure|ok(ay)?|confirm(ed)?|go ahead|do it|please do|sounds good|correct|that'?s right)\b", re.I)
+    _DENY_RE = re.compile(r"^\s*(no|nope|nah|don'?t|do not|cancel|never\s*mind|nevermind|stop|actually no|leave it)\b", re.I)
+    pending = await udb.coach_pending_confirm.find_one({"id": cid})
+    if pending:
+        await udb.coach_pending_confirm.delete_one({"id": cid})
+        if _AFFIRM_RE.search(_ml):
+            try:
+                if pending["action"] == "reset_start":
+                    plan_id = pending["payload"]["plan_id"]
+                    d = datetime.strptime(pending["payload"]["new_start"], "%Y-%m-%d").date()
+                    res = await _reset_plan_start(plan_id, d)
+                    plan_updated, can_undo, applied_note = True, True, res["note"]
+                    await _record_adaptation(plan_id, req.coach_name, res["note"], "Start date reset")
+                elif pending["action"] == "set_ftp":
+                    res = await _set_ftp(pending["payload"]["value"])
+                    plan_updated, applied_note = True, res["note"]
+                    await _record_adaptation(await _active_plan_id() or "none", req.coach_name, f"I {res['note']}", "FTP updated")
+            except Exception:
+                logging.warning("chat pending-confirm apply failed")
+                confirm_prompt = "Something went wrong applying that change — let the rider know kindly and offer to try again."
+        elif _DENY_RE.search(_ml):
+            confirm_prompt = (f"The rider decided NOT to go ahead with the change you'd proposed "
+                               f"({pending.get('note')}). Acknowledge warmly in one short sentence — don't apply anything.")
+        # else: an unrelated new message — silently drop the stale proposal and fall through to normal parsing below.
+
     # Reset the plan start date from chat ("restart my plan Monday", "reset the
     # start date to 15 June"). Shifts the whole plan; honours a hard event date.
-    if not plan_updated and _START_RE.search(_ml):
+    if not plan_updated and not confirm_prompt and _START_RE.search(_ml):
         d = _parse_natural_date(req.message)
         if d:
             try:
                 plan_id = await _active_plan_id()
                 if plan_id and plan_id != "none":
-                    res = await _reset_plan_start(plan_id, d)
-                    plan_updated = True
-                    can_undo = True
-                    applied_note = res["note"]
-                    await _record_adaptation(plan_id, req.coach_name, res["note"], "Start date reset")
+                    note = f"re-anchor your whole plan to start {d.isoformat()}"
+                    await udb.coach_pending_confirm.update_one(
+                        {"id": cid},
+                        {"$set": {"id": cid, "action": "reset_start",
+                                  "payload": {"plan_id": plan_id, "new_start": d.isoformat()}, "note": note,
+                                  "created_at": now_iso()}},
+                        upsert=True,
+                    )
+                    confirm_prompt = (f"The rider asked to {note}. This shifts every future session — before doing it, "
+                                       "ask them to confirm with a quick yes/no in one short friendly sentence. Do NOT say it's done yet.")
             except Exception:
                 logging.warning("chat start-date reset failed")
 
     # Cancel / rest-day a session ("cancel today's ride", "make today a rest day").
-    if not plan_updated and _REST_RE.search(_ml):
+    if not plan_updated and not confirm_prompt and _REST_RE.search(_ml):
         try:
             plan_id = await _active_plan_id()
             if plan_id and plan_id != "none":
@@ -826,7 +873,7 @@ async def coach_chat(req: CoachChatRequest):
             logging.warning("chat rest-day failed")
 
     # Move a planned session to another day ("move my next workout to tomorrow").
-    if not plan_updated and _SESSION_MOVE_RE.search(_ml):
+    if not plan_updated and not confirm_prompt and _SESSION_MOVE_RE.search(_ml):
         try:
             plan_id = await _active_plan_id()
             if plan_id and plan_id != "none":
@@ -848,7 +895,7 @@ async def coach_chat(req: CoachChatRequest):
             logging.warning("chat session-move failed")
 
     # Schedule a workout on a day ("add a recovery ride Thursday").
-    if not plan_updated and _SCHEDULE_RE.search(_ml) and "goal" not in _ml:
+    if not plan_updated and not confirm_prompt and _SCHEDULE_RE.search(_ml) and "goal" not in _ml:
         try:
             plan_id = await _active_plan_id()
             today = datetime.now(timezone.utc).date()
@@ -875,7 +922,7 @@ async def coach_chat(req: CoachChatRequest):
             logging.warning("chat schedule-workout failed")
 
     # Undo the last plan change ("undo that").
-    if not plan_updated and _UNDO_RE.search(_ml):
+    if not plan_updated and not confirm_prompt and _UNDO_RE.search(_ml):
         try:
             plan_id = await _active_plan_id()
             snap = await udb.plan_undo.find_one({"id": plan_id})
@@ -891,17 +938,32 @@ async def coach_chat(req: CoachChatRequest):
             logging.warning("chat undo failed")
 
     # Set FTP or schedule an FTP re-test.
-    if not plan_updated and not clarify and _FTP_RE.search(_ml):
+    if not plan_updated and not clarify and not confirm_prompt and _FTP_RE.search(_ml):
         try:
             plan_id = await _active_plan_id()
             num = re.search(r"(\d{2,3})", _ml)
             wants_test = any(k in _ml for k in ("test", "re-test", "retest", "re test"))
             if num and not wants_test and any(k in _ml for k in ("set", "change", "update", "is ", "to ", "my ftp", "=")):
-                res = await _set_ftp(int(num.group(1)))
-                if res.get("ok"):
-                    plan_updated = True
-                    applied_note = res["note"]
-                    await _record_adaptation(plan_id or "none", req.coach_name, f"I {res['note']}", "FTP updated")
+                new_v = int(num.group(1))
+                cur_settings = await udb.settings.find_one({"id": "app"}) or {}
+                old_v = int(cur_settings.get("ftp") or 0)
+                big_jump = (old_v <= 0) or (abs(new_v - old_v) / old_v >= 0.08)
+                if big_jump:
+                    note = f"change your FTP from {old_v or 'unset'} to {new_v} W (your zones recalculate around it)"
+                    await udb.coach_pending_confirm.update_one(
+                        {"id": cid},
+                        {"$set": {"id": cid, "action": "set_ftp", "payload": {"value": new_v}, "note": note,
+                                  "created_at": now_iso()}},
+                        upsert=True,
+                    )
+                    confirm_prompt = (f"The rider asked to {note}. That's a meaningful jump — before doing it, "
+                                       "ask them to confirm with a quick yes/no in one short friendly sentence. Do NOT say it's done yet.")
+                else:
+                    res = await _set_ftp(new_v)
+                    if res.get("ok"):
+                        plan_updated = True
+                        applied_note = res["note"]
+                        await _record_adaptation(plan_id or "none", req.coach_name, f"I {res['note']}", "FTP updated")
             elif wants_test:
                 today = datetime.now(timezone.utc).date()
                 when = _parse_natural_date(req.message) or (today + timedelta(days=1))
@@ -919,7 +981,7 @@ async def coach_chat(req: CoachChatRequest):
             logging.warning("chat ftp intent failed")
 
     # Set weekly training days ("make it 4 days a week").
-    if not plan_updated and not clarify and _DAYS_RE.search(_ml):
+    if not plan_updated and not clarify and not confirm_prompt and _DAYS_RE.search(_ml):
         try:
             plan_id = await _active_plan_id()
             mm = _DAYS_RE.search(_ml)
@@ -934,7 +996,7 @@ async def coach_chat(req: CoachChatRequest):
             logging.warning("chat weekly-days intent failed")
 
     # Add a training goal.
-    if not plan_updated and not clarify and _GOAL_RE.search(_ml):
+    if not plan_updated and not clarify and not confirm_prompt and _GOAL_RE.search(_ml):
         try:
             plan_id = await _active_plan_id()
             m = re.split(r"\b(goal is|goal:|be able to|add (?:a |another )?goal(?:\s+of|\s+to)?|new goal(?:\s+of|\s+to)?)\b", req.message, maxsplit=1, flags=re.I)
@@ -951,7 +1013,7 @@ async def coach_chat(req: CoachChatRequest):
             logging.warning("chat goal intent failed")
 
     # Pause / resume the whole plan.
-    if not plan_updated and not clarify and _PAUSE_RE.search(_ml):
+    if not plan_updated and not clarify and not confirm_prompt and _PAUSE_RE.search(_ml):
         try:
             plan_id = await _active_plan_id()
             wm = re.search(r"(\d+)\s*week", _ml)
@@ -968,7 +1030,7 @@ async def coach_chat(req: CoachChatRequest):
         except Exception:
             logging.warning("chat pause intent failed")
 
-    if not plan_updated and not clarify and _RESUME_RE.search(_ml):
+    if not plan_updated and not clarify and not confirm_prompt and _RESUME_RE.search(_ml):
         try:
             plan_id = await _active_plan_id()
             if plan_id and plan_id != "none":
@@ -984,7 +1046,7 @@ async def coach_chat(req: CoachChatRequest):
             logging.warning("chat resume intent failed")
 
     # Switch coaching tone ("be tougher on me", "keep it gentler").
-    if not plan_updated and not clarify and _STYLE_RE.search(_ml):
+    if not plan_updated and not clarify and not confirm_prompt and _STYLE_RE.search(_ml):
         st = _map_style(_ml)
         if st:
             style_override = st
@@ -995,7 +1057,7 @@ async def coach_chat(req: CoachChatRequest):
 
 
     # Missed workout: skip or reschedule the most recent missed session.
-    if not plan_updated and not clarify and _MISSED_RE.search(_ml):
+    if not plan_updated and not clarify and not confirm_prompt and _MISSED_RE.search(_ml):
         try:
             today = datetime.now(timezone.utc).date()
             sched = await udb.scheduled_workouts.find().to_list(500)
@@ -1026,7 +1088,7 @@ async def coach_chat(req: CoachChatRequest):
 
     # Companion plan editing: if the rider asks for a plan change, turn it into
     # safe structured edits and apply them so the coach can confirm in-reply.
-    if not plan_updated and not clarify and companion_plan.has_plan_edit_intent(req.message):
+    if not plan_updated and not clarify and not confirm_prompt and companion_plan.has_plan_edit_intent(req.message):
         try:
             plan_id = await _active_plan_id()
             plan_def = await plans_admin.get_plan_def(plan_id)
@@ -1061,8 +1123,10 @@ async def coach_chat(req: CoachChatRequest):
         f"You have just updated the rider's plan at their request: {applied_note}. "
         "Confirm this change warmly and briefly explain why it helps.\n\n" if applied_note else ""
     ) + (
+        f"IMPORTANT: {confirm_prompt}\n\n" if (confirm_prompt and not applied_note) else ""
+    ) + (
         f"IMPORTANT: {clarify} Do not claim anything was changed — ask one short, friendly question.\n\n"
-        if (clarify and not applied_note) else ""
+        if (clarify and not applied_note and not confirm_prompt) else ""
     ) + f"Rider: {req.message.strip()}\n{req.coach_name}:"
 
     try:
@@ -1094,6 +1158,7 @@ async def coach_chat(req: CoachChatRequest):
 
     return {"reply": reply, "user_message": user_msg, "coach_message": coach_msg,
             "plan_updated": plan_updated, "plan_change": applied_note, "can_undo": can_undo,
+            "awaiting_confirm": bool(confirm_prompt and not applied_note),
             "coaching_style": style_override}
 
 

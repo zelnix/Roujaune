@@ -29,6 +29,7 @@ from services.plan_engine import (
     _ctr_state, _ctr_progress, _ctr_readiness, _ctr_completions, _plan_done,
     _ctr_calendar_week, _ctr_plan_response, _with_adaptation_meta, _free_calendar_week,
     _ctr_today, _ctr_day_date, _fmt_dur, _pm, _apply_companion_ops, _weeks_and_tss,
+    _plan_skips,
 )  # noqa: F401
 from services.plan_common import _active_plan_id, _plan_id_or_active, STRUCTURED_PLAN_IDS, _RIDE_PREFIX  # noqa: F401
 from services.rider_common import _rider_doc, _cal_status  # noqa: F401
@@ -150,7 +151,8 @@ async def get_plan(id: str = ""):
             pdoc, weeks_map, planned, prefix = await _struct_ctx_for_rider(spid)
             cur, ride_map, supp = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id=spid, ride_prefix=prefix)
             prog = await _ctr_progress(ride_map, ride_prefix=prefix, planned_tss=planned)
-            done = _plan_done(weeks_map, cur, int(pdoc.get("duration_weeks") or 16), ride_map, supp)
+            skipped_ids = await _plan_skips(spid)
+            done = _plan_done(weeks_map, cur, int(pdoc.get("duration_weeks") or 16), ride_map, supp, skipped_ids)
             return await _with_adaptation_meta(_ctr_plan_response(cur, ride_map, prog, weeks=weeks_map, plan_doc=pdoc, plan_id=spid, plan_complete=done, supp_dates=supp), spid)
         # Non-structured (custom/admin-authored) plan the rider is explicitly on.
         doc = await udb.training_plans.find_one({"id": active})
@@ -424,16 +426,17 @@ async def get_calendar_week(start: str = "2025-05-12", focus_date: Optional[str]
         if active in ("couch-to-road", "ride-stronger", "ride-beyond") or active.startswith("custom-"):
             pdoc, weeks_map, planned, prefix = await _struct_ctx_for_rider(active)
             cur, ride_map, supp_dates = await _ctr_state(weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id=active, ride_prefix=prefix)
+            skipped_ids = await _plan_skips(active)
 
         if weeks_map is not None:
             chosen = _week_containing(weeks_map, target) if target is not None else None
             if chosen is not None:
-                doc = _ctr_calendar_week(chosen, ride_map, supp_dates, _ctr_today())
+                doc = _ctr_calendar_week(chosen, ride_map, supp_dates, _ctr_today(), skipped_ids)
             elif target is not None:
                 # Requested date falls outside the structured plan → open week.
                 doc = _free_calendar_week(target.isoformat())
             else:
-                doc = _ctr_calendar_week(weeks_map[cur], ride_map, supp_dates, _ctr_today())
+                doc = _ctr_calendar_week(weeks_map[cur], ride_map, supp_dates, _ctr_today(), skipped_ids)
         elif active == "build-and-climb":
             # The demo showcase week; if the rider moved the plan start, the demo
             # week travels with it so the coach's change is real and visible.
@@ -987,21 +990,45 @@ def _easy_zone_label(current_zone: Optional[str]) -> str:
 
 
 async def _readiness_downgrade_preview() -> dict:
-    """If this morning's check-in is low and today's plan holds a hard ride,
-    build a one-tap 'swap for an easy recovery spin' suggestion. This is a
-    preview only — nothing is changed on the plan until the rider accepts.
-    Handles both dated week/day plans (Couch-to-Road, Ride Stronger, Ride
-    Beyond, custom plans) and flat 'featured workout' showcase plans (Build &
-    Climb) where the Today screen always surfaces workouts[0]."""
+    """If this morning's check-in is low — OR the rider's most recent ride
+    needed a live safety ease (systemic-fatigue/HR-drift gate) — and today's
+    plan holds a hard ride, build a one-tap 'swap for an easy recovery spin'
+    suggestion. Preview only — nothing changes until the rider accepts. Handles
+    both dated week/day plans and flat 'featured workout' showcase plans."""
     today_iso = date.today().isoformat()
     doc = await udb.daily_checkins.find_one({"id": "latest"})
-    if not doc or doc.get("date") != today_iso or doc.get("safetyOverride"):
+    today_checkin = doc if (doc and doc.get("date") == today_iso) else None
+    already_handled = bool(today_checkin and (today_checkin.get("downgrade_applied") or today_checkin.get("downgrade_dismissed")))
+    if already_handled:
         return {"available": False}
-    if doc.get("downgrade_applied") or doc.get("downgrade_dismissed"):
+    if today_checkin and today_checkin.get("safetyOverride"):
+        return {"available": False}   # medical-flag banner already covers this case
+
+    score = today_checkin.get("score") if today_checkin else None
+    reason = None
+    if score is not None and score < 55:
+        factors = today_checkin.get("mainFactors") or []
+        reason = next(
+            (f for f in factors if any(k in f.lower() for k in ("hrv", "hr &", "sleep", "fatigue", "energy"))),
+            None,
+        ) or (factors[0] if factors else "Your readiness signals are low this morning.")
+
+    safety_ride = False
+    if reason is None:
+        # No low check-in — did the rider's most recent ride need a live
+        # safety ease? Auto-suggest easing off the very next session too.
+        try:
+            cutoff = (datetime.now(timezone.utc) - timedelta(hours=36)).isoformat()
+            recent = await udb.ride_history.find({"created_at": {"$gte": cutoff}}).sort("created_at", -1).to_list(1)
+            if recent and recent[0].get("had_safety_event"):
+                reason = "Your last ride needed a safety ease (heart-rate drift) — let's back off today so you recover properly."
+                safety_ride = True
+        except Exception:
+            logging.warning("safety-triggered downgrade check failed")
+
+    if reason is None:
         return {"available": False}
-    score = doc.get("score")
-    if score is None or score >= 55:
-        return {"available": False}
+
     plan_id = await _active_plan_id()
     if not plan_id or plan_id == "none":
         return {"available": False}
@@ -1024,18 +1051,14 @@ async def _readiness_downgrade_preview() -> dict:
     rider = await _rider_doc()
     level = _LEVEL_FOR_CAPABILITY.get(rider.get("capability"), "Development")
     rec = _RECOVERY_SPIN_BY_LEVEL[level]
-    factors = doc.get("mainFactors") or []
-    reason = next(
-        (f for f in factors if any(k in f.lower() for k in ("hrv", "hr &", "sleep", "fatigue", "energy"))),
-        None,
-    ) or (factors[0] if factors else "Your readiness signals are low this morning.")
     return {
         "available": True,
         "score": score,
-        "status": doc.get("status"),
+        "status": today_checkin.get("status") if today_checkin else ("caution" if safety_ride else None),
         "reason": reason,
         "date": today_iso,
         "current": current,
+        "safety_ride": safety_ride,
         "suggested": {
             "title": "Recovery Spin", "zone": _easy_zone_label(current.get("zone")),
             "duration": rec["duration"], "tss": f"{rec['tss']} TSS", "workout_id": rec["workout_id"],
@@ -1080,8 +1103,8 @@ async def _apply_readiness_downgrade() -> dict:
     target["tss"] = f"{rec['tss']} TSS" if is_flat else rec["tss"]
 
     await udb.training_plans.update_one({"id": plan_id}, {"$set": {"id": plan_id, "definition": d}}, upsert=True)
-    await udb.daily_checkins.update_one({"id": "latest"}, {"$set": {"downgrade_applied": True}})
-    await udb.daily_checkins.update_one({"id": preview["date"]}, {"$set": {"downgrade_applied": True}})
+    await udb.daily_checkins.update_one({"id": "latest"}, {"$set": {"id": "latest", "date": preview["date"], "downgrade_applied": True}}, upsert=True)
+    await udb.daily_checkins.update_one({"id": preview["date"]}, {"$set": {"id": preview["date"], "date": preview["date"], "downgrade_applied": True}}, upsert=True)
     return {
         "ok": True, "can_undo": True, "applied": preview["suggested"],
         "note": f"Swapped '{was_title}' for a Recovery Spin today — recovery matters as much as the hard days. Undo any time.",
@@ -1090,8 +1113,8 @@ async def _apply_readiness_downgrade() -> dict:
 
 async def _dismiss_readiness_downgrade() -> dict:
     today_iso = date.today().isoformat()
-    await udb.daily_checkins.update_one({"id": "latest"}, {"$set": {"downgrade_dismissed": True}})
-    await udb.daily_checkins.update_one({"id": today_iso}, {"$set": {"downgrade_dismissed": True}})
+    await udb.daily_checkins.update_one({"id": "latest"}, {"$set": {"id": "latest", "date": today_iso, "downgrade_dismissed": True}}, upsert=True)
+    await udb.daily_checkins.update_one({"id": today_iso}, {"$set": {"id": today_iso, "date": today_iso, "downgrade_dismissed": True}}, upsert=True)
     return {"ok": True}
 
 
@@ -1286,43 +1309,160 @@ async def undo_reschedule(req: StartDateRequest):
             "note": "Reverted your plan back to the previous schedule."}
 
 
+@router.get("/rider/ftp-test-reminder")
+async def ftp_test_reminder():
+    """Coach nudge for the morning of a booked FTP re-test (chat-scheduled via
+    'schedule an FTP test') — the structured-plan benchmark-week banner never
+    saw these since they're plain ad-hoc scheduled_workouts, not plan test days."""
+    today = datetime.now(timezone.utc).date().isoformat()
+    entry = await udb.scheduled_workouts.find_one({
+        "date": today, "status": "scheduled",
+        "title": {"$regex": "ftp.*test|ftp.*re-?test", "$options": "i"},
+    })
+    if not entry:
+        return {"available": False}
+    return {"available": True, "id": entry.get("id"), "title": entry.get("title"), "date": today}
+
+
 @router.get("/rider/missed")
 async def rider_missed():
     """Missed cycling sessions the rider can Skip or Reschedule. Includes a
-    coach-suggested safe reschedule date (next free day)."""
+    coach-suggested safe reschedule date (next free day). Covers both the
+    rider's own ad-hoc scheduled workouts AND missed days from an active
+    structured plan (Couch to Road / Ride Stronger / Ride Beyond / custom) —
+    previously only ad-hoc entries were surfaced here."""
     today_d = datetime.now(timezone.utc).date()
     today = today_d.isoformat()
     try:
         sched = await udb.scheduled_workouts.find().to_list(500)
     except Exception:
         sched = []
-    missed = [
+    adhoc_missed = [
         w for w in sched
         if str(w.get("date", "")) < today and w.get("status") not in ("completed", "skipped", "rescheduled")
     ]
-    missed.sort(key=lambda w: str(w.get("date", "")), reverse=True)
+    missed_items: List[Dict[str, Any]] = [
+        {"id": w.get("id"), "date": w.get("date"), "title": w.get("title") or w.get("name"), "kind": "adhoc"}
+        for w in adhoc_missed
+    ]
+
+    # Structured-plan missed rides — the current week's cycling days that are
+    # already in the past and neither completed nor explicitly skipped/
+    # rescheduled via this same prompt.
+    try:
+        active = await _active_plan_id()
+        if active and (active in STRUCTURED_PLAN_IDS or active.startswith("custom-")):
+            pdoc, weeks_map, _planned, prefix = await _struct_ctx_for_rider(active)
+            cur, ride_map, _supp = await _ctr_state(
+                weeks=weeks_map, duration_weeks=pdoc.get("duration_weeks"), plan_id=active, ride_prefix=prefix)
+            skipped_ids = await _plan_skips(active)
+            ride_ids = set(ride_map.keys())
+            week = weeks_map.get(cur)
+            if week:
+                for i, day in enumerate(week.get("days", [])):
+                    if day.get("kind") != "cycling":
+                        continue
+                    wid = day.get("workout_id")
+                    if not wid or wid in ride_ids or wid in skipped_ids:
+                        continue
+                    dt = _ctr_day_date(week, i)
+                    if dt >= today_d:
+                        continue
+                    missed_items.append({
+                        "id": f"plan:{active}:{wid}",
+                        "date": dt.isoformat(),
+                        "title": day.get("title") or "Planned ride",
+                        "kind": "structured",
+                    })
+    except Exception:
+        logging.warning("structured-plan missed detection failed", exc_info=True)
+
+    missed_items.sort(key=lambda w: str(w.get("date", "")), reverse=True)
     suggested = _next_free_day(sched, today_d)
     return {
-        "count": len(missed),
+        "count": len(missed_items),
         "suggested_date": suggested,
-        "missed": [{"id": w.get("id"), "date": w.get("date"), "title": w.get("title") or w.get("name"),
-                    "suggested_date": suggested} for w in missed[:5]],
+        "missed": [{**m, "suggested_date": suggested} for m in missed_items[:5]],
         "guidance": ("Skip if life got in the way, or reschedule to a free day — "
-                     "your plan adjusts and your event date stays fixed.") if missed else "",
+                     "your plan adjusts and your event date stays fixed.") if missed_items else "",
     }
 
 
 @router.post("/rider/missed/resolve")
 async def resolve_missed_workout(req: MissedResolveRequest):
     """Skip a missed workout (mark skipped, plan continues) or reschedule it to a
-    new day (plan updates). Reschedule uses the given date or the coach's pick."""
+    new day (plan updates). Reschedule uses the given date or the coach's pick.
+    Handles both ad-hoc scheduled_workouts entries and structured-plan slots
+    (entry id shaped 'plan:<plan_id>:<workout_id>')."""
+    if req.entry_id.startswith("plan:"):
+        try:
+            _, plan_id, workout_id = req.entry_id.split(":", 2)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid structured-plan entry id")
+        title, original_date, day_meta = workout_id, None, {}
+        try:
+            pdoc, weeks_map, _planned, _prefix = await _struct_ctx_for_rider(plan_id)
+            for wk in weeks_map.values():
+                for i, day in enumerate(wk.get("days", [])):
+                    if day.get("workout_id") == workout_id:
+                        title = day.get("title") or title
+                        original_date = _ctr_day_date(wk, i).isoformat()
+                        day_meta = day
+                        break
+                if original_date:
+                    break
+        except Exception:
+            logging.warning("structured-plan lookup for missed resolve failed", exc_info=True)
+
+        if req.action == "skip":
+            reason = (req.reason or "").strip()[:120]
+            await udb.plan_skips.update_one(
+                {"plan_id": plan_id, "workout_id": workout_id},
+                {"$set": {"id": str(uuid.uuid4()), "plan_id": plan_id, "workout_id": workout_id,
+                          "action": "skipped", "original_date": original_date, "reason": reason,
+                          "created_at": now_iso()}},
+                upsert=True,
+            )
+            msg = "Marked as skipped — no make-up needed. Your plan continues from here."
+            if reason:
+                msg = f"Marked as skipped ({reason}) — no make-up needed. Your plan continues from here."
+            return {"ok": True, "action": "skip", "message": msg}
+        if req.action == "reschedule":
+            sched = await udb.scheduled_workouts.find().to_list(500)
+            new_date = req.date or _next_free_day(sched, datetime.now(timezone.utc).date())
+            if not _parse_ymd(new_date):
+                raise HTTPException(status_code=400, detail="Invalid reschedule date")
+            await udb.plan_skips.update_one(
+                {"plan_id": plan_id, "workout_id": workout_id},
+                {"$set": {"id": str(uuid.uuid4()), "plan_id": plan_id, "workout_id": workout_id,
+                          "action": "rescheduled", "original_date": original_date, "new_date": new_date,
+                          "created_at": now_iso()}},
+                upsert=True,
+            )
+            # Attach the make-up ride to its new day via the same rider-scheduled
+            # mechanism the calendar already renders — completing it there still
+            # satisfies the original structured-plan slot (matched by workout_id).
+            await udb.scheduled_workouts.insert_one({
+                "id": str(uuid.uuid4()), "type": "cycling", "workout_id": workout_id, "title": title,
+                "duration": day_meta.get("duration", ""), "tss": f"{day_meta['tss']} TSS" if day_meta.get("tss") else "",
+                "zone": day_meta.get("zone", ""), "color": "yellow", "date": new_date,
+                "status": "scheduled", "created_by": "Alberto", "rescheduled_from": original_date,
+            })
+            return {"ok": True, "action": "reschedule", "date": new_date,
+                    "message": f"Moved '{title}' to {new_date}. Plan updated."}
+        raise HTTPException(status_code=400, detail="action must be 'skip' or 'reschedule'")
+
+    # ---- ad-hoc scheduled_workouts flow ----
     entry = await udb.scheduled_workouts.find_one({"id": req.entry_id})
     if not entry:
         raise HTTPException(status_code=404, detail="Workout not found")
     if req.action == "skip":
-        await udb.scheduled_workouts.update_one({"id": req.entry_id}, {"$set": {"status": "skipped"}})
-        return {"ok": True, "action": "skip",
-                "message": "Marked as skipped — no make-up needed. Your plan continues from here."}
+        reason = (req.reason or "").strip()[:120]
+        await udb.scheduled_workouts.update_one({"id": req.entry_id}, {"$set": {"status": "skipped", "skip_reason": reason}})
+        msg = "Marked as skipped — no make-up needed. Your plan continues from here."
+        if reason:
+            msg = f"Marked as skipped ({reason}) — no make-up needed. Your plan continues from here."
+        return {"ok": True, "action": "skip", "message": msg}
     if req.action == "reschedule":
         sched = await udb.scheduled_workouts.find().to_list(500)
         new_date = req.date or _next_free_day(sched, datetime.now(timezone.utc).date())

@@ -5,10 +5,10 @@ import { useRouter } from "expo-router";
 import { AppScaffold, Card } from "@/src/components/app-scaffold";
 import { colors } from "@/src/theme";
 import {
-  fetchPmc, fetchRecords, fetchWeeklyDigest, fetchFormTarget, fetchWeeklyNote, fetchStreak, fetchMilestones, fetchSeasonRecap,
-  Pmc, PowerRecord, WeeklyDigest, FormTarget, WeeklyNote, Streak, Milestones, SeasonRecap,
+  fetchPmc, fetchRecords, fetchWeeklyDigest, fetchFormTarget, fetchWeeklyNote, fetchStreak, fetchMilestones, fetchSeasonRecap, fetchStruggleTrend,
+  Pmc, PowerRecord, WeeklyDigest, FormTarget, WeeklyNote, Streak, Milestones, SeasonRecap, StruggleTrend,
 } from "@/src/lib/analysis";
-import { PmcChart, PmcSummary, RecordsGrid, WeeklyDigestCard, ForecastSummary, FormTargetCard, CoachWeeklyNote, StreakCard, MilestonesCard, SeasonRecapCard } from "@/src/components/analysis/FitnessCharts";
+import { PmcChart, PmcSummary, RecordsGrid, WeeklyDigestCard, ForecastSummary, FormTargetCard, CoachWeeklyNote, StreakCard, MilestonesCard, SeasonRecapCard, StruggleRecapCard } from "@/src/components/analysis/FitnessCharts";
 import { ShareCardModal } from "@/src/components/ShareCardModal";
 import { AdaptationCard } from "@/src/components/analysis/AdaptationCard";
 import { fetchAdaptation, Adaptation } from "@/src/lib/adaptation";
@@ -27,6 +27,7 @@ export default function FitnessScreen() {
   const [milestones, setMilestones] = React.useState<Milestones | null>(null);
   const [season, setSeason] = React.useState<SeasonRecap | null>(null);
   const [adaptation, setAdaptation] = React.useState<Adaptation | null>(null);
+  const [struggleTrend, setStruggleTrend] = React.useState<StruggleTrend | null>(null);
   const currentYear = new Date().getFullYear();
   const [seasonYear, setSeasonYear] = React.useState(currentYear);
   const [noteLoading, setNoteLoading] = React.useState(true);
@@ -40,6 +41,7 @@ export default function FitnessScreen() {
       setPmc(p); setRecords(r); setDigest(wd); setTarget(ft); setStreak(st); setMilestones(ms); setLoading(false);
     });
     fetchAdaptation(8).then((a) => { if (alive) setAdaptation(a); });
+    fetchStruggleTrend(8).then((st) => { if (alive) setStruggleTrend(st); });
     return () => { alive = false; };
   }, []);
 
@@ -134,6 +136,13 @@ export default function FitnessScreen() {
             <Card>
               <Text style={s.h}>Adaptation <Text style={s.hDim}>what&apos;s improving</Text></Text>
               <AdaptationCard data={adaptation} onTalkToCoach={() => router.push("/plan")} />
+            </Card>
+          )}
+
+          {struggleTrend && struggleTrend.weeks.some((w) => w.rides > 0) && (
+            <Card>
+              <Text style={s.h}>Struggle Recap <Text style={s.hDim}>tough moments, week by week</Text></Text>
+              <StruggleRecapCard data={struggleTrend} />
             </Card>
           )}
 

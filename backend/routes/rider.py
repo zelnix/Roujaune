@@ -555,10 +555,18 @@ async def rider_checkin(payload: dict):
 @router.get("/rider/readiness/today")
 async def rider_readiness_today():
     """Return the latest stored daily check-in readiness (or unavailable),
-    plus today's coach downgrade suggestion, if any."""
+    plus today's coach downgrade suggestion, if any — including one auto-
+    triggered by a safety ease during the rider's last ride, even with no
+    morning check-in at all."""
     doc = await udb.daily_checkins.find_one({"id": "latest"})
+    downgrade = await _downgrade_preview_safe()
     if not doc:
+        if downgrade.get("available"):
+            return {"available": True, "score": None, "status": downgrade.get("status"),
+                    "mainFactors": [downgrade.get("reason")] if downgrade.get("reason") else [],
+                    "safetyOverride": False, "downgrade": downgrade}
         return {"available": False}
     doc.pop("_id", None)
-    downgrade = await _downgrade_preview_safe()
+    if doc.get("score") is None and not downgrade.get("available"):
+        return {"available": False}
     return {"available": True, **doc, "downgrade": downgrade}

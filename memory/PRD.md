@@ -1216,3 +1216,10 @@ User wanted an in-app rating + feedback capture (fb50-style) opened from Setting
 - **Fitness dashboard** `app/fitness.tsx` → `AdaptationCard` (`src/components/analysis/AdaptationCard.tsx`, `src/lib/adaptation.ts`): callouts, per-metric trend rows w/ sparklines, Fitness/Form/ramp tiles, auto-apply notes, and confirm prompts with a "Talk to coach" → /plan action. Shown only when ≥3 computed rides exist.
 - **New-plan start date**: onboarding plan pick now opens `ChangeStartDateModal` → `resetPlanStart(date)` before landing home (ride-free skips). Per user request "when adding a new plan need to prompt for start date".
 - Coach acting model = user choice: auto-apply small tweaks + read-back/confirm big changes; pre-workout readiness downgrade = suggest-and-accept (NOT yet wired — next), manual HRV/sleep entry = still to add (next).
+
+## Undo Anywhere — Today-screen toast surfaces coach plan changes (2026-06 fork)
+- `CoachChatModal.tsx`: `onPlanUpdated` now fires with `{ message, canUndo }` (was previously called with no args, so downstream screens never learned whether the change was undo-able).
+- `app/index.tsx` (Today): local `Toast` extended to accept an optional `undo` callback — renders an inline "Undo" chip, holds 4.5s (vs 1.9s for plain toasts) so riders have time to react. Wired `CoachChatModal.onPlanUpdated` → shows the toast with an Undo action (calls `undoReschedule()` from `src/lib/plan.ts`) whenever `canUndo` is true, even after the chat modal is closed.
+- `app/plan.tsx`: `onPlanUpdated` was previously just `refreshPlan` (ignored can_undo); now also surfaces the same Undo toast via the screen's existing Toast+undo infra, for consistency across the two screens where a plan change can start.
+- Verified live (demo@roujaune.app / Green Lantern account): "Restart my whole plan next Wednesday" → confirm → "Yes, do it" → plan updated, chat-internal Undo shown; closed modal → Today-screen toast persisted with correct text + Undo button (DOM + text asserted); tapping Undo reverted the plan and showed "Reverted to your previous schedule" confirmation toast.
+

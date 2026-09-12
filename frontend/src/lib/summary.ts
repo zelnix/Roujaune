@@ -254,6 +254,7 @@ export function useSummary() {
           samples: manual ? [] : rec.samples,
           manual: manual ?? null,
           est_calories: rec.estCalories ?? 0,
+          struggles: (rec.struggles ?? []).slice(0, 20).map((m) => ({ t: m.t, primary: m.primary, severity: m.severity, safety: m.safety })),
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

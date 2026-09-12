@@ -105,7 +105,7 @@ export function readinessTone(score?: number, safety?: boolean): Tone {
 
 /** Whether today's readiness should soften/gate the planned session. */
 export function shouldGate(r: TodayReadiness): boolean {
-  return !!r.available && (!!r.safetyOverride || (r.score != null && r.score < 55));
+  return !!r.available && (!!r.safetyOverride || (r.score != null && r.score < 55) || !!r.downgrade?.available);
 }
 
 /** One-tap accept: swap today's hard session for the coach's easy recovery

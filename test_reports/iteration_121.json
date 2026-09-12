@@ -1,0 +1,52 @@
+{
+  "summary": "Tested the two NEW P0 features from this session. TASK 1 ('Missed On Plan' — structured-plan missed rides surfaced in GET /api/rider/missed, with skip/reschedule via POST /api/rider/missed/resolve) is VERIFIED WORKING end-to-end, both via a new pytest suite and a live manual reproduction against greenlantern@roujaune.app (temporarily shifted the plan's start date 10 days into the past via POST /api/plan/start-date to organically produce 3 past-due, uncompleted structured-plan cycling days, since the seed data's real current week had none past-due). Confirmed: (a) GET /api/rider/missed returned 3 entries shaped 'plan:couch-to-road:<workout_id>' with kind:'structured', (b) skip on ctr-ride-1 returned ok:true and the entry disappeared from a subsequent GET, (c) reschedule on ctr-ride-2 to tomorrow (2026-09-13) returned ok:true + date, disappeared from missed, and correctly appeared as a rider-scheduled entry in GET /api/calendar/week for that date (status:'scheduled', color:'yellow', rescheduled_from set). Regression-verified the pre-existing ad-hoc (entry_id NOT starting with 'plan:') skip/reschedule flow still works identically via a new pytest test (create past-due scheduled_workouts row -> appears in missed -> skip/reschedule -> verified via GET). All test-induced state (plan start-date override, plan_skips docs, the rescheduled scheduled_workouts row) was reverted/cleaned up afterward via POST /api/plan/undo-reschedule + direct cleanup so greenlantern's account is back to its pre-test state (start_date 2026-09-26, current_week 1). TASK 2 (full month calendar grid in ChangeStartDateModal) is VERIFIED WORKING via Playwright on a 390x844 mobile viewport: month/year header with working prev/next arrows, Mo-Su weekday header, tappable day cells, today (Sep 12) marked with a small dot, past days (1-11) dimmed/disabled, tapping a day updates both the 'Set start to ...' confirm button and the top selected-date label ('startdate-label'). prev-month arrow is correctly non-functional at the current calendar month (clicked it, month label stayed 'September 2026' — confirmed via the label not changing, not just visual opacity). next-month arrow correctly jumped 3 months ahead (Sep -> Dec 2026) and a day in that far month could be selected and set as the new start (confirmed via a live end-to-end confirm that returned a real toast: 'Restarted From Couch to Road on 2026-09-13...' after switching back via the Tomorrow chip). The 3 quick chips (Tomorrow/Next Monday/In 2 weeks) correctly synced the grid back to the right month (Dec 2026 -> Sep 2026 when 'Tomorrow' was tapped) and highlighted the matching day. This test-induced start-date confirm was also reverted via undo-reschedule afterward.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "/plan (Your Training Plan) heading + description, mobile viewport 390x844",
+        "issues": ["Pre-existing issue (flagged in iteration_119/120, unrelated to Task 1/Task 2, not fixed yet): the 'Your Training Plan' heading and its description text still render vertically, one character per line, on a 390px mobile viewport. Did not block testing (worked around by scrolling to / directly targeting the change-start-date button via testID), but still an outstanding layout bug worth fixing since it affects the same screen these two new features live on."]
+      }
+    ],
+    "react_native_issues": []
+  },
+  "verified_working": [
+    "TASK 1: GET /api/rider/missed returns 200 + valid JSON in all cases (organic empty-state and forced past-due scenario).",
+    "TASK 1: Structured-plan missed entries correctly shaped 'plan:<plan_id>:<workout_id>' with kind:'structured', date, title, suggested_date.",
+    "TASK 1: POST /api/rider/missed/resolve action:'skip' on a structured entry -> ok:true, entry removed from subsequent GET /api/rider/missed.",
+    "TASK 1: POST /api/rider/missed/resolve action:'reschedule' on a structured entry with a future date -> ok:true + date, entry removed from missed, new rider-scheduled entry appears in GET /api/calendar/week for that date.",
+    "TASK 1: Regression — ad-hoc (non-'plan:') missed-workout skip/reschedule flow works identically to before (own pytest test, create->missed->resolve->verify).",
+    "TASK 1: Invalid entry_id format ('plan:badformat') and invalid action both correctly return 400.",
+    "TASK 2: Full month calendar grid renders with month/year header, prev/next arrows, Mo-Su weekday header, 6x7 day grid.",
+    "TASK 2: Today (Sep 12, 2026) marked with a small dot; past days (1-11) visually dimmed and non-clickable.",
+    "TASK 2: Tapping a day cell updates both the confirm button label ('Set start to ...') and the top selected-date label.",
+    "TASK 2: prev-month arrow is non-functional (verified label unchanged after click, not just opacity) when viewing the current calendar month.",
+    "TASK 2: next-month arrow correctly navigates multiple months ahead (3 clicks: Sep 2026 -> Dec 2026) and a day in a far month can be selected.",
+    "TASK 2: The 3 quick chips (Tomorrow/Next Monday/In 2 weeks) correctly jump the grid back to the right month and highlight the matching day.",
+    "TASK 2: Confirming a far-off date change via the grid actually calls POST /api/plan/start-date successfully (observed real toast 'Restarted From Couch to Road on 2026-09-13 — every session shifts with the new start.' with working Undo)."
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_iter121_missed_structured_plan.py",
+    "/app/test_reports/pytest/iter121_missed.xml"
+  ],
+  "action_items": [
+    "No blocking issues found for Task 1 or Task 2 — both features work as specified.",
+    "Low priority / pre-existing (not part of this round): /plan screen heading and description still wrap vertically one-character-per-line on 390px mobile viewport; worth revisiting the responsive text layout on that screen since both new features (Change start date button, missed-workout prompt) live there."
+  ],
+  "critical_code_review_comments": [
+    "backend/routes/plan.py rider_missed()/resolve_missed_workout(): clean separation between ad-hoc and 'plan:'-prefixed structured entry handling, with plan_skips collection correctly preventing a skipped/rescheduled structured slot from re-nagging while still allowing week completion (_ctr_week_complete honors skipped_ids). No issues found.",
+    "frontend ChangeStartDateModal.tsx: buildMonthGrid/chunk7 correctly build a Monday-first 6x7 grid; canGoPrevMonth comparison against curMonthStart correctly blocks navigating before the real current month; jumpTo() correctly keeps sel and viewMonth in sync when a chip or day is tapped. No issues found."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (6 passed, 2 skipped due to no organically-past-due structured entry in current seed data — separately verified live via a temporary plan start-date shift, see summary)", "frontend": "100% (all Task 2 calendar grid interactions verified on mobile viewport)"},
+  "seed_data_creation": "None persisted. Test-induced changes to greenlantern@roujaune.app (plan start-date shifted to 2026-09-02 for missed-scenario reproduction, then to 2026-09-13 via the Task 2 UI confirm flow; 2 plan_skips docs for ctr-ride-1/ctr-ride-2; 1 rescheduled scheduled_workouts row) were all reverted/cleaned up via POST /api/plan/undo-reschedule and direct doc deletion — account restored to start_date 2026-09-26, current_week 1 (its pre-test state).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Both Task 1 (missed structured-plan surfacing + skip/reschedule) and Task 2 (full month calendar picker in ChangeStartDateModal) are verified working end-to-end, backend and frontend. No bugs found this round. Note: the system clock in this sandbox is set to ~2026-09-12 (not Jan 2026 as stated in the problem context) — use date.today() dynamically in any future date-dependent tests rather than hardcoding an assumed 'today'. greenlantern@roujaune.app's plan state was returned to its original values (start_date 2026-09-26, current_week 1) after testing.",
+  "rca_of_issue": "N/A — no bugs found in this round; both features passed all tests as implemented."
+}

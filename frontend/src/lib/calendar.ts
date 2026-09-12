@@ -8,7 +8,7 @@ function apiBase(): string {
 /* ── types ──────────────────────────────────────────────────────────────── */
 export type SessionType = "cycling" | "fb50" | "wellness";
 export type SessionStatus =
-  | "planned" | "scheduled" | "today" | "completed" | "rescheduled" | "rest";
+  | "planned" | "scheduled" | "today" | "completed" | "rescheduled" | "rest" | "skipped";
 
 export type CalendarSession = {
   id: string;
@@ -167,6 +167,7 @@ export const STATUS_LABEL: Record<SessionStatus, string> = {
   completed: "Completed",
   rescheduled: "Moved to another day",
   rest: "Rest day",
+  skipped: "Skipped",
 };
 
 export const FILTERS = [

@@ -64,6 +64,7 @@ class SummarizeRequest(BaseModel):
     manual: Optional[Dict[str, Any]] = None  # user-entered metrics when no telemetry
     samples: List[TelemetrySample] = Field(default_factory=list)
     est_calories: int = 0     # live in-ride kcal estimate (used when no telemetry)
+    struggles: List[Dict[str, Any]] = Field(default_factory=list)  # flagged tough moments from the live struggle engine
 
 
 class CoachCueRequest(BaseModel):
@@ -258,6 +259,7 @@ class MissedResolveRequest(BaseModel):
     entry_id: str
     action: str  # "skip" | "reschedule"
     date: str = ""  # required for reschedule; blank => use coach's safe pick
+    reason: str = ""  # optional — why the rider missed/needs rest (e.g. "sick", "too busy")
 
 
 class ReviewRequest(BaseModel):

@@ -861,9 +861,11 @@ MILESTONE_HOURS = [10, 25, 50, 100, 250, 500, 1000]
 @router.get("/milestones")
 async def milestones():
     """Lifetime totals + any big round-number milestone just crossed by the most
-    recent ride, plus the next milestone to chase."""
+    recent ride (or a new all-time aerobic-efficiency best), plus the next
+    milestone to chase."""
     rides = await udb.ride_history.find(
-        {}, {"_id": 0, "created_at": 1, "distance_km": 1, "duration_sec": 1, "tss": 1}).to_list(length=5000)
+        {}, {"_id": 0, "created_at": 1, "distance_km": 1, "duration_sec": 1, "tss": 1,
+             "ef": 1, "intensity": 1}).to_list(length=5000)
     total_rides = len(rides)
     total_km = round(sum(float(r.get("distance_km") or 0) for r in rides), 1)
     total_hours = round(sum(float(r.get("duration_sec") or 0) for r in rides) / 3600.0, 1)
@@ -886,6 +888,17 @@ async def milestones():
                 recent = {"kind": "distance", "label": f"{m:,} km", "value": m,
                           "blurb": f"You've ridden over {m:,} km in total. Incredible mileage!"}
                 break
+    if recent is None:
+        # New all-time aerobic-efficiency best (steady endurance rides only —
+        # IF 0.55-0.90 — so a hard interval session can't fake a "better" EF).
+        steady = [r for r in sorted(rides, key=lambda r: r.get("created_at") or "")
+                  if r.get("ef") and 0.55 <= (r.get("intensity") or 0) <= 0.90]
+        if len(steady) >= 4 and steady[-1] is last and (last or {}).get("ef"):
+            prior_best = max((r["ef"] for r in steady[:-1]), default=0)
+            if steady[-1]["ef"] > prior_best > 0:
+                pct = round((steady[-1]["ef"] / prior_best - 1) * 100)
+                recent = {"kind": "ef_best", "label": "New efficiency best", "value": steady[-1]["ef"],
+                          "blurb": f"New aerobic-efficiency best — {pct}% more watts per heartbeat than ever before!"}
 
     def _prev_next(total, arr):
         prev, nxt = 0, None
@@ -909,6 +922,73 @@ async def milestones():
         "next_km": next_km, "km_to_next": round(next_km - total_km, 1) if next_km else None,
         "prev_km": prev_km, "km_progress": km_progress,
     }
+
+
+@router.get("/struggle-trend")
+async def struggle_trend(weeks: int = 8):
+    """Weekly frequency of live-detected struggle moments (cadence decay, HR
+    decoupling, power drops, W' depletion) across the last N weeks — powers the
+    dashboard's Struggle Recap card so a rider can see if tough moments are
+    trending up (fatigue building) or down (adapting well)."""
+    weeks = max(2, min(weeks, 26))
+    today = date.today()
+    start = today - timedelta(weeks=weeks)
+    rides = await udb.ride_history.find(
+        {"created_at": {"$gte": start.isoformat()}},
+        {"_id": 0, "created_at": 1, "struggle_count": 1, "struggle_types": 1},
+    ).to_list(2000)
+
+    buckets: Dict[str, Dict[str, Any]] = {}
+    for r in rides:
+        c = r.get("created_at") or ""
+        try:
+            dt = datetime.fromisoformat(c.replace("Z", "+00:00")) if c else None
+        except Exception:
+            dt = None
+        if not dt:
+            continue
+        wk = _iso_week(dt)
+        b = buckets.setdefault(wk, {"week": wk, "rides": 0, "struggles": 0, "types": {}})
+        b["rides"] += 1
+        cnt = r.get("struggle_count")
+        if cnt is not None:
+            b["struggles"] += int(cnt)
+        for t in (r.get("struggle_types") or []):
+            b["types"][t] = b["types"].get(t, 0) + 1
+
+    # Fill every week in the window, even ones with zero rides, so the trend line is continuous.
+    ordered = []
+    cur = start
+    while cur <= today:
+        wk = _iso_week(datetime(cur.year, cur.month, cur.day))
+        b = buckets.get(wk) or {"week": wk, "rides": 0, "struggles": 0, "types": {}}
+        top_type = max(b["types"], key=b["types"].get) if b["types"] else None
+        ordered.append({
+            "week": wk, "rides": b["rides"], "struggles": b["struggles"],
+            "per_ride": round(b["struggles"] / b["rides"], 2) if b["rides"] else 0.0,
+            "top_type": top_type,
+        })
+        cur += timedelta(days=7)
+    # De-dupe (multiple days can map to the same iso week at the boundary).
+    seen = set()
+    dedup = []
+    for w in ordered:
+        if w["week"] in seen:
+            continue
+        seen.add(w["week"])
+        dedup.append(w)
+
+    recent = dedup[-4:] if len(dedup) >= 4 else dedup
+    prior = dedup[-8:-4] if len(dedup) >= 8 else []
+    recent_avg = round(sum(w["struggles"] for w in recent) / len(recent), 2) if recent else 0.0
+    prior_avg = round(sum(w["struggles"] for w in prior) / len(prior), 2) if prior else None
+    trend = "flat"
+    if prior_avg is not None and prior_avg > 0:
+        if recent_avg <= prior_avg * 0.8:
+            trend = "improving"
+        elif recent_avg >= prior_avg * 1.2:
+            trend = "rising"
+    return {"weeks": dedup, "recent_avg": recent_avg, "prior_avg": prior_avg, "trend": trend}
 
 
 async def check_and_email_milestones():

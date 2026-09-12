@@ -309,7 +309,20 @@ export default function TrainingPlanScreen() {
           onOpen={(w) => { setWorkoutDetail(null); router.push({ pathname: "/training", params: { workoutId: w.id, title: w.title } } as any); }}
           onSwap={(w) => { setWorkoutDetail(null); setSwapWO(w); }}
         />
-        <CoachChatModal visible={showChat} onClose={() => { setShowChat(false); setChatSeed(undefined); }} persona={persona} onPlanUpdated={refreshPlan} seedMessage={chatSeed} onCreatePlan={() => { setShowChat(false); setShowCreator(true); }} />
+        <CoachChatModal
+          visible={showChat}
+          onClose={() => { setShowChat(false); setChatSeed(undefined); }}
+          persona={persona}
+          onPlanUpdated={(info) => {
+            refreshPlan();
+            showToast(
+              info.message,
+              info.canUndo ? async () => { await undoReschedule(); refreshPlan(); showToast("Reverted to your previous schedule"); } : undefined,
+            );
+          }}
+          seedMessage={chatSeed}
+          onCreatePlan={() => { setShowChat(false); setShowCreator(true); }}
+        />
         <CoachPlanCreatorModal visible={showCreator} onClose={() => setShowCreator(false)} persona={persona} onAccepted={(title) => { showToast(`New plan ready: ${title}`); refreshPlan(); }} />
         <ChangeStartDateModal
           visible={showStartDate}

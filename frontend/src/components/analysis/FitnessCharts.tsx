@@ -784,3 +784,75 @@ const s = StyleSheet.create({
   recUnit: { color: colors.textFaint, fontSize: 13, fontWeight: "700" },
   recWhen: { color: colors.textFaint, fontSize: 11, marginTop: 4, fontWeight: "600" },
 });
+
+
+const STRUGGLE_LABELS: Record<string, string> = {
+  cadence_decay: "Cadence fade", hr_decoupling: "HR decoupling", power_drop: "Power drop",
+  wprime_depleted: "W' depletion", systemic_fatigue: "Systemic fatigue", erg_failure: "ERG struggle",
+};
+
+/** Struggle Recap — weekly frequency of live-detected tough moments (cadence
+ * fade, HR decoupling, power drops, W' depletion). Trending down means the
+ * rider is adapting well; trending up flags building fatigue worth a look. */
+export function StruggleRecapCard({ data }: { data: import("@/src/lib/analysis").StruggleTrend | null }) {
+  if (!data || data.weeks.length === 0) return <Text style={rs.empty}>Ride a few sessions to see your struggle trend here.</Text>;
+  const max = Math.max(1, ...data.weeks.map((w) => w.struggles));
+  const tone = data.trend === "improving" ? colors.green : data.trend === "rising" ? colors.red : colors.yellow;
+  const toneLabel = data.trend === "improving" ? "Improving" : data.trend === "rising" ? "Rising" : "Steady";
+  const toneNote = data.trend === "improving"
+    ? "Fewer tough moments than a few weeks ago — you're adapting well."
+    : data.trend === "rising"
+      ? "Struggle moments are trending up — could be fatigue building. Worth an easier week."
+      : "About the same as recent weeks.";
+  const topAll = (() => {
+    const counts: Record<string, number> = {};
+    for (const w of data.weeks) if (w.top_type) counts[w.top_type] = (counts[w.top_type] || 0) + w.struggles;
+    const keys = Object.keys(counts);
+    return keys.length ? keys.reduce((a, b) => (counts[a] >= counts[b] ? a : b)) : null;
+  })();
+
+  return (
+    <View testID="struggle-recap-card">
+      <View style={rs.topRow}>
+        <View style={[rs.pill, { borderColor: tone, backgroundColor: `${tone}22` }]}>
+          <Text style={[rs.pillText, { color: tone }]}>{toneLabel}</Text>
+        </View>
+        <Text style={rs.avg}>{data.recent_avg} struggles / week (recent 4wk avg)</Text>
+      </View>
+      <Text style={rs.note}>{toneNote}</Text>
+      <View style={rs.barsRow}>
+        {data.weeks.map((w) => {
+          const h = 6 + Math.round((w.struggles / max) * 46);
+          return (
+            <View key={w.week} style={rs.barCol} testID={`struggle-week-${w.week}`}>
+              <View style={rs.barTrack}>
+                <View style={[rs.bar, { height: h, backgroundColor: w.struggles > 0 ? tone : colors.border }]} />
+              </View>
+              <Text style={rs.barVal}>{w.struggles}</Text>
+              <Text style={rs.barWk}>{w.week.split("-W")[1]}</Text>
+            </View>
+          );
+        })}
+      </View>
+      {topAll && (
+        <Text style={rs.topType}>Most common: {STRUGGLE_LABELS[topAll] || topAll}</Text>
+      )}
+    </View>
+  );
+}
+
+const rs = StyleSheet.create({
+  empty: { color: colors.textDim, fontSize: 12.5, lineHeight: 18 },
+  topRow: { flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap" },
+  pill: { borderRadius: 999, borderWidth: 1, paddingVertical: 5, paddingHorizontal: 12 },
+  pillText: { fontSize: 12, fontWeight: "800" },
+  avg: { color: colors.textDim, fontSize: 12, fontWeight: "600" },
+  note: { color: colors.textDim, fontSize: 12.5, lineHeight: 18, marginTop: 8 },
+  barsRow: { flexDirection: "row", alignItems: "flex-end", gap: 6, marginTop: 16, justifyContent: "space-between" },
+  barCol: { flex: 1, alignItems: "center" },
+  barTrack: { height: 52, alignItems: "center", justifyContent: "flex-end" },
+  bar: { width: "70%", minWidth: 10, borderRadius: 4 },
+  barVal: { color: colors.white, fontSize: 10.5, fontWeight: "800", marginTop: 4 },
+  barWk: { color: colors.textFaint, fontSize: 9, fontWeight: "700", marginTop: 1 },
+  topType: { color: colors.textFaint, fontSize: 11.5, fontWeight: "600", marginTop: 12 },
+});

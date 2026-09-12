@@ -313,7 +313,7 @@ export function IntervalTargetsCard({ intervals, overall, hasData, compact = fal
 }
 
 /* ======================= CHARTS ======================= */
-function PowerBarsChart({ stats, width }: { stats: SummaryStats; width: number }) {
+function PowerBarsChart({ stats, width, highlightFrac }: { stats: SummaryStats; width: number; highlightFrac?: number | null }) {
   const H = 150, padL = 34, padR = 6, padT = 10, padB = 24;
   const cw = width - padL - padR, ch = H - padT - padB;
   const maxA = stats.power_max_axis;
@@ -355,6 +355,12 @@ function PowerBarsChart({ stats, width }: { stats: SummaryStats; width: number }
           return <Rect key={i} x={x} y={top} width={bw} height={baseline - top} rx={2} fill={colors.red} opacity={0.92} />;
         })}
         <Line x1={padL} y1={targetY} x2={padL + cw} y2={targetY} stroke="#fff" strokeWidth={1.5} strokeDasharray="5,4" opacity={0.85} />
+        {highlightFrac != null && (
+          <>
+            <Line x1={padL + highlightFrac * cw} y1={padT} x2={padL + highlightFrac * cw} y2={baseline} stroke={colors.yellow} strokeWidth={2} strokeDasharray="3,3" />
+            <Circle cx={padL + highlightFrac * cw} cy={padT} r={4} fill={colors.yellow} />
+          </>
+        )}
       </Svg>
       <View style={[styles.yAxis, { height: H, pointerEvents: "none" }]}>
         {yLabels.map((v) => <Text key={v} style={[styles.axisLabel, { top: yFor(v) - 6 }]}>{v}</Text>)}
@@ -371,7 +377,7 @@ function PowerBarsChart({ stats, width }: { stats: SummaryStats; width: number }
 // tiny helper to avoid importing SvgText everywhere (labels rendered as RN Text overlay)
 function SvgText(_: { x: number; y: number }) { return null; }
 
-function HRLineChart({ stats, width }: { stats: SummaryStats; width: number }) {
+function HRLineChart({ stats, width, highlightFrac }: { stats: SummaryStats; width: number; highlightFrac?: number | null }) {
   const H = 150, padL = 34, padR = 6, padT = 10, padB = 24;
   const cw = width - padL - padR, ch = H - padT - padB;
   const maxA = stats.hr_max_axis, minA = 60;
@@ -403,6 +409,12 @@ function HRLineChart({ stats, width }: { stats: SummaryStats; width: number }) {
         ))}
         <Path d={areaPath} fill="url(#hrArea)" />
         <Polyline points={line} fill="none" stroke={colors.red} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
+        {highlightFrac != null && (
+          <>
+            <Line x1={padL + highlightFrac * cw} y1={padT} x2={padL + highlightFrac * cw} y2={baseline} stroke={colors.yellow} strokeWidth={2} strokeDasharray="3,3" />
+            <Circle cx={padL + highlightFrac * cw} cy={padT} r={4} fill={colors.yellow} />
+          </>
+        )}
       </Svg>
       <View style={[styles.yAxis, { height: H, pointerEvents: "none" }]}>
         {yLabels.map((v) => <Text key={v} style={[styles.axisLabel, { top: yFor(v) - 6 }]}>{v}</Text>)}
@@ -445,13 +457,13 @@ function fmtHms(sec: number) {
   return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-export function ChartsRow({ stats, width, vertical = false }: { stats: SummaryStats; width: number; vertical?: boolean }) {
+export function ChartsRow({ stats, width, vertical = false, highlightFrac }: { stats: SummaryStats; width: number; vertical?: boolean; highlightFrac?: number | null }) {
   if (vertical) {
     const w = Math.max(220, width - spacing.md * 2);
     return (
       <View style={styles.chartsCol} testID="charts-row">
-        <PowerBarsChart stats={stats} width={w} />
-        <HRLineChart stats={stats} width={w} />
+        <PowerBarsChart stats={stats} width={w} highlightFrac={highlightFrac} />
+        <HRLineChart stats={stats} width={w} highlightFrac={highlightFrac} />
         <TimeInZonesPanel stats={stats} full />
       </View>
     );
@@ -460,8 +472,8 @@ export function ChartsRow({ stats, width, vertical = false }: { stats: SummarySt
   const chartW = Math.max(220, (width - zonesW - spacing.md * 2) / 2);
   return (
     <View style={styles.chartsRow} testID="charts-row">
-      <PowerBarsChart stats={stats} width={chartW} />
-      <HRLineChart stats={stats} width={chartW} />
+      <PowerBarsChart stats={stats} width={chartW} highlightFrac={highlightFrac} />
+      <HRLineChart stats={stats} width={chartW} highlightFrac={highlightFrac} />
       <TimeInZonesPanel stats={stats} />
     </View>
   );
@@ -720,10 +732,11 @@ export function RecoveryCard() {
     );
   }
 
+  const hasScore = readiness.score != null;
   const score = readiness.score ?? 0;
-  const tone = readinessTone(score, readiness.safetyOverride);
+  const tone = hasScore ? readinessTone(score, readiness.safetyOverride) : { color: colors.yellow, label: "Ease recommended" };
   const factorsText = readiness.mainFactors && readiness.mainFactors.length ? readiness.mainFactors.slice(0, 2).join(" · ") : "Based on today's check-in.";
-  const low = score < 55 || readiness.safetyOverride;
+  const low = hasScore ? (score < 55 || readiness.safetyOverride) : true;
   const items = low
     ? [
         { icon: "body", label: "FB50 Recommendation", value: "Post-Ride Mobility  •  10 min" },
@@ -735,7 +748,13 @@ export function RecoveryCard() {
     <View style={styles.rightCard} testID="recovery-card">
       <View style={styles.mHead}><Ionicons name="leaf" size={14} color={colors.green} /><Text style={styles.rightHeadLabel}>RECOVERY & NEXT STEPS</Text></View>
       <View style={styles.recoveryTop}>
-        <Ring size={76} stroke={8} pct={score} color={tone.color} big={`${score}%`} small={"RECOVERY\nSCORE"} />
+        {hasScore ? (
+          <Ring size={76} stroke={8} pct={score} color={tone.color} big={`${score}%`} small={"RECOVERY\nSCORE"} />
+        ) : (
+          <View style={{ width: 76, height: 76, borderRadius: 38, alignItems: "center", justifyContent: "center", backgroundColor: `${tone.color}22`, borderWidth: 2, borderColor: tone.color }}>
+            <Ionicons name="pulse" size={28} color={tone.color} />
+          </View>
+        )}
         <View style={{ flex: 1 }}>
           <Text style={[styles.recRecoTitle, { color: tone.color }]}>{tone.label}</Text>
           <Text style={styles.recRecoText}>{factorsText}</Text>

@@ -340,7 +340,16 @@ function KmSplitsCard({ splits }: { splits: KmSplit[] }) {
 // lap-by-lap interval breakdown — for data-focused riders.
 function FullAnalysisModal({ stats, intervals, overall, hasData, ftp, adjustments = [], struggles = [], routeName, onClose }: { stats: any; intervals: any[]; overall: number | null; hasData: boolean; ftp: number; adjustments?: { t: string; label: string }[]; struggles?: any[]; routeName?: string; onClose: () => void }) {
   const [w, setW] = React.useState(600);
+  const [activeStruggle, setActiveStruggle] = React.useState<number | null>(null);
+  const scrollRef = React.useRef<ScrollView>(null);
   const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  const totalSec = Math.max(1, stats?.duration_sec || 1);
+  const highlightFrac = activeStruggle != null && struggles[activeStruggle]
+    ? Math.min(1, Math.max(0, struggles[activeStruggle].t / totalSec)) : null;
+  const toggleZoom = (i: number) => {
+    setActiveStruggle((cur) => (cur === i ? null : i));
+    scrollRef.current?.scrollTo({ y: 0, animated: true }); // charts sit right above the metrics grid
+  };
   return (
     <View style={styles.overlay}>
       <View style={styles.analysisCard} testID="full-analysis-modal">
@@ -354,13 +363,14 @@ function FullAnalysisModal({ stats, intervals, overall, hasData, ftp, adjustment
           </Pressable>
         </View>
         <ScrollView
+          ref={scrollRef}
           style={{ flex: 1 }}
           contentContainerStyle={styles.analysisScroll}
           showsVerticalScrollIndicator={false}
           onLayout={(e: LayoutChangeEvent) => setW(e.nativeEvent.layout.width)}
         >
           <MetricsGrid stats={stats} routeName={routeName} />
-          <ChartsRow stats={stats} width={w} vertical />
+          <ChartsRow stats={stats} width={w} vertical highlightFrac={highlightFrac} />
           <IntervalTargetsCard intervals={intervals} overall={overall} hasData={hasData} />
 
           <View style={styles.lapCard} testID="lap-split-table">
@@ -428,15 +438,21 @@ function FullAnalysisModal({ stats, intervals, overall, hasData, ftp, adjustment
               <View style={styles.lapHeadRow}>
                 <Ionicons name="pulse" size={15} color={colors.red} />
                 <Text style={styles.lapTitle}>Tough Moments</Text>
-                <Text style={styles.lapHint}>Where the coach stepped in</Text>
+                <Text style={styles.lapHint}>Tap to zoom the graph above</Text>
               </View>
               {struggles.map((m, i) => (
-                <View key={i} style={[styles.adjRow, i % 2 === 1 && styles.lapRowAlt]}>
+                <Pressable
+                  key={i}
+                  testID={`struggle-row-${i}`}
+                  onPress={() => toggleZoom(i)}
+                  style={[styles.adjRow, i % 2 === 1 && styles.lapRowAlt, activeStruggle === i && { backgroundColor: "rgba(255,194,10,0.12)", borderRadius: 8 }]}
+                >
                   <Text style={styles.adjTime}>{`${Math.floor(m.t / 60)}:${String(m.t % 60).padStart(2, "0")}`}</Text>
-                  <Text style={styles.adjLabel}>
+                  <Text style={[styles.adjLabel, { flex: 1 }]}>
                     {(STRUGGLE_LABEL[m.primary as string] ?? "Strain")}{m.safety ? " · safety ease → recovery" : m.severity === "high" ? " · eased −8%" : " · eased −8%"}
                   </Text>
-                </View>
+                  <Ionicons name={activeStruggle === i ? "contract" : "search"} size={14} color={activeStruggle === i ? colors.yellow : colors.textFaint} />
+                </Pressable>
               ))}
             </View>
           )}

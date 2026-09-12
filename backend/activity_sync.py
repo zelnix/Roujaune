@@ -147,7 +147,7 @@ async def ingest_activities(db, user_id: str, activities: List[dict], ftp: int,
                  "$addToSet": {"source_references": f"{provider}:{ext}"}})
             updated += 1
             if is_canonical:
-                await _mirror_history(db, await db.cycling_activities.find_one({"id": doc_id}))
+                await _mirror_history(db, await db.cycling_activities.find_one({"id": doc_id}), ftp)
             continue
 
         # New source: is this the same ride already imported from another provider?
@@ -173,7 +173,7 @@ async def ingest_activities(db, user_id: str, activities: List[dict], ftp: int,
                 update = {**base_doc, "is_canonical": True,
                           "canonical_activity_id": canonical_id, "source_references": refs}
             await db.cycling_activities.update_one({"id": canonical_id}, {"$set": update})
-            await _mirror_history(db, await db.cycling_activities.find_one({"id": canonical_id}))
+            await _mirror_history(db, await db.cycling_activities.find_one({"id": canonical_id}), ftp)
         else:
             # Brand new canonical ride.
             await db.cycling_activities.insert_one(
@@ -181,23 +181,41 @@ async def ingest_activities(db, user_id: str, activities: List[dict], ftp: int,
                  "is_canonical": True, "imported_at": _now(),
                  "source_references": [f"{provider}:{ext}"]})
             imported += 1
-            await _mirror_history(db, await db.cycling_activities.find_one({"id": doc_id}))
+            await _mirror_history(db, await db.cycling_activities.find_one({"id": doc_id}), ftp)
 
     return {"imported": imported, "updated": updated, "duplicates": duplicates,
             "total": imported + updated}
 
 
-async def _mirror_history(db, doc: dict):
+async def _mirror_history(db, doc: dict, ftp: int = 200):
     """Mirror the canonical cycling activity into ride_history (one record) so it
-    flows into season/progress/coach context. Never overwrites indoor workouts."""
+    flows into season/progress/coach context — AND into the longitudinal
+    adaptation engine (EF/VI/intensity trends), which previously only ever saw
+    indoor rides because these fields were never populated for imports.
+
+    `moving_seconds` (auto-pause aware — excludes coasting/stopped time the
+    provider already detected) is preferred over raw `elapsed_seconds` for
+    duration/TSS so a ride with several traffic-light stops isn't penalised
+    or over-credited versus an indoor session of the same pedalling time.
+    Never overwrites indoor workouts (separate `id` namespace)."""
     hid = f"import-{doc.get('canonical_activity_id') or doc['id']}"
     dist = doc.get("distance_metres")
+    dur_sec = doc.get("moving_seconds") or doc.get("elapsed_seconds") or 0
+    dur_hr = dur_sec / 3600.0 if dur_sec else 0.0
+
+    npv, apv, avg_hr = doc.get("normalised_power"), doc.get("average_power"), doc.get("average_heart_rate")
+    ifv = _intensity_factor(doc, ftp)
+    ef = round(npv / avg_hr, 3) if npv and avg_hr else (round(apv / avg_hr, 3) if apv and avg_hr else None)
+    vi = round(npv / apv, 3) if npv and apv else None
+
     tss = doc.get("training_load")
+    if tss is None and ifv is not None and dur_hr:
+        tss = round(dur_hr * ifv * ifv * 100)          # standard TSS = hours * IF^2 * 100
     if tss is None:
-        # crude TSS estimate from duration + intensity effect
-        dur = doc.get("elapsed_seconds") or 0
+        # No power/HR data at all — crude duration-only estimate.
         te = doc.get("training_effect") or 2.5
-        tss = round((dur / 3600.0) * (30 + te * 12))
+        tss = round(dur_hr * (30 + te * 12))
+
     mirror = {
         "id": hid,
         "user_id": doc.get("user_id"),
@@ -209,10 +227,15 @@ async def _mirror_history(db, doc: dict):
         "external_activity_id": doc.get("external_activity_id"),
         "cycling_activity_id": doc.get("canonical_activity_id") or doc["id"],
         "ride_type": doc.get("ride_type"),
-        "duration_sec": doc.get("elapsed_seconds"),
+        "duration_sec": dur_sec,
         "distance_km": None if dist is None else round(dist / 1000.0, 2),
         "elevation_m": doc.get("elevation_gain_metres"),
-        "avg_power": doc.get("average_power"),
+        "avg_power": apv,
+        "norm_power": npv,
+        "avg_hr": avg_hr,
+        "ef": ef,
+        "vi": vi,
+        "intensity": ifv,
         "tss": tss,
         "computed": True,
         "imported": True,

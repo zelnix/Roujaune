@@ -5,12 +5,13 @@ import { spacing, colors } from "../theme";
 import { useAuth } from "../lib/auth-context";
 import { usePlanBadge } from "../lib/plan-badge";
 import { useBenchmarkWeek, useBenchmarkPlanReview, useBenchmarkNudge } from "../lib/benchmark/api";
-import { useMissedWorkouts } from "../lib/home-notices";
+import { useMissedWorkouts, useFtpTestReminder } from "../lib/home-notices";
 import { PlanUpdatedNudge } from "./PlanUpdatedNudge";
 import { BenchmarkReminderBanner } from "./BenchmarkReminderBanner";
 import { RebenchmarkNudgeBanner } from "./RebenchmarkNudgeBanner";
 import { VerifyEmailBanner } from "./VerifyEmailBanner";
 import { MissedWorkoutBanner } from "./MissedWorkoutBanner";
+import { FtpTestReminderBanner } from "./FtpTestReminderBanner";
 import { MilestoneNudgeBanner, useMilestoneNudge } from "./MilestoneNudgeBanner";
 import { PremiumExpiryBanner, usePremiumExpiry } from "./PremiumExpiryBanner";
 
@@ -25,13 +26,14 @@ function daysUntil(dateStr: string): number {
  * One prioritised notification area for Home. Replaces the previously stacked
  * banners: it shows only the single highest-priority notice, with a "+N more"
  * control to reveal the rest — keeping today's workout above the fold.
- * Priority: premium expiring > verify email > re-benchmark required > missed workouts > benchmark due > plan updated.
+ * Priority: premium expiring > verify email > re-benchmark required > FTP test today > missed workouts > benchmark due > plan updated.
  */
 export function HomeNotificationArea() {
   const [expanded, setExpanded] = React.useState(false);
   const { user } = useAuth();
   const planUpdated = usePlanBadge();
   const missed = useMissedWorkouts();
+  const ftpTest = useFtpTestReminder();
   const { week } = useBenchmarkWeek();
   const { review } = useBenchmarkPlanReview();
   const { nudge } = useBenchmarkNudge();
@@ -57,6 +59,7 @@ export function HomeNotificationArea() {
   if (premiumExpiry.show) items.push({ key: "premium-expiry", node: <PremiumExpiryBanner /> });
   if (verifyActive) items.push({ key: "verify", node: <VerifyEmailBanner /> });
   if (nudge.required) items.push({ key: "rebenchmark", node: <RebenchmarkNudgeBanner nudge={nudge} /> });
+  if (ftpTest.available) items.push({ key: "ftp-test", node: <FtpTestReminderBanner reminder={ftpTest} /> });
   if (missedActive) items.push({ key: "missed", node: <MissedWorkoutBanner data={missed} /> });
   if (benchmarkActive) items.push({ key: "benchmark", node: <BenchmarkReminderBanner only={benchmarkOnly} /> });
   if (planUpdated) items.push({ key: "plan", node: <PlanUpdatedNudge /> });

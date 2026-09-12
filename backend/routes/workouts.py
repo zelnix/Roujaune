@@ -407,6 +407,13 @@ async def _save_ride_history(body: SummarizeRequest, result: dict) -> Optional[s
             "samples": samples,
             "strava_activity_id": None,
             "debrief": None,
+            # Live struggle-detection events flagged during the ride (cadence
+            # decay, HR decoupling, power drops, W' depletion) — feeds the
+            # weekly Struggle Recap trend card, and had_safety_event drives
+            # next-session recovery coaching (auto-easier suggestion).
+            "struggle_count": len(body.struggles or []),
+            "struggle_types": [s.get("primary") for s in (body.struggles or []) if s.get("primary")],
+            "had_safety_event": any((s.get("safety")) for s in (body.struggles or [])),
         }
         await udb.ride_history.insert_one(doc)
         try:

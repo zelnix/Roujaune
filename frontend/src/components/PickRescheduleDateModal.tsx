@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, Modal, Pressable, StyleSheet } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
-import { C } from "./plan";
+import { colors as C, radius } from "../theme";
 
 function iso(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -14,16 +14,9 @@ function addDays(d: Date, n: number): Date {
 function addMonths(d: Date, n: number): Date {
   return new Date(d.getFullYear(), d.getMonth() + n, 1);
 }
-function nextMonday(from: Date): Date {
-  const x = new Date(from);
-  const day = x.getDay(); // 0 Sun … 6 Sat
-  const delta = ((8 - day) % 7) || 7; // always the *next* Monday
-  return addDays(x, delta);
-}
 function daysInMonth(y: number, m: number): number {
   return new Date(y, m + 1, 0).getDate();
 }
-/** Monday-first 6x7 grid for the given month, padded with nulls. */
 function buildMonthGrid(viewMonth: Date): (Date | null)[] {
   const y = viewMonth.getFullYear(), m = viewMonth.getMonth();
   const firstIdx = (new Date(y, m, 1).getDay() + 6) % 7; // 0=Mon … 6=Sun
@@ -41,76 +34,59 @@ function chunk7<T>(arr: T[]): T[][] {
 }
 const WEEKDAY_HEAD = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"];
 
-/** Web- and native-safe date picker for re-anchoring a plan: a full month
- * calendar grid for jumping straight to any far-off date, plus quick chips
- * for the common intents. */
-export function ChangeStartDateModal({
-  visible, onClose, onConfirm, currentStart,
+/** Full month calendar for picking exactly which day to move a missed ride to
+ * — riders previously only got a single coach-suggested day with no choice. */
+export function PickRescheduleDateModal({
+  visible, onClose, onConfirm, suggestedDate, title,
 }: {
   visible: boolean;
   onClose: () => void;
   onConfirm: (dateISO: string) => void;
-  currentStart?: string;
+  suggestedDate?: string;
+  title?: string;
 }) {
   const today = React.useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, [visible]);
-  const [sel, setSel] = React.useState<Date>(today);
-  const [viewMonth, setViewMonth] = React.useState<Date>(() => new Date(today.getFullYear(), today.getMonth(), 1));
+  const initial = React.useMemo(() => {
+    if (suggestedDate) { const d = new Date(`${suggestedDate}T00:00:00`); if (!isNaN(d.getTime())) return d; }
+    return addDays(today, 1);
+  }, [suggestedDate, today]);
+  const [sel, setSel] = React.useState<Date>(initial);
+  const [viewMonth, setViewMonth] = React.useState<Date>(() => new Date(initial.getFullYear(), initial.getMonth(), 1));
 
   React.useEffect(() => {
     if (!visible) return;
-    const t = addDays(today, 1);
-    setSel(t);
-    setViewMonth(new Date(t.getFullYear(), t.getMonth(), 1));
-  }, [visible, today]);
+    setSel(initial);
+    setViewMonth(new Date(initial.getFullYear(), initial.getMonth(), 1));
+  }, [visible, initial]);
 
   const selIso = iso(sel);
   const label = sel.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-  const isPast = sel < today;
   const monthLabel = viewMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const curMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const canGoPrevMonth = viewMonth > curMonthStart;
   const grid = React.useMemo(() => chunk7(buildMonthGrid(viewMonth)), [viewMonth]);
-
-  const jumpTo = (d: Date) => {
-    setSel(d);
-    setViewMonth(new Date(d.getFullYear(), d.getMonth(), 1));
-  };
-
-  const chips: { label: string; date: Date }[] = [
-    { label: "Tomorrow", date: addDays(today, 1) },
-    { label: "Next Monday", date: nextMonday(today) },
-    { label: "In 2 weeks", date: addDays(today, 14) },
-  ];
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={s.bg} onPress={onClose}>
         <Pressable style={s.sheet} onPress={() => {}}>
           <View style={s.head}>
-            <Text style={s.title}>Change start date</Text>
-            <Pressable testID="startdate-close" onPress={onClose} hitSlop={8}><Ionicons name="close" size={20} color={C.white} /></Pressable>
+            <Text style={s.title}>Reschedule{title ? ` “${title}”` : ""}</Text>
+            <Pressable testID="reschedule-close" onPress={onClose} hitSlop={8}><Ionicons name="close" size={20} color={C.white} /></Pressable>
           </View>
-          <Text style={s.sub}>
-            Your whole plan re-anchors to the day you pick{currentStart ? ` (currently ${currentStart})` : ""}. A hard event date stays fixed — the plan tightens to fit if needed.
-          </Text>
+          <Text style={s.sub}>Pick any free day — your plan adjusts around it.</Text>
 
           <View style={s.selectedRow}>
             <Ionicons name="calendar" size={15} color={C.yellow} />
-            <Text style={s.dateLabel} testID="startdate-label" numberOfLines={1}>{label}</Text>
+            <Text style={s.dateLabel} testID="reschedule-label" numberOfLines={1}>{label}</Text>
           </View>
-          {isPast ? <Text style={s.pastWarn}>Pick today or later</Text> : null}
 
           <View style={s.monthNav}>
-            <Pressable
-              testID="startdate-month-prev"
-              disabled={!canGoPrevMonth}
-              onPress={() => setViewMonth((d) => addMonths(d, -1))}
-              style={[s.monthBtn, !canGoPrevMonth && { opacity: 0.3 }]}
-            >
+            <Pressable testID="reschedule-month-prev" disabled={!canGoPrevMonth} onPress={() => setViewMonth((d) => addMonths(d, -1))} style={[s.monthBtn, !canGoPrevMonth && { opacity: 0.3 }]}>
               <Ionicons name="chevron-back" size={18} color={C.white} />
             </Pressable>
-            <Text style={s.monthLabel} testID="startdate-month-label">{monthLabel}</Text>
-            <Pressable testID="startdate-month-next" onPress={() => setViewMonth((d) => addMonths(d, 1))} style={s.monthBtn}>
+            <Text style={s.monthLabel} testID="reschedule-month-label">{monthLabel}</Text>
+            <Pressable testID="reschedule-month-next" onPress={() => setViewMonth((d) => addMonths(d, 1))} style={s.monthBtn}>
               <Ionicons name="chevron-forward" size={18} color={C.white} />
             </Pressable>
           </View>
@@ -131,10 +107,10 @@ export function ChangeStartDateModal({
                   return (
                     <Pressable
                       key={ci}
-                      testID={`startdate-day-${dIso}`}
+                      testID={`reschedule-day-${dIso}`}
                       disabled={past}
-                      onPress={() => jumpTo(d)}
-                      style={[s.dayCell, s.dayTouchable, active && s.dayActive, past && { opacity: 0.3 }]}
+                      onPress={() => setSel(d)}
+                      style={[s.dayCell, past && { opacity: 0.3 }, active && s.dayActive]}
                     >
                       <Text style={[s.dayText, active && s.dayTextActive]}>{d.getDate()}</Text>
                       {isToday && !active ? <View style={s.todayDot} /> : null}
@@ -145,25 +121,9 @@ export function ChangeStartDateModal({
             ))}
           </View>
 
-          <View style={s.chips}>
-            {chips.map((c) => {
-              const active = iso(c.date) === selIso;
-              return (
-                <Pressable key={c.label} testID={`startdate-chip-${c.label.replace(/\s+/g, "-").toLowerCase()}`} onPress={() => jumpTo(c.date)} style={[s.chip, active && s.chipActive]}>
-                  <Text style={[s.chipText, active && s.chipTextActive]}>{c.label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <Pressable
-            testID="startdate-confirm"
-            disabled={isPast}
-            onPress={() => onConfirm(selIso)}
-            style={[s.confirm, isPast && { opacity: 0.5 }]}
-          >
-            <Ionicons name="calendar" size={16} color="#241B00" />
-            <Text style={s.confirmText}>Set start to {sel.toLocaleDateString(undefined, { day: "numeric", month: "short" })}</Text>
+          <Pressable testID="reschedule-confirm" onPress={() => onConfirm(selIso)} style={s.confirm}>
+            <Ionicons name="checkmark-circle" size={16} color="#04210F" />
+            <Text style={s.confirmText}>Move to {sel.toLocaleDateString(undefined, { day: "numeric", month: "short" })}</Text>
           </Pressable>
         </Pressable>
       </Pressable>
@@ -173,31 +133,24 @@ export function ChangeStartDateModal({
 
 const s = StyleSheet.create({
   bg: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center", padding: 20 },
-  sheet: { width: 420, maxWidth: "100%", backgroundColor: C.cardHi, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 18, gap: 12 },
+  sheet: { width: 420, maxWidth: "100%", backgroundColor: "#1B1B1B", borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 18, gap: 12 },
   head: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  title: { color: C.white, fontSize: 18, fontWeight: "800" },
-  sub: { color: C.dim, fontSize: 12.5, lineHeight: 18 },
-  selectedRow: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(255,194,10,0.08)", borderRadius: 12, borderWidth: 1, borderColor: "rgba(255,194,10,0.25)", paddingVertical: 10, paddingHorizontal: 12 },
+  title: { color: C.white, fontSize: 17, fontWeight: "800", flex: 1, marginRight: 8 },
+  sub: { color: C.textDim, fontSize: 12.5, lineHeight: 18 },
+  selectedRow: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "rgba(255,194,10,0.08)", borderRadius: radius.md, borderWidth: 1, borderColor: "rgba(255,194,10,0.25)", paddingVertical: 10, paddingHorizontal: 12 },
   dateLabel: { color: C.white, fontSize: 14, fontWeight: "800", flex: 1 },
-  pastWarn: { color: C.rouge, fontSize: 11.5, fontWeight: "700", marginTop: -6 },
   monthNav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   monthBtn: { width: 40, height: 40, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.05)" },
   monthLabel: { color: C.white, fontSize: 15, fontWeight: "800" },
   weekHead: { flexDirection: "row", justifyContent: "space-between" },
-  weekHeadText: { color: C.dim, fontSize: 10.5, fontWeight: "700", width: 40, textAlign: "center" },
+  weekHeadText: { color: C.textDim, fontSize: 10.5, fontWeight: "700", width: 40, textAlign: "center" },
   grid: { gap: 4 },
   gridRow: { flexDirection: "row", justifyContent: "space-between" },
   dayCell: { width: 40, height: 38, alignItems: "center", justifyContent: "center", borderRadius: 10 },
-  dayTouchable: { minHeight: 38 },
   dayActive: { backgroundColor: C.yellow },
   dayText: { color: C.white, fontSize: 13.5, fontWeight: "600" },
   dayTextActive: { color: "#241B00", fontWeight: "800" },
   todayDot: { position: "absolute", bottom: 4, width: 4, height: 4, borderRadius: 2, backgroundColor: C.yellow },
-  chips: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-  chip: { paddingVertical: 9, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, borderColor: C.border, minHeight: 40, justifyContent: "center" },
-  chipActive: { backgroundColor: "rgba(255,194,10,0.14)", borderColor: C.yellow },
-  chipText: { color: C.white, fontSize: 12.5, fontWeight: "700" },
-  chipTextActive: { color: C.yellow },
   confirm: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.yellow, borderRadius: 12, paddingVertical: 14, minHeight: 50 },
   confirmText: { color: "#241B00", fontSize: 14.5, fontWeight: "800" },
 });

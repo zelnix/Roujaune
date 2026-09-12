@@ -15,16 +15,19 @@ function apiBase(): string {
 }
 
 /** Skip or reschedule a missed session. Reschedule uses `date` (or the coach's
- * safe pick when omitted). Signals the whole app so the plan/calendar refresh. */
+ * safe pick when omitted). `reason` is optional context for why the rider
+ * missed/needs rest — the coach factors it into future guidance. Signals the
+ * whole app so the plan/calendar refresh. */
 export async function resolveMissed(
   entryId: string,
   action: "skip" | "reschedule",
   date?: string,
+  reason?: string,
 ): Promise<boolean> {
   try {
     const res = await fetch(`${apiBase()}/api/rider/missed/resolve`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ entry_id: entryId, action, date: date || "" }),
+      body: JSON.stringify({ entry_id: entryId, action, date: date || "", reason: reason || "" }),
     });
     if (res.ok) { notifyPlanChanged(); return true; }
   } catch { /* best-effort */ }
@@ -51,5 +54,23 @@ export function useMissedWorkouts(): MissedWorkouts {
     })();
     return () => { alive = false; };
   }, [nonce, refresh]);
+  return data;
+}
+
+export type FtpTestReminder = { available: boolean; id?: string; title?: string; date?: string };
+
+/** Coach nudge for the morning of a booked FTP re-test. */
+export function useFtpTestReminder(): FtpTestReminder {
+  const [data, setData] = React.useState<FtpTestReminder>({ available: false });
+  React.useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`${apiBase()}/api/rider/ftp-test-reminder`);
+        if (res.ok) { const j = await res.json(); if (alive) setData(j); }
+      } catch { /* best-effort */ }
+    })();
+    return () => { alive = false; };
+  }, []);
   return data;
 }

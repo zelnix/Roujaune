@@ -37,6 +37,9 @@ export function SessionStatusIndicator({ status }: { status: string }) {
   if (status === "rescheduled") {
     return <View style={cs.statMoved} accessibilityLabel={label}><Ionicons name="swap-horizontal" size={9} color={CC.dim} /></View>;
   }
+  if (status === "skipped") {
+    return <View style={cs.statMoved} accessibilityLabel={label}><Ionicons name="remove" size={11} color={CC.dim} /></View>;
+  }
   return <View style={cs.statTodo} accessibilityLabel={label} />;
 }
 

@@ -20,7 +20,7 @@ function TypingDots() {
   );
 }
 
-export function CoachChatModal({ visible, onClose, persona, onPlanUpdated, seedMessage, onCreatePlan }: { visible: boolean; onClose: () => void; persona: CoachPersona; onPlanUpdated?: () => void; seedMessage?: string; onCreatePlan?: () => void }) {
+export function CoachChatModal({ visible, onClose, persona, onPlanUpdated, seedMessage, onCreatePlan }: { visible: boolean; onClose: () => void; persona: CoachPersona; onPlanUpdated?: (info: { message: string; canUndo: boolean }) => void; seedMessage?: string; onCreatePlan?: () => void }) {
   const style = useCoachStyle();
   const { speak, stop, speakingId } = useCoachSpeech(persona.id);
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
@@ -67,7 +67,7 @@ export function CoachChatModal({ visible, onClose, persona, onPlanUpdated, seedM
         setCanUndo(!!res.can_undo);
         if (res.coaching_style) setCoachStyle(res.coaching_style as CoachStyle);
         notifyPlanChanged();
-        onPlanUpdated?.();
+        onPlanUpdated?.({ message: res.plan_change || "Your plan was updated", canUndo: !!res.can_undo });
       }
     } catch {
       setMessages((m) => [...m, { id: `err-${Date.now()}`, role: "coach", text: "I couldn't reach you just now — give me a moment and try again.", at: new Date().toISOString() }]);
