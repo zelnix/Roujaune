@@ -104,6 +104,9 @@ export function useBleSensors(_wheelCircumferenceMm?: number) {
 
   const noopBool = useCallback(async () => false, []);
   const noopVoid = useCallback(async () => {}, []);
+  // Web preview has no real device to re-establish — just reuse the demo
+  // connect flow so the global BLE context's boot logic has something to call.
+  const connectSilently = useCallback((id: string, _name: string) => { connect(id); }, [connect]);
 
   return {
     supported: true,
@@ -119,6 +122,7 @@ export function useBleSensors(_wheelCircumferenceMm?: number) {
     stopScan,
     connect,
     disconnect,
+    connectSilently,
     battery,
     reconnecting,
     rssi,

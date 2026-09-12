@@ -218,9 +218,7 @@ export default function SettingsScreen() {
         <SectionTitle label="EQUIPMENT & RIDE" color={CC.rouge} />
         <PrefRow icon="bluetooth" label="Bluetooth sensors" sub="Connect your trainer, power, cadence & heart-rate straps during a ride" onPress={() => router.push("/workout")} testID="row-ble-sensors" divider />
         <PrefToggle label="Live HUD overlay" sub="On-screen metrics during rides" on={settings.hudEnabled} onToggle={() => setSetting("hudEnabled", !settings.hudEnabled)} testID="tg-hudEnabled" divider />
-        <PrefToggle label="Seated mode" sub={`${persona.name} avoids standing-effort cues`} on={settings.seatedMode} onToggle={() => setSetting("seatedMode", !settings.seatedMode)} testID="tg-seatedMode" divider />
-        <PrefToggle label="Demo mode" sub="Simulate sensor data without hardware — rides are Live by default" on={settings.demoMode} onToggle={() => setSetting("demoMode", !settings.demoMode)} testID="tg-demoMode" />
-        <Text style={s.coachHint}>Rides are Live by default and show only real sensor data. Turn on Demo to preview a simulated ride without hardware.</Text>
+        <PrefToggle label="Seated mode" sub={`${persona.name} avoids standing-effort cues`} on={settings.seatedMode} onToggle={() => setSetting("seatedMode", !settings.seatedMode)} testID="tg-seatedMode" />
       </Card>
 
       <Card testID="wheel-speed">

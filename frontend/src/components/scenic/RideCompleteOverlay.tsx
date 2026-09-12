@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { View, Text, StyleSheet, Pressable, Modal } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { colors, radius } from "@/src/theme";
 import { RideRouteMap, RouteMapPoint } from "@/src/components/RideRouteMap";
@@ -27,7 +27,8 @@ export function RideCompleteOverlay({
   discoveries, caption, cardWidth, mapWidth, onShare, onHome,
 }: Props) {
   return (
-    <View style={s.completeWrap} testID="ride-complete">
+    <Modal transparent visible animationType="fade">
+      <View style={s.completeWrap} testID="ride-complete">
       <View style={[s.recapCard, { width: cardWidth }]}>
         <View style={s.recapHeader}>
           <View style={s.completeIcon}><Ionicons name="checkmark" size={26} color={colors.bg} /></View>
@@ -75,6 +76,7 @@ export function RideCompleteOverlay({
         {savedCount >= 3 && <ConfettiBurst width={cardWidth} height={360} count={36} originY={26} />}
       </View>
     </View>
+    </Modal>
   );
 }
 

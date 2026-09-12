@@ -1,12 +1,12 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, Image, useWindowDimensions } from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView, Image, useWindowDimensions, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { colors, radius, spacing, shadow } from "@/src/theme";
 import { useTelemetry } from "@/src/hooks/useTelemetry";
-import { useBleSensors } from "@/src/hooks/useBleSensors";
+import { useBLE } from "@/src/lib/ble-context";
 import { BleSensorsPanel } from "@/src/components/BleSensorsPanel";
 import { TrainerControlPanel } from "@/src/components/streaming/TrainerControlPanel";
 import { useSettings } from "@/src/lib/settings";
@@ -64,13 +64,14 @@ export default function VirtualRouteScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const compact = width < 820;
-  const { telemetry, connectionState, stale, sendErg, sendTarget, sendSensor, simulateDropout, pause, resume } = useTelemetry(settings.demoMode);
+  const { telemetry, connectionState, stale, sendErg, sendTarget, sendSensor, pause, resume } = useTelemetry();
   const { settings } = useSettings();
-  const ble = useBleSensors(settings.wheelCircumference);
+  const ble = useBLE();
+  React.useEffect(() => { ble.setWheelCircumferenceMm(settings.wheelCircumference); }, [settings.wheelCircumference]); // eslint-disable-line react-hooks/exhaustive-deps
   const [showBle, setShowBle] = React.useState(false);
   const [showTrainer, setShowTrainer] = React.useState(false);
 
-  // Push real Bluetooth sensor readings into the telemetry stream (overrides sim).
+  // Push real Bluetooth sensor readings into the live telemetry stream.
   React.useEffect(() => {
     if (ble.readings.ts <= 0 || connectionState !== "connected") return;
     sendSensor({ power: ble.readings.power, cadence: ble.readings.cadence, hr: ble.readings.hr, speed: ble.readings.speed });
@@ -159,7 +160,7 @@ export default function VirtualRouteScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, autoResistance, emergency, resistanceTarget, route.gradient, ble.hasTrainerControl]);
 
-  const sensorsOn = settings.demoMode || ble.connected.length > 0;
+  const sensorsOn = ble.connected.length > 0;
   const hrOn = telemetry.hr > 0;
   const scene: SceneTelemetry = {
     power: sm.power, cadence: sm.cadence, speed: sm.speed, hr: hrOn ? sm.hr : 0,
@@ -267,7 +268,7 @@ export default function VirtualRouteScreen() {
           onPreset={(w) => sendTarget(w)}
           ergOn={autoResistance && !emergency}
           onErgToggle={() => setAutoResistance((a) => !a)}
-          onReconnect={simulateDropout}
+          onReconnect={() => setShowBle(true)}
           exitLabel="End Ride"
           exitIcon="stop"
           onExitFullscreen={requestEnd}
@@ -381,6 +382,7 @@ export default function VirtualRouteScreen() {
 
       {/* End-of-ride summary shown after saving */}
       {summary && (
+        <Modal transparent visible animationType="fade">
         <View style={s.summaryOverlay}>
           <View style={s.summaryCard} testID="vr-summary">
             <View style={s.summaryHead}>
@@ -416,6 +418,7 @@ export default function VirtualRouteScreen() {
             </Pressable>
           </View>
         </View>
+        </Modal>
       )}
       {/* Bluetooth sensor pairing */}
       {showBle && (
@@ -471,7 +474,7 @@ function deriveConnection(state: string, stale: boolean, sensorsOn: boolean): { 
   if (state === "reconnecting") return { label: "Signal lost — reconnecting", tone: colors.yellow };
   if (state === "disconnected") return { label: "Device disconnected", tone: colors.red };
   if (stale) return { label: "Signal temporarily lost", tone: colors.yellow };
-  if (!sensorsOn) return { label: "Not connected — connect a sensor or turn on Demo", tone: "#5AC8FA" };
+  if (!sensorsOn) return { label: "No devices connected", tone: "#5AC8FA" };
   return { label: "Connected", tone: colors.green };
 }
 

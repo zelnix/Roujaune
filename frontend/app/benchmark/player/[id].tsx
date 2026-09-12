@@ -11,10 +11,10 @@ import { useSettings } from "@/src/lib/settings";
 import { POWER_REQUIRED, POWER_PREFERRED } from "@/src/lib/benchmark/setup";
 import {
   kindToState, targetWatts, STATE_LABEL, STOP_REASONS, SAFETY_GUIDANCE, coachPrompt,
-  simulateReadings, RAMP_STEP_OPTIONS, effortBaseWatts, type WorkoutState,
+  RAMP_STEP_OPTIONS, type WorkoutState,
 } from "@/src/lib/benchmark/player";
 import { computeResult, assembleCapture, type IntervalCapture } from "@/src/lib/benchmark/calc";
-import { useBleSensors } from "@/src/hooks/useBleSensors";
+import { useBLE } from "@/src/lib/ble-context";
 import { BleSensorsPanel } from "@/src/components/BleSensorsPanel";
 
 function apiBase() { return (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, ""); }
@@ -95,7 +95,6 @@ export default function WorkoutPlayerScreen() {
       iv,
       state: kindToState(iv.kind),
       target: targetWatts(iv, ftp),
-      simBase: iv.targetType === "rpe" ? effortBaseWatts(iv, ftp) : targetWatts(iv, ftp),
       cadenceTarget: iv.cadenceLow && iv.cadenceHigh ? Math.round((iv.cadenceLow + iv.cadenceHigh) / 2) : undefined,
       isRamp: iv.targetType === "ramp",
       duration: iv.durationSec,
@@ -112,7 +111,6 @@ export default function WorkoutPlayerScreen() {
   const [p3, setP3] = React.useState(0);
   const [avgIv, setAvgIv] = React.useState(0);
   const [rpe, setRpe] = React.useState(5);
-  const [fade, setFade] = React.useState(0);
   const [pauseTotal, setPauseTotal] = React.useState(0);
   const [showPauseWarn, setShowPauseWarn] = React.useState(false);
   const [showStop, setShowStop] = React.useState(false);
@@ -131,24 +129,24 @@ export default function WorkoutPlayerScreen() {
   const [weightKg, setWeightKg] = React.useState<number | undefined>(undefined);
   const running = ["warmup", "main", "recovery", "cooldown"].includes(runState);
 
-  // A benchmark test defaults to SIMULATED data so it can be tried without any
-  // hardware. Any connected BLE sensor's readings take over per-metric — a
+  // A benchmark test requires a real connected BLE sensor for live data — a
   // power/cadence sensor counts as a trainer, a HR strap as a wearable —
-  // exactly mirroring the live workout screen's convention. Once at least one
-  // real sensor is connected the test is no longer "sim", which also makes
-  // its result eligible to update the rider's real FTP profile (the backend
-  // never applies a result flagged `isDevData` to the profile).
+  // exactly mirroring the live workout screen's convention. Only once a real
+  // sensor is connected does a result become eligible to update the rider's
+  // real FTP profile (the backend never applies a result recorded with no
+  // device connected to the profile).
   const [showBle, setShowBle] = React.useState(false);
-  const ble = useBleSensors(settings.wheelCircumference);
+  const ble = useBLE();
+  React.useEffect(() => { ble.setWheelCircumferenceMm(settings.wheelCircumference); }, [settings.wheelCircumference]); // eslint-disable-line react-hooks/exhaustive-deps
   const bleTrainer = ble.connected.length > 0 && (ble.readings.power != null || ble.readings.cadence != null);
   const bleWearable = ble.connected.length > 0 && ble.readings.hr != null;
-  const usingSim = !bleTrainer && !bleWearable;
-  const [finishedIsDev, setFinishedIsDev] = React.useState<boolean | null>(null);
-  const showDevNote = finishedIsDev ?? usingSim;
+  const noDevice = !bleTrainer && !bleWearable;
+  const [finishedNoDevice, setFinishedNoDevice] = React.useState<boolean | null>(null);
+  const showNoDeviceNote = finishedNoDevice ?? noDevice;
   const bleReadingsRef = React.useRef(ble.readings); bleReadingsRef.current = ble.readings;
   const bleTrainerRef = React.useRef(bleTrainer); bleTrainerRef.current = bleTrainer;
   const bleWearableRef = React.useRef(bleWearable); bleWearableRef.current = bleWearable;
-  const usingSimRef = React.useRef(usingSim); usingSimRef.current = usingSim;
+  const noDeviceRef = React.useRef(noDevice); noDeviceRef.current = noDevice;
 
   // Metric relevance
   const powerTest = !!test && (POWER_REQUIRED.has(test.id) || POWER_PREFERRED.has(test.id));
@@ -184,7 +182,7 @@ export default function WorkoutPlayerScreen() {
     if (!session) return;
     fetch(`${apiBase()}/api/benchmark/sessions/${session}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status, usingDevData: usingSimRef.current, ...extra }),
+      body: JSON.stringify({ status, usingDevData: noDeviceRef.current, ...extra }),
     }).catch(() => {});
   }, [session]);
 
@@ -226,14 +224,14 @@ export default function WorkoutPlayerScreen() {
   // to the result page. Simulated data is flagged and never touches the profile.
   const finishRun = React.useCallback(async (status: string, stoppedReason: string | null, rampFinalWatts?: number) => {
     if (!test) return;
-    setFinishedIsDev(usingSimRef.current);
+    setFinishedNoDevice(noDeviceRef.current);
     const capture = assembleCapture(test, logRef.current, {
       totalElapsed: totalRef.current,
       pauseCount: pauseCountRef.current,
       rampFinalWatts,
       rampStep: rampStepRef.current,
       sensorLevel: sensorLevelRef.current,
-      isDevData: usingSimRef.current,
+      isDevData: noDeviceRef.current,
       rpe: rpeRef.current,
       weightKg: weightRef.current,
       ftp: ftpRef.current,
@@ -263,16 +261,13 @@ export default function WorkoutPlayerScreen() {
           const stepSec = cur.iv.rampStepSec || 60;
           if (ne % stepSec === 0) setRampTarget((rt) => rt + rampStep);
         }
-        // simulate telemetry, but let a connected REAL BLE sensor take over
-        // per-metric (trainer → power/cadence, wearable → heart rate) — same
-        // priority rule as the live workout screen.
-        const tgt = cur.isRamp ? rampTargetRef.current : (cur.simBase ?? cur.target);
-        const sim = simulateReadings(tgt, cur.state, cur.cadenceTarget, fadeRef.current);
+        // Live telemetry only — a connected REAL BLE sensor drives each metric
+        // (trainer → power/cadence, wearable → heart rate); zero otherwise.
         const br = bleReadingsRef.current;
         const r = {
-          power: bleTrainerRef.current && br.power != null ? br.power : sim.power,
-          cadence: bleTrainerRef.current && br.cadence != null ? br.cadence : sim.cadence,
-          hr: bleWearableRef.current && br.hr != null ? br.hr : sim.hr,
+          power: bleTrainerRef.current && br.power != null ? br.power : 0,
+          cadence: bleTrainerRef.current && br.cadence != null ? br.cadence : 0,
+          hr: bleWearableRef.current && br.hr != null ? br.hr : 0,
         };
         setReadings(r);
         pRoll.current = [...pRoll.current, r.power].slice(-3);
@@ -299,11 +294,10 @@ export default function WorkoutPlayerScreen() {
       });
     }, 1000);
     return () => clearInterval(t);
-  }, [running, stepIdx, steps, rampStep, fade, persist]);
+  }, [running, stepIdx, steps, rampStep, persist]);
 
   // refs to read latest values inside interval
   const rampTargetRef = React.useRef(rampTarget); rampTargetRef.current = rampTarget;
-  const fadeRef = React.useRef(fade); fadeRef.current = fade;
 
   if (!test) {
     return (
@@ -329,16 +323,6 @@ export default function WorkoutPlayerScreen() {
   };
   const confirmPause = () => { pauseCountRef.current += 1; setShowPauseWarn(false); setRunState("paused"); };
   const resume = () => { setPauseTotal((p) => p); setRunState(step?.state ?? "main"); };
-  // DEV: jump to the next interval (lets simulated testing reach the main effort fast).
-  const skipStep = () => {
-    const cur = steps[stepIdx];
-    if (!cur) return;
-    logRef.current.push(finalizeInterval(cur, accRef.current, stepElapsed, rampTarget));
-    accRef.current = newAcc(); pRoll.current = [];
-    const next = stepIdx + 1;
-    if (next >= steps.length) { setRunState("completed"); finishRef.current("completed", null); }
-    else { setStepIdx(next); setStepElapsed(0); if (steps[next].isRamp) setRampTarget(steps[next].iv.rampStartWatts || 100); setRunState(steps[next].state); }
-  };
   const pickStop = (rid: string, isSafety?: boolean) => {
     setShowStop(false); setStoppedReason(rid); setSafety(!!isSafety);
     // finalize the in-progress interval so its recorded data is captured
@@ -382,9 +366,9 @@ export default function WorkoutPlayerScreen() {
       <View style={s.topBar}>
         <Text style={s.testName} numberOfLines={1}>{test.name}</Text>
         <View style={s.stateChip}><Text style={s.stateChipText}>{STATE_LABEL[runState]}</Text></View>
-        {usingSim ? (
+        {noDevice ? (
           <Pressable testID="ble-open" onPress={() => setShowBle(true)} style={s.devBadge}>
-            <Text style={s.devText}>SIM DATA</Text>
+            <Text style={s.devText}>NO DEVICES</Text>
           </Pressable>
         ) : (
           <Pressable testID="ble-open" onPress={() => setShowBle(true)} style={s.liveBadge}>
@@ -433,7 +417,7 @@ export default function WorkoutPlayerScreen() {
             <Text style={s.sumLine}>Elapsed: {fmt(totalElapsed)}</Text>
             <Text style={s.sumLine}>Avg power (last interval): {avgIv} W</Text>
             {stoppedReason && <Text style={s.sumLine}>Reason: {STOP_REASONS.find((r) => r.id === stoppedReason)?.label}</Text>}
-            {showDevNote && <Text style={s.devInline}>Recorded from simulated development data — not added to your real profile.</Text>}
+            {showNoDeviceNote && <Text style={s.devInline}>Recorded with no device connected — not added to your real profile.</Text>}
           </View>
           <View style={s.noteCard}><Text style={s.dim}>Your session has been saved. Your recorded data is preserved.</Text></View>
           <Pressable testID="player-return" onPress={() => router.replace("/benchmark")} style={s.beginBtn}><Text style={s.beginText}>Return to Benchmark Workouts</Text></Pressable>
@@ -481,25 +465,9 @@ export default function WorkoutPlayerScreen() {
             <Text style={s.connectText}>
               {bleTrainer || bleWearable
                 ? `${ble.connected.length} sensor${ble.connected.length > 1 ? "s" : ""} connected`
-                : "No devices connected — using simulated data"}
+                : "No devices connected"}
             </Text>
           </Pressable>
-
-          {/* Dev inject controls */}
-          <View style={s.injectBox}>
-            <Text style={s.injectTitle}>DEV · SIMULATE</Text>
-            <View style={s.injectRow}>
-              <Pressable testID="inject-fade" onPress={() => setFade((f) => Math.min(1, f + 0.2))} style={s.injectBtn}><Text style={s.injectText}>Power fade</Text></Pressable>
-              <Pressable testID="inject-reset" onPress={() => setFade(0)} style={s.injectBtn}><Text style={s.injectText}>Reset</Text></Pressable>
-              <Pressable testID="inject-skip" onPress={skipStep} style={s.injectBtn}><Text style={s.injectText}>Skip interval</Text></Pressable>
-              <Pressable testID="inject-interrupt" onPress={() => { setRunState("interrupted"); persist({ runState: "interrupted" }); }} style={s.injectBtn}><Text style={s.injectText}>Dropout</Text></Pressable>
-            </View>
-          </View>
-
-          {runState === "interrupted" && (
-            <View style={s.warnCard}><Ionicons name="wifi-outline" size={16} color={CC.yellow} /><Text style={s.warnText}>Sensor signal lost. Recorded data is preserved — resume when the signal returns.</Text>
-              <Pressable testID="resume-interrupt" onPress={resume} style={s.smallBtn}><Text style={s.smallBtnText}>Resume</Text></Pressable></View>
-          )}
         </ScrollView>
       )}
 
@@ -623,15 +591,6 @@ const s = StyleSheet.create({
   rpeValue: { color: CC.white, fontSize: 20, fontWeight: "900", minWidth: 26, textAlign: "center" },
   coachCard: { flexDirection: "row", gap: 10, alignItems: "flex-start", backgroundColor: "rgba(201,23,39,0.06)", borderWidth: 1, borderColor: "rgba(201,23,39,0.2)", borderRadius: 12, padding: 13, width: "100%" },
   coachText: { flex: 1, color: CC.white, fontSize: 13, lineHeight: 19 },
-  injectBox: { backgroundColor: "rgba(255,194,10,0.05)", borderWidth: 1, borderColor: "rgba(255,194,10,0.2)", borderRadius: 12, padding: 12, gap: 8 },
-  injectTitle: { color: CC.yellow, fontSize: 10, fontWeight: "800", letterSpacing: 0.5 },
-  injectRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-  injectBtn: { borderWidth: 1, borderColor: CC.border, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: "rgba(255,255,255,0.03)" },
-  injectText: { color: CC.white, fontSize: 12, fontWeight: "700" },
-  warnCard: { flexDirection: "row", gap: 10, alignItems: "center", flexWrap: "wrap", backgroundColor: "rgba(255,194,10,0.08)", borderWidth: 1, borderColor: "rgba(255,194,10,0.3)", borderRadius: 12, padding: 12 },
-  warnText: { flex: 1, color: CC.white, fontSize: 12.5, lineHeight: 18 },
-  smallBtn: { backgroundColor: CC.rouge, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 14 },
-  smallBtnText: { color: "#fff", fontSize: 12.5, fontWeight: "800" },
 
   footer: { flexDirection: "row", gap: 12, paddingHorizontal: 20, paddingVertical: 12, borderTopWidth: 1, borderTopColor: CC.border },
   pauseBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "rgba(255,255,255,0.08)", borderRadius: 12, paddingVertical: 14, minHeight: 50 },

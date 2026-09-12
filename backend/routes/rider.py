@@ -95,7 +95,7 @@ async def update_rider_prefs(req: PrefsUpdate):
 
 # ---- Rider settings (live-workout + home location) ----
 SETTINGS_DEFAULT = {
-    "id": "me", "hasTrainer": False, "hasWearable": False, "demoMode": False,
+    "id": "me", "hasTrainer": False, "hasWearable": False,
     "hudEnabled": True, "ftp": 287, "ftpAuto": True, "seatedMode": False,
     "wheelCircumference": 2105,
     "homeCity": "South Perth, Australia", "homeLat": -31.9833, "homeLon": 115.8586,

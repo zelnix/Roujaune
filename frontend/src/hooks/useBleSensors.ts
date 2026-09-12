@@ -420,6 +420,15 @@ export function useBleSensors(wheelCircumferenceMm: number = 2105) {
     if (!ok) setError("Connection failed");
   }, [openConnection, stopScan]);
 
+  // Silently reconnect to a previously-paired sensor (app boot / global BLE
+  // context) — connects straight to the known device id (no scan needed) and
+  // reuses the same backoff/"Reconnecting…" UX as an in-ride drop. Gives up
+  // quietly after a few tries if the sensor simply isn't nearby.
+  const connectSilently = useCallback((id: string, name: string) => {
+    intentionalRef.current.delete(id);
+    attemptReconnect(id, name, 0);
+  }, [attemptReconnect]);
+
   const disconnect = useCallback(async (id: string) => {
     intentionalRef.current.add(id);
     const t = reconnectTimers.current[id];
@@ -441,7 +450,7 @@ export function useBleSensors(wheelCircumferenceMm: number = 2105) {
 
   return {
     supported, poweredOn, scanning, devices, connected, readings, permissionStatus,
-    error, requestPermission, startScan, stopScan, connect, disconnect,
+    error, requestPermission, startScan, stopScan, connect, disconnect, connectSilently,
     // Auto-reconnect + battery
     battery, reconnecting, rssi,
     // FTMS trainer control

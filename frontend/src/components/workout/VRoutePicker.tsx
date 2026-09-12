@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView, Modal } from "react-native";
 import { Image } from "expo-image";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { colors, radius, spacing, shadow } from "@/src/theme";
@@ -21,8 +21,9 @@ export type VRoutePickerProps = {
  *  or pin a favourite route for the current workout type (persisted). */
 export function VRoutePicker({ vRouteId, favRouteId, auto, workoutTypeName, onSelect, onAuto, onShuffle, onPin, onClose }: VRoutePickerProps) {
   return (
-    <Pressable style={p.overlay} testID="vroute-picker-overlay" onPress={onClose}>
-      <Pressable style={p.panel} onPress={(e) => e.stopPropagation()}>
+    <Modal transparent visible animationType="fade" onRequestClose={onClose}>
+      <Pressable style={p.overlay} testID="vroute-picker-overlay" onPress={onClose}>
+        <Pressable style={p.panel} onPress={() => { /* swallow */ }}>
         <View style={p.head}>
           <Text style={p.title}>Choose your route</Text>
           <Pressable testID="vroute-picker-close" onPress={onClose} hitSlop={10}><Ionicons name="close" size={22} color={colors.white} /></Pressable>
@@ -68,6 +69,7 @@ export function VRoutePicker({ vRouteId, favRouteId, auto, workoutTypeName, onSe
         </ScrollView>
       </Pressable>
     </Pressable>
+    </Modal>
   );
 }
 

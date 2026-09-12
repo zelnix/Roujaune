@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Animated, Platform, Pressable, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, Animated, Platform, Pressable, ActivityIndicator, Modal } from "react-native";
 import { Image } from "expo-image";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { colors, radius, shadow, spacing } from "@/src/theme";
@@ -52,8 +52,9 @@ export function CompletePrompt({
   onFinish: () => void;
 }) {
   return (
-    <View style={m.overlay}>
-      <View style={m.completePanel} testID="workout-complete-prompt">
+    <Modal transparent visible animationType="fade" onRequestClose={onFinish}>
+      <Pressable style={m.overlay} onPress={onFinish} testID="workout-complete-overlay">
+        <Pressable style={m.completePanel} onPress={() => { /* swallow */ }} testID="workout-complete-prompt">
         <View style={m.completeBadge}><Ionicons name="checkmark-circle" size={40} color={colors.green} /></View>
         <Text style={m.completeTitle}>Workout Complete</Text>
         <Text style={m.completeSub}>You finished {workoutTitle}. Nicely done.</Text>
@@ -95,16 +96,18 @@ export function CompletePrompt({
           <Ionicons name="checkmark-circle" size={18} color="#fff" />
           <Text style={m.endSaveText}>OK</Text>
         </Pressable>
-      </View>
-    </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
 // End-ride confirmation (save / abandon / resume).
 export function EndPrompt({ onSave, onAbandon, onResume }: { onSave: () => void; onAbandon: () => void; onResume: () => void }) {
   return (
-    <View style={m.overlay}>
-      <View style={m.endPanel} testID="end-ride-prompt">
+    <Modal transparent visible animationType="fade" onRequestClose={onResume}>
+      <Pressable style={m.overlay} onPress={onResume} testID="end-ride-overlay">
+        <Pressable style={m.endPanel} onPress={() => { /* swallow */ }} testID="end-ride-prompt">
         <Ionicons name="flag" size={30} color={colors.yellow} />
         <Text style={m.endTitle}>End this ride?</Text>
         <Text style={m.endSub}>Save your ride to record it in your progress and plan, or abandon it — abandoned rides are not recorded.</Text>
@@ -119,8 +122,9 @@ export function EndPrompt({ onSave, onAbandon, onResume }: { onSave: () => void;
         <Pressable testID="end-resume" onPress={onResume} style={m.endResume}>
           <Text style={m.endResumeText}>Resume</Text>
         </Pressable>
-      </View>
-    </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 

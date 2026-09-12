@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, useWindowDimensions, LayoutChangeEvent, Pressable } from "react-native";
+import { View, Text, StyleSheet, ScrollView, useWindowDimensions, LayoutChangeEvent, Pressable, Modal } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -8,6 +8,7 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 
 import { colors, radius, spacing, shadow } from "@/src/theme";
 import { useTelemetry } from "@/src/hooks/useTelemetry";
+import { useBLE } from "@/src/lib/ble-context";
 import { rideRecorder } from "@/src/lib/ride";
 import { useEntitlement, consumeRide, refreshEntitlement } from "@/src/lib/entitlement";
 import { PaywallModal } from "@/src/components/PaywallModal";
@@ -33,7 +34,6 @@ import {
   MetricCard, SessionCard, CoachBanner, TerrainCard, BrandCard, StepTimeline, StepDetailModal, LiveControlBar, AdjustmentsStrip, SensorHealthRow, SensorHealth,
 } from "@/src/components/workout-live";
 import { useWorkoutAudio } from "@/src/hooks/useWorkoutAudio";
-import { useBleSensors } from "@/src/hooks/useBleSensors";
 import { BleSensorsPanel } from "@/src/components/BleSensorsPanel";
 import { TrainerControlPanel } from "@/src/components/streaming/TrainerControlPanel";
 import { fetchCoachCue, fetchExtendPlan, ExtendPlan } from "@/src/lib/coach";
@@ -163,14 +163,15 @@ export default function LiveWorkout() {
   const [cueIdx] = React.useState(0);
 
   const { settings, setSetting, loaded } = useSettings();
-  const { telemetry, connectionState, sendErg, sendTarget, sendInit, sendSensor, pause, resume, simulateDropout } = useTelemetry(settings.demoMode);
+  const { telemetry, connectionState, sendErg, sendTarget, sendInit, sendSensor, pause, resume } = useTelemetry();
   // Subscription gating — free tier is limited to N rides of ≤M minutes.
   const ent = useEntitlement();
   const [paywall, setPaywall] = React.useState<string | null>(null);
   const rideKeyRef = React.useRef(`workout-${selected?.id || "ride"}-${Date.now()}`);
   const gatedRef = React.useRef(false);
   const freeSecs = ent.freeRideMinutes * 60;
-  const ble = useBleSensors(settings.wheelCircumference);
+  const ble = useBLE();
+  React.useEffect(() => { ble.setWheelCircumferenceMm(settings.wheelCircumference); }, [settings.wheelCircumference]); // eslint-disable-line react-hooks/exhaustive-deps
   // ERG intensity: optimistic local value so +/- feels instant, then reconciles
   // with the trainer sim once taps settle (~1.5s of no local changes).
   const [erg, setErg] = React.useState(telemetry.erg);
@@ -405,8 +406,7 @@ export default function LiveWorkout() {
         showToast(voiceOn ? `${persona.name} muted` : `${persona.name} unmuted`);
         break;
       case "reconnect":
-        simulateDropout();
-        showToast("Reconnecting trainer…");
+        setShowBle(true);
         break;
       case "trainer":
         setShowTrainer(true);
@@ -515,20 +515,19 @@ export default function LiveWorkout() {
 
   const vroute = getVRoute(vRouteId);
 
-  // A ride is LIVE by default. Real values come only from a connected Bluetooth
-  // device; "Demo mode" (opt-in) simulates a trainer + wearable so the app can be
-  // previewed without hardware. A BLE power/cadence sensor counts as a trainer;
-  // a BLE heart-rate strap counts as a wearable.
+  // A ride is LIVE only — real values come exclusively from a connected
+  // Bluetooth device. A BLE power/cadence sensor counts as a trainer; a BLE
+  // heart-rate strap counts as a wearable.
   const bleTrainer = ble.connected.length > 0 && (ble.readings.power != null || ble.readings.cadence != null);
   const bleWearable = ble.connected.length > 0 && ble.readings.hr != null;
-  const trainerOn = settings.demoMode || bleTrainer;
-  const wearableOn = settings.demoMode || bleWearable;
+  const trainerOn = bleTrainer;
+  const wearableOn = bleWearable;
   // Names of the actual connected devices, shown on the metric cards. The HR
   // strap is matched by name; the trainer/power device is the other one.
   const hrDevice = ble.connected.find((d) => /hr|heart|polar|tickr|band|strap|rhythm/i.test(d.name));
   const trainerDevice = ble.connected.find((d) => /kickr|trainer|tacx|wahoo|saris|elite|neo|flux|power|bike|hammer|suito|assioma|stages|quarq/i.test(d.name)) ?? ble.connected.find((d) => d.id !== hrDevice?.id) ?? ble.connected[0];
-  const hrName = settings.demoMode ? "Demo" : (hrDevice?.name ?? (bleWearable ? "HR Sensor" : undefined));
-  const trainerName = settings.demoMode ? "Demo" : (trainerDevice?.name ?? (bleTrainer ? "Trainer" : undefined));
+  const hrName = hrDevice?.name ?? (bleWearable ? "HR Sensor" : undefined);
+  const trainerName = trainerDevice?.name ?? (bleTrainer ? "Trainer" : undefined);
   const hrBattery = hrDevice ? ble.battery[hrDevice.id] ?? null : null;
   const trainerBattery = trainerDevice ? ble.battery[trainerDevice.id] ?? null : null;
   const hrSignal = hrDevice ? ble.rssi[hrDevice.id] ?? null : null;
@@ -567,9 +566,8 @@ export default function LiveWorkout() {
   }, [ble.reconnecting, ble.connected, showToast]);
 
   // Compact per-sensor health list (battery + signal) for the strip, built from
-  // the actually connected BLE devices. Empty in demo mode / with no sensors.
+  // the actually connected BLE devices. Empty with no sensors connected.
   const sensorHealth: SensorHealth[] = React.useMemo(() => {
-    if (settings.demoMode) return [];
     return ble.connected.map((d) => ({
       id: d.id,
       name: d.name || "Sensor",
@@ -578,7 +576,7 @@ export default function LiveWorkout() {
       signal: ble.rssi[d.id] ?? null,
       reconnecting: ble.reconnecting.includes(d.id),
     }));
-  }, [ble.connected, ble.battery, ble.rssi, ble.reconnecting, hrDevice, trainerDevice, settings.demoMode]);
+  }, [ble.connected, ble.battery, ble.rssi, ble.reconnecting, hrDevice, trainerDevice]);
   // Keep the extend-advice context (workout type + wearable state) current.
   React.useEffect(() => {
     extendMetaRef.current = { type_id: selected?.typeId ?? "endurance", wearable_on: wearableOn };
@@ -992,7 +990,7 @@ export default function LiveWorkout() {
                     appearance={appearance}
                     metrics={vMetrics}
                     paused={paused}
-                    connected={trainerOn || wearableOn || settings.demoMode}
+                    connected={trainerOn || wearableOn}
                     simulation={!trainerOn}
                     hrOn={wearableOn}
                     load={vResistance}
@@ -1032,7 +1030,7 @@ export default function LiveWorkout() {
         onMirror={() => setShowCast(true)}
         onErg={onErg}
         onControls={() => setShowControls(true)}
-        onReconnect={() => { simulateDropout(); showToast("Reconnecting trainer…"); }}
+        onReconnect={() => setShowBle(true)}
         onSettings={() => setShowSettings(true)}
         onBluetooth={() => setShowBle(true)}
         onLock={() => { setLocked(true); showToast("Screen locked — hold the button to unlock."); }}
@@ -1113,7 +1111,7 @@ export default function LiveWorkout() {
               appearance={appearance}
               metrics={vMetrics}
               paused={paused}
-              connected={trainerOn || wearableOn || settings.demoMode}
+              connected={trainerOn || wearableOn}
               simulation={!trainerOn}
               hrOn={wearableOn}
               load={vResistance}
@@ -1129,7 +1127,7 @@ export default function LiveWorkout() {
               onPreset={(w) => { sendTarget(w); showToast(`Target ${w} W`); logControl(`Target → ${w} W`); }}
               ergOn={ergMode}
               onErgToggle={() => setErgMode((m) => { const next = !m; showToast(next ? "ERG mode ON" : "ERG mode OFF"); logControl(next ? "ERG mode ON" : "ERG mode OFF"); return next; })}
-              onReconnect={() => { simulateDropout(); showToast("Reconnecting trainer…"); }}
+              onReconnect={() => setShowBle(true)}
             />
           )}
         </View>
@@ -1244,16 +1242,18 @@ export default function LiveWorkout() {
       )}
 
       {stepDetail != null && stepList[stepDetail] && (
-        <Pressable style={styles.overlay} testID="step-detail-overlay" onPress={() => setStepDetail(null)}>
-          <Pressable onPress={(e) => e.stopPropagation()}>
-            <StepDetailModal
-              step={stepList[stepDetail]}
-              activeIndex={activeSeg?.index ?? -1}
-              total={stepList.length}
-              onClose={() => setStepDetail(null)}
-            />
+        <Modal transparent visible animationType="fade" onRequestClose={() => setStepDetail(null)}>
+          <Pressable style={styles.overlay} testID="step-detail-overlay" onPress={() => setStepDetail(null)}>
+            <Pressable onPress={() => { /* swallow */ }}>
+              <StepDetailModal
+                step={stepList[stepDetail]}
+                activeIndex={activeSeg?.index ?? -1}
+                total={stepList.length}
+                onClose={() => setStepDetail(null)}
+              />
+            </Pressable>
           </Pressable>
-        </Pressable>
+        </Modal>
       )}
 
       <Toast message={toast} />

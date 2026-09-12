@@ -10,6 +10,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { AuthProvider, useAuth } from "@/src/lib/auth-context";
+import { BLEProvider } from "@/src/lib/ble-context";
 import { registerForPush } from "@/src/lib/push";
 import { loadCatalog } from "@/src/lib/catalog";
 import { colors } from "@/src/theme";
@@ -163,7 +164,9 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <AuthGate />
+        <BLEProvider>
+          <AuthGate />
+        </BLEProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

@@ -13,7 +13,7 @@ import * as Haptics from "expo-haptics";
 import { useScenicRoute, useScenicPois, ScenicPoi, logScenicRide, ytThumb, saveDiscovery, deleteDiscovery, fetchDiscoveries } from "@/src/lib/scenic-routes";
 import { getResume, saveResume, clearResume } from "@/src/lib/scenic-resume";
 import { useCoach, useVoiceGuidance, setVoiceGuidance, VoiceGuidance } from "@/src/lib/coach-persona";
-import { useBleSensors } from "@/src/hooks/useBleSensors";
+import { useBLE } from "@/src/lib/ble-context";
 import { RouteMapPoint } from "@/src/components/RideRouteMap";
 import { recapCaption } from "@/src/lib/scenic-recap";
 import { SERIF, clock, GradientText, Ring, Waveform, Metric, Seg, NavItem, MusicControl } from "@/src/components/scenic/hud-widgets";
@@ -67,7 +67,7 @@ export default function ScenicRideScreen() {
 
   // Live BLE cadence / heart-rate telemetry (native build only). When no
   // sensor is connected these metrics are hidden from the HUD entirely.
-  const ble = useBleSensors();
+  const ble = useBLE();
   const hasTelemetry = ble.connected.length > 0;
   const cadence = ble.readings.cadence;
   const hr = ble.readings.hr;

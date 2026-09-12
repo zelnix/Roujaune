@@ -5,7 +5,7 @@ import { AppScaffold, Card, SectionTitle, Toggle } from "@/src/components/app-sc
 import { CC } from "@/src/components/calendar";
 import { useSettings } from "@/src/lib/settings";
 import { HealthSyncCard } from "@/src/components/HealthSyncCard";
-import { useBleSensors } from "@/src/hooks/useBleSensors";
+import { useBLE } from "@/src/lib/ble-context";
 import { BleSensorsPanel } from "@/src/components/BleSensorsPanel";
 import {
   useConnections, useImportedActivities, Provider, startConnect, syncNow, disconnect,
@@ -121,7 +121,8 @@ export default function ConnectionsScreen() {
   const refresh = () => { reload(); reloadRides(); };
 
   // Real Bluetooth LE pairing (same engine used during rides): scan → select → connect.
-  const ble = useBleSensors(settings.wheelCircumference);
+  const ble = useBLE();
+  React.useEffect(() => { ble.setWheelCircumferenceMm(settings.wheelCircumference); }, [settings.wheelCircumference]); // eslint-disable-line react-hooks/exhaustive-deps
   const [showBle, setShowBle] = React.useState(false);
   // A power/cadence/speed sensor is a "trainer"; a heart-rate sensor is a "wearable".
   const bleTrainer = ble.connected.length > 0 && (ble.readings.power != null || ble.readings.cadence != null || ble.readings.speed != null);

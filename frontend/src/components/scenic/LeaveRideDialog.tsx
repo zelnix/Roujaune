@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import { Text, StyleSheet, Pressable, Modal } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { colors, radius } from "@/src/theme";
 
@@ -14,23 +14,25 @@ type Props = {
 /** "Leave this ride?" — save & leave / end without saving / continue. */
 export function LeaveRideDialog({ routeName, pct, onSave, onEnd, onContinue }: Props) {
   return (
-    <View style={s.dialogWrap} testID="leave-dialog">
-      <View style={s.dialogCard}>
-        <Text style={s.dialogTitle}>Leave this ride?</Text>
-        <Text style={s.dialogSub}>You&apos;re {Math.round(pct * 100)}% through {routeName}.</Text>
-        <Pressable style={[s.dialogBtn, s.dialogPrimary]} testID="dlg-save" onPress={onSave}>
-          <Ionicons name="bookmark" size={16} color="#fff" />
-          <Text style={s.dialogBtnText}>Save &amp; leave</Text>
+    <Modal transparent visible animationType="fade" onRequestClose={onContinue}>
+      <Pressable style={s.dialogWrap} testID="leave-dialog" onPress={onContinue}>
+        <Pressable style={s.dialogCard} onPress={() => { /* swallow */ }}>
+          <Text style={s.dialogTitle}>Leave this ride?</Text>
+          <Text style={s.dialogSub}>You&apos;re {Math.round(pct * 100)}% through {routeName}.</Text>
+          <Pressable style={[s.dialogBtn, s.dialogPrimary]} testID="dlg-save" onPress={onSave}>
+            <Ionicons name="bookmark" size={16} color="#fff" />
+            <Text style={s.dialogBtnText}>Save &amp; leave</Text>
+          </Pressable>
+          <Pressable style={[s.dialogBtn, s.dialogDanger]} testID="dlg-end" onPress={onEnd}>
+            <Ionicons name="stop-circle-outline" size={16} color="#fff" />
+            <Text style={s.dialogBtnText}>End without saving</Text>
+          </Pressable>
+          <Pressable style={[s.dialogBtn, s.dialogGhost]} testID="dlg-continue" onPress={onContinue}>
+            <Text style={[s.dialogBtnText, { color: colors.white }]}>Continue riding</Text>
+          </Pressable>
         </Pressable>
-        <Pressable style={[s.dialogBtn, s.dialogDanger]} testID="dlg-end" onPress={onEnd}>
-          <Ionicons name="stop-circle-outline" size={16} color="#fff" />
-          <Text style={s.dialogBtnText}>End without saving</Text>
-        </Pressable>
-        <Pressable style={[s.dialogBtn, s.dialogGhost]} testID="dlg-continue" onPress={onContinue}>
-          <Text style={[s.dialogBtnText, { color: colors.white }]}>Continue riding</Text>
-        </Pressable>
-      </View>
-    </View>
+      </Pressable>
+    </Modal>
   );
 }
 

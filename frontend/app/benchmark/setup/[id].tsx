@@ -108,7 +108,7 @@ export default function SetupWizardScreen() {
           method: "PATCH", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             equipment: equip, sensorLevel: level, environment: { mode: envMode, checks: envChecks },
-            coaching: { voice, depth }, usingDevData: true, status: "ready_to_start",
+            coaching: { voice, depth }, status: "ready_to_start",
           }),
         });
       } catch { /* non-blocking */ }

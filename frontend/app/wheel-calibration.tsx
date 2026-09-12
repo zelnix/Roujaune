@@ -6,7 +6,7 @@ import { useRouter } from "expo-router";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import * as Location from "expo-location";
 import { CC } from "@/src/components/calendar";
-import { useBleSensors } from "@/src/hooks/useBleSensors";
+import { useBLE } from "@/src/lib/ble-context";
 import { BleSensorsPanel } from "@/src/components/BleSensorsPanel";
 import { useSettings, nearestWheelPreset } from "@/src/lib/settings";
 import { haversineMeters } from "@/src/lib/geo";
@@ -29,7 +29,8 @@ function revsDelta(start: number, curr: number): number {
 export default function WheelCalibrationScreen() {
   const router = useRouter();
   const { settings, setSetting } = useSettings();
-  const ble = useBleSensors(settings.wheelCircumference);
+  const ble = useBLE();
+  React.useEffect(() => { ble.setWheelCircumferenceMm(settings.wheelCircumference); }, [settings.wheelCircumference]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [phase, setPhase] = React.useState<Phase>("idle");
   const [showBle, setShowBle] = React.useState(false);

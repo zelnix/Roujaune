@@ -8,7 +8,6 @@ import json
 import re
 import copy
 import asyncio
-import random
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field
@@ -80,25 +79,25 @@ api_router = APIRouter(prefix="/api")
 
 # ----------------------- Trainer telemetry (BLE bridge stand-in) -----------------------
 class TrainerSim:
-    """Server-side smart-trainer/wearable simulator.
+    """Server-side smart-trainer/wearable bridge — LIVE data only.
 
-    Stands in for a native BLE bridge: streams power/cadence/HR/speed at ~5 Hz,
-    responds to ERG intensity commands, and can emulate signal dropout so the
-    client can exercise its reconnect / stale-data handling.
+    Stands in for a native BLE bridge: streams power/cadence/HR/speed at ~5 Hz
+    from whatever real sensor readings the client has pushed via `{type:
+    'sensor'}` messages. There is no fabricated/demo data path — with no
+    fresh sensor reading, every metric reports 0 and `source` is
+    "disconnected".
     """
 
     def __init__(self):
         self.erg = 100
         self.paused = False
-        self.mode = "live"  # "live" = only real sensor data; "demo" = simulate
-        self.dropout_until = 0.0
         self.elapsed = 0.0
         self.distance = 0.0
         self.base_target = 251.0  # target watts driven by the chosen workout's segment
-        self.power = 251.0
-        self.cadence = 88.0
-        self.hr = 162.0
-        self.speed = 26.4
+        self.power = 0.0
+        self.cadence = 0.0
+        self.hr = 0.0
+        self.speed = 0.0
         self.gradient = 7.8
         # Real BLE sensor overrides (set via {type:'sensor'} messages).
         self.sensor_power = None
@@ -108,35 +107,15 @@ class TrainerSim:
         self.sensor_expires = 0.0
         self.sensor_fresh = False
 
-    def is_dropped(self, t: float) -> bool:
-        return t < self.dropout_until
-
     def step(self, dt: float):
         if self.paused:
             return
-        if self.mode == "demo":
-            # Demo mode fabricates a plausible ride so the app can be previewed
-            # without any hardware connected.
-            target_power = self.base_target * (self.erg / 100.0)
-            self.power = max(0.0, target_power + random.uniform(-8, 8))
-            self.cadence = max(0.0, 88.0 + random.uniform(-4, 4))
-            target_hr = 118 + (self.power - 150) * 0.34
-            self.hr += (target_hr - self.hr) * 0.15 + random.uniform(-1.5, 1.5)
-            self.hr = max(90.0, min(185.0, self.hr))
-            # Speed model calibrated to real road cycling: flat-road speed rises
-            # ~ with the cube-root of power (aero-dominated), and is reduced on
-            # climbs. Tuned so ~250 W ≈ 35 km/h on the flat (the old linear model
-            # under-read by ~40%). gradient is a % grade.
-            flat_kmh = 3.6 * (max(0.0, self.power) / 0.27) ** (1.0 / 3.0)
-            grade_factor = 1.0 / (1.0 + max(0.0, self.gradient) * 0.11)
-            self.speed = max(0.0, flat_kmh * grade_factor + random.uniform(-0.4, 0.4))
-        else:
-            # LIVE mode: never fabricate. Only real sensor readings count.
-            self.power = 0.0
-            self.cadence = 0.0
-            self.hr = 0.0
-            self.speed = 0.0
-        # Real sensor data (BLE) overrides while it is fresh (both modes).
+        # Never fabricate — only real sensor readings count.
+        self.power = 0.0
+        self.cadence = 0.0
+        self.hr = 0.0
+        self.speed = 0.0
+        # Real sensor data (BLE) overrides while it is fresh.
         if self.sensor_fresh:
             if self.sensor_power is not None:
                 self.power = float(self.sensor_power)
@@ -150,12 +129,7 @@ class TrainerSim:
         self.distance += self.speed * dt / 3600.0
 
     def sample(self) -> dict:
-        if self.sensor_fresh:
-            source = "sensor"          # measured from a real BLE device
-        elif self.mode == "demo":
-            source = "estimated"       # simulated preview data
-        else:
-            source = "disconnected"    # live ride, no sensor data yet
+        source = "sensor" if self.sensor_fresh else "disconnected"
         return {
             "elapsed": int(self.elapsed),
             "power": round(self.power),
@@ -189,10 +163,6 @@ async def telemetry_ws(websocket: WebSocket):
                 t = msg.get("type")
                 if t == "erg":
                     sim.erg = max(50, min(150, int(msg.get("intensity", sim.erg))))
-                elif t == "mode":
-                    m = msg.get("mode")
-                    if m in ("live", "demo"):
-                        sim.mode = m
                 elif t == "target":
                     sim.base_target = max(0.0, float(msg.get("watts", sim.base_target)))
                 elif t == "init":
@@ -206,9 +176,6 @@ async def telemetry_ws(websocket: WebSocket):
                     sim.paused = True
                 elif t == "resume":
                     sim.paused = False
-                elif t == "dropout":
-                    # emulate a signal loss for a few seconds
-                    sim.dropout_until = loop.time() + float(msg.get("seconds", 4))
                 elif t == "sensor":
                     # real BLE readings pushed from the device
                     if msg.get("power") is not None:
@@ -230,8 +197,7 @@ async def telemetry_ws(websocket: WebSocket):
             t = loop.time()
             sim.sensor_fresh = t < sim.sensor_expires
             sim.step(dt)
-            if not sim.is_dropped(t):
-                await websocket.send_text(json.dumps({"type": "telemetry", "data": sim.sample()}))
+            await websocket.send_text(json.dumps({"type": "telemetry", "data": sim.sample()}))
             await asyncio.sleep(dt)
     except WebSocketDisconnect:
         pass

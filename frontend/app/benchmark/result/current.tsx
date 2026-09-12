@@ -112,9 +112,9 @@ export default function BenchmarkResultScreen() {
           </Text>
           {saved === "accepted" && dev && (
             <View style={s.devNotice} testID="result-dev-notice">
-              <Ionicons name="flask-outline" size={16} color={CC.yellow} />
+              <Ionicons name="bluetooth-outline" size={16} color={CC.yellow} />
               <Text style={s.devNoticeText}>
-                This was recorded from simulated development data, so your training profile was not changed. Real sensor results can update your profile once reviewed.
+                This was recorded with no device connected, so your training profile was not changed. Connect a power/HR sensor next time so your result can update your profile.
               </Text>
             </View>
           )}
@@ -144,7 +144,7 @@ export default function BenchmarkResultScreen() {
             <Text style={s.title}>{test.name}</Text>
             <Text style={s.sub}>{payload.status === "completed" ? "Benchmark complete" : "Stopped early"}{stopLabel ? ` · ${stopLabel}` : ""}</Text>
           </View>
-          {capture?.isDevData && <View style={s.devBadge}><Text style={s.devText}>SIM DATA</Text></View>}
+          {capture?.isDevData && <View style={s.devBadge}><Text style={s.devText}>NO DEVICES</Text></View>}
         </View>
 
         {/* Primary metric */}

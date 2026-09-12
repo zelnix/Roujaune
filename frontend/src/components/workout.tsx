@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, Switch, Platform, TextInput } from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView, Switch, Platform, TextInput, Modal } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "@react-native-vector-icons/ionicons";
@@ -30,7 +30,7 @@ export function BrandWordmark() {
   );
 }
 
-export function WorkoutTopBar({ elapsed, connectionState, stale, onPress, routeName = "Alpe d'Huez", riddenKm = 0, totalKm = 0, demoMode = false, onToggleDemo }: { elapsed: string; connectionState: string; stale: boolean; onPress: (m: string) => void; routeName?: string; riddenKm?: number; totalKm?: number; demoMode?: boolean; onToggleDemo?: () => void }) {
+export function WorkoutTopBar({ elapsed, connectionState, stale, onPress, routeName = "Alpe d'Huez", riddenKm = 0, totalKm = 0 }: { elapsed: string; connectionState: string; stale: boolean; onPress: (m: string) => void; routeName?: string; riddenKm?: number; totalKm?: number }) {
   const pct = totalKm > 0 ? Math.max(0, Math.min(100, Math.round((riddenKm / totalKm) * 100))) : 0;
   const conn = connectionState === "connected" && !stale
     ? { c: colors.green, label: "LIVE", icon: "wifi" as const }
@@ -69,12 +69,6 @@ export function WorkoutTopBar({ elapsed, connectionState, stale, onPress, routeN
             <View style={[styles.connDot, { backgroundColor: conn.c }]} />
             <Ionicons name={conn.icon} size={14} color={conn.c} />
             <Text style={[styles.connText, { color: conn.c }]}>{conn.label}</Text>
-          </View>
-        </Touchable>
-        <Touchable testID="demo-toggle" scaleTo={0.9} onPress={() => onToggleDemo?.()}>
-          <View style={[styles.demoPill, demoMode && styles.demoPillOn]}>
-            <Ionicons name="flask" size={13} color={demoMode ? "#241B00" : colors.yellow} />
-            <Text style={[styles.demoText, demoMode && styles.demoTextOn]}>{demoMode ? "DEMO ON" : "DEMO DATA"}</Text>
           </View>
         </Touchable>
         <Touchable testID="settings-icon" scaleTo={0.9} onPress={() => onPress("Settings")}><Ionicons name="settings-outline" size={20} color={colors.white} /></Touchable>
@@ -735,71 +729,73 @@ export function RoutePicker({ routes, activeIndex, recommendedTag, auto, lastRou
   onSelect: (i: number) => void; onAuto: () => void; onShuffle: () => void; onClose: () => void;
 }) {
   return (
-    <Pressable style={styles.rpOverlay} onPress={onClose} testID="route-picker">
-      <Pressable style={styles.rpPanel} onPress={() => { /* swallow */ }}>
-        <View style={styles.rpHead}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.rpTitle}>Choose your route</Text>
-            <Text style={styles.rpSub}>Immersive first-person scenery — swap any time</Text>
+    <Modal transparent visible animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.rpOverlay} onPress={onClose} testID="route-picker">
+        <Pressable style={styles.rpPanel} onPress={() => { /* swallow */ }}>
+          <View style={styles.rpHead}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rpTitle}>Choose your route</Text>
+              <Text style={styles.rpSub}>Immersive first-person scenery — swap any time</Text>
+            </View>
+            <Pressable onPress={onClose} testID="route-picker-close" hitSlop={10}><Ionicons name="close" size={22} color={colors.white} /></Pressable>
           </View>
-          <Pressable onPress={onClose} testID="route-picker-close" hitSlop={10}><Ionicons name="close" size={22} color={colors.white} /></Pressable>
-        </View>
 
-        <View style={styles.rpActions}>
-          <Pressable style={[styles.rpActionBtn, auto && styles.rpActionBtnOn]} onPress={onAuto} testID="route-auto" accessibilityRole="button" accessibilityLabel="Auto-match route to workout">
-            <Ionicons name="sparkles" size={14} color={auto ? "#1a1300" : colors.yellow} />
-            <Text style={[styles.rpActionText, auto && { color: "#1a1300" }]}>Auto-match to workout</Text>
-          </Pressable>
-          <Pressable style={styles.rpActionBtn} onPress={onShuffle} testID="route-shuffle" accessibilityRole="button" accessibilityLabel="Surprise me with a random route">
-            <Ionicons name="shuffle" size={14} color="#fff" />
-            <Text style={styles.rpActionText}>Surprise me</Text>
-          </Pressable>
-        </View>
+          <View style={styles.rpActions}>
+            <Pressable style={[styles.rpActionBtn, auto && styles.rpActionBtnOn]} onPress={onAuto} testID="route-auto" accessibilityRole="button" accessibilityLabel="Auto-match route to workout">
+              <Ionicons name="sparkles" size={14} color={auto ? "#1a1300" : colors.yellow} />
+              <Text style={[styles.rpActionText, auto && { color: "#1a1300" }]}>Auto-match to workout</Text>
+            </Pressable>
+            <Pressable style={styles.rpActionBtn} onPress={onShuffle} testID="route-shuffle" accessibilityRole="button" accessibilityLabel="Surprise me with a random route">
+              <Ionicons name="shuffle" size={14} color="#fff" />
+              <Text style={styles.rpActionText}>Surprise me</Text>
+            </Pressable>
+          </View>
 
-        <ScrollView contentContainerStyle={styles.rpScroll} showsVerticalScrollIndicator={false}>
-          {(["Race", "Casual"] as const).map((lvl) => {
-            const items = routes.map((r, i) => ({ r, i })).filter((x) => x.r.level === lvl);
-            if (items.length === 0) return null;
-            return (
-              <View key={lvl} style={{ width: "100%" }}>
-                <View style={styles.rpSection}>
-                  <Ionicons name={lvl === "Race" ? "trophy" : "leaf"} size={13} color={lvl === "Race" ? colors.red : colors.green} />
-                  <Text style={styles.rpSectionText}>{lvl === "Race" ? "Legendary race climbs & stages" : "Easy & scenic — casual riders"}</Text>
+          <ScrollView contentContainerStyle={styles.rpScroll} showsVerticalScrollIndicator={false}>
+            {(["Race", "Casual"] as const).map((lvl) => {
+              const items = routes.map((r, i) => ({ r, i })).filter((x) => x.r.level === lvl);
+              if (items.length === 0) return null;
+              return (
+                <View key={lvl} style={{ width: "100%" }}>
+                  <View style={styles.rpSection}>
+                    <Ionicons name={lvl === "Race" ? "trophy" : "leaf"} size={13} color={lvl === "Race" ? colors.red : colors.green} />
+                    <Text style={styles.rpSectionText}>{lvl === "Race" ? "Legendary race climbs & stages" : "Easy & scenic — casual riders"}</Text>
+                  </View>
+                  <View style={styles.rpGrid}>
+                    {items.map(({ r, i }) => {
+                      const active = i === activeIndex;
+                      const reco = !!recommendedTag && r.tag === recommendedTag;
+                      const isLast = !!lastRouteId && r.id === lastRouteId;
+                      return (
+                        <Pressable key={r.id} testID={`route-option-${i}`} style={[styles.rpCard, active && styles.rpCardActive]} onPress={() => onSelect(i)} accessibilityRole="button" accessibilityLabel={`Select route ${r.title}`}>
+                          <View style={styles.rpThumb}>
+                            <Image source={{ uri: posterFor(r.id) }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+                            <View style={styles.rpThumbScrim} />
+                            <View style={[styles.rpTag, { backgroundColor: r.tagColor }]}><Text style={styles.rpTagText}>{r.tag}</Text></View>
+                            {active && <View style={styles.rpActiveBadge}><Ionicons name={auto ? "sparkles" : "checkmark"} size={12} color="#1a1300" /></View>}
+                          </View>
+                          <Text style={styles.rpName} numberOfLines={1}>{r.title}</Text>
+                          <Text style={styles.rpPlace}>{r.place}</Text>
+                          <View style={styles.rpStats}>
+                            <View style={styles.rpStat}><MaterialCommunityIcons name="map-marker-distance" size={12} color={colors.textDim} /><Text style={styles.rpStatText}>{r.distance}</Text></View>
+                            <View style={styles.rpStat}><MaterialCommunityIcons name="terrain" size={12} color={colors.textDim} /><Text style={styles.rpStatText}>{r.elevation}</Text></View>
+                          </View>
+                          {isLast ? (
+                            <View style={[styles.rpReco, styles.rpLast]}><Ionicons name="time" size={10} color="#8FD3FF" /><Text style={[styles.rpRecoText, { color: "#8FD3FF" }]}>Your last ride</Text></View>
+                          ) : reco ? (
+                            <View style={styles.rpReco}><Ionicons name="star" size={10} color={colors.yellow} /><Text style={styles.rpRecoText}>Great for your workout</Text></View>
+                          ) : null}
+                        </Pressable>
+                      );
+                    })}
+                  </View>
                 </View>
-                <View style={styles.rpGrid}>
-                  {items.map(({ r, i }) => {
-                    const active = i === activeIndex;
-                    const reco = !!recommendedTag && r.tag === recommendedTag;
-                    const isLast = !!lastRouteId && r.id === lastRouteId;
-                    return (
-                      <Pressable key={r.id} testID={`route-option-${i}`} style={[styles.rpCard, active && styles.rpCardActive]} onPress={() => onSelect(i)} accessibilityRole="button" accessibilityLabel={`Select route ${r.title}`}>
-                        <View style={styles.rpThumb}>
-                          <Image source={{ uri: posterFor(r.id) }} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
-                          <View style={styles.rpThumbScrim} />
-                          <View style={[styles.rpTag, { backgroundColor: r.tagColor }]}><Text style={styles.rpTagText}>{r.tag}</Text></View>
-                          {active && <View style={styles.rpActiveBadge}><Ionicons name={auto ? "sparkles" : "checkmark"} size={12} color="#1a1300" /></View>}
-                        </View>
-                        <Text style={styles.rpName} numberOfLines={1}>{r.title}</Text>
-                        <Text style={styles.rpPlace}>{r.place}</Text>
-                        <View style={styles.rpStats}>
-                          <View style={styles.rpStat}><MaterialCommunityIcons name="map-marker-distance" size={12} color={colors.textDim} /><Text style={styles.rpStatText}>{r.distance}</Text></View>
-                          <View style={styles.rpStat}><MaterialCommunityIcons name="terrain" size={12} color={colors.textDim} /><Text style={styles.rpStatText}>{r.elevation}</Text></View>
-                        </View>
-                        {isLast ? (
-                          <View style={[styles.rpReco, styles.rpLast]}><Ionicons name="time" size={10} color="#8FD3FF" /><Text style={[styles.rpRecoText, { color: "#8FD3FF" }]}>Your last ride</Text></View>
-                        ) : reco ? (
-                          <View style={styles.rpReco}><Ionicons name="star" size={10} color={colors.yellow} /><Text style={styles.rpRecoText}>Great for your workout</Text></View>
-                        ) : null}
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
-            );
-          })}
-        </ScrollView>
+              );
+            })}
+          </ScrollView>
+        </Pressable>
       </Pressable>
-    </Pressable>
+    </Modal>
   );
 }
 
@@ -810,26 +806,27 @@ export function SettingsPanel({ settings, setSetting, onClose }: {
   settings: Settings; setSetting: <K extends keyof Settings>(k: K, v: Settings[K]) => void; onClose: () => void;
 }) {
   const rows: { key: keyof Settings; icon: IoniconName; label: string; sub: string }[] = [
-    { key: "demoMode", icon: "flask-outline", label: "Demo mode", sub: "Simulate a ride without hardware — Live by default" },
     { key: "hudEnabled", icon: "eye", label: "Show on-screen HUD", sub: "Live-data overlay in full screen" },
     { key: "seatedMode", icon: "body-outline", label: "Seated mode", sub: "Stay in the saddle — cues avoid standing efforts" },
   ];
   return (
-    <Pressable style={styles.rpOverlay} onPress={onClose} testID="settings-panel">
-      <Pressable style={styles.spPanel} onPress={() => { /* swallow */ }}>
-        <View style={styles.rpHead}>
-          <View style={{ flex: 1 }}><Text style={styles.rpTitle}>Workout settings</Text><Text style={styles.rpSub}>Devices & display</Text></View>
-          <Pressable onPress={onClose} testID="settings-close" hitSlop={10}><Ionicons name="close" size={22} color={colors.white} /></Pressable>
-        </View>
-        {rows.map((r) => (
-          <View key={r.key} style={styles.spRow}>
-            <View style={styles.spIcon}><Ionicons name={r.icon} size={18} color={colors.yellow} /></View>
-            <View style={{ flex: 1 }}><Text style={styles.spLabel}>{r.label}</Text><Text style={styles.spSub}>{r.sub}</Text></View>
-            <Switch testID={`toggle-${r.key}`} value={settings[r.key]} onValueChange={(v) => setSetting(r.key, v)} trackColor={{ true: colors.red, false: "rgba(255,255,255,0.2)" }} thumbColor="#fff" />
+    <Modal transparent visible animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.rpOverlay} onPress={onClose} testID="settings-panel">
+        <Pressable style={styles.spPanel} onPress={() => { /* swallow */ }}>
+          <View style={styles.rpHead}>
+            <View style={{ flex: 1 }}><Text style={styles.rpTitle}>Workout settings</Text><Text style={styles.rpSub}>Devices & display</Text></View>
+            <Pressable onPress={onClose} testID="settings-close" hitSlop={10}><Ionicons name="close" size={22} color={colors.white} /></Pressable>
           </View>
-        ))}
+          {rows.map((r) => (
+            <View key={r.key} style={styles.spRow}>
+              <View style={styles.spIcon}><Ionicons name={r.icon} size={18} color={colors.yellow} /></View>
+              <View style={{ flex: 1 }}><Text style={styles.spLabel}>{r.label}</Text><Text style={styles.spSub}>{r.sub}</Text></View>
+              <Switch testID={`toggle-${r.key}`} value={settings[r.key]} onValueChange={(v) => setSetting(r.key, v)} trackColor={{ true: colors.red, false: "rgba(255,255,255,0.2)" }} thumbColor="#fff" />
+            </View>
+          ))}
+        </Pressable>
       </Pressable>
-    </Pressable>
+    </Modal>
   );
 }
 
@@ -840,8 +837,9 @@ export function MusicPanel({ musicOn, toggleMusic, volume, setVolume, voiceOn, t
 }) {
   const level = Math.round(volume * 5);
   return (
-    <Pressable style={styles.rpOverlay} onPress={onClose} testID="music-panel">
-      <Pressable style={styles.spPanel} onPress={() => { /* swallow */ }}>
+    <Modal transparent visible animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.rpOverlay} onPress={onClose} testID="music-panel">
+        <Pressable style={styles.spPanel} onPress={() => { /* swallow */ }}>
         <View style={styles.rpHead}>
           <View style={{ flex: 1 }}><Text style={styles.rpTitle}>Music & audio</Text><Text style={styles.rpSub}>Ride soundtrack & your companion coach&apos;s voice</Text></View>
           <Pressable onPress={onClose} testID="music-close" hitSlop={10}><Ionicons name="close" size={22} color={colors.white} /></Pressable>
@@ -926,6 +924,7 @@ export function MusicPanel({ musicOn, toggleMusic, volume, setVolume, voiceOn, t
         </View>
       </Pressable>
     </Pressable>
+    </Modal>
   );
 }
 
@@ -1029,31 +1028,33 @@ export function CastPanel({ onClose }: { onClose: () => void }) {
         "Return here — your full ride now shows on the TV.",
       ];
   return (
-    <Pressable style={styles.rpOverlay} onPress={onClose} testID="cast-panel">
-      <Pressable style={styles.spPanel} onPress={() => { /* swallow */ }}>
-        <View style={styles.rpHead}>
-          <View style={{ flex: 1 }}><Text style={styles.rpTitle}>Mirror to TV</Text><Text style={styles.rpSub}>Show the whole workout on your TV</Text></View>
-          <Pressable onPress={onClose} testID="cast-close" hitSlop={10}><Ionicons name="close" size={22} color={colors.white} /></Pressable>
-        </View>
-
-        <View style={styles.mirrorHeadRow}>
-          <View style={styles.spIcon}><Ionicons name="tv" size={18} color={colors.yellow} /></View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.spLabel}>{heading}</Text>
-            <Text style={styles.spSub}>Same Wi-Fi on phone &amp; TV</Text>
+    <Modal transparent visible animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.rpOverlay} onPress={onClose} testID="cast-panel">
+        <Pressable style={styles.spPanel} onPress={() => { /* swallow */ }}>
+          <View style={styles.rpHead}>
+            <View style={{ flex: 1 }}><Text style={styles.rpTitle}>Mirror to TV</Text><Text style={styles.rpSub}>Show the whole workout on your TV</Text></View>
+            <Pressable onPress={onClose} testID="cast-close" hitSlop={10}><Ionicons name="close" size={22} color={colors.white} /></Pressable>
           </View>
-        </View>
 
-        {steps.map((s, i) => (
-          <View key={i} style={styles.mirrorStep}>
-            <View style={styles.mirrorNum}><Text style={styles.mirrorNumText}>{i + 1}</Text></View>
-            <Text style={styles.mirrorStepText}>{s}</Text>
+          <View style={styles.mirrorHeadRow}>
+            <View style={styles.spIcon}><Ionicons name="tv" size={18} color={colors.yellow} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.spLabel}>{heading}</Text>
+              <Text style={styles.spSub}>Same Wi-Fi on phone &amp; TV</Text>
+            </View>
           </View>
-        ))}
 
-        <Text style={styles.castNote}>Screen mirroring is a system feature, so it runs from your phone&apos;s menu (not this button) and only works on a real device — not in Expo Go or the web preview. Tip: turn off auto-lock so the screen stays on during your ride.</Text>
+          {steps.map((s, i) => (
+            <View key={i} style={styles.mirrorStep}>
+              <View style={styles.mirrorNum}><Text style={styles.mirrorNumText}>{i + 1}</Text></View>
+              <Text style={styles.mirrorStepText}>{s}</Text>
+            </View>
+          ))}
+
+          <Text style={styles.castNote}>Screen mirroring is a system feature, so it runs from your phone&apos;s menu (not this button) and only works on a real device — not in Expo Go or the web preview. Tip: turn off auto-lock so the screen stays on during your ride.</Text>
+        </Pressable>
       </Pressable>
-    </Pressable>
+    </Modal>
   );
 }
 const styles = StyleSheet.create({
@@ -1061,10 +1062,6 @@ const styles = StyleSheet.create({
   topBar: { flexDirection: "row", alignItems: "center", gap: spacing.lg, backgroundColor: colors.card, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.lg, paddingVertical: 10, ...shadow.card },
   brandRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   brandMark: { width: 168, height: 26 },
-  demoPill: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderColor: colors.yellow, borderRadius: 999, paddingVertical: 5, paddingHorizontal: 10, backgroundColor: "rgba(255,255,255,0.03)" },
-  demoPillOn: { backgroundColor: colors.yellow, borderColor: colors.yellow },
-  demoText: { color: colors.yellow, fontSize: 10.5, fontWeight: "800", letterSpacing: 0.5 },
-  demoTextOn: { color: "#241B00" },
   topElapsed: { alignItems: "flex-start" },
   elapsedVal: { color: colors.white, fontSize: 26, fontWeight: "800", letterSpacing: 0.5 },
   microLabel: { color: colors.textDim, fontSize: 10, fontWeight: "700", letterSpacing: 0.6 },

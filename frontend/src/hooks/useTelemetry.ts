@@ -21,15 +21,15 @@ const DEFAULTS: Telemetry = {
   // total duration before the first real telemetry frame arrives, tripping
   // the "workout complete" check the instant the screen mounts.
   elapsed: 0,
-  power: 251,
-  cadence: 88,
-  hr: 162,
-  speed: 26.4,
+  power: 0,
+  cadence: 0,
+  hr: 0,
+  speed: 0,
   distance: 0,
-  gradient: 7.8,
+  gradient: 0,
   erg: 100,
   paused: false,
-  source: "estimated",
+  source: "disconnected",
 };
 
 function wsUrl(): string {
@@ -40,11 +40,13 @@ function wsUrl(): string {
 }
 
 /**
- * Live telemetry over WebSocket (smart-trainer / wearable bridge).
- * Handles connect / reconnect (backoff), stale-data detection (holds last
- * valid values then flags them as estimated) and ERG / pause control.
+ * Live telemetry over WebSocket (smart-trainer / wearable bridge). LIVE
+ * data only — every metric is 0 with `source: "disconnected"` until a real
+ * BLE sensor reading is pushed in via `sendSensor`. Handles connect /
+ * reconnect (backoff), stale-data detection (holds last valid values then
+ * flags them so the UI can grey them out) and ERG / pause control.
  */
-export function useTelemetry(demo: boolean = false) {
+export function useTelemetry() {
   const [telemetry, setTelemetry] = useState<Telemetry>(DEFAULTS);
   const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
   const [stale, setStale] = useState(false);
@@ -54,7 +56,6 @@ export function useTelemetry(demo: boolean = false) {
   const retries = useRef(0);
   const closed = useRef(false);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const demoRef = useRef(demo);
 
   const connect = useCallback(() => {
     try {
@@ -64,8 +65,6 @@ export function useTelemetry(demo: boolean = false) {
       socket.onopen = () => {
         retries.current = 0;
         setConnectionState("connected");
-        // Tell the backend whether to stream real ("live") or simulated ("demo") data.
-        try { socket.send(JSON.stringify({ type: "mode", mode: demoRef.current ? "demo" : "live" })); } catch { /* noop */ }
       };
       socket.onmessage = (ev) => {
         lastMsg.current = Date.now();
@@ -116,19 +115,12 @@ export function useTelemetry(demo: boolean = false) {
     if (s && s.readyState === 1) s.send(JSON.stringify(obj));
   }, []);
 
-  // Switch the backend stream between live (real sensors only) and demo (simulated).
-  useEffect(() => {
-    demoRef.current = demo;
-    send({ type: "mode", mode: demo ? "demo" : "live" });
-  }, [demo, send]);
-
   const sendErg = useCallback((intensity: number) => send({ type: "erg", intensity }), [send]);
   const sendTarget = useCallback((watts: number) => send({ type: "target", watts }), [send]);
   const sendInit = useCallback((opts: { elapsed?: number; distance?: number; watts?: number }) => send({ type: "init", ...opts }), [send]);
   const sendSensor = useCallback((r: { power?: number | null; cadence?: number | null; hr?: number | null; speed?: number | null }) => send({ type: "sensor", ...r }), [send]);
   const pause = useCallback(() => send({ type: "pause" }), [send]);
   const resume = useCallback(() => send({ type: "resume" }), [send]);
-  const simulateDropout = useCallback(() => send({ type: "dropout", seconds: 4 }), [send]);
 
-  return { telemetry, connectionState, stale, sendErg, sendTarget, sendInit, sendSensor, pause, resume, simulateDropout };
+  return { telemetry, connectionState, stale, sendErg, sendTarget, sendInit, sendSensor, pause, resume };
 }

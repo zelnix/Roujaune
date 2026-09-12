@@ -197,7 +197,7 @@ export default function BenchmarkLandingScreen() {
                       <Text style={s.resultMeta}>
                         {new Date(r.createdAt).toLocaleDateString()}
                         {typeof r.confidence === "number" ? ` · ${Math.round(r.confidence)}% confidence` : ""}
-                        {r.isDevData ? " · simulated" : ""}
+                        {r.isDevData ? " · no device data" : ""}
                       </Text>
                     </View>
                     {pm && <Text style={s.resultValue}>{pm.value} {pm.unit}</Text>}

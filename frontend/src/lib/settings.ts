@@ -4,7 +4,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 export type Settings = {
   hasTrainer: boolean;   // rider has a smart trainer (power / cadence / speed)
   hasWearable: boolean;  // rider has a wearable (heart rate / wellness)
-  demoMode: boolean;     // preview the connected experience with simulated data
   hudEnabled: boolean;   // show the on-screen HUD overlay in immersive mode
   ftp: number;           // rider FTP (watts) — drives live ERG target power
   ftpAuto: boolean;      // keep FTP in sync with training-progress FTP
@@ -22,7 +21,7 @@ export type Settings = {
   restReminders: boolean; // reminders to take scheduled rest days
 };
 
-const DEFAULTS: Settings = { hasTrainer: false, hasWearable: false, demoMode: false, hudEnabled: true, ftp: 287, ftpAuto: true, maxHr: 0, age: 0, wheelCircumference: 2105, seatedMode: false, homeCity: "", homeLat: 0, homeLon: 0, units: "metric", coachAudio: true, autoSync: true, weeklyReport: true, restReminders: false };
+const DEFAULTS: Settings = { hasTrainer: false, hasWearable: false, hudEnabled: true, ftp: 287, ftpAuto: true, maxHr: 0, age: 0, wheelCircumference: 2105, seatedMode: false, homeCity: "", homeLat: 0, homeLon: 0, units: "metric", coachAudio: true, autoSync: true, weeklyReport: true, restReminders: false };
 const KEY = "roujaune:settings";
 
 // Common tyre roll-outs (mm) — matches standard cycling speed-sensor tables.
