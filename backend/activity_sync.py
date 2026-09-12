@@ -93,6 +93,17 @@ def _now():
     return datetime.now(timezone.utc).isoformat()
 
 
+# Fields that identify WHICH source record this is — never overwritten when a
+# richer cross-provider source is merged in, otherwise the original source's
+# identity is lost and its next periodic re-sync (providers routinely re-send
+# already-seen activities) can no longer find `existing` by provider+external
+# id, silently re-creating it as a brand new duplicate every sync cycle.
+_IDENTITY_FIELDS = {
+    "user_id", "provider", "external_activity_id", "device_name",
+    "activity_type", "source_payload_reference", "fingerprint",
+}
+
+
 async def ingest_activities(db, user_id: str, activities: List[dict], ftp: int,
                             disable_route: bool = False) -> dict:
     """Persist normalized activities with dedup + classification, and mirror the
@@ -168,10 +179,15 @@ async def ingest_activities(db, user_id: str, activities: List[dict], ftp: int,
                  "source_references": [f"{provider}:{ext}"]})
             refs = sorted(set(canonical_doc.get("source_references", [])) | {f"{provider}:{ext}"})
             update = {"source_references": refs, "updated_at": _now()}
-            # Prefer the most complete source as the canonical.
+            # Prefer the most complete source's METRICS as canonical, but never
+            # overwrite the canonical record's own identity (provider/external
+            # id/device/fingerprint) — otherwise its next re-sync from that
+            # original provider can no longer recognise it as already-imported
+            # and will re-insert it as a fresh duplicate every sync cycle.
             if comp > (canonical_doc.get("completeness") or 0):
-                update = {**base_doc, "is_canonical": True,
-                          "canonical_activity_id": canonical_id, "source_references": refs}
+                merged_metrics = {k: v for k, v in base_doc.items() if k not in _IDENTITY_FIELDS}
+                update = {**merged_metrics, "completeness": comp, "source_references": refs,
+                          "updated_at": _now()}
             await db.cycling_activities.update_one({"id": canonical_id}, {"$set": update})
             await _mirror_history(db, await db.cycling_activities.find_one({"id": canonical_id}), ftp)
         else:
