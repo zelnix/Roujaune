@@ -10,6 +10,7 @@ import { refreshA11yFromServer, resetA11y } from "./a11y";
 import { resetTodayMode, hydrateTodayModeForUser, clearTodayModeForUser } from "./today-mode";
 import { refreshScenicFavourites, resetScenicFavourites } from "./scenic-routes";
 import { refreshScenicResume, resetScenicResume } from "./scenic-resume";
+import { refreshWorkoutResume, resetWorkoutResume } from "./workout-resume";
 import { resetModeInterest } from "./mode-interest";
 
 const API = (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/$/, "");
@@ -146,6 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       hydrateTodayModeForUser(user.user_id);
       refreshScenicFavourites();
       refreshScenicResume();
+      refreshWorkoutResume();
     }
   }, [user]);
 
@@ -226,6 +228,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     resetA11y();
     resetTodayMode();
     resetScenicFavourites();
+    resetScenicResume();
+    resetWorkoutResume();
     resetModeInterest();
     await setToken(null);
     setUser(null);
@@ -253,6 +257,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     resetA11y();
     clearTodayModeForUser(user?.user_id);
     resetScenicFavourites();
+    resetScenicResume();
+    resetWorkoutResume();
     resetModeInterest();
     await setToken(null);
     setUser(null);

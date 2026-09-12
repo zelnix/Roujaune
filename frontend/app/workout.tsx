@@ -9,6 +9,7 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 import { colors, radius, spacing, shadow } from "@/src/theme";
 import { useTelemetry } from "@/src/hooks/useTelemetry";
 import { useBLE } from "@/src/lib/ble-context";
+import { getWorkoutResume, loadWorkoutResumeAsync, saveWorkoutResume, clearWorkoutResume, type WorkoutResume } from "@/src/lib/workout-resume";
 import { rideRecorder } from "@/src/lib/ride";
 import { useEntitlement, consumeRide, refreshEntitlement } from "@/src/lib/entitlement";
 import { PaywallModal } from "@/src/components/PaywallModal";
@@ -123,6 +124,11 @@ export default function LiveWorkout() {
   const selected = getWorkout(params.workoutId) ?? getWorkout("threshold-climb");
   const selectedType = selected ? WORKOUT_TYPES.find((t) => t.id === selected.typeId) : undefined;
   const workoutTitle = selected?.name ?? params.title ?? currentWorkout.title;
+  // In-progress ride saved to disk (background/app-kill resilience) — only
+  // adopted when it matches the exact workout the rider is opening, so
+  // picking a different workout always starts fresh.
+  const resumeRef = React.useRef(getWorkoutResume());
+  const r0 = selected?.id && resumeRef.current?.workoutId === selected.id ? resumeRef.current : null;
   // Real interval timeline built from the chosen workout's segments.
   const baseSegments = React.useMemo(() => (selected ? buildSegments(selected) : []), [selected]);
   const [extraSegments, setExtraSegments] = React.useState<import("@/src/lib/workout-catalog").Segment[]>([]);
@@ -136,8 +142,8 @@ export default function LiveWorkout() {
   const [videoSlotH, setVideoSlotH] = React.useState(0);
   const [paused, setPaused] = React.useState(false);
   const [expanded, setExpanded] = React.useState(false);
-  const [vRouteId, setVRouteId] = React.useState(() => vrouteIdForType(selected?.typeId));
-  const [routeSource, setRouteSource] = React.useState<"auto" | "favorite" | "manual">("auto");
+  const [vRouteId, setVRouteId] = React.useState(() => r0?.vRouteId || vrouteIdForType(selected?.typeId));
+  const [routeSource, setRouteSource] = React.useState<"auto" | "favorite" | "manual">(r0?.routeSource ?? "auto");
   const [favRouteId, setFavRouteId] = React.useState<string | null>(null);
   const [reducedMotion, setReducedMotion] = React.useState(false);
   const [appearance, setAppearance] = React.useState<RiderAppearanceConfiguration>(DEFAULT_APPEARANCE);
@@ -179,7 +185,7 @@ export default function LiveWorkout() {
   const ergPendingUntil = React.useRef(0);
   // ERG mode: when off, the trainer holds resistance and the rider controls effort
   // (we stop pushing per-segment target watts).
-  const [ergMode, setErgMode] = React.useState(true);
+  const [ergMode, setErgMode] = React.useState(r0 ? r0.ergMode : true);
   const ergModeRef = React.useRef(true);
   React.useEffect(() => { ergModeRef.current = ergMode; }, [ergMode]);
   // Struggle auto-ease: the coach quietly drops the ERG target while the rider
@@ -242,15 +248,32 @@ export default function LiveWorkout() {
     [segments, ftp, zoneBias],
   );
 
-  // Start the ride at the beginning of the chosen session and keep the trainer
-  // sim tracking the current segment's target watts (true end-to-end execution).
+  // Start the ride at the beginning of the chosen session — or resume exactly
+  // where the rider left off, if this workout has an in-progress save — and
+  // keep the trainer sim tracking the current segment's target watts.
+  // The very first `init` waits for a fresh, un-cached disk read of any saved
+  // progress (not the best-effort in-memory snapshot above) so a cold app
+  // launch straight into this exact workout never races the AsyncStorage
+  // read and accidentally sends elapsed:0.
+  const [resumeReady, setResumeReady] = React.useState(false);
+  const resumeValueRef = React.useRef<WorkoutResume | null>(null);
+  React.useEffect(() => {
+    let alive = true;
+    loadWorkoutResumeAsync().then((r) => {
+      if (!alive) return;
+      resumeValueRef.current = selected?.id && r?.workoutId === selected.id ? r : null;
+      setResumeReady(true);
+    });
+    return () => { alive = false; };
+  }, [selected?.id]);
   const initSent = React.useRef(false);
   const lastTargetSent = React.useRef<number>(-1);
   React.useEffect(() => {
-    if (connectionState !== "connected") return;
+    if (connectionState !== "connected" || !resumeReady) return;
     if (!initSent.current) {
       initSent.current = true;
-      sendInit({ elapsed: 0, distance: 0, watts: effTarget });
+      const rv = resumeValueRef.current;
+      sendInit({ elapsed: rv?.elapsedSec ?? 0, distance: rv?.distanceKm ?? 0, watts: effTarget });
       lastTargetSent.current = effTarget;
       return;
     }
@@ -258,7 +281,7 @@ export default function LiveWorkout() {
       lastTargetSent.current = effTarget;
       if (ergModeRef.current) sendTarget(effTarget);
     }
-  }, [connectionState, effTarget, sendInit, sendTarget]);
+  }, [connectionState, resumeReady, effTarget, sendInit, sendTarget]);
 
   // Real FTMS trainer: in ERG mode, auto-hold the current (eased) target watts.
   React.useEffect(() => {
@@ -308,9 +331,11 @@ export default function LiveWorkout() {
 
   // Load a route pinned as favourite for THIS workout type (auto-loads it),
   // otherwise the auto-matched route stays. Persists across sessions per type.
+  // Skipped when resuming an in-progress ride — keep the scenery the rider
+  // was already on instead of swapping it under them.
   React.useEffect(() => {
     const tid = selected?.typeId;
-    if (!tid) return;
+    if (!tid || r0) return;
     let alive = true;
     (async () => {
       const fav = await getFavoriteRoute(tid);
@@ -354,6 +379,25 @@ export default function LiveWorkout() {
   // re-firing on every telemetry tick.
   const telemetryRef = React.useRef(telemetry);
   React.useEffect(() => { telemetryRef.current = telemetry; }, [telemetry]);
+
+  // Persist the in-progress ride to disk every few seconds — so backgrounding
+  // the app, or even a full close, resumes exactly where the rider left off
+  // instead of restarting the workout from zero.
+  React.useEffect(() => {
+    if (paused || !selected?.id) return;
+    const t = setInterval(() => {
+      saveWorkoutResume({
+        workoutId: selected.id,
+        title: workoutTitle,
+        elapsedSec: telemetryRef.current.elapsed,
+        distanceKm: telemetryRef.current.distance,
+        vRouteId,
+        routeSource,
+        ergMode,
+      });
+    }, 5000);
+    return () => clearInterval(t);
+  }, [paused, selected?.id, workoutTitle, vRouteId, routeSource, ergMode]);
 
   const onCenterLayout = (e: LayoutChangeEvent) => setCenterW(e.nativeEvent.layout.width);
 
@@ -425,12 +469,14 @@ export default function LiveWorkout() {
   const onSaveRide = () => {
     rideRecorder.setStruggles(struggleMon.moments.current);
     submitRoutePR(segTotalSec > 0 && telemetryRef.current.elapsed >= segTotalSec);
+    clearWorkoutResume();
     setEndPrompt(false);
     router.replace("/summary");
   };
   const onAbandonRide = () => {
     setEndPrompt(false);
     rideRecorder.reset({ workout: workoutTitle, workoutId: selected?.id, ftp });
+    clearWorkoutResume();
     router.replace("/");
   };
   const onResumeRide = () => { setEndPrompt(false); if (paused) { resume(); setPaused(false); } };
@@ -502,7 +548,7 @@ export default function LiveWorkout() {
     }
   }, [speak]);
 
-  const onFinishComplete = () => { rideRecorder.setStruggles(struggleMon.moments.current); setCompletePrompt(false); router.replace("/summary"); };
+  const onFinishComplete = () => { rideRecorder.setStruggles(struggleMon.moments.current); clearWorkoutResume(); setCompletePrompt(false); router.replace("/summary"); };
   const onExtendRide = (minutes: number, label: string) => {
     if (!selected) return;
     setExtraSegments((x) => [...x, extensionSegment(selected, minutes)]);

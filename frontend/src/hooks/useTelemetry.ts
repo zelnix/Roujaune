@@ -56,6 +56,12 @@ export function useTelemetry() {
   const retries = useRef(0);
   const closed = useRef(false);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tracks the last good frame + whether we've ever connected before, so a
+  // dropped/re-established socket (brief background, network blip) can tell
+  // the fresh server-side sim to resume from here instead of silently
+  // restarting the ride at zero.
+  const everConnected = useRef(false);
+  const lastGood = useRef<{ elapsed: number; distance: number } | null>(null);
 
   const connect = useCallback(() => {
     try {
@@ -65,13 +71,22 @@ export function useTelemetry() {
       socket.onopen = () => {
         retries.current = 0;
         setConnectionState("connected");
+        if (everConnected.current && lastGood.current) {
+          try {
+            socket.send(JSON.stringify({ type: "init", elapsed: lastGood.current.elapsed, distance: lastGood.current.distance }));
+          } catch { /* noop */ }
+        }
+        everConnected.current = true;
       };
       socket.onmessage = (ev) => {
         lastMsg.current = Date.now();
         setStale(false);
         try {
           const msg = JSON.parse(ev.data as string);
-          if (msg.type === "telemetry" && msg.data) setTelemetry(msg.data as Telemetry);
+          if (msg.type === "telemetry" && msg.data) {
+            setTelemetry(msg.data as Telemetry);
+            lastGood.current = { elapsed: msg.data.elapsed, distance: msg.data.distance };
+          }
         } catch {
           /* ignore malformed frame */
         }
