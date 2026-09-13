@@ -444,7 +444,7 @@ export type TimelineStep = {
 export type StepStatus = "done" | "current" | "future";
 
 function ProfileSeg({ step, status, width, fill, onPress }: { step: TimelineStep; status: StepStatus; width: number; fill: number; onPress: () => void }) {
-  const h = Math.max(110, 82 + Math.max(0, Math.min(1, step.intensity)) * 52);
+  const h = Math.max(76, 58 + Math.max(0, Math.min(1, step.intensity)) * 38);
   const base = status === "future" ? "rgba(255,255,255,0.12)" : status === "done" ? colors.yellow + "44" : step.color + "33";
   const fillPct = status === "done" ? 100 : status === "current" ? Math.max(0, Math.min(1, fill)) * 100 : 0;
   const dim = status === "future";
@@ -874,7 +874,7 @@ const tc = StyleSheet.create({
 });
 
 const st = StyleSheet.create({
-  wrap: { ...card, paddingHorizontal: 14, paddingVertical: 12, gap: 0 },
+  wrap: { ...card, paddingHorizontal: 14, paddingVertical: 9, gap: 0 },
   head: { flexDirection: "row", alignItems: "center", gap: 14 },
   titleWrap: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 },
   title: { color: colors.white, fontSize: 15, fontWeight: "800", flexShrink: 1 },
@@ -892,7 +892,7 @@ const st = StyleSheet.create({
   progressFill: { height: "100%", backgroundColor: colors.yellow, borderRadius: 4 },
   progressPct: { color: colors.yellow, fontSize: 11, fontWeight: "800", minWidth: 34, textAlign: "right" },
   nowNext: { flexDirection: "row", alignItems: "stretch", gap: spacing.xs },
-  nnCell: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 14, paddingVertical: 12, minHeight: 68, overflow: "hidden" },
+  nnCell: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 14, paddingVertical: 9, minHeight: 58, overflow: "hidden" },
   nnNow: { backgroundColor: colors.yellow + "16", borderColor: colors.yellow + "44" },
   nnNext: { backgroundColor: "rgba(255,255,255,0.04)", borderColor: colors.border },
   nnArrow: { alignSelf: "center" },
@@ -910,7 +910,7 @@ const st = StyleSheet.create({
   nnCountLabel: { color: colors.yellow, fontSize: 9, fontWeight: "800", letterSpacing: 1.5, marginTop: -1 },
   nnProgressTrack: { position: "absolute", left: 0, right: 0, bottom: 0, height: 4, backgroundColor: "rgba(255,255,255,0.10)" },
   nnProgressFill: { height: "100%", backgroundColor: colors.yellow },
-  chart: { flexDirection: "row", alignItems: "flex-end", height: 140, gap: 0 },
+  chart: { flexDirection: "row", alignItems: "flex-end", height: 100, gap: 0 },
   seg: { height: "100%", justifyContent: "flex-end", paddingHorizontal: 2 },
   segBar: { width: "100%", borderRadius: 7, borderWidth: 1, overflow: "hidden", justifyContent: "flex-end" },
   segFill: { position: "absolute", left: 0, top: 0, bottom: 0, backgroundColor: colors.yellow + "3A", borderRightWidth: 2, borderRightColor: colors.yellow },

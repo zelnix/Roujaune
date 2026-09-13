@@ -136,7 +136,7 @@ export default function LiveWorkout() {
   const segments = React.useMemo(() => [...baseSegments, ...extraSegments], [baseSegments, extraSegments]);
   const compact = height < 620;
   const narrow = height >= 620 && winW < 1000;   // small-wide screens (e.g. Z Fold): 2×2 metric grid
-  const rightW = compact ? 194 : 238;
+  const rightW = compact ? 250 : 310;
 
   const [centerW, setCenterW] = React.useState(560);
   const [paused, setPaused] = React.useState(false);
@@ -941,19 +941,17 @@ export default function LiveWorkout() {
   // from the measured column width — no stretching to fill leftover screen
   // height, so the frame always looks like a real video, not a letterbox.
   const tablet = !compact;
-  // Coach slot (left of video) is sized to roughly match the rendered video
-  // card's own width (not the narrow right-hand Terrain/Route column) so the
-  // two feel balanced — clamped so it never crowds out the video on narrow
-  // screens or grows absurdly wide on very large ones.
+  // Coach slot (left of video) is set to the SAME width as the right-hand
+  // Terrain/Route column so the video sits exactly centred left-to-right
+  // across the whole row, not just centred between two unevenly-sized side
+  // columns.
   const gapW = spacing.xs;
-  const coachW = Math.max(180, Math.min(440, Math.round((centerW - gapW) / 3)));
+  const coachW = rightW;
   // Available width between the coach card and the right column — the video
-  // card itself is rendered at HALF this size (both dimensions, so the 16:9
-  // frame shrinks proportionally) and centred inside that same zone, so the
-  // rest of the screen (telemetry, step timeline, control bar) fits above
-  // the fold without the rider needing to scroll.
+  // is centred inside this zone (equal breathing room either side) so it
+  // stays centred even when its own rendered size is smaller than the zone.
   const videoAreaW = Math.max(220, Math.round(centerW - coachW - gapW));
-  const videoW = Math.max(140, Math.round(videoAreaW * 0.5));
+  const videoW = Math.max(140, Math.round(videoAreaW * 0.625));
   const videoRenderH = Math.round((videoW * 9) / 16);
 
   // ---- Derived values for the redesigned live dashboard ----
@@ -1031,7 +1029,7 @@ export default function LiveWorkout() {
                 <CoachBanner name={persona.name} message={liveCue} avatar={persona.image} compact struggle={struggle && struggle.active ? { severity: struggle.severity, safety: struggle.safety, label: REASON_LABEL[(struggle.primary ?? struggle.reasons[0]) as keyof typeof REASON_LABEL] ?? "digging deep" } : null} />
                 <AdjustmentsStrip entries={controlLog} compact />
               </View>
-              <View style={[styles.videoSlot, { height: videoRenderH, width: videoAreaW }]}>
+              <View style={[styles.videoSlot, { height: videoRenderH, width: videoAreaW, alignSelf: "center" }]}>
                 {expanded ? (
                   <Pressable style={styles.fsMinimised} onPress={() => setExpanded(false)} testID="vr-restore-inline">
                     <Ionicons name="contract-outline" size={22} color={colors.textDim} />
@@ -1378,7 +1376,7 @@ export default function LiveWorkout() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.md, gap: spacing.md },
-  tabletContent: { flexGrow: 1, padding: spacing.md, gap: spacing.md },
+  tabletContent: { flexGrow: 1, padding: spacing.sm, gap: spacing.sm },
   flex1: { flex: 1 },
   videoRow: { flexDirection: "row", gap: spacing.xs, alignItems: "stretch" },
   coachSlot: { minWidth: 0, gap: spacing.xs },
@@ -1409,10 +1407,10 @@ const styles = StyleSheet.create({
   sessionCenterWrap: { flex: 1, flexDirection: "row", alignItems: "stretch", justifyContent: "center", gap: spacing.xs },
   metricRowWrap: { flexWrap: "wrap", rowGap: spacing.sm },
   mainRow: { flexDirection: "row", gap: spacing.xs, alignItems: "stretch" },
-  leftCenter: { flex: 1, minWidth: 0, gap: spacing.sm },
+  leftCenter: { flex: 1, minWidth: 0, gap: spacing.xs },
   innerRow: { flexDirection: "row", gap: spacing.sm, alignItems: "stretch" },
   leftCol: { gap: spacing.sm },
-  centerCol: { flex: 1, minWidth: 0, gap: spacing.sm },
+  centerCol: { flex: 1, minWidth: 0, gap: spacing.xs },
   rightCol: { gap: spacing.sm },
 
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center" },
