@@ -71,6 +71,14 @@ export function useBleSensors(wheelCircumferenceMm: number = 2105) {
   // meter (or a separate speed sensor) never trample each other's samples.
   const crankState = useRef<Record<string, CrankSample>>({});
   const wheelState = useRef<Record<string, WheelSample>>({});
+  // Smart trainers (e.g. Tacx Flux S2) commonly advertise BOTH the legacy
+  // Cycling Speed & Cadence / Cycling Power wheel-revolution fields AND FTMS
+  // Indoor Bike Data. The legacy fields derive speed from a generic assumed
+  // wheel circumference, which under-reads real speed on a direct-drive
+  // trainer with no actual wheel. FTMS reports the trainer's own calculated
+  // speed, which is authoritative — so once we see Indoor Bike Data from a
+  // device we stop letting its CSC/Power wheel-revs override that speed.
+  const ibdCapableRef = useRef<Set<string>>(new Set());
   const circumferenceRef = useRef(wheelCircumferenceMm);
   useEffect(() => { circumferenceRef.current = wheelCircumferenceMm || 2105; }, [wheelCircumferenceMm]);
   const seen = useRef<Set<string>>(new Set());
@@ -204,7 +212,10 @@ export function useBleSensors(wheelCircumferenceMm: number = 2105) {
             }
             crankState.current[deviceId] = cp.crank;
           }
-          if (cp.wheel) {
+          // Skip the generic wheel-circumference speed calc for trainers that
+          // also expose FTMS Indoor Bike Data — that field is the trainer's
+          // own authoritative speed (see ibdCapableRef comment above).
+          if (cp.wheel && !ibdCapableRef.current.has(deviceId)) {
             const prevW = wheelState.current[deviceId];
             if (prevW) {
               const sp = speedFromWheel(prevW, cp.wheel, circumferenceRef.current);
@@ -212,6 +223,8 @@ export function useBleSensors(wheelCircumferenceMm: number = 2105) {
             }
             wheelState.current[deviceId] = cp.wheel;
             next.wheelRevs = cp.wheel.revs;
+          } else if (cp.wheel) {
+            wheelState.current[deviceId] = cp.wheel;
           }
           return next;
         });
@@ -229,7 +242,10 @@ export function useBleSensors(wheelCircumferenceMm: number = 2105) {
             }
             crankState.current[deviceId] = csc.crank;
           }
-          if (csc.wheel) {
+          // Same override guard as Cycling Power above — an FTMS-capable
+          // trainer's own Indoor Bike Data speed always wins over CSC's
+          // wheel-revs estimate.
+          if (csc.wheel && !ibdCapableRef.current.has(deviceId)) {
             const prevW = wheelState.current[deviceId];
             if (prevW) {
               const sp = speedFromWheel(prevW, csc.wheel, circumferenceRef.current);
@@ -237,6 +253,8 @@ export function useBleSensors(wheelCircumferenceMm: number = 2105) {
             }
             wheelState.current[deviceId] = csc.wheel;
             next.wheelRevs = csc.wheel.revs;
+          } else if (csc.wheel) {
+            wheelState.current[deviceId] = csc.wheel;
           }
           return next;
         });
@@ -351,10 +369,22 @@ export function useBleSensors(wheelCircumferenceMm: number = 2105) {
   const setupDevice = useCallback(async (device: any, id: string) => {
     await device.discoverAllServicesAndCharacteristics();
     const services = await device.services();
+    // First pass: collect every relevant service's characteristics and note
+    // whether this device exposes FTMS Indoor Bike Data — BEFORE subscribing
+    // to anything, so the CSC/Power-vs-IBD speed priority (see ibdCapableRef
+    // above) is already settled before the first notification can arrive.
+    const relevant: { svc: any; chars: any[] }[] = [];
     for (const svc of services) {
       const su = svc.uuid.toLowerCase();
       if (![UUID.heartRate, UUID.cyclingPower, UUID.csc, UUID.fitnessMachine].includes(su)) continue;
       const chars = await svc.characteristics();
+      relevant.push({ svc, chars });
+    }
+    const hasIndoorBikeData = relevant.some(({ chars }) =>
+      chars.some((ch: any) => ch.uuid.toLowerCase() === UUID.indoorBikeData));
+    if (hasIndoorBikeData) ibdCapableRef.current.add(id);
+    else ibdCapableRef.current.delete(id);
+    for (const { svc, chars } of relevant) {
       for (const ch of chars) {
         const cu = ch.uuid.toLowerCase();
         if ([UUID.heartRateMeasurement, UUID.cyclingPowerMeasurement, UUID.cscMeasurement, UUID.indoorBikeData].includes(cu)) {
@@ -389,6 +419,7 @@ export function useBleSensors(wheelCircumferenceMm: number = 2105) {
         setBattery((b) => { const n = { ...b }; delete n[id]; return n; });
         setRssi((r) => { const n = { ...r }; delete n[id]; return n; });
         delete deviceRefs.current[id];
+        ibdCapableRef.current.delete(id);
       } else {
         attemptReconnect(id, dev?.name || device?.name || "Sensor");
       }
@@ -437,6 +468,7 @@ export function useBleSensors(wheelCircumferenceMm: number = 2105) {
     try { await managerRef.current?.cancelDeviceConnection(id); } catch { /* noop */ }
     delete crankState.current[id];
     delete wheelState.current[id];
+    ibdCapableRef.current.delete(id);
     if (controlRef.current?.device?.id === id) {
       controlRef.current = null;
       setHasTrainerControl(false);

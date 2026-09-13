@@ -15,14 +15,16 @@ type Props = {
   onClose: () => void;
   onPickRoute: () => void;
   onPickYouTube: (videoId: string) => void;
+  onPickEmbed: (url: string, label: string) => void;
   routeLabel?: string;
   routeDesc?: string;
 };
 
 /** Bottom sheet to choose what plays behind a live ride: the scenic route
- *  video (default), the rider's own YouTube video (played in-app), or launch
- *  their own streaming app (Netflix / Prime / Disney+ / Apple TV) via PiP. */
-export function StreamingSourceSheet({ visible, source, onClose, onPickRoute, onPickYouTube, routeLabel = "Scenic route video", routeDesc = "The curated ride footage with points of interest." }: Props) {
+ *  video (default), the rider's own YouTube video (played in-app), a
+ *  free-to-air/custom app (tried in our own in-app browser, like YouTube), or
+ *  launch a DRM streaming app (Netflix / Prime / Disney+ / Apple TV) via PiP. */
+export function StreamingSourceSheet({ visible, source, onClose, onPickRoute, onPickYouTube, onPickEmbed, routeLabel = "Scenic route video", routeDesc = "The curated ride footage with points of interest." }: Props) {
   const [url, setUrl] = React.useState("");
   const [err, setErr] = React.useState<string | null>(null);
   const [expandYT, setExpandYT] = React.useState(source === "youtube");
@@ -61,6 +63,7 @@ export function StreamingSourceSheet({ visible, source, onClose, onPickRoute, on
   };
 
   const launch = (svc: StreamingService) => {
+    if (svc.embeddable) { onPickEmbed(svc.webUrl, svc.name); onClose(); return; }
     Alert.alert(
       `Watch on ${svc.name}`,
       pipTip(svc.name),
@@ -72,6 +75,10 @@ export function StreamingSourceSheet({ visible, source, onClose, onPickRoute, on
   };
 
   const launchCustom = (app: CustomStreamingApp) => {
+    // Custom apps are almost always a plain website link — try it inside our
+    // own in-app browser first, like a YouTube embed. A real app:// scheme
+    // can't be loaded in a webview, so those still deep-link out.
+    if (/^https?:\/\//i.test(app.url)) { onPickEmbed(app.url, app.name); onClose(); return; }
     Alert.alert(
       `Watch on ${app.name}`,
       pipTip(app.name),
@@ -108,9 +115,9 @@ export function StreamingSourceSheet({ visible, source, onClose, onPickRoute, on
   const onToggleFav = (id: string) => { toggleFavorite(id).then(setFavs); };
 
   // Unified tile model across built-in services + the rider's custom apps.
-  type TileItem = { id: string; name: string; color: string; icon?: string; label?: string; custom?: boolean; url?: string };
-  const builtin: TileItem[] = STREAMING_SERVICES.map((s) => ({ id: s.id, name: s.name, color: s.color, icon: s.icon, label: s.label }));
-  const custom: TileItem[] = customApps.map((a) => ({ id: a.id, name: a.name, color: colors.cardElevated, label: a.name.slice(0, 2).toUpperCase(), custom: true, url: a.url }));
+  type TileItem = { id: string; name: string; color: string; icon?: string; label?: string; custom?: boolean; url?: string; embeddable?: boolean };
+  const builtin: TileItem[] = STREAMING_SERVICES.map((s) => ({ id: s.id, name: s.name, color: s.color, icon: s.icon, label: s.label, embeddable: s.embeddable }));
+  const custom: TileItem[] = customApps.map((a) => ({ id: a.id, name: a.name, color: colors.cardElevated, label: a.name.slice(0, 2).toUpperCase(), custom: true, url: a.url, embeddable: /^https?:\/\//i.test(a.url) }));
   const byId = new Map<string, TileItem>([...builtin, ...custom].map((i) => [i.id, i]));
   const favSet = new Set(favs);
   const favItems: TileItem[] = favs.map((id) => byId.get(id)).filter(Boolean) as TileItem[];
@@ -148,6 +155,11 @@ export function StreamingSourceSheet({ visible, source, onClose, onPickRoute, on
           {item.icon
             ? <MaterialCommunityIcons name={item.icon as any} size={24} color="#fff" />
             : <Text style={[sx.tileMono, item.custom && { color: colors.yellow }]} numberOfLines={1}>{item.label || item.name.slice(0, 2)}</Text>}
+          {item.embeddable && (
+            <View style={sx.embedBadge} testID={`embed-badge-${item.id}`}>
+              <Ionicons name="phone-portrait" size={9} color={colors.bg} />
+            </View>
+          )}
         </View>
         <Text style={sx.tileName} numberOfLines={1}>{item.name}</Text>
       </Pressable>
@@ -343,7 +355,8 @@ const sx = StyleSheet.create({
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   tile: { width: "30%", alignItems: "center", gap: 8, paddingVertical: 12, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardElevated, position: "relative" },
   star: { position: "absolute", top: 4, right: 4, padding: 4, zIndex: 2 },
-  tileIcon: { width: 46, height: 46, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  tileIcon: { width: 46, height: 46, borderRadius: 12, alignItems: "center", justifyContent: "center", position: "relative" },
+  embedBadge: { position: "absolute", bottom: -2, right: -2, width: 16, height: 16, borderRadius: 8, backgroundColor: colors.yellow, alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: colors.bg },
   tileMono: { color: "#fff", fontSize: 17, fontWeight: "900", letterSpacing: -0.5 },
   tileName: { color: colors.white, fontSize: 12.5, fontWeight: "700" },
   tileAdd: { borderStyle: "dashed", borderColor: "rgba(245,179,1,0.5)", backgroundColor: "rgba(245,179,1,0.05)" },

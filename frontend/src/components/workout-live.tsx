@@ -266,25 +266,25 @@ export function SessionCard({
 }
 
 // ---- Alberto coaching banner ----------------------------------------------
-export function CoachBanner({ name, message, avatar, struggle }: { name: string; message: string; avatar: any; struggle?: { severity: string; safety: boolean; label: string } | null }) {
+export function CoachBanner({ name, message, avatar, struggle, compact }: { name: string; message: string; avatar: any; struggle?: { severity: string; safety: boolean; label: string } | null; compact?: boolean }) {
   const alert = struggle && struggle.severity && struggle.severity !== "none";
   const pillColor = struggle?.safety || struggle?.severity === "high" ? colors.red : colors.yellow;
   return (
-    <View style={[cb.wrap, alert ? { borderColor: pillColor, borderWidth: 1 } : null]} testID="coach-banner">
-      <Image source={avatar} style={cb.avatar} contentFit="cover" contentPosition="top center" />
-      <View style={{ flex: 1 }}>
+    <View style={[cb.wrap, compact && cb.wrapCompact, alert ? { borderColor: pillColor, borderWidth: 1 } : null]} testID="coach-banner">
+      <Image source={avatar} style={[cb.avatar, compact && cb.avatarCompact]} contentFit="cover" contentPosition="top center" />
+      <View style={{ flex: 1, minWidth: 0 }}>
         <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
-          <Text style={cb.name}>{name} · Live coaching</Text>
-          {alert ? (
-            <View style={[cb.pill, { backgroundColor: pillColor }]} testID="struggle-pill">
-              <Ionicons name={struggle?.safety ? "shield-half" : "pulse"} size={11} color="#180a0a" />
-              <Text style={cb.pillText}>{struggle?.safety ? "EASING TO RECOVER" : `HOLD ON · ${struggle?.label ?? "digging deep"}`}</Text>
-            </View>
-          ) : null}
+          <Text style={[cb.name, compact && cb.nameCompact]} numberOfLines={1}>{name} · Live coaching</Text>
         </View>
-        <Text style={cb.msg} numberOfLines={2}>{message}</Text>
+        {alert ? (
+          <View style={[cb.pill, compact && cb.pillCompact, { backgroundColor: pillColor, alignSelf: "flex-start" }]} testID="struggle-pill">
+            <Ionicons name={struggle?.safety ? "shield-half" : "pulse"} size={compact ? 9 : 11} color="#180a0a" />
+            <Text style={[cb.pillText, compact && cb.pillTextCompact]}>{struggle?.safety ? "EASING TO RECOVER" : `HOLD ON · ${struggle?.label ?? "digging deep"}`}</Text>
+          </View>
+        ) : null}
+        <Text style={[cb.msg, compact && cb.msgCompact]} numberOfLines={compact ? 3 : 2}>{message}</Text>
       </View>
-      <Ionicons name="mic" size={16} color={colors.yellow} />
+      {!compact && <Ionicons name="mic" size={16} color={colors.yellow} />}
     </View>
   );
 }
@@ -644,8 +644,8 @@ const h = StyleSheet.create({
 });
 
 const brand = StyleSheet.create({
-  card: { ...card, flex: 1, minWidth: 120, alignItems: "center", justifyContent: "center", paddingVertical: 16, gap: 8 },
-  cardDense: { minWidth: 92, paddingVertical: 8, gap: 4 },
+  card: { ...card, minWidth: 120, alignItems: "center", justifyContent: "center", paddingVertical: 16, paddingHorizontal: 18, gap: 8 },
+  cardDense: { minWidth: 92, paddingVertical: 8, paddingHorizontal: 14, gap: 4 },
   glyph: { width: 44, height: 44 },
   glyphDense: { width: 30, height: 30 },
   version: { color: colors.textFaint, fontSize: 10.5, fontWeight: "700", letterSpacing: 0.3, marginTop: 4 },
@@ -735,11 +735,17 @@ const sc = StyleSheet.create({
 
 const cb = StyleSheet.create({
   wrap: { flexDirection: "row", alignItems: "center", gap: 14, ...card, borderColor: colors.yellow + "3A", backgroundColor: colors.yellow + "10", paddingVertical: 14, paddingHorizontal: 16 },
+  wrapCompact: { gap: 10, paddingVertical: 12, paddingHorizontal: 12 },
   avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: "rgba(255,255,255,0.08)" },
+  avatarCompact: { width: 38, height: 38, borderRadius: 19 },
   name: { color: colors.yellow, fontSize: 13, fontWeight: "800", letterSpacing: 0.5 },
+  nameCompact: { fontSize: 11, letterSpacing: 0.2 },
   msg: { color: colors.white, fontSize: 28, fontWeight: "600", lineHeight: 36, marginTop: 3 },
-  pill: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2, marginLeft: 8 },
+  msgCompact: { fontSize: 14.5, lineHeight: 19, fontWeight: "700", marginTop: 4 },
+  pill: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2, marginTop: 4 },
+  pillCompact: { paddingHorizontal: 6, paddingVertical: 2 },
   pillText: { color: "#180a0a", fontSize: 10.5, fontWeight: "900", letterSpacing: 0.5, textTransform: "uppercase" },
+  pillTextCompact: { fontSize: 9 },
 });
 
 const ic = StyleSheet.create({

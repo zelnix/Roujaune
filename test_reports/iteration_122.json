@@ -1,0 +1,44 @@
+{
+  "summary": "Frontend-only verification of 2 fixes + 2 regression checks per E1's request. Tested via Playwright against the live web preview (https://scenic-trainer.preview.emergentagent.com), logged in as demo@roujaune.app. NOTE: at the standard mobile viewport (390x844) the workout screen's cards overlap/overflow (Terrain/Route cards render on top of the video card, several text labels like 'Workout Step' wrap vertically char-by-char) which made the 'Watch' button unreachable/unclickable at that width — this is a PRE-EXISTING responsive-layout issue on /workout (and also seen on /today and /training screens this session, consistent with a similar issue flagged in iteration_121 for /plan), unrelated to the embed/BLE changes. Switched to a 1024x900 (tablet/desktop) viewport where the same layout renders correctly and completed all requested tests there.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "/workout screen main layout (mainRow / metricRow / video card)",
+        "issue": "At a 390x844 mobile viewport, the Terrain and Route cards render absolutely/overlapping on top of the video card area, pushing the 'Watch' (vr-embed-source) button behind them (Playwright reports it as 'visible' with a valid bounding box, but force-clicking it does not open the StreamingSourceSheet — likely because the overlapping card intercepts the tap in the real render). Several labels ('Workout Step', 'Alpine...') also truncate/wrap oddly. This blocks the entire Watch->StreamingSourceSheet->EmbeddedWebPlayer flow on a real phone-sized viewport in the web preview. Pre-existing, not introduced this session, but directly blocks manually verifying this session's fix on the actual target form factor (phone).",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "verified_working": [
+    "FIX 1 (EmbeddedWebPlayer wiring): On 1024x900 viewport, tapped 'Watch' (vr-embed-source) -> StreamingSourceSheet opened -> tapped 'SBS On Demand' tile (has phone-icon embed badge) -> video card cleanly switched to EmbeddedWebPlayer showing 'SBS On Demand' badge top-left, open-external + close(X) icons top-right, and the expected web-fallback card ('SBS On Demand can't be embedded in a browser tab' + 'Open SBS On Demand' button). No crash, no white screen, no console errors.",
+    "FIX 1: Tapped close(X) (embed-close-btn) -> embedded-web-player unmounted cleanly, VirtualRidePlayer ('vr-embed-source'/'Watch') returned with no leftover overlay.",
+    "FIX 1: Tapped 'Netflix' (stream-netflix, non-embeddable/DRM) -> StreamingSourceSheet correctly did NOT invoke onPickEmbed (no embedded-web-player rendered, sheet remained open/unchanged). Could not visually confirm the native Alert dialog itself because react-native-web's Alert.alert is a documented no-op stub (node_modules/react-native-web/dist/exports/Alert/index.js: `static alert() {}`) — this is a react-native-web platform limitation affecting Alert.alert across the WHOLE app, not something introduced by this session's streaming changes. No crash occurred; behavior (no embed attempt for DRM services) is correct.",
+    "REGRESSION - YouTube: pasted a YouTube URL, tapped 'Play this video' -> YouTubePlayer rendered inline and played correctly with its own Watch/fullscreen controls (workout-source, workout-yt-fullscreen testIDs present).",
+    "REGRESSION - clean source switching: From YouTube playing, reopened the sheet and picked the SBS embed tile again -> video card correctly swapped straight to EmbeddedWebPlayer with the YouTube control bar (workout-yt-fullscreen) fully gone — no leftover overlay from the previous source.",
+    "BLE sanity: Tapping the 'Sensors' bottom-bar button opened the Bluetooth sensors panel without any crash/error boundary/red screen. Panel correctly shows 'Preview demo — showing simulated sensors. Real Bluetooth needs a device build.' confirming `supported` gracefully evaluates false in web preview and the UI shows the expected non-error empty state (Power/Cadence/Speed/HR all '—', 'No sensors yet' message, working Scan button visible).",
+    "BLE auto-reconnect sanity: App boot (login -> Today -> direct workout screen navigation) completed with zero console errors and no hang/crash attributable to ble-context.tsx's AsyncStorage-based reconnect provider.",
+    "General workout screen stability: telemetry/metric cards, coach banner (Alberto), terrain/route cards, step timeline, live control bar (Audio/Mirror/Reconnect/Settings/Sensors/Lock/Pause/End) all rendered and remained functional throughout every source switch."
+  ],
+  "test_report_links": [],
+  "action_items": [
+    "No bugs found in the two session fixes (EmbeddedWebPlayer wiring, DRM-alert path) or the two regression checks (YouTube playback, BLE panel/auto-reconnect sanity) — all work as specified when tested on a viewport where the layout renders correctly.",
+    "HIGH PRIORITY (pre-existing, not from this session): investigate the /workout screen's responsive layout at true mobile widths (~390px) — Terrain/Route overlay cards currently sit on top of the video card and swallow taps intended for the 'Watch' button underneath. Same class of vertical-text-wrap issue previously flagged on /plan (iteration_121), /today, and /training screens this round. Recommend a dedicated pass on mobile breakpoints for these dashboard screens since it currently blocks core interactions (not just cosmetics) at phone width in the web preview."
+  ],
+  "critical_code_review_comments": [
+    "workout.tsx: onPickRoute/onPickYouTube/onPickEmbed all correctly clear the other two video-source states (customVideoId, embedSource) before setting their own, so there is no possibility of two video sources being mounted simultaneously. Confirmed via testing.",
+    "EmbeddedWebPlayer.tsx: Platform.OS==='web' fallback branch is well-guarded and matches iframe X-Frame-Options reality; failed/timeout branch on native is separate and correctly distinct from the web branch. No issues found.",
+    "StreamingSourceSheet.tsx launch(): correctly branches on svc.embeddable before ever calling onPickEmbed vs. Alert.alert — Netflix/Prime/Disney+/Apple TV (non-embeddable) never reach onPickEmbed. Confirmed via testing (no embedded-web-player rendered for Netflix).",
+    "useBleSensors.ts ibdCapableRef logic could not be hardware-tested (no physical Tacx Flux S2 available in this sandbox) as expected/acknowledged by E1 — only code-level sanity (panel doesn't crash, `supported` gracefully false) was verified, consistent with the request."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A - not tested this round (no backend changes)", "frontend": "100% of requested checks passed (7/7 verified_working items); 1 pre-existing HIGH-priority mobile-viewport layout bug found (unrelated to this session's changes) that blocks reaching the Watch button on a true phone-width viewport"},
+  "seed_data_creation": "None.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All 4 items from this session's review request (EmbeddedWebPlayer crash fix, DRM Alert path, YouTube regression, BLE auto-reconnect/panel sanity) are verified working on a 1024x900 viewport. IMPORTANT: at true mobile width (390x844) the /workout screen's Terrain/Route cards overlap the video card and intercept taps meant for the underlying 'Watch' button (vr-embed-source) — could not reproduce the embed flow at phone width for that reason; used desktop/tablet viewport instead where layout is correct. This same overlap/vertical-text-wrap pattern was also seen on /today (nav sidebar overlapping cards) and /training (header text wrapping vertically, content overflowing far right of 390px viewport) — likely a shared layout regression across dashboard-style screens worth a dedicated look. react-native-web's Alert.alert is a no-op stub globally (not app-specific) so native Alert dialogs (Netflix/Prime/etc, and any other Alert.alert call in the codebase) can never be visually confirmed in this web preview — only testable on a real native build.",
+  "rca_of_issue": "Layout bug RCA (pre-existing, reported not fixed): /workout's mainRow appears to use fixed-width columns (rightW ~194-238px) and absolute-positioned Terrain/Route cards sized for a wide/tablet layout; at <420px viewport width these overlay cards no longer have room to sit beside the video/metric column and instead stack on top of it with a higher paint order, intercepting touch events for elements underneath (e.g. vr-embed-source). Recommend adding a narrower breakpoint that stacks these cards vertically below the video instead of overlaying them."
+}

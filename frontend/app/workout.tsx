@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, useWindowDimensions, LayoutChangeEvent, Pressable, Modal } from "react-native";
+import { View, Text, StyleSheet, ScrollView, useWindowDimensions, LayoutChangeEvent, Pressable, Modal, Linking } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -22,6 +22,7 @@ import { WORKOUT_TYPES } from "@/src/lib/workouts";
 import { VirtualRidePlayer } from "@/src/components/virtual-route/VirtualRidePlayer";
 import YouTubePlayer from "@/src/components/YouTubePlayer";
 import { FullscreenHud } from "@/src/components/FullscreenHud";
+import { EmbeddedWebPlayer } from "@/src/components/EmbeddedWebPlayer";
 import { StreamingSourceSheet } from "@/src/components/streaming/StreamingSourceSheet";
 import { VIRTUAL_ROUTES, getVRoute } from "@/src/lib/vroutes";
 import { vrouteIdForType, deriveVirtualRide } from "@/src/lib/workout-vroute";
@@ -155,6 +156,7 @@ export default function LiveWorkout() {
   const [showTrainer, setShowTrainer] = React.useState(false);
   const [showStream, setShowStream] = React.useState(false);
   const [customVideoId, setCustomVideoId] = React.useState<string | null>(null);
+  const [embedSource, setEmbedSource] = React.useState<{ url: string; label: string } | null>(null);
   const [autoErg, setAutoErg] = React.useState(true);
   const [endPrompt, setEndPrompt] = React.useState(false);
   const [completePrompt, setCompletePrompt] = React.useState(false);
@@ -943,7 +945,11 @@ export default function LiveWorkout() {
   // from the measured column width — no stretching to fill leftover screen
   // height, so the frame always looks like a real video, not a letterbox.
   const tablet = !compact;
-  const videoW = Math.max(220, Math.round(centerW * 0.5));
+  // Coach slot (left of video) mirrors the Terrain/Route column width (right
+  // of video) so the video card sits exactly centred between them — clamped
+  // down on very narrow screens so the video never drops below a usable size.
+  const coachW = Math.max(72, Math.min(rightW, centerW - 220 - spacing.sm));
+  const videoW = Math.max(220, Math.round(centerW - coachW - spacing.sm));
   const videoRenderH = Math.round((videoW * 9) / 16);
 
   // ---- Derived values for the redesigned live dashboard ----
@@ -1002,7 +1008,10 @@ export default function LiveWorkout() {
           </View>
 
           <View style={styles.centerCol} onLayout={onCenterLayout}>
-            <View style={styles.videoWrap}>
+            <View style={styles.videoRow}>
+              <View style={[styles.coachSlot, { width: coachW }]}>
+                <CoachBanner name={persona.name} message={liveCue} avatar={persona.image} compact struggle={struggle && struggle.active ? { severity: struggle.severity, safety: struggle.safety, label: REASON_LABEL[(struggle.primary ?? struggle.reasons[0]) as keyof typeof REASON_LABEL] ?? "digging deep" } : null} />
+              </View>
               <View style={[styles.videoSlot, { height: videoRenderH, width: videoW }]}>
                 {expanded ? (
                   <Pressable style={styles.fsMinimised} onPress={() => setExpanded(false)} testID="vr-restore-inline">
@@ -1030,6 +1039,15 @@ export default function LiveWorkout() {
                       </Pressable>
                     </View>
                   </View>
+                ) : embedSource ? (
+                  <EmbeddedWebPlayer
+                    url={embedSource.url}
+                    label={embedSource.label}
+                    width={videoW}
+                    height={videoRenderH}
+                    onOpenExternally={() => Linking.openURL(embedSource.url)}
+                    onClose={() => setEmbedSource(null)}
+                  />
                 ) : (
                   <VirtualRidePlayer
                     mode="embedded"
@@ -1074,8 +1092,6 @@ export default function LiveWorkout() {
               )}
               <MetricCard icon="navigate" label="Distance" value={riddenKm.toFixed(1)} unit="km" sub={`OF ${routeInfo.km.toFixed(1)} KM`} accent="#5AC8FA" half={narrow} dense={tablet} />
             </View>
-
-            <CoachBanner name={persona.name} message={liveCue} avatar={persona.image} struggle={struggle && struggle.active ? { severity: struggle.severity, safety: struggle.safety, label: REASON_LABEL[(struggle.primary ?? struggle.reasons[0]) as keyof typeof REASON_LABEL] ?? "digging deep" } : null} />
           </View>
         </View>
 
@@ -1235,8 +1251,9 @@ export default function LiveWorkout() {
         visible={showStream}
         source={customVideoId ? "youtube" : "route"}
         onClose={() => setShowStream(false)}
-        onPickRoute={() => setCustomVideoId(null)}
-        onPickYouTube={(id) => { setCustomVideoId(id); setPaused(false); }}
+        onPickRoute={() => { setCustomVideoId(null); setEmbedSource(null); }}
+        onPickYouTube={(id) => { setCustomVideoId(id); setEmbedSource(null); setPaused(false); }}
+        onPickEmbed={(url, label) => { setEmbedSource({ url, label }); setCustomVideoId(null); setPaused(false); }}
         routeLabel="Virtual ride (avatar)"
         routeDesc="Your rider on the virtual route, with live ERG resistance."
       />
@@ -1346,7 +1363,8 @@ const styles = StyleSheet.create({
   content: { padding: spacing.md, gap: spacing.md },
   tabletContent: { flexGrow: 1, padding: spacing.md, gap: spacing.md },
   flex1: { flex: 1 },
-  videoWrap: { alignItems: "center" },
+  videoRow: { flexDirection: "row", gap: spacing.sm, alignItems: "stretch" },
+  coachSlot: { minWidth: 0, justifyContent: "center" },
   videoSlot: { minHeight: 150 },
   ytControls: { position: "absolute", top: 8, right: 8, flexDirection: "row", alignItems: "center", gap: 7 },
   ytSourceBtn: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(0,0,0,0.6)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 6 },

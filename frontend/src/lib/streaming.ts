@@ -28,11 +28,19 @@ export type StreamingService = {
   label?: string; // short monogram shown when there's no brand icon (e.g. "9", "7+")
   appUrl: string; // deep-link / universal link that opens the app if installed
   webUrl: string; // fallback (browser)
+  /** Free-to-air / ad-supported services worth TRYING inside our own in-app
+   *  browser (like a YouTube embed). Paid DRM services (Netflix, Prime,
+   *  Disney+, Apple TV, Stan, Binge, Kayo) always deep-link out instead —
+   *  their video playback is blocked in any third-party embed/webview by
+   *  design, so there's no point pretending otherwise. */
+  embeddable?: boolean;
 };
 
 /** External streaming apps the rider can watch alongside the ride (their own
- *  subscription, on-device). We deep-link out and rely on Picture-in-Picture /
- *  split-screen so ROUJAUNE keeps recording — we never embed their content. */
+ *  subscription, on-device). Paid/DRM services deep-link out and rely on
+ *  Picture-in-Picture / split-screen — we never embed their content (Netflix
+ *  etc. actively block it). A few free-to-air services are flagged
+ *  `embeddable` and get tried inside our own in-app browser first. */
 export const STREAMING_SERVICES: StreamingService[] = [
   { id: "netflix", name: "Netflix", color: "#E50914", icon: "netflix", appUrl: "nflx://", webUrl: "https://www.netflix.com" },
   { id: "prime", name: "Prime Video", color: "#1FA0FF", icon: "filmstrip", appUrl: "https://app.primevideo.com", webUrl: "https://www.primevideo.com" },
@@ -41,11 +49,11 @@ export const STREAMING_SERVICES: StreamingService[] = [
   { id: "youtube", name: "YouTube", color: "#FF0000", icon: "youtube", appUrl: "youtube://", webUrl: "https://www.youtube.com" },
   // --- Australian free-to-air & subscription services (universal links open --
   //     the app when installed, else the website) --------------------------- //
-  { id: "sbs", name: "SBS On Demand", color: "#5A5A5A", label: "SBS", appUrl: "https://www.sbs.com.au/ondemand", webUrl: "https://www.sbs.com.au/ondemand" },
-  { id: "9now", name: "9Now", color: "#0096D6", label: "9", appUrl: "https://www.9now.com.au", webUrl: "https://www.9now.com.au" },
-  { id: "7plus", name: "7plus", color: "#EE3124", label: "7+", appUrl: "https://7plus.com.au", webUrl: "https://7plus.com.au" },
-  { id: "10play", name: "10 play", color: "#005CB9", label: "10", appUrl: "https://10play.com.au", webUrl: "https://10play.com.au" },
-  { id: "iview", name: "ABC iview", color: "#14C5C8", label: "iV", appUrl: "https://iview.abc.net.au", webUrl: "https://iview.abc.net.au" },
+  { id: "sbs", name: "SBS On Demand", color: "#5A5A5A", label: "SBS", appUrl: "https://www.sbs.com.au/ondemand", webUrl: "https://www.sbs.com.au/ondemand", embeddable: true },
+  { id: "9now", name: "9Now", color: "#0096D6", label: "9", appUrl: "https://www.9now.com.au", webUrl: "https://www.9now.com.au", embeddable: true },
+  { id: "7plus", name: "7plus", color: "#EE3124", label: "7+", appUrl: "https://7plus.com.au", webUrl: "https://7plus.com.au", embeddable: true },
+  { id: "10play", name: "10 play", color: "#005CB9", label: "10", appUrl: "https://10play.com.au", webUrl: "https://10play.com.au", embeddable: true },
+  { id: "iview", name: "ABC iview", color: "#14C5C8", label: "iV", appUrl: "https://iview.abc.net.au", webUrl: "https://iview.abc.net.au", embeddable: true },
   { id: "stan", name: "Stan", color: "#0067FF", label: "S", appUrl: "https://www.stan.com.au", webUrl: "https://www.stan.com.au" },
   { id: "binge", name: "Binge", color: "#E4007C", label: "B", appUrl: "https://binge.com.au", webUrl: "https://binge.com.au" },
   { id: "kayo", name: "Kayo Sports", color: "#0A8F5B", label: "K", appUrl: "https://kayosports.com.au", webUrl: "https://kayosports.com.au" },
