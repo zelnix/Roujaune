@@ -1081,7 +1081,7 @@ export default function LiveWorkout() {
               </View>
             </View>
 
-            <View style={[styles.metricRow, narrow && styles.metricRowWrap]}>
+            <View style={[styles.metricRow, styles.telemetryRow, narrow && styles.metricRowWrap]}>
               {timeBased ? (
                 <>
                   <MetricCard icon="stopwatch-outline" label="Elapsed" value={elapsedShort} sub={`TOTAL SESSION ${mmss(totalSec)}`} accent={colors.yellow} half={narrow} dense={tablet} />
@@ -1395,6 +1395,7 @@ const styles = StyleSheet.create({
   routeOptName: { color: colors.white, fontSize: 14, fontWeight: "800" },
   routeOptMeta: { color: colors.textFaint, fontSize: 12, fontWeight: "600", marginTop: 2 },
   metricRow: { flexDirection: "row", gap: spacing.sm },
+  telemetryRow: { gap: spacing.xs },
   metricRowWrap: { flexWrap: "wrap", rowGap: spacing.sm },
   mainRow: { flexDirection: "row", gap: spacing.sm, alignItems: "stretch" },
   leftCenter: { flex: 1, minWidth: 0, gap: spacing.sm },
