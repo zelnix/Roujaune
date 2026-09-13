@@ -948,13 +948,13 @@ export default function LiveWorkout() {
   // Coach slot (left of video) mirrors the Terrain/Route column width (right
   // of video) so the video card sits exactly centred between them — clamped
   // down on very narrow screens so the video never drops below a usable size.
-  const coachW = Math.max(72, Math.min(rightW, centerW - 220 - spacing.sm));
+  const coachW = Math.max(72, Math.min(rightW, centerW - 220 - spacing.xs));
   // Available width between the coach card and the right column — the video
   // card itself is rendered at HALF this size (both dimensions, so the 16:9
   // frame shrinks proportionally) and centred inside that same zone, so the
   // rest of the screen (telemetry, step timeline, control bar) fits above
   // the fold without the rider needing to scroll.
-  const videoAreaW = Math.max(220, Math.round(centerW - coachW - spacing.sm));
+  const videoAreaW = Math.max(220, Math.round(centerW - coachW - spacing.xs));
   const videoW = Math.max(140, Math.round(videoAreaW * 0.5));
   const videoRenderH = Math.round((videoW * 9) / 16);
 
@@ -1004,20 +1004,23 @@ export default function LiveWorkout() {
         <View style={styles.leftCenter}>
           <View style={[styles.metricRow, narrow && styles.metricRowWrap]}>
             {!narrow && <BrandCard dense={tablet} onPress={() => router.replace("/")} />}
-            <SessionCard
-              elapsed={fmt(telemetry.elapsed)}
-              estFinish={estFinish}
-              currentTime={currentTimeLabel}
-              sensors={sensorHealth}
-              onSensorPress={() => setShowBle(true)}
-              workoutName={workoutTitle}
-            />
+            <View style={styles.sessionCenterWrap}>
+              <SessionCard
+                elapsed={fmt(telemetry.elapsed)}
+                estFinish={estFinish}
+                currentTime={currentTimeLabel}
+                sensors={sensorHealth}
+                onSensorPress={() => setShowBle(true)}
+                workoutName={workoutTitle}
+              />
+            </View>
           </View>
 
           <View style={styles.centerCol} onLayout={onCenterLayout}>
             <View style={styles.videoRow}>
               <View style={[styles.coachSlot, { width: coachW }]}>
                 <CoachBanner name={persona.name} message={liveCue} avatar={persona.image} compact struggle={struggle && struggle.active ? { severity: struggle.severity, safety: struggle.safety, label: REASON_LABEL[(struggle.primary ?? struggle.reasons[0]) as keyof typeof REASON_LABEL] ?? "digging deep" } : null} />
+                <AdjustmentsStrip entries={controlLog} compact />
               </View>
               <View style={[styles.videoSlot, { height: videoRenderH, width: videoAreaW }]}>
                 {expanded ? (
@@ -1109,8 +1112,6 @@ export default function LiveWorkout() {
       </View>
 
       <StepTimeline steps={stepList} activeIndex={activeSeg?.index ?? -1} remaining={timeLeftLabel} stepProgress={activeSeg ? activeSeg.elapsedInSeg / Math.max(1, activeSeg.segment.durationSec) : 0} onStepPress={(i) => setStepDetail(i)} />
-
-      <AdjustmentsStrip entries={controlLog} />
 
       <LiveControlBar
         paused={paused}
@@ -1370,8 +1371,8 @@ const styles = StyleSheet.create({
   content: { padding: spacing.md, gap: spacing.md },
   tabletContent: { flexGrow: 1, padding: spacing.md, gap: spacing.md },
   flex1: { flex: 1 },
-  videoRow: { flexDirection: "row", gap: spacing.sm, alignItems: "stretch" },
-  coachSlot: { minWidth: 0 },
+  videoRow: { flexDirection: "row", gap: spacing.xs, alignItems: "stretch" },
+  coachSlot: { minWidth: 0, gap: spacing.xs },
   videoSlot: { minHeight: 150, alignItems: "center", justifyContent: "center" },
   ytControls: { position: "absolute", top: 8, right: 8, flexDirection: "row", alignItems: "center", gap: 7 },
   ytSourceBtn: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(0,0,0,0.6)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 6 },
@@ -1394,10 +1395,11 @@ const styles = StyleSheet.create({
   routeOptThumb: { width: 84, height: 52, borderRadius: radius.sm, backgroundColor: "#0d0f14" },
   routeOptName: { color: colors.white, fontSize: 14, fontWeight: "800" },
   routeOptMeta: { color: colors.textFaint, fontSize: 12, fontWeight: "600", marginTop: 2 },
-  metricRow: { flexDirection: "row", gap: spacing.sm },
+  metricRow: { flexDirection: "row", gap: spacing.xs },
   telemetryRow: { gap: spacing.xs },
+  sessionCenterWrap: { flex: 1, alignItems: "center" },
   metricRowWrap: { flexWrap: "wrap", rowGap: spacing.sm },
-  mainRow: { flexDirection: "row", gap: spacing.sm, alignItems: "stretch" },
+  mainRow: { flexDirection: "row", gap: spacing.xs, alignItems: "stretch" },
   leftCenter: { flex: 1, minWidth: 0, gap: spacing.sm },
   innerRow: { flexDirection: "row", gap: spacing.sm, alignItems: "stretch" },
   leftCol: { gap: spacing.sm },

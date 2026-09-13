@@ -50,19 +50,19 @@ export function BrandCard({ dense, onPress }: { dense?: boolean; onPress?: () =>
 }
 
 // Compact history of ride-affecting adjustments made during the session.
-export function AdjustmentsStrip({ entries }: { entries: { id: number; t: string; label: string }[] }) {
+export function AdjustmentsStrip({ entries, compact }: { entries: { id: number; t: string; label: string }[]; compact?: boolean }) {
   if (!entries.length) return null;
   return (
-    <View style={aj.wrap} testID="adjustments-strip">
+    <View style={[aj.wrap, compact && aj.wrapCompact]} testID="adjustments-strip">
       <View style={aj.head}>
         <Ionicons name="options" size={13} color={colors.yellow} />
         <Text style={aj.title}>ADJUSTMENTS</Text>
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={aj.row}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[aj.row, compact && aj.rowCompact]}>
         {entries.map((e) => (
-          <View key={e.id} style={aj.chip}>
+          <View key={e.id} style={[aj.chip, compact && aj.chipCompact]}>
             <Text style={aj.chipTime}>{e.t}</Text>
-            <Text style={aj.chipText}>{e.label}</Text>
+            <Text style={aj.chipText} numberOfLines={1}>{e.label}</Text>
           </View>
         ))}
       </ScrollView>
@@ -687,16 +687,19 @@ const brand = StyleSheet.create({
 
 const aj = StyleSheet.create({
   wrap: { ...card, flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 12, paddingVertical: 8 },
+  wrapCompact: { flexDirection: "column", alignItems: "stretch", gap: 6, paddingHorizontal: 10, paddingVertical: 8, marginTop: 8 },
   head: { flexDirection: "row", alignItems: "center", gap: 6 },
   title: { color: colors.textDim, fontSize: 10.5, fontWeight: "800", letterSpacing: 1 },
   row: { flexDirection: "row", alignItems: "center", gap: 8, paddingRight: 4 },
+  rowCompact: { gap: 6 },
   chip: { flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 5 },
+  chipCompact: { paddingHorizontal: 8, paddingVertical: 4, maxWidth: 150 },
   chipTime: { color: colors.yellow, fontSize: 11, fontWeight: "800", fontVariant: ["tabular-nums"] },
   chipText: { color: colors.white, fontSize: 12, fontWeight: "700" },
 });
 
 const m = StyleSheet.create({
-  card: { ...card, flex: 1, paddingHorizontal: 20, paddingVertical: 18, minWidth: 188 },
+  card: { ...card, flex: 1, minWidth: 188, paddingHorizontal: 20, paddingVertical: 18 },
   cardHalf: { flex: 0, flexGrow: 1, flexBasis: "47%", minWidth: 175 },
   cardDense: { paddingHorizontal: 15, paddingVertical: 10, minWidth: 135 },
   head: { flexDirection: "row", alignItems: "center", gap: 7 },
@@ -752,7 +755,7 @@ const cn = StyleSheet.create({
 });
 
 const sc = StyleSheet.create({
-  panel: { ...card, flex: 1, paddingHorizontal: 18, paddingVertical: 12, gap: 2, minWidth: 260 },
+  panel: { ...card, paddingHorizontal: 18, paddingVertical: 12, gap: 2, minWidth: 260, alignSelf: "center" },
   header: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 6 },
   title: { color: colors.white, fontSize: 11.5, fontWeight: "800", letterSpacing: 1 },
   headerDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: colors.textFaint },
@@ -826,7 +829,7 @@ const st = StyleSheet.create({
   progressTrack: { flex: 1, height: 7, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.1)", overflow: "hidden" },
   progressFill: { height: "100%", backgroundColor: colors.yellow, borderRadius: 4 },
   progressPct: { color: colors.yellow, fontSize: 11, fontWeight: "800", minWidth: 34, textAlign: "right" },
-  nowNext: { flexDirection: "row", alignItems: "stretch", gap: 8 },
+  nowNext: { flexDirection: "row", alignItems: "stretch", gap: spacing.xs },
   nnCell: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderRadius: radius.lg, paddingHorizontal: 14, paddingVertical: 12, minHeight: 68, overflow: "hidden" },
   nnNow: { backgroundColor: colors.yellow + "16", borderColor: colors.yellow + "44" },
   nnNext: { backgroundColor: "rgba(255,255,255,0.04)", borderColor: colors.border },
