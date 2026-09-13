@@ -8,6 +8,7 @@ It mimics the tiny slice of the emergentintegrations API the app uses:
 """
 import os
 import logging
+import asyncio
 
 MODEL = "gemini-3-flash-preview"
 _client = None
@@ -55,9 +56,26 @@ class LlmChat:
             response_mime_type="application/json" if want_json else "text/plain",
             thinking_config=types.ThinkingConfig(thinking_budget=0),
         )
-        resp = await client.aio.models.generate_content(
-            model=MODEL,
-            contents=text,
-            config=cfg,
-        )
-        return (resp.text or "").strip()
+        # Transient hiccups (rate limits, brief network blips, upstream 5xx)
+        # are common with any live LLM call — retry a couple of times with a
+        # short backoff before giving up, instead of surfacing a 502 to the
+        # rider on the very first blip (this call sits on the hot path for
+        # live in-ride coaching cues, so a single retry meaningfully cuts
+        # down on avoidable failures without adding noticeable latency).
+        attempts = 3
+        last_exc: Exception | None = None
+        for attempt in range(attempts):
+            try:
+                resp = await asyncio.wait_for(
+                    client.aio.models.generate_content(model=MODEL, contents=text, config=cfg),
+                    timeout=12,
+                )
+                return (resp.text or "").strip()
+            except Exception as exc:  # noqa: BLE001
+                last_exc = exc
+                if attempt < attempts - 1:
+                    logging.getLogger("server").warning(
+                        "gemini_shim: attempt %d/%d failed (%s), retrying", attempt + 1, attempts, type(exc).__name__,
+                    )
+                    await asyncio.sleep(0.4 * (2 ** attempt))
+        raise last_exc
