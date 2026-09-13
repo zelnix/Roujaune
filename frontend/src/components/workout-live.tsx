@@ -7,7 +7,6 @@ import { colors, radius, spacing, textShadow } from "@/src/theme";
 import { versionLabel } from "./AppVersionTag";
 import { BUILD_STAMP } from "@/src/lib/build-stamp";
 
-const WORDMARK = require("../../assets/images/auth_wordmark.png");
 const LOGO_GLYPH = require("../../assets/images/auth_logo_glyph.png");
 
 type Tone = "good" | "warn" | "bad" | "neutral";
@@ -44,7 +43,6 @@ export function BrandCard({ dense, onPress }: { dense?: boolean; onPress?: () =>
       {...(onPress ? { onPress, accessibilityRole: "button", accessibilityLabel: "ROUJAUNE — go to home" } : {})}
     >
       <Image source={LOGO_GLYPH} style={dense ? brand.glyphDense : brand.glyph} contentFit="contain" />
-      <Image source={WORDMARK} style={dense ? brand.logoDense : brand.logo} contentFit="contain" />
       <Text style={[brand.version, dense && brand.versionDense]} numberOfLines={1}>{versionLabel()}</Text>
       {__DEV__ ? <Text style={[brand.stamp, dense && brand.stampDense]} numberOfLines={1}>Preview · {BUILD_STAMP}</Text> : null}
     </Wrap>
@@ -91,7 +89,7 @@ export function MetricCard({
   return (
     <View style={[m.card, half && m.cardHalf, dense && m.cardDense]} testID={`metric-${label.toLowerCase().replace(/\s+/g, "-")}`}>
       <View style={m.head}>
-        <Ionicons name={icon} size={dense ? 14 : 16} color={accent} />
+        <Ionicons name={icon} size={dense ? 18 : 20} color={accent} />
         {connected !== undefined ? (
           <ConnTag
             style={m.conn}
@@ -149,11 +147,11 @@ function SignalBars({ signal }: { signal: number | null }) {
   );
 }
 
-export function SensorHealthRow({ sensors, onSensorPress }: { sensors: SensorHealth[]; onSensorPress?: (id: string) => void }) {
+export function SensorHealthRow({ sensors, onSensorPress, bare }: { sensors: SensorHealth[]; onSensorPress?: (id: string) => void; bare?: boolean }) {
   if (!sensors.length) return null;
   const Chip: any = onSensorPress ? Pressable : View;
   return (
-    <View style={sh.strip} testID="sensor-health-row">
+    <View style={[sh.strip, bare && sh.stripBare]} testID="sensor-health-row">
       <Ionicons name="pulse" size={14} color={colors.yellow} style={{ marginRight: 2 }} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={sh.scroll}>
         {sensors.map((s) => {
@@ -228,24 +226,40 @@ export function ConnectionsPanel({ trainerOn, wearableOn, powerOn, hrOn, cadence
   );
 }
 
-// ---- Session card (Elapsed / Est. finish / Distance) ----------------------
-export function SessionCard({ elapsed, estFinish, riddenKm, totalKm }: { elapsed: string; estFinish: string; riddenKm: number; totalKm: number }) {
+// ---- Session card (Elapsed / Est. finish + current time / Devices) -------
+export function SessionCard({
+  elapsed, estFinish, currentTime, sensors, onSensorPress,
+}: {
+  elapsed: string; estFinish: string; currentTime: string;
+  sensors?: SensorHealth[]; onSensorPress?: () => void;
+}) {
   return (
     <View style={sc.panel} testID="session-card">
-      <View style={sc.header}><Ionicons name="stopwatch-outline" size={15} color={colors.yellow} /><Text style={sc.title}>SESSION</Text></View>
-      <View style={sc.stat}>
-        <Text style={sc.label}>ELAPSED</Text>
-        <Text style={sc.value} testID="session-elapsed">{elapsed}</Text>
-      </View>
-      <View style={sc.divider} />
-      <View style={sc.stat}>
-        <Text style={sc.label}>EST. FINISH</Text>
-        <Text style={sc.value} testID="session-estfinish">{estFinish}</Text>
-      </View>
-      <View style={sc.divider} />
-      <View style={sc.stat}>
-        <Text style={sc.label}>DISTANCE</Text>
-        <Text style={sc.value} testID="session-distance">{riddenKm.toFixed(1)}<Text style={sc.unit}> / {totalKm.toFixed(1)} km</Text></Text>
+      <View style={sc.header}><Ionicons name="stopwatch-outline" size={14} color={colors.yellow} /><Text style={sc.title}>SESSION</Text></View>
+      <View style={sc.row}>
+        <View style={sc.stat}>
+          <Text style={sc.label}>ELAPSED</Text>
+          <Text style={sc.value} testID="session-elapsed">{elapsed}</Text>
+        </View>
+        <View style={sc.divider} />
+        <View style={sc.stat}>
+          <Text style={sc.label}>EST. FINISH</Text>
+          <Text style={sc.value} testID="session-estfinish">{estFinish}</Text>
+        </View>
+        <View style={sc.divider} />
+        <View style={sc.stat}>
+          <Text style={sc.label}>CURRENT TIME</Text>
+          <Text style={sc.value} testID="session-currenttime">{currentTime}</Text>
+        </View>
+        {sensors && sensors.length > 0 ? (
+          <>
+            <View style={sc.divider} />
+            <View style={sc.devicesWrap}>
+              <Text style={sc.label}>DEVICES</Text>
+              <SensorHealthRow sensors={sensors} onSensorPress={onSensorPress ? () => onSensorPress() : undefined} bare />
+            </View>
+          </>
+        ) : null}
       </View>
     </View>
   );
@@ -411,6 +425,7 @@ export function StepTimeline({
               <View style={st.nnBody}>
                 <Text style={st.nnName} numberOfLines={1}>{cur.index + 1}. {cur.label}</Text>
                 <Text style={st.nnMeta} numberOfLines={1}>{cur.zoneLabel}{cur.watts > 0 ? ` · ${cur.watts} W` : ""}</Text>
+                {cur.desc ? <Text style={st.nnDesc} numberOfLines={1}>{cur.desc}</Text> : null}
               </View>
               {remaining ? (
                 <View style={st.nnCountdown}>
@@ -431,6 +446,7 @@ export function StepTimeline({
                   <View style={st.nnBody}>
                     <Text style={st.nnName} numberOfLines={1}>{nxt.index + 1}. {nxt.label}</Text>
                     <Text style={st.nnMeta} numberOfLines={1}>{nxt.duration}{nxt.watts > 0 ? ` · ${nxt.watts} W` : ""}</Text>
+                    {nxt.desc ? <Text style={st.nnDesc} numberOfLines={1}>{nxt.desc}</Text> : null}
                   </View>
                 </>
               ) : (
@@ -632,8 +648,6 @@ const brand = StyleSheet.create({
   cardDense: { minWidth: 92, paddingVertical: 8, gap: 4 },
   glyph: { width: 44, height: 44 },
   glyphDense: { width: 30, height: 30 },
-  logo: { width: "86%", height: 40 },
-  logoDense: { width: "88%", height: 24 },
   version: { color: colors.textFaint, fontSize: 10.5, fontWeight: "700", letterSpacing: 0.3, marginTop: 4 },
   versionDense: { fontSize: 8.5, marginTop: 2 },
   stamp: { color: colors.textFaint, fontSize: 9.5, fontWeight: "600", letterSpacing: 0.2, marginTop: 2, opacity: 0.8 },
@@ -651,32 +665,33 @@ const aj = StyleSheet.create({
 });
 
 const m = StyleSheet.create({
-  card: { ...card, flex: 1, paddingHorizontal: 16, paddingVertical: 14, minWidth: 150 },
-  cardHalf: { flex: 0, flexGrow: 1, flexBasis: "47%", minWidth: 140 },
-  cardDense: { paddingHorizontal: 12, paddingVertical: 8, minWidth: 108 },
+  card: { ...card, flex: 1, paddingHorizontal: 20, paddingVertical: 18, minWidth: 188 },
+  cardHalf: { flex: 0, flexGrow: 1, flexBasis: "47%", minWidth: 175 },
+  cardDense: { paddingHorizontal: 15, paddingVertical: 10, minWidth: 135 },
   head: { flexDirection: "row", alignItems: "center", gap: 7 },
   conn: { flexDirection: "row", alignItems: "center", gap: 4 },
   connDot: { width: 8, height: 8, borderRadius: 4, borderWidth: 1.5 },
   connText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.3, textTransform: "uppercase", maxWidth: 96 },
   batIcon: { marginLeft: 2, transform: [{ rotate: "90deg" }] },
-  label: { color: colors.textDim, fontSize: 13, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase", flex: 1 },
-  labelDense: { fontSize: 11.5, letterSpacing: 0.6 },
+  label: { color: colors.textDim, fontSize: 16, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase", flex: 1 },
+  labelDense: { fontSize: 14.5, letterSpacing: 0.6 },
   pill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, borderWidth: 1 },
   pillDense: { paddingHorizontal: 7, paddingVertical: 3 },
-  pillText: { fontSize: 12.5, fontWeight: "800", letterSpacing: 0.5 },
-  pillTextDense: { fontSize: 11.5 },
-  valueRow: { flexDirection: "row", alignItems: "flex-end", gap: 6, marginTop: 8 },
-  valueRowDense: { marginTop: 3, gap: 4 },
-  value: { fontSize: 40, fontWeight: "900", fontVariant: ["tabular-nums"], lineHeight: 44 },
-  valueDense: { fontSize: 25, lineHeight: 28 },
-  unit: { color: colors.textDim, fontSize: 14, fontWeight: "700", marginBottom: 7 },
-  unitDense: { fontSize: 11, marginBottom: 3 },
-  sub: { color: colors.textDim, fontSize: 14, fontWeight: "800", marginTop: 5, letterSpacing: 0.3 },
-  subDense: { fontSize: 12, marginTop: 3 },
+  pillText: { fontSize: 15.5, fontWeight: "800", letterSpacing: 0.5 },
+  pillTextDense: { fontSize: 14.5 },
+  valueRow: { flexDirection: "row", alignItems: "flex-end", gap: 7, marginTop: 10 },
+  valueRowDense: { marginTop: 4, gap: 5 },
+  value: { fontSize: 50, fontWeight: "900", fontVariant: ["tabular-nums"], lineHeight: 55 },
+  valueDense: { fontSize: 31, lineHeight: 35 },
+  unit: { color: colors.textDim, fontSize: 17.5, fontWeight: "700", marginBottom: 9 },
+  unitDense: { fontSize: 14, marginBottom: 4 },
+  sub: { color: colors.textDim, fontSize: 17.5, fontWeight: "800", marginTop: 6, letterSpacing: 0.3 },
+  subDense: { fontSize: 15, marginTop: 4 },
 });
 
 const sh = StyleSheet.create({
   strip: { flexDirection: "row", alignItems: "center", gap: 8, ...card, paddingVertical: 8, paddingHorizontal: 12 },
+  stripBare: { borderWidth: 0, backgroundColor: "transparent", paddingHorizontal: 0, paddingVertical: 0 },
   scroll: { flexDirection: "row", alignItems: "center", gap: 8, paddingRight: 4 },
   chip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: colors.borderSoft, borderRadius: radius.pill, paddingVertical: 5, paddingHorizontal: 10 },
   chipWeak: { borderColor: colors.red + "88", backgroundColor: colors.red + "18" },
@@ -706,23 +721,25 @@ const cn = StyleSheet.create({
 });
 
 const sc = StyleSheet.create({
-  panel: { ...card, padding: 16, gap: 2 },
-  header: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 10 },
-  title: { color: colors.white, fontSize: 12.5, fontWeight: "800", letterSpacing: 1 },
-  stat: { paddingVertical: 6 },
+  panel: { ...card, flex: 1, paddingHorizontal: 18, paddingVertical: 12, gap: 2, minWidth: 260 },
+  header: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 6 },
+  title: { color: colors.white, fontSize: 11.5, fontWeight: "800", letterSpacing: 1 },
+  row: { flexDirection: "row", alignItems: "stretch" },
+  stat: { paddingVertical: 2, paddingRight: 14, justifyContent: "center" },
   label: { color: colors.textFaint, fontSize: 10, fontWeight: "800", letterSpacing: 1, marginBottom: 3 },
-  value: { color: colors.white, fontSize: 26, fontWeight: "900", fontVariant: ["tabular-nums"], letterSpacing: 0.5 },
-  unit: { color: colors.textDim, fontSize: 14, fontWeight: "700" },
-  divider: { height: 1, backgroundColor: colors.borderSoft, marginVertical: 4 },
+  value: { color: colors.white, fontSize: 22, fontWeight: "900", fontVariant: ["tabular-nums"], letterSpacing: 0.5 },
+  unit: { color: colors.textDim, fontSize: 13, fontWeight: "700" },
+  divider: { width: 1, backgroundColor: colors.borderSoft, marginHorizontal: 14 },
+  devicesWrap: { flex: 1, minWidth: 0, justifyContent: "center", gap: 4 },
 });
 
 const cb = StyleSheet.create({
-  wrap: { flexDirection: "row", alignItems: "center", gap: 12, ...card, borderColor: colors.yellow + "3A", backgroundColor: colors.yellow + "10", paddingVertical: 11, paddingHorizontal: 14 },
-  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.08)" },
-  name: { color: colors.yellow, fontSize: 11.5, fontWeight: "800", letterSpacing: 0.5 },
-  msg: { color: colors.white, fontSize: 14, fontWeight: "600", lineHeight: 19, marginTop: 2 },
+  wrap: { flexDirection: "row", alignItems: "center", gap: 14, ...card, borderColor: colors.yellow + "3A", backgroundColor: colors.yellow + "10", paddingVertical: 14, paddingHorizontal: 16 },
+  avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: "rgba(255,255,255,0.08)" },
+  name: { color: colors.yellow, fontSize: 13, fontWeight: "800", letterSpacing: 0.5 },
+  msg: { color: colors.white, fontSize: 28, fontWeight: "600", lineHeight: 36, marginTop: 3 },
   pill: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2, marginLeft: 8 },
-  pillText: { color: "#180a0a", fontSize: 9.5, fontWeight: "900", letterSpacing: 0.5, textTransform: "uppercase" },
+  pillText: { color: "#180a0a", fontSize: 10.5, fontWeight: "900", letterSpacing: 0.5, textTransform: "uppercase" },
 });
 
 const ic = StyleSheet.create({
@@ -779,6 +796,7 @@ const st = StyleSheet.create({
   nnTagNextText: { color: colors.textDim, fontSize: 12.5, fontWeight: "900", letterSpacing: 1 },
   nnName: { color: colors.white, fontSize: 19, fontWeight: "800" },
   nnMeta: { color: colors.textDim, fontSize: 14.5, fontWeight: "700", marginTop: 3 },
+  nnDesc: { color: colors.textFaint, fontSize: 12.5, fontWeight: "600", marginTop: 2 },
   nnCountdown: { alignItems: "flex-end", marginLeft: 6, paddingLeft: 12, borderLeftWidth: 1, borderLeftColor: colors.yellow + "33" },
   nnCountValue: { color: colors.yellow, fontSize: 22, fontWeight: "900", fontVariant: ["tabular-nums"], letterSpacing: 0.5 },
   nnCountLabel: { color: colors.yellow, fontSize: 9, fontWeight: "800", letterSpacing: 1.5, marginTop: -1 },

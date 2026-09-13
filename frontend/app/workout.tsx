@@ -21,6 +21,7 @@ import { fetchZoneBias, ZoneBias } from "@/src/lib/targets";
 import { WORKOUT_TYPES } from "@/src/lib/workouts";
 import { VirtualRidePlayer } from "@/src/components/virtual-route/VirtualRidePlayer";
 import YouTubePlayer from "@/src/components/YouTubePlayer";
+import { FullscreenHud } from "@/src/components/FullscreenHud";
 import { StreamingSourceSheet } from "@/src/components/streaming/StreamingSourceSheet";
 import { VIRTUAL_ROUTES, getVRoute } from "@/src/lib/vroutes";
 import { vrouteIdForType, deriveVirtualRide } from "@/src/lib/workout-vroute";
@@ -32,7 +33,7 @@ import {
   SettingsPanel, MusicPanel, CastPanel, RouteMapCard,
 } from "@/src/components/workout";
 import {
-  MetricCard, SessionCard, CoachBanner, TerrainCard, BrandCard, StepTimeline, StepDetailModal, LiveControlBar, AdjustmentsStrip, SensorHealthRow, SensorHealth,
+  MetricCard, SessionCard, CoachBanner, TerrainCard, BrandCard, StepTimeline, StepDetailModal, LiveControlBar, AdjustmentsStrip, SensorHealth,
 } from "@/src/components/workout-live";
 import { useWorkoutAudio } from "@/src/hooks/useWorkoutAudio";
 import { BleSensorsPanel } from "@/src/components/BleSensorsPanel";
@@ -135,11 +136,9 @@ export default function LiveWorkout() {
   const segments = React.useMemo(() => [...baseSegments, ...extraSegments], [baseSegments, extraSegments]);
   const compact = height < 620;
   const narrow = height >= 620 && winW < 1000;   // small-wide screens (e.g. Z Fold): 2×2 metric grid
-  const leftW = compact ? 168 : 210;
   const rightW = compact ? 194 : 238;
 
   const [centerW, setCenterW] = React.useState(560);
-  const [videoSlotH, setVideoSlotH] = React.useState(0);
   const [paused, setPaused] = React.useState(false);
   const [expanded, setExpanded] = React.useState(false);
   const [vRouteId, setVRouteId] = React.useState(() => r0?.vRouteId || vrouteIdForType(selected?.typeId));
@@ -940,15 +939,12 @@ export default function LiveWorkout() {
     }
   };
 
-  // Tablet/TV (landscape): the layout fills the screen with a responsive
-  // flexbox column — the route video expands to take the remaining vertical
-  // space so nothing is stretched or squashed on any display size. Phones keep
-  // a scrolling layout with a fixed 16:9 video sized from the column width.
+  // Tablet/TV (landscape) and phone both get the same strict 16:9 video, sized
+  // from the measured column width — no stretching to fill leftover screen
+  // height, so the frame always looks like a real video, not a letterbox.
   const tablet = !compact;
-  const phoneVideoH = Math.round((centerW * 9) / 16);
-  // On tablets the video fills its slot; use the measured slot height for the
-  // virtual-route canvas so it matches exactly. Falls back to 16:9 before layout.
-  const videoRenderH = tablet ? (videoSlotH || phoneVideoH) : phoneVideoH;
+  const videoW = Math.max(220, Math.round(centerW * 0.5));
+  const videoRenderH = Math.round((videoW * 9) / 16);
 
   // ---- Derived values for the redesigned live dashboard ----
   const powerVal = Math.round(telemetry.power);
@@ -960,6 +956,8 @@ export default function LiveWorkout() {
   const remainingSec = Math.max(0, totalSec - telemetry.elapsed);
   const finishAt = new Date(Date.now() + remainingSec * 1000);
   const estFinish = `${String(finishAt.getHours()).padStart(2, "0")}:${String(finishAt.getMinutes()).padStart(2, "0")}`;
+  const nowClock = new Date();
+  const currentTimeLabel = `${String(nowClock.getHours()).padStart(2, "0")}:${String(nowClock.getMinutes()).padStart(2, "0")}`;
   // Time-based ride: no live sensors connected → show duration metrics (elapsed,
   // interval remaining, calories, workout step) instead of blank telemetry cards.
   const timeBased = !trainerOn && !wearableOn;
@@ -990,47 +988,32 @@ export default function LiveWorkout() {
 
   const body = (
     <>
-      <View style={[styles.mainRow, tablet && styles.flex1]}>
-        <View style={[styles.leftCenter, tablet && styles.flex1]}>
+      <View style={styles.mainRow}>
+        <View style={styles.leftCenter}>
           <View style={[styles.metricRow, narrow && styles.metricRowWrap]}>
             {!narrow && <BrandCard dense={tablet} onPress={() => router.replace("/")} />}
-            {timeBased ? (
-              <>
-                <MetricCard icon="stopwatch-outline" label="Elapsed" value={elapsedShort} sub={`TOTAL SESSION ${mmss(totalSec)}`} accent={colors.yellow} half={narrow} dense={tablet} />
-                <MetricCard icon="timer-outline" label="Interval" value={timeLeftLabel ?? "—"} status="REMAINING" statusTone="neutral" sub="CURRENT BLOCK" accent="#5AC8FA" half={narrow} dense={tablet} />
-                <MetricCard icon="flame" label="Calories" value={String(kcal)} unit="kcal" sub="ESTIMATED" accent={colors.red} half={narrow} dense={tablet} />
-                <MetricCard icon="flag" label="Workout Step" value={`Step ${(activeSeg?.index ?? 0) + 1}`} unit={`of ${segments.length}`} sub="CURRENT STEP" accent={colors.green} half={narrow} dense={tablet} />
-              </>
-            ) : (
-              <>
-                <MetricCard icon="heart" label="Heart Rate" value={wearableOn ? String(telemetry.hr) : "—"} unit="bpm" status={wearableOn ? `ZONE ${hrZone(telemetry.hr)}` : undefined} statusTone="neutral" accent={colors.red} connected={wearableOn} deviceName={hrName} battery={hrBattery} signal={hrSignal} onDevicePress={() => setShowBle(true)} half={narrow} dense={tablet} />
-                <MetricCard icon="speedometer" label="Speed" value={trainerOn ? String(Math.round(telemetry.speed)) : "—"} unit="km/h" accent="#5AC8FA" connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} half={narrow} dense={tablet} />
-                <MetricCard icon="sync" label="Cadence" value={trainerOn ? String(telemetry.cadence) : "—"} unit="rpm" status={cadStatus} statusTone={cadInRange ? "good" : "warn"} sub={`TARGET ${CAD_LOW}–${CAD_HIGH}`} accent={colors.green} connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} half={narrow} dense={tablet} />
-                <MetricCard icon="flash" label="Power" value={trainerOn ? String(powerVal) : "—"} unit="W" status={powerStatus} statusTone={powerTone} sub={`TARGET ${Math.max(0, targetW - 8)}–${targetW + 8} W`} accent={colors.yellow} connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} half={narrow} dense={tablet} />
-              </>
-            )}
+            <SessionCard
+              elapsed={fmt(telemetry.elapsed)}
+              estFinish={estFinish}
+              currentTime={currentTimeLabel}
+              sensors={sensorHealth}
+              onSensorPress={() => setShowBle(true)}
+            />
           </View>
 
-          <View style={[styles.innerRow, tablet && styles.flex1]}>
-            <View style={[styles.leftCol, { width: leftW }]}>
-              <SessionCard elapsed={fmt(telemetry.elapsed)} estFinish={estFinish} riddenKm={riddenKm} totalKm={routeInfo.km} />
-            </View>
-            <View style={styles.centerCol} onLayout={onCenterLayout}>
-              <CoachBanner name={persona.name} message={liveCue} avatar={persona.image} struggle={struggle && struggle.active ? { severity: struggle.severity, safety: struggle.safety, label: REASON_LABEL[(struggle.primary ?? struggle.reasons[0]) as keyof typeof REASON_LABEL] ?? "digging deep" } : null} />
-              <View
-                style={[styles.videoSlot, tablet && styles.flex1]}
-                onLayout={tablet ? (e) => setVideoSlotH(Math.round(e.nativeEvent.layout.height)) : undefined}
-              >
+          <View style={styles.centerCol} onLayout={onCenterLayout}>
+            <View style={styles.videoWrap}>
+              <View style={[styles.videoSlot, { height: videoRenderH, width: videoW }]}>
                 {expanded ? (
                   <Pressable style={styles.fsMinimised} onPress={() => setExpanded(false)} testID="vr-restore-inline">
                     <Ionicons name="contract-outline" size={22} color={colors.textDim} />
                     <Text style={styles.fsMinimisedText}>Virtual ride is fullscreen — tap to return</Text>
                   </Pressable>
                 ) : customVideoId ? (
-                  <View style={tablet ? styles.flex1 : { height: videoRenderH }}>
+                  <View style={{ height: videoRenderH }}>
                     <YouTubePlayer
                       videoId={customVideoId}
-                      width={centerW}
+                      width={videoW}
                       height={videoRenderH}
                       playing={!paused}
                     />
@@ -1067,11 +1050,32 @@ export default function LiveWorkout() {
                     sourceLabel="Watch"
                     sourceIcon="tv-outline"
                     routeBadge={routeBadge}
-                    style={tablet ? styles.flex1 : { height: videoRenderH }}
+                    style={{ height: videoRenderH, width: videoW }}
                   />
                 )}
               </View>
             </View>
+
+            <View style={[styles.metricRow, narrow && styles.metricRowWrap]}>
+              {timeBased ? (
+                <>
+                  <MetricCard icon="stopwatch-outline" label="Elapsed" value={elapsedShort} sub={`TOTAL SESSION ${mmss(totalSec)}`} accent={colors.yellow} half={narrow} dense={tablet} />
+                  <MetricCard icon="timer-outline" label="Interval" value={timeLeftLabel ?? "—"} status="REMAINING" statusTone="neutral" sub="CURRENT BLOCK" accent="#5AC8FA" half={narrow} dense={tablet} />
+                  <MetricCard icon="flame" label="Calories" value={String(kcal)} unit="kcal" sub="ESTIMATED" accent={colors.red} half={narrow} dense={tablet} />
+                  <MetricCard icon="flag" label="Workout Step" value={`Step ${(activeSeg?.index ?? 0) + 1}`} unit={`of ${segments.length}`} sub="CURRENT STEP" accent={colors.green} half={narrow} dense={tablet} />
+                </>
+              ) : (
+                <>
+                  <MetricCard icon="heart" label="Heart Rate" value={wearableOn ? String(telemetry.hr) : "—"} unit="bpm" status={wearableOn ? `ZONE ${hrZone(telemetry.hr)}` : undefined} statusTone="neutral" accent={colors.red} connected={wearableOn} deviceName={hrName} battery={hrBattery} signal={hrSignal} onDevicePress={() => setShowBle(true)} half={narrow} dense={tablet} />
+                  <MetricCard icon="speedometer" label="Speed" value={trainerOn ? String(Math.round(telemetry.speed)) : "—"} unit="km/h" accent="#5AC8FA" connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} half={narrow} dense={tablet} />
+                  <MetricCard icon="sync" label="Cadence" value={trainerOn ? String(telemetry.cadence) : "—"} unit="rpm" status={cadStatus} statusTone={cadInRange ? "good" : "warn"} sub={`TARGET ${CAD_LOW}–${CAD_HIGH}`} accent={colors.green} connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} half={narrow} dense={tablet} />
+                  <MetricCard icon="flash" label="Power" value={trainerOn ? String(powerVal) : "—"} unit="W" status={powerStatus} statusTone={powerTone} sub={`TARGET ${Math.max(0, targetW - 8)}–${targetW + 8} W`} accent={colors.yellow} connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} half={narrow} dense={tablet} />
+                </>
+              )}
+              <MetricCard icon="navigate" label="Distance" value={riddenKm.toFixed(1)} unit="km" sub={`OF ${routeInfo.km.toFixed(1)} KM`} accent="#5AC8FA" half={narrow} dense={tablet} />
+            </View>
+
+            <CoachBanner name={persona.name} message={liveCue} avatar={persona.image} struggle={struggle && struggle.active ? { severity: struggle.severity, safety: struggle.safety, label: REASON_LABEL[(struggle.primary ?? struggle.reasons[0]) as keyof typeof REASON_LABEL] ?? "digging deep" } : null} />
           </View>
         </View>
 
@@ -1080,8 +1084,6 @@ export default function LiveWorkout() {
           <RouteMapCard title={routeInfo.title} progress={progress} riddenKm={riddenKm} totalKm={routeInfo.km} timeBased={!trainerOn} fill />
         </View>
       </View>
-
-      <SensorHealthRow sensors={sensorHealth} onSensorPress={() => setShowBle(true)} />
 
       <StepTimeline steps={stepList} activeIndex={activeSeg?.index ?? -1} remaining={timeLeftLabel} stepProgress={activeSeg ? activeSeg.elapsedInSeg / Math.max(1, activeSeg.segment.durationSec) : 0} onStepPress={(i) => setStepDetail(i)} />
 
@@ -1163,10 +1165,23 @@ export default function LiveWorkout() {
           {customVideoId ? (
             <>
               <YouTubePlayer videoId={customVideoId} width={winW} height={height} playing={!paused} />
-              <Pressable style={styles.fsExit} onPress={() => setExpanded(false)} testID="vr-exit-fullscreen"
-                accessibilityRole="button" accessibilityLabel="Exit fullscreen">
-                <Ionicons name="contract-outline" size={22} color={colors.white} />
-              </Pressable>
+              <FullscreenHud
+                metrics={{ power: telemetry.power, cadence: telemetry.cadence, speed: telemetry.speed, hr: telemetry.hr, hrOn: wearableOn, elapsed: telemetry.elapsed, riddenKm }}
+                stages={workoutStages}
+                cue={liveCue}
+                stepLabel={activeSeg?.segment.label}
+                stepTimeLeft={timeLeftLabel ?? undefined}
+                paused={paused}
+                onPauseToggle={onPauseToggle}
+                onExitFullscreen={() => setExpanded(false)}
+                exitLabel="Exit"
+                exitIcon="contract-outline"
+                ergOn={ergMode}
+                onErgToggle={() => setErgMode((m) => { const next = !m; showToast(next ? "ERG mode ON" : "ERG mode OFF"); logControl(next ? "ERG mode ON" : "ERG mode OFF"); return next; })}
+                onReconnect={() => setShowBle(true)}
+                onPreset={(w) => { sendTarget(w); showToast(`Target ${w} W`); logControl(`Target → ${w} W`); }}
+                compact={compact}
+              />
             </>
           ) : (
             <VirtualRidePlayer
@@ -1331,12 +1346,12 @@ const styles = StyleSheet.create({
   content: { padding: spacing.md, gap: spacing.md },
   tabletContent: { flexGrow: 1, padding: spacing.md, gap: spacing.md },
   flex1: { flex: 1 },
+  videoWrap: { alignItems: "center" },
   videoSlot: { minHeight: 150 },
   ytControls: { position: "absolute", top: 8, right: 8, flexDirection: "row", alignItems: "center", gap: 7 },
   ytSourceBtn: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(0,0,0,0.6)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 6 },
   ytSourceText: { color: colors.white, fontSize: 11.5, fontWeight: "800" },
   ytIconBtn: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)" },
-  fsExit: { position: "absolute", top: 20, right: 20, width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.55)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", zIndex: 51 },
   immersive: { ...StyleSheet.absoluteFillObject, backgroundColor: "#000", zIndex: 50, alignItems: "center", justifyContent: "center" },
   lockOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.82)", alignItems: "center", justifyContent: "center", gap: 14, zIndex: 60 },
   lockTitle: { color: colors.white, fontSize: 18, fontWeight: "800" },
