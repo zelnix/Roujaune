@@ -12,8 +12,6 @@ import { RiderAppearanceConfiguration, DEFAULT_APPEARANCE } from "@/src/lib/ride
 const WORDMARK = require("../../../assets/images/auth_wordmark.png");
 const LOGO_GLYPH = require("../../../assets/images/auth_logo_glyph.png");
 
-const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-
 const PRESETS = [
   { label: "Recovery", w: 120, icon: "leaf-outline" as const },
   { label: "Endurance", w: 185, icon: "bicycle-outline" as const },
@@ -84,7 +82,7 @@ export type VirtualRidePlayerProps = {
 export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
   const {
     mode, vroute, routeState, appearance = DEFAULT_APPEARANCE, metrics, paused, simulation,
-    hrOn, load = 100, reducedMotion, onToggleReducedMotion, cue, stepLabel, stepTimeLeft, compact, style, routeBadge, stages,
+    hrOn, reducedMotion, onToggleReducedMotion, cue, stepLabel, stepTimeLeft, compact, style, routeBadge, stages,
     onFullscreen, onExitFullscreen, onPauseToggle, onOpenRoutes, onOpenSource, sourceLabel, sourceIcon, onPreset, ergOn, onErgToggle, onReconnect,
     exitLabel = "Exit", exitIcon = "contract", onSensors, sensorsOn, onEmergency, connLabel, connTone,
   } = props;
@@ -92,7 +90,8 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
   const rider = riderVisualFor(appearance.riderType);
   const { width } = useWindowDimensions();
   const smallTablet = width < 1000 || !!compact;
-  const railW = smallTablet ? 160 : 208;
+  const railW = smallTablet ? 200 : 260;
+  const stagesW = smallTablet ? 190 : 240;
   const glyphSize = smallTablet ? 30 : 40;
   const wordW = railW - 24 - glyphSize - 10;
   // Responsive bottom control bar — scales down on small screens so the row
@@ -116,8 +115,8 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
   const roundTxtDyn = { fontSize: RB_TXT };
   // Everything scales down on small tablets — small fonts/graphics are the
   // accepted trade-off for a small screen (per product direction).
-  const RAIL_VAL = smallTablet ? 15 : 18;
-  const RAIL_ICON = smallTablet ? 14 : 16;
+  const RAIL_VAL = smallTablet ? 20 : 24;
+  const RAIL_ICON = smallTablet ? 18 : 21;
   const TR_ICON = smallTablet ? 42 : 52;
   const TR_GLYPH = smallTablet ? 18 : 22;
   const scene: SceneTelemetry = {
@@ -181,15 +180,17 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
   }
 
   // ---- Fullscreen: full Virtual Ride HUD ----
+  // Same 6 metrics, same left-to-right order, as the main Live Workout
+  // dashboard's telemetry row (Heart Rate → Speed → Cadence → Power →
+  // Gradient → Distance) — just laid out top-to-bottom here instead, so the
+  // numbers a rider sees never change depending on which screen they're on.
   const cells = [
-    { label: "POWER", value: `${Math.round(metrics.power)}`, unit: "W", icon: "flash" as const, tone: colors.yellow },
-    { label: "CADENCE", value: `${Math.round(metrics.cadence)}`, unit: "rpm", icon: "sync" as const, tone: colors.green },
-    { label: "SPEED", value: `${Math.round(metrics.speed)}`, unit: "km/h", icon: "speedometer" as const, tone: "#5AC8FA" },
     { label: "HEART RATE", value: hrOn ? `${Math.round(metrics.hr)}` : "—", unit: "bpm", icon: "heart" as const, tone: colors.red },
+    { label: "SPEED", value: `${Math.round(metrics.speed)}`, unit: "km/h", icon: "speedometer" as const, tone: "#5AC8FA" },
+    { label: "CADENCE", value: `${Math.round(metrics.cadence)}`, unit: "rpm", icon: "sync" as const, tone: colors.green },
+    { label: "POWER", value: `${Math.round(metrics.power)}`, unit: "W", icon: "flash" as const, tone: colors.yellow },
     { label: "GRADIENT", value: `${routeState.gradient}`, unit: "%", icon: "trending-up" as const, tone: gradeTone },
-    { label: "LOAD", value: `${load}`, unit: "%", icon: "barbell" as const, tone: load >= 120 ? colors.red : load >= 105 ? colors.yellow : colors.green },
     { label: "DISTANCE", value: `${metrics.riddenKm.toFixed(1)}`, unit: "km", icon: "navigate" as const, tone: "#5AC8FA" },
-    { label: "ELAPSED", value: mmss(metrics.elapsed), unit: "", icon: "time-outline" as const, tone: colors.white },
   ];
 
   return (
@@ -218,7 +219,7 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
         <View style={st.railMetrics}>
           {cells.map((c) => (
             <View key={c.label} style={st.railRow}>
-              <Ionicons name={c.icon} size={RAIL_ICON} color={c.tone} style={{ width: 20, textAlign: "center" }} />
+              <Ionicons name={c.icon} size={RAIL_ICON} color={c.tone} style={{ width: 24, textAlign: "center" }} />
               <View style={{ flex: 1 }}>
                 <Text style={[st.railValue, { fontSize: RAIL_VAL }]} numberOfLines={1}>{c.value}<Text style={st.railUnit}> {c.unit}</Text></Text>
                 <Text style={st.railLabel}>{c.label}</Text>
@@ -226,29 +227,37 @@ export function VirtualRidePlayer(props: VirtualRidePlayerProps) {
             </View>
           ))}
         </View>
-
-        {!!stages && stages.length > 0 && (
-          <View style={st.stages}>
-            <Text style={st.stagesLabel}>STAGES</Text>
-            {stages.map((sg, i) => {
-              const tone = sg.state === "active" ? colors.yellow : sg.state === "done" ? colors.green : colors.textFaint;
-              const icon = sg.state === "done" ? "checkmark-circle" : sg.state === "active" ? "radio-button-on" : "ellipse-outline";
-              return (
-                <View key={`${sg.label}-${i}`} style={[st.stageRow, sg.state === "active" && st.stageActive]}>
-                  <Ionicons name={icon as any} size={14} color={tone} style={{ width: 18, textAlign: "center" }} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[st.stageName, sg.state === "active" && { color: colors.white }, sg.state === "upcoming" && { color: colors.textDim }]} numberOfLines={1}>{sg.label}</Text>
-                    {!!sg.sub && <Text style={st.stageSub} numberOfLines={1}>{sg.sub}</Text>}
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        )}
       </ScrollView>
 
-      {/* Top-right: connection, coaching cue, interval, camera/motion toggle */}
-      <View style={[st.fsTopRight, { pointerEvents: "box-none" }]}>
+      {/* Stages / intervals get their own panel on the right — bigger and
+          decluttered from the live-metrics rail on the left. */}
+      {!!stages && stages.length > 0 && (
+        <ScrollView
+          style={[st.stagesPanel, { width: stagesW, pointerEvents: "box-none" }]}
+          contentContainerStyle={st.stagesPanelContent}
+          showsVerticalScrollIndicator={false}
+          testID="vr-full-stages"
+        >
+          <Text style={st.stagesLabel}>STAGES</Text>
+          {stages.map((sg, i) => {
+            const tone = sg.state === "active" ? colors.yellow : sg.state === "done" ? colors.green : colors.textFaint;
+            const icon = sg.state === "done" ? "checkmark-circle" : sg.state === "active" ? "radio-button-on" : "ellipse-outline";
+            return (
+              <View key={`${sg.label}-${i}`} style={[st.stageRow, sg.state === "active" && st.stageActive]}>
+                <Ionicons name={icon as any} size={18} color={tone} style={{ width: 22, textAlign: "center" }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[st.stageName, sg.state === "active" && { color: colors.white }, sg.state === "upcoming" && { color: colors.textDim }]} numberOfLines={1}>{sg.label}</Text>
+                  {!!sg.sub && <Text style={st.stageSub} numberOfLines={1}>{sg.sub}</Text>}
+                </View>
+              </View>
+            );
+          })}
+        </ScrollView>
+      )}
+
+      {/* Top: connection, coaching cue, interval, camera/motion toggle — sits
+          in the gap between the metrics rail and the stages panel. */}
+      <View style={[st.fsTopRight, { left: railW + 12, right: (!!stages && stages.length > 0 ? stagesW : 0) + 12, pointerEvents: "box-none" }]}>
         {!!connLabel && (
           <View style={[st.connPill, { borderColor: (connTone ?? colors.textDim) + "88", backgroundColor: (connTone ?? colors.textDim) + "22" }]}>
             <View style={[st.connDot, { backgroundColor: connTone ?? colors.textDim }]} />
@@ -340,24 +349,28 @@ const st = StyleSheet.create({
 
   // Vertical HUD rail (left)
   rail: { position: "absolute", left: 0, top: 0, bottom: 74, backgroundColor: "rgba(8,9,12,0.62)", borderRightWidth: 1, borderRightColor: colors.border },
-  railContent: { padding: 12, gap: 8 },
+  railContent: { padding: 14, gap: 10 },
   brand: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
   railHead: { flexDirection: "row", alignItems: "center", gap: 5 },
   railRoute: { color: colors.textDim, fontSize: 11, fontWeight: "700", flex: 1 },
   railKm: { color: colors.textFaint, fontSize: 10, fontWeight: "700" },
   progressTrack: { height: 5, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.14)", overflow: "hidden" },
   progressFill: { height: "100%", backgroundColor: colors.yellow, borderRadius: 3 },
-  railMetrics: { marginTop: 4, gap: 2 },
-  railRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 5, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)" } as any,
+  railMetrics: { marginTop: 6, gap: 4 },
+  railRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)" } as any,
   railValue: { color: colors.white, fontSize: 18, fontWeight: "900", fontVariant: ["tabular-nums"] },
-  railUnit: { color: colors.textFaint, fontSize: 10, fontWeight: "700" },
-  railLabel: { color: colors.textFaint, fontSize: 8.5, fontWeight: "800", letterSpacing: 0.8 },
+  railUnit: { color: colors.textFaint, fontSize: 11.5, fontWeight: "700" },
+  railLabel: { color: colors.textFaint, fontSize: 10, fontWeight: "800", letterSpacing: 0.8 },
+  // Stages / intervals — separate panel on the right, bigger text than the
+  // old inline-in-the-rail version so the upcoming block is easy to scan.
+  stagesPanel: { position: "absolute", right: 0, top: 0, bottom: 74, backgroundColor: "rgba(8,9,12,0.62)", borderLeftWidth: 1, borderLeftColor: colors.border },
+  stagesPanelContent: { padding: 14, gap: 4 },
   stages: { marginTop: 8, gap: 2, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.08)", paddingTop: 6 },
-  stagesLabel: { color: colors.textFaint, fontSize: 9, fontWeight: "800", letterSpacing: 1, marginBottom: 2 },
-  stageRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 4, borderRadius: 8, paddingHorizontal: 4 },
+  stagesLabel: { color: colors.textFaint, fontSize: 11, fontWeight: "800", letterSpacing: 1.2, marginBottom: 6 },
+  stageRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8, borderRadius: 10, paddingHorizontal: 6 },
   stageActive: { backgroundColor: "rgba(240,192,64,0.14)" },
-  stageName: { color: colors.textDim, fontSize: 12, fontWeight: "700" },
-  stageSub: { color: colors.textFaint, fontSize: 9.5, fontWeight: "600" },
+  stageName: { color: colors.textDim, fontSize: 15, fontWeight: "700" },
+  stageSub: { color: colors.textFaint, fontSize: 12, fontWeight: "600", marginTop: 1 },
   connPill: { flexDirection: "row", alignItems: "center", gap: 6, height: 40, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 12 },
   connDot: { width: 8, height: 8, borderRadius: 4 },
   connText: { color: colors.white, fontSize: 12, fontWeight: "800" },

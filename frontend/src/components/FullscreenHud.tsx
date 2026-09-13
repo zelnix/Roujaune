@@ -46,7 +46,8 @@ export function FullscreenHud({
 }) {
   const { width } = useWindowDimensions();
   const smallTablet = width < 1000 || !!compact;
-  const railW = smallTablet ? 160 : 208;
+  const railW = smallTablet ? 200 : 260;
+  const stagesW = smallTablet ? 190 : 240;
   const glyphSize = smallTablet ? 30 : 40;
   const wordW = railW - 24 - glyphSize - 10;
   const compactBar = width < 1180 || !!compact;
@@ -66,21 +67,25 @@ export function FullscreenHud({
   const EX_GAP = tinyBar ? 8 : compactBar ? 9 : 10;
   const roundDyn = { minWidth: RB_MINW, height: RB_H, paddingHorizontal: RB_PAD };
   const roundTxtDyn = { fontSize: RB_TXT };
-  const RAIL_VAL = smallTablet ? 15 : 18;
-  const RAIL_ICON = smallTablet ? 14 : 16;
+  const RAIL_VAL = smallTablet ? 20 : 24;
+  const RAIL_ICON = smallTablet ? 18 : 21;
 
+  // Same 5 metrics (no route Gradient here — a custom video has no scenic
+  // elevation profile), same left-to-right order, as the main Live Workout
+  // dashboard's telemetry row: Heart Rate → Speed → Cadence → Power →
+  // Distance. Elapsed is kept as a bonus final entry.
   const cells = [
-    { label: "POWER", value: `${Math.round(metrics.power)}`, unit: "W", icon: "flash" as const, tone: colors.yellow },
-    { label: "CADENCE", value: `${Math.round(metrics.cadence)}`, unit: "rpm", icon: "sync" as const, tone: colors.green },
-    { label: "SPEED", value: `${Math.round(metrics.speed)}`, unit: "km/h", icon: "speedometer" as const, tone: "#5AC8FA" },
     { label: "HEART RATE", value: metrics.hrOn ? `${Math.round(metrics.hr)}` : "—", unit: "bpm", icon: "heart" as const, tone: colors.red },
+    { label: "SPEED", value: `${Math.round(metrics.speed)}`, unit: "km/h", icon: "speedometer" as const, tone: "#5AC8FA" },
+    { label: "CADENCE", value: `${Math.round(metrics.cadence)}`, unit: "rpm", icon: "sync" as const, tone: colors.green },
+    { label: "POWER", value: `${Math.round(metrics.power)}`, unit: "W", icon: "flash" as const, tone: colors.yellow },
     { label: "DISTANCE", value: `${metrics.riddenKm.toFixed(1)}`, unit: "km", icon: "navigate" as const, tone: "#5AC8FA" },
     { label: "ELAPSED", value: `${Math.floor(metrics.elapsed / 60)}:${String(Math.floor(metrics.elapsed % 60)).padStart(2, "0")}`, unit: "", icon: "time-outline" as const, tone: colors.white },
   ];
 
   return (
     <View style={[fh.wrap, { pointerEvents: "box-none" }]} testID="fullscreen-hud">
-      {/* Vertical HUD rail down the left — brand, live metrics, stages */}
+      {/* Vertical HUD rail down the left — brand + live metrics */}
       <ScrollView
         style={[fh.rail, { width: railW, pointerEvents: "box-none" }]}
         contentContainerStyle={fh.railContent}
@@ -94,7 +99,7 @@ export function FullscreenHud({
         <View style={fh.railMetrics}>
           {cells.map((c) => (
             <View key={c.label} style={fh.railRow}>
-              <Ionicons name={c.icon} size={RAIL_ICON} color={c.tone} style={{ width: 20, textAlign: "center" }} />
+              <Ionicons name={c.icon} size={RAIL_ICON} color={c.tone} style={{ width: 24, textAlign: "center" }} />
               <View style={{ flex: 1 }}>
                 <Text style={[fh.railValue, { fontSize: RAIL_VAL }]} numberOfLines={1}>{c.value}<Text style={fh.railUnit}> {c.unit}</Text></Text>
                 <Text style={fh.railLabel}>{c.label}</Text>
@@ -102,29 +107,35 @@ export function FullscreenHud({
             </View>
           ))}
         </View>
-
-        {!!stages && stages.length > 0 && (
-          <View style={fh.stages}>
-            <Text style={fh.stagesLabel}>STAGES</Text>
-            {stages.map((sg, i) => {
-              const tone = sg.state === "active" ? colors.yellow : sg.state === "done" ? colors.green : colors.textFaint;
-              const icon = sg.state === "done" ? "checkmark-circle" : sg.state === "active" ? "radio-button-on" : "ellipse-outline";
-              return (
-                <View key={`${sg.label}-${i}`} style={[fh.stageRow, sg.state === "active" && fh.stageActive]}>
-                  <Ionicons name={icon as any} size={14} color={tone} style={{ width: 18, textAlign: "center" }} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[fh.stageName, sg.state === "active" && { color: colors.white }, sg.state === "upcoming" && { color: colors.textDim }]} numberOfLines={1}>{sg.label}</Text>
-                    {!!sg.sub && <Text style={fh.stageSub} numberOfLines={1}>{sg.sub}</Text>}
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        )}
       </ScrollView>
 
-      {/* Top-right: coaching cue + current interval */}
-      <View style={[fh.topRight, { pointerEvents: "box-none" }]}>
+      {/* Stages / intervals get their own panel on the right */}
+      {!!stages && stages.length > 0 && (
+        <ScrollView
+          style={[fh.stagesPanel, { width: stagesW, pointerEvents: "box-none" }]}
+          contentContainerStyle={fh.stagesPanelContent}
+          showsVerticalScrollIndicator={false}
+          testID="fullscreen-hud-stages"
+        >
+          <Text style={fh.stagesLabel}>STAGES</Text>
+          {stages.map((sg, i) => {
+            const tone = sg.state === "active" ? colors.yellow : sg.state === "done" ? colors.green : colors.textFaint;
+            const icon = sg.state === "done" ? "checkmark-circle" : sg.state === "active" ? "radio-button-on" : "ellipse-outline";
+            return (
+              <View key={`${sg.label}-${i}`} style={[fh.stageRow, sg.state === "active" && fh.stageActive]}>
+                <Ionicons name={icon as any} size={18} color={tone} style={{ width: 22, textAlign: "center" }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[fh.stageName, sg.state === "active" && { color: colors.white }, sg.state === "upcoming" && { color: colors.textDim }]} numberOfLines={1}>{sg.label}</Text>
+                  {!!sg.sub && <Text style={fh.stageSub} numberOfLines={1}>{sg.sub}</Text>}
+                </View>
+              </View>
+            );
+          })}
+        </ScrollView>
+      )}
+
+      {/* Top: coaching cue + current interval — sits between the rail and the stages panel */}
+      <View style={[fh.topRight, { left: railW + 12, right: (!!stages && stages.length > 0 ? stagesW : 0) + 12, pointerEvents: "box-none" }]}>
         {(stepLabel || stepTimeLeft) && (
           <View style={fh.interval}>
             <Ionicons name="flag" size={13} color={colors.yellow} />
@@ -179,21 +190,22 @@ export function FullscreenHud({
 const fh = StyleSheet.create({
   wrap: { ...StyleSheet.absoluteFillObject },
   rail: { position: "absolute", left: 0, top: 0, bottom: 74, backgroundColor: "rgba(8,9,12,0.62)", borderRightWidth: 1, borderRightColor: colors.border },
-  railContent: { padding: 12, gap: 8 },
+  railContent: { padding: 14, gap: 10 },
   brand: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
-  railMetrics: { marginTop: 4, gap: 2 },
-  railRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 5, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)" } as any,
+  railMetrics: { marginTop: 6, gap: 4 },
+  railRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)" } as any,
   railValue: { color: colors.white, fontSize: 18, fontWeight: "900", fontVariant: ["tabular-nums"] },
-  railUnit: { color: colors.textFaint, fontSize: 10, fontWeight: "700" },
-  railLabel: { color: colors.textFaint, fontSize: 8.5, fontWeight: "800", letterSpacing: 0.8 },
-  stages: { marginTop: 8, gap: 2, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.08)", paddingTop: 6 },
-  stagesLabel: { color: colors.textFaint, fontSize: 9, fontWeight: "800", letterSpacing: 1, marginBottom: 2 },
-  stageRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 4, borderRadius: 8, paddingHorizontal: 4 },
+  railUnit: { color: colors.textFaint, fontSize: 11.5, fontWeight: "700" },
+  railLabel: { color: colors.textFaint, fontSize: 10, fontWeight: "800", letterSpacing: 0.8 },
+  stagesPanel: { position: "absolute", right: 0, top: 0, bottom: 74, backgroundColor: "rgba(8,9,12,0.62)", borderLeftWidth: 1, borderLeftColor: colors.border },
+  stagesPanelContent: { padding: 14, gap: 4 },
+  stagesLabel: { color: colors.textFaint, fontSize: 11, fontWeight: "800", letterSpacing: 1.2, marginBottom: 6 },
+  stageRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8, borderRadius: 10, paddingHorizontal: 6 },
   stageActive: { backgroundColor: "rgba(240,192,64,0.14)" },
-  stageName: { color: colors.textDim, fontSize: 12, fontWeight: "700" },
-  stageSub: { color: colors.textFaint, fontSize: 9.5, fontWeight: "600" },
+  stageName: { color: colors.textDim, fontSize: 15, fontWeight: "700" },
+  stageSub: { color: colors.textFaint, fontSize: 12, fontWeight: "600", marginTop: 1 },
 
-  topRight: { position: "absolute", top: 0, right: 0, flexDirection: "row", alignItems: "flex-start", gap: 8, padding: 12, maxWidth: "62%" },
+  topRight: { position: "absolute", top: 0, flexDirection: "row", alignItems: "flex-start", gap: 8, padding: 12 },
   cuePill: { flexShrink: 1, flexDirection: "row", alignItems: "center", gap: 7, backgroundColor: "rgba(10,11,14,0.8)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 8 },
   cueText: { color: colors.textDim, fontSize: 12, fontWeight: "700", flexShrink: 1 },
   interval: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(0,0,0,0.6)", borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 12, height: 40 },
