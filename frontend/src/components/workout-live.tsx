@@ -274,6 +274,41 @@ export function SessionCard({
   );
 }
 
+// ---- Device dock (always-visible connection status, next to Session card) -
+export function DeviceDock({
+  hrOn, hrName, hrBattery, hrSignal, trainerOn, trainerName, trainerBattery, trainerSignal, onPress,
+}: {
+  hrOn?: boolean; hrName?: string; hrBattery?: number | null; hrSignal?: number | null;
+  trainerOn?: boolean; trainerName?: string; trainerBattery?: number | null; trainerSignal?: number | null;
+  onPress?: () => void;
+}) {
+  const slots = [
+    { key: "hr", icon: "heart" as const, on: !!hrOn, label: hrOn ? (hrName || "Heart rate") : "Heart rate", battery: hrBattery, signal: hrSignal },
+    { key: "trainer", icon: "bicycle" as const, on: !!trainerOn, label: trainerOn ? (trainerName || "Trainer") : "Trainer", battery: trainerBattery, signal: trainerSignal },
+  ];
+  return (
+    <Pressable style={dd.wrap} onPress={onPress} testID="device-dock" accessibilityRole="button" accessibilityLabel="Sensors — tap to manage connections">
+      <View style={dd.header}>
+        <Ionicons name="bluetooth" size={14} color={colors.yellow} />
+        <Text style={dd.title}>DEVICES</Text>
+      </View>
+      <View style={dd.row}>
+        {slots.map((s) => {
+          const batColor = s.battery == null ? colors.textDim : s.battery <= 15 ? colors.red : s.battery <= 30 ? colors.yellow : colors.green;
+          const batIcon = s.battery == null ? null : s.battery >= 66 ? "battery-full" : s.battery >= 25 ? "battery-half" : "battery-dead";
+          return (
+            <View key={s.key} style={[dd.chip, s.on ? dd.chipOn : dd.chipOff]} testID={`device-dock-${s.key}`}>
+              <View style={[dd.dot, { backgroundColor: s.on ? colors.green : colors.textFaint }]} />
+              <Ionicons name={s.icon} size={13} color={s.on ? colors.white : colors.textFaint} />
+              <Text style={[dd.chipText, !s.on && dd.chipTextOff]} numberOfLines={1}>{s.label}</Text>
+              {s.on && batIcon ? <Ionicons name={batIcon as any} size={12} color={batColor} style={dd.batIcon} /> : null}
+            </View>
+          );
+        })}
+      </View>
+    </Pressable>
+  );
+}
 // ---- Alberto coaching banner ----------------------------------------------
 export function CoachBanner({ name, message, avatar, struggle, compact }: { name: string; message: string; avatar: any; struggle?: { severity: string; safety: boolean; label: string } | null; compact?: boolean }) {
   const alert = struggle && struggle.severity && struggle.severity !== "none";
@@ -767,6 +802,20 @@ const sc = StyleSheet.create({
   unit: { color: colors.textDim, fontSize: 13, fontWeight: "700" },
   divider: { width: 1, backgroundColor: colors.borderSoft, marginHorizontal: 14 },
   devicesWrap: { flex: 1, minWidth: 0, justifyContent: "center", gap: 4 },
+});
+
+const dd = StyleSheet.create({
+  wrap: { ...card, paddingHorizontal: 14, paddingVertical: 10, gap: 2, justifyContent: "center" },
+  header: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 6 },
+  title: { color: colors.white, fontSize: 11.5, fontWeight: "800", letterSpacing: 1 },
+  row: { flexDirection: "row", gap: 8 },
+  chip: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 5, maxWidth: 130 },
+  chipOn: { borderColor: colors.green + "55", backgroundColor: colors.green + "18" },
+  chipOff: { borderColor: colors.border, backgroundColor: "rgba(255,255,255,0.03)" },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  chipText: { color: colors.white, fontSize: 11.5, fontWeight: "700" },
+  chipTextOff: { color: colors.textFaint },
+  batIcon: { marginLeft: -1 },
 });
 
 const cb = StyleSheet.create({

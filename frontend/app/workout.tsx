@@ -34,7 +34,7 @@ import {
   SettingsPanel, MusicPanel, CastPanel, RouteMapCard,
 } from "@/src/components/workout";
 import {
-  MetricCard, SessionCard, CoachBanner, TerrainCard, BrandCard, StepTimeline, StepDetailModal, LiveControlBar, AdjustmentsStrip, SensorHealth,
+  MetricCard, SessionCard, DeviceDock, CoachBanner, TerrainCard, BrandCard, StepTimeline, StepDetailModal, LiveControlBar, AdjustmentsStrip, SensorHealth,
 } from "@/src/components/workout-live";
 import { useWorkoutAudio } from "@/src/hooks/useWorkoutAudio";
 import { BleSensorsPanel } from "@/src/components/BleSensorsPanel";
@@ -1013,6 +1013,17 @@ export default function LiveWorkout() {
                 onSensorPress={() => setShowBle(true)}
                 workoutName={workoutTitle}
               />
+              <DeviceDock
+                hrOn={wearableOn}
+                hrName={hrName}
+                hrBattery={hrBattery}
+                hrSignal={hrSignal}
+                trainerOn={trainerOn}
+                trainerName={trainerName}
+                trainerBattery={trainerBattery}
+                trainerSignal={trainerSignal}
+                onPress={() => setShowBle(true)}
+              />
             </View>
           </View>
 
@@ -1098,7 +1109,6 @@ export default function LiveWorkout() {
             <MetricCard icon="stopwatch-outline" label="Elapsed" value={elapsedShort} sub={`TOTAL SESSION ${mmss(totalSec)}`} accent={colors.yellow} half={narrow} dense={tablet} />
             <MetricCard icon="timer-outline" label="Interval" value={timeLeftLabel ?? "—"} status="REMAINING" statusTone="neutral" sub="CURRENT BLOCK" accent="#5AC8FA" half={narrow} dense={tablet} />
             <MetricCard icon="flame" label="Calories" value={String(kcal)} unit="kcal" sub="ESTIMATED" accent={colors.red} half={narrow} dense={tablet} />
-            <MetricCard icon="flag" label="Workout Step" value={`Step ${(activeSeg?.index ?? 0) + 1}`} unit={`of ${segments.length}`} sub="CURRENT STEP" accent={colors.green} half={narrow} dense={tablet} />
           </>
         ) : (
           <>
@@ -1108,8 +1118,8 @@ export default function LiveWorkout() {
             <MetricCard icon="flash" label="Power" value={trainerOn ? String(powerVal) : "—"} unit="W" status={powerStatus} statusTone={powerTone} sub={`TARGET ${Math.max(0, targetW - 8)}–${targetW + 8} W`} accent={colors.yellow} connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} half={narrow} dense={tablet} />
           </>
         )}
-        <MetricCard icon="trending-up" label="Gradient" value={Math.abs(terrain.grade).toFixed(1)} unit="%" sub={terrain.isClimb ? `${Math.max(0, terrain.km - riddenKm).toFixed(1)} KM TO TOP` : `${Math.max(0, terrain.km - riddenKm).toFixed(1)} KM LEFT`} accent={colors.yellow} half={narrow} dense={tablet} />
-        <MetricCard icon="navigate" label="Distance" value={riddenKm.toFixed(1)} unit="km" sub={`OF ${routeInfo.km.toFixed(1)} KM`} accent="#5AC8FA" half={narrow} dense={tablet} />
+        <MetricCard icon="trending-up" label="Gradient" value={Math.abs(terrain.grade).toFixed(1)} unit="%" sub={`${Math.max(0, terrain.km - riddenKm).toFixed(1)} KM LEFT ON CLIMB`} accent={colors.yellow} half={narrow} dense={tablet} />
+        <MetricCard icon="navigate" label="Distance" value={`${riddenKm.toFixed(1)}/${routeInfo.km.toFixed(1)}`} unit="km" sub={`${Math.max(0, routeInfo.km - riddenKm).toFixed(1)} KM DISTANCE LEFT`} accent="#5AC8FA" half={narrow} dense={tablet} />
       </View>
 
       <StepTimeline steps={stepList} activeIndex={activeSeg?.index ?? -1} remaining={timeLeftLabel} stepProgress={activeSeg ? activeSeg.elapsedInSeg / Math.max(1, activeSeg.segment.durationSec) : 0} onStepPress={(i) => setStepDetail(i)} />
@@ -1398,7 +1408,7 @@ const styles = StyleSheet.create({
   routeOptMeta: { color: colors.textFaint, fontSize: 12, fontWeight: "600", marginTop: 2 },
   metricRow: { flexDirection: "row", gap: spacing.xs },
   telemetryRow: { gap: spacing.xs },
-  sessionCenterWrap: { flex: 1, alignItems: "center" },
+  sessionCenterWrap: { flex: 1, flexDirection: "row", alignItems: "stretch", justifyContent: "center", gap: spacing.xs },
   metricRowWrap: { flexWrap: "wrap", rowGap: spacing.sm },
   mainRow: { flexDirection: "row", gap: spacing.xs, alignItems: "stretch" },
   leftCenter: { flex: 1, minWidth: 0, gap: spacing.sm },
