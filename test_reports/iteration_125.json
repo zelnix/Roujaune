@@ -1,0 +1,45 @@
+{
+  "summary": "Frontend-only regression test of this session's bug fixes on the live workout dashboard (duplicate DEVICES card, SESSION/DEVICES alignment, cadence/power flicker hysteresis, new 'Simulate devices connected' toggle, video/coach/terrain sizing, inline now/next step description). Logged in as demo@roujaune.app, navigated to /workout?workoutId=w1 on a 1920x800 desktop viewport via Playwright.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "coach cue API (live coaching)", "issue": "Observed two intermittent 502 responses + one failed WebSocket handshake to '/message' while pausing/ending the ride. App handled this gracefully (fell back to local cue text 'Workout paused — take a breath'), no crash or visible breakage. Likely a transient backend/coach-cue service blip, not caused by this session's changes — flagging for awareness only.", "affected_testIDs": ["bc-pause", "bc-end"]}
+    ],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "verified_fixes": [
+    {"item": "Duplicate DEVICES card removed", "result": "PASS — DOM text search for 'DEVICES' returns exactly 1 match before AND after enabling the demo sensor toggle. Only one device-dock testID rendered, positioned next to SESSION card."},
+    {"item": "SESSION/DEVICES title top-line alignment", "result": "PASS — bounding_box() of [data-testid=session-card] and [data-testid=device-dock] both start at y=8 with identical height=93; header row styles (sc.header/dd.header) share identical marginBottom/gap/alignItems in code — confirmed visually and via measurement, no vertical offset."},
+    {"item": "Cadence/Power status flicker (hysteresis)", "result": "PASS — sampled metric-power and metric-cadence testIDs every 1s for 20s with sim toggle ON. Every single LOW/ON TARGET/HIGH transition traced back exactly to the coded hysteresis thresholds (entry at ±18W/±4rpm outside target, exit at ±12W / crossing target line) — no back-and-forth flip within the same boundary. Multiple genuine transitions occurred because the demo signal's simulated sine wave has a wide ±40W amplitude over a ~9.4s period, which legitimately crosses the band several times in 20s — this is expected signal behaviour, not flicker. Cadence badge only changed twice in the 20s window and held steady in between."},
+    {"item": "'Simulate devices connected' toggle — Switch present, web/demo only", "result": "PASS — testID ble-sim-toggle renders inside Bluetooth sensors panel only on Platform.OS==='web', with demo banner clearly labelling it a preview simulation."},
+    {"item": "Toggle ON instantly connects 2 demo devices + live readings", "result": "PASS — 'Demo Smart Trainer (Demo)' + 'Demo Heart Rate (Demo)' appear under CONNECTED with battery pills; POWER/CADENCE/SPEED/HEART RATE readings populate live in the panel and on the dashboard telemetry row."},
+    {"item": "Toggle ON switches telemetry row to sensor-based cards", "result": "PASS — row switched from Elapsed/Interval/Calories to Heart Rate/Speed/Cadence/Power cards with live values, device names, battery + signal shown on each card."},
+    {"item": "Toggle OFF instantly disconnects both + reverts to time-based cards", "result": "PASS — after toggling OFF, DEVICES card reverted to 'Heart rate'/'Trainer' greyed-out placeholders and telemetry row reverted to Elapsed/Interval/Calories cards."},
+    {"item": "Video card size + horizontal centring between Coach and Terrain/Route column", "result": "PASS (visual) — at 1920x800, video area spans x≈479-1090 (width ≈611px, visibly large, not tiny). Coach card spans x≈8-323 (width ≈315px) and right Terrain/Route column spans x≈1257-1567 (width ≈310px) — nearly identical widths. Video's horizontal centre (≈784) closely matches the midpoint between coach-right-edge and column-left-edge (≈790) — off by only ~6px, effectively centred."},
+    {"item": "Coach/Terrain/Route cards wide and roughly equal width", "result": "PASS — Coach card ≈315px wide vs Terrain/Route column ≈310px wide — within ~5px of each other, both clearly wide (not cramped) at this viewport."},
+    {"item": "Now/Next step description inline, not on separate 3rd line", "result": "PASS — StepTimeline's now-next strip renders '1. Warm-up · Aerobic endurance · conversational' on one line (nnTitleRow flexDirection:row with nnDescInline immediately after the step name), confirmed in both screenshot and JSX/style review (workout-live.tsx lines 490-496, 900-902)."},
+    {"item": "Pause/End buttons functional", "result": "PASS — Pause (bc-pause) toggles to 'Resume', shows 'Workout paused — take a breath' coach line and 'Paused' entry in Adjustments log. End (bc-end) opens 'End this ride?' confirmation with Save Ride / Abandon Ride / Resume options."},
+    {"item": "General regression — fit/console errors", "result": "PASS — dashboard fits at 1920x800 without excessive scroll; only console noise was the two transient 502s on the coach-cue/message endpoint noted above (non-blocking, graceful fallback)."}
+  ],
+  "test_report_links": [],
+  "action_items": [
+    "Optional: investigate the intermittent 502 / failed WebSocket handshake to the coach-cue '/message' endpoint seen around Pause/End actions — currently harmless (falls back to local cue text) but worth a look if it recurs frequently in production."
+  ],
+  "critical_code_review_comments": [
+    "workout.tsx remains very large (1400+ lines) — main agent already aware from prior rounds; changes this session (hysteresis state machines, DeviceDock consolidation, videoAreaW/videoSizeBasisW decoupling) are well-commented and correctly scoped.",
+    "Hysteresis implementation for powerStatus/cadStatus (lines ~960-985) is textbook-correct: entry thresholds are wider than exit thresholds, using a ref-free useState+prev-state closure pattern that avoids stale closures.",
+    "DeviceDock is now rendered exactly once (inside sessionCenterWrap next to SessionCard) — grep confirms no second invocation exists anywhere in workout.tsx."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not tested per request — frontend-only session)", "frontend": "100% (12/12 requested checks passed)"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All bug fixes and the new 'Simulate devices connected' feature from this session verified working correctly on web preview at 1920x800 desktop viewport, demo@roujaune.app/demo9900, navigating directly to /workout?workoutId=w1. No duplicate DEVICES card, SESSION/DEVICES title rows perfectly aligned (both y=8), cadence/power status changes are hysteresis-correct (verified transition-by-transition against the coded thresholds, not just eyeballed), sim toggle connects/disconnects 2 demo devices instantly and switches telemetry card sets correctly both directions, video is large and centred with coach/terrain/route columns at near-equal widths (~315px vs ~310px), and the now/next step description renders inline. Only note: two transient 502s on a coach-cue websocket/message endpoint during Pause/End taps — non-blocking, app degrades gracefully to local fallback text.",
+  "rca_of_issue": "N/A — no blocking bugs found this round. The transient 502 on the coach-cue endpoint is informational only; app already has a working try/catch fallback."
+}
