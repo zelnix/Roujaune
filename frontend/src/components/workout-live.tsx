@@ -5,7 +5,6 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 import Svg, { Polyline, Polygon as SvgPolygon } from "react-native-svg";
 import { colors, radius, spacing, textShadow } from "@/src/theme";
 import { versionLabel } from "./AppVersionTag";
-import { BUILD_STAMP } from "@/src/lib/build-stamp";
 
 const LOGO_GLYPH = require("../../assets/images/auth_logo_glyph.png");
 
@@ -44,7 +43,12 @@ export function BrandCard({ dense, onPress }: { dense?: boolean; onPress?: () =>
     >
       <Image source={LOGO_GLYPH} style={dense ? brand.glyphDense : brand.glyph} contentFit="contain" />
       <Text style={[brand.version, dense && brand.versionDense]} numberOfLines={1}>{versionLabel()}</Text>
-      {__DEV__ ? <Text style={[brand.stamp, dense && brand.stampDense]} numberOfLines={1}>Preview · {BUILD_STAMP}</Text> : null}
+      {__DEV__ ? (
+        <View style={[brand.previewPill, dense && brand.previewPillDense]}>
+          <View style={brand.previewDot} />
+          <Text style={[brand.previewText, dense && brand.previewTextDense]} numberOfLines={1}>PREVIEW</Text>
+        </View>
+      ) : null}
     </Wrap>
   );
 }
@@ -321,9 +325,13 @@ export function CoachBanner({ name, message, avatar, struggle, compact }: { name
   if (compact) {
     return (
       <View style={[cb.wrapTall, alert ? { borderColor: pillColor, borderWidth: 1 } : null]} testID="coach-banner">
-        <Image source={avatar} style={cb.avatarTall} contentFit="cover" contentPosition="top center" />
-        <Text style={cb.nameTall} numberOfLines={1}>{name}</Text>
-        <Text style={cb.tagTall} numberOfLines={1}>LIVE COACHING</Text>
+        <View style={cb.headRowTall}>
+          <Image source={avatar} style={cb.avatarTall} contentFit="cover" contentPosition="top center" />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={cb.nameTall} numberOfLines={1}>{name}</Text>
+            <Text style={cb.tagTall} numberOfLines={1}>LIVE COACHING</Text>
+          </View>
+        </View>
         {alert ? (
           <View style={[cb.pill, { backgroundColor: pillColor }]} testID="struggle-pill">
             <Ionicons name={struggle?.safety ? "shield-half" : "pulse"} size={10} color="#180a0a" />
@@ -614,6 +622,7 @@ export function LiveControlBar({
   const compact = width < 1180;
   const tiny = width < 900;
   const H = tiny ? 48 : compact ? 58 : 76;          // control height
+  const PH = tiny ? 44 : compact ? 48 : 58;         // pause/end button height (shorter, less dominant; kept ≥44pt for touch)
   const ICON = tiny ? 17 : compact ? 20 : 26;       // secondary icon size
   const PICON = tiny ? 19 : compact ? 22 : 28;      // pause icon size
   const RTXT = tiny ? 10 : compact ? 11 : 13;       // secondary label
@@ -670,11 +679,11 @@ export function LiveControlBar({
       </ScrollView>
 
       <View style={bc.primary}>
-        <Pressable onPress={onPauseToggle} style={[bc.pause, { height: H, paddingHorizontal: PPADH }]} testID="bc-pause">
+        <Pressable onPress={onPauseToggle} style={[bc.pause, { height: PH, paddingHorizontal: PPADH }]} testID="bc-pause">
           <Ionicons name={paused ? "play" : "pause"} size={PICON} color={colors.bg} />
           <Text style={[bc.pauseText, { fontSize: PTXT }]}>{paused ? "Resume" : "Pause"}</Text>
         </Pressable>
-        <Pressable onPress={onEnd} style={[bc.end, { height: H, paddingHorizontal: PPADH }]} testID="bc-end">
+        <Pressable onPress={onEnd} style={[bc.end, { height: PH, paddingHorizontal: PPADH }]} testID="bc-end">
           <Ionicons name="stop" size={ICON} color="#fff" />
           <Text style={[bc.endText, { fontSize: PTXT }]}>End</Text>
         </Pressable>
@@ -716,8 +725,11 @@ const brand = StyleSheet.create({
   glyphDense: { width: 30, height: 30 },
   version: { color: colors.textFaint, fontSize: 10.5, fontWeight: "700", letterSpacing: 0.3, marginTop: 4 },
   versionDense: { fontSize: 8.5, marginTop: 2 },
-  stamp: { color: colors.textFaint, fontSize: 9.5, fontWeight: "600", letterSpacing: 0.2, marginTop: 2, opacity: 0.8 },
-  stampDense: { fontSize: 8, marginTop: 1 },
+  previewPill: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 5, borderRadius: 999, borderWidth: 1, borderColor: colors.yellow + "70", backgroundColor: colors.yellow + "1F", paddingHorizontal: 9, paddingVertical: 3 },
+  previewPillDense: { marginTop: 2, paddingHorizontal: 6, paddingVertical: 2, gap: 4 },
+  previewDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: colors.yellow },
+  previewText: { color: colors.yellow, fontSize: 9.5, fontWeight: "900", letterSpacing: 0.8 },
+  previewTextDense: { fontSize: 8 },
 });
 
 const aj = StyleSheet.create({
@@ -829,11 +841,12 @@ const cb = StyleSheet.create({
   // flex:1 so the card's own background fills the full available height
   // (mirrors the Terrain+Route "fill" cards on the right of the video)
   // instead of a small row-card floating above dead space.
-  wrapTall: { flex: 1, flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, ...card, borderColor: colors.yellow + "3A", backgroundColor: colors.yellow + "10", paddingVertical: 20, paddingHorizontal: 16 },
-  avatarTall: { width: 64, height: 64, borderRadius: 32, backgroundColor: "rgba(255,255,255,0.08)" },
-  nameTall: { color: colors.yellow, fontSize: 14, fontWeight: "800", letterSpacing: 0.3, textAlign: "center", marginTop: 2 },
-  tagTall: { color: colors.yellow, fontSize: 9.5, fontWeight: "800", letterSpacing: 1.2, opacity: 0.7, textAlign: "center" },
-  msgTall: { color: colors.white, fontSize: 15.5, fontWeight: "700", lineHeight: 21, textAlign: "center", marginTop: 4 },
+  wrapTall: { flex: 1, flexDirection: "column", alignItems: "flex-start", justifyContent: "center", gap: 10, ...card, borderColor: colors.yellow + "3A", backgroundColor: colors.yellow + "10", paddingVertical: 20, paddingHorizontal: 18 },
+  headRowTall: { flexDirection: "row", alignItems: "center", gap: 12, alignSelf: "stretch" },
+  avatarTall: { width: 56, height: 56, borderRadius: 28, backgroundColor: "rgba(255,255,255,0.08)" },
+  nameTall: { color: colors.yellow, fontSize: 15, fontWeight: "800", letterSpacing: 0.3, textAlign: "left" },
+  tagTall: { color: colors.yellow, fontSize: 9.5, fontWeight: "800", letterSpacing: 1.2, opacity: 0.7, textAlign: "left", marginTop: 2 },
+  msgTall: { color: colors.white, fontSize: 15.5, fontWeight: "700", lineHeight: 21, textAlign: "left", alignSelf: "stretch" },
   pillTextCompact: { color: "#180a0a", fontSize: 9, fontWeight: "900", letterSpacing: 0.4, textTransform: "uppercase" },
 });
 
@@ -861,7 +874,7 @@ const tc = StyleSheet.create({
 });
 
 const st = StyleSheet.create({
-  wrap: { ...card, paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
+  wrap: { ...card, paddingHorizontal: 14, paddingVertical: 12, gap: 0 },
   head: { flexDirection: "row", alignItems: "center", gap: 14 },
   titleWrap: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 },
   title: { color: colors.white, fontSize: 15, fontWeight: "800", flexShrink: 1 },

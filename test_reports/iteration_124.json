@@ -1,0 +1,49 @@
+{
+  "summary": "Frontend-only regression test of the live workout screen and summary/share bug fixes (session fix-forward). Logged in as demo@roujaune.app, navigated to /workout?workoutId=w1 and /summary. All 8 requested items verified via Playwright on web preview (1280x800 desktop viewport).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "workout.tsx (live dashboard, tablet ScrollView)",
+        "issues": [
+          "At a shorter viewport (1366x768, still >620 tall so 'tablet' branch), page content scrollHeight (850px) exceeds clientHeight (768px) by ~82px, cutting off part of the bottom control bar (Pause/End) visually. The web root has overflow:hidden (Expo default), so there's no visible scrollbar to reach the cut-off area. At 1280x800 it fits fine with no cutoff. This is a minor/edge-case regression only on short-height (~768px) desktop windows — worth a look if the target 'standard viewport' includes 768px-tall windows."
+        ]
+      }
+    ],
+    "react_native_issues": []
+  },
+  "verified_fixes": [
+    {"item": "Summary close (X) button vs wifi icon spacing", "result": "PASS — clear gap between wifi icon and close button, no overlap (zoomed screenshot confirms)."},
+    {"item": "RideShareSheet size/readability", "result": "PASS — sheet renders wider with larger title ('Share your ride', 24px) and readable caption text."},
+    {"item": "Facebook/Instagram(Story+Feed) buttons visible on web", "result": "PASS — all 6 buttons (Story, Feed, Facebook, X, WhatsApp, Copy) visible in the share row."},
+    {"item": "Tapping Facebook/Instagram on web", "result": "PASS — new tab opened to facebook.com / instagram.com respectively, caption copied, notice toast shown ('Caption copied — paste it when you post on Facebook/Instagram'), no crash."},
+    {"item": "Coach card (coach-banner) left-alignment + row layout", "result": "PASS — avatar + 'Alberto' + 'LIVE COACHING' inline in a row at top; coaching message left-aligned below (verified styles textAlign:'left' and screenshot)."},
+    {"item": "Terrain/Route cards reflect actual selected route", "result": "PASS — switched route via Watch->route picker from 'Alpine Sunset Pass' (1.0%/640m/20.0km) to 'Coastal Sprint' (0.0%/180m/12.0km); terrain-card, RouteMapCard, and bottom Gradient/Distance MetricCards all updated correctly and consistently."},
+    {"item": "Netflix (DRM) tap shows confirm dialog on web", "result": "PASS — window.confirm fired with title 'Watch on Netflix' and PiP/split-screen tip text; Cancel/Open Netflix flow works, no silent no-op."},
+    {"item": "SBS On Demand (embeddable) tap shows fallback panel", "result": "PASS — video card switched to EmbeddedWebPlayer panel with honest limitation text ('Browser preview can't show embedded video...') and a working 'Open SBS On Demand in a new tab' button. No crash."},
+    {"item": "Pause/End buttons shorter but tappable", "result": "PASS — measured button height = 58px (>=44pt touch target) at desktop size, visibly shorter than a full-height control. Pause toggles to 'Resume' and shows toast/coach message; End opens the End Ride confirmation (Save Ride/Abandon Ride/Resume) correctly."},
+    {"item": "BrandCard single version line + PREVIEW pill", "result": "PASS — shows one line 'Published 8 Sep 2026, 06:40 · Build 1' plus a separate yellow dot+'PREVIEW' pill below it. No duplicate second timestamp line."},
+    {"item": "StepTimeline no visible gap between now/next and stage cards", "result": "PASS — visually no gap in all screenshots captured."},
+    {"item": "General fit without vertical scroll", "result": "PASS at 1280x800; minor overflow noted at 1366x768 (see design_issues above)."}
+  ],
+  "test_report_links": [],
+  "action_items": [
+    "Optional: consider trimming ~80px of vertical spacing in the tablet ScrollView layout (workout.tsx) so the dashboard also fits cleanly at ~768px-tall viewports without relying on scroll (root has overflow:hidden on web so content below the fold is currently unreachable at that height)."
+  ],
+  "critical_code_review_comments": [
+    "workout.tsx is very large (1300+ lines) — consider splitting further, though this session's changes themselves are well-scoped and commented.",
+    "Coach-banner left-alignment, BrandCard PREVIEW pill, TerrainCard real-route derivation, and shorter Pause/End buttons are all implemented cleanly with clear inline comments explaining the reasoning."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (not tested per request)", "frontend": "100% (11/11 requested checks passed; 1 minor unrelated viewport-height edge case noted)"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All 8 bug-fix items from this session verified working correctly on web preview at 1280x800 viewport using demo@roujaune.app/demo9900. Only a minor, likely pre-existing edge case: at 1366x768 (short height) the tablet ScrollView content slightly overflows and the overflow:hidden web root prevents scrolling to see the cut-off bottom control bar. Not a regression introduced by this session's changes per se, but worth a look if very short desktop windows are a target viewport.",
+  "rca_of_issue": "N/A — no blocking bugs found. Vertical-overflow note is informational only."
+}

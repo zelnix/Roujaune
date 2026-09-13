@@ -51,14 +51,14 @@ export function CaptionEditor({
 }
 
 const st = StyleSheet.create({
-  wrap: { alignSelf: "stretch", marginTop: 16, maxWidth: 360, width: "100%" },
-  head: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6, gap: 8 },
-  label: { color: colors.yellow, fontSize: 10.5, fontWeight: "900", letterSpacing: 1.4 },
+  wrap: { alignSelf: "stretch", marginTop: 18, maxWidth: 480, width: "100%" },
+  head: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8, gap: 8 },
+  label: { color: colors.yellow, fontSize: 12, fontWeight: "900", letterSpacing: 1.4 },
   tones: { flexDirection: "row", gap: 6 },
-  tone: { borderWidth: 1, borderColor: colors.yellow + "55", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  tone: { borderWidth: 1, borderColor: colors.yellow + "55", borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 },
   toneActive: { backgroundColor: colors.yellow, borderColor: colors.yellow },
   toneHover: { backgroundColor: colors.yellow + "18" },
-  toneText: { color: colors.yellow, fontSize: 11, fontWeight: "800" },
+  toneText: { color: colors.yellow, fontSize: 12.5, fontWeight: "800" },
   toneTextActive: { color: "#241B00" },
-  input: { color: colors.white, fontSize: 13.5, lineHeight: 19, minHeight: 62, borderWidth: 1, borderColor: "rgba(255,255,255,0.14)", borderRadius: 12, backgroundColor: "rgba(255,255,255,0.04)", paddingHorizontal: 12, paddingVertical: 10, textAlignVertical: "top" },
+  input: { color: colors.white, fontSize: 16, lineHeight: 22, minHeight: 80, borderWidth: 1, borderColor: "rgba(255,255,255,0.14)", borderRadius: 14, backgroundColor: "rgba(255,255,255,0.04)", paddingHorizontal: 14, paddingVertical: 12, textAlignVertical: "top" },
 });

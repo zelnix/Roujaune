@@ -36,7 +36,12 @@ export function SocialShareRow({
     catch { onNotice("Couldn't copy the caption."); }
   };
   const shareInstagram = async (mode: "story" | "feed") => {
-    if (Platform.OS === "web") { onNotice("Instagram sharing is available on the mobile app."); return; }
+    if (Platform.OS === "web") {
+      try { await Clipboard.setStringAsync(caption); } catch { /* best-effort */ }
+      await openUrl("https://www.instagram.com/", "Couldn't open Instagram — copy the caption and post manually.");
+      onNotice("Caption copied — paste it when you post on Instagram.");
+      return;
+    }
     try {
       try { await Clipboard.setStringAsync(caption); } catch { /* caption copy is best-effort */ }
       const uri = await getImageUri();
@@ -71,7 +76,12 @@ export function SocialShareRow({
     } catch { onNotice("Couldn't prepare your Instagram share. Please try again."); }
   };
   const shareFacebook = async () => {
-    if (Platform.OS === "web") { onNotice("Facebook sharing is available on the mobile app."); return; }
+    if (Platform.OS === "web") {
+      try { await Clipboard.setStringAsync(caption); } catch { /* best-effort */ }
+      await openUrl("https://www.facebook.com/", "Couldn't open Facebook — copy the caption and post manually.");
+      onNotice("Caption copied — paste it when you post on Facebook.");
+      return;
+    }
     try {
       try { await Clipboard.setStringAsync(caption); } catch { /* best-effort */ }
       const uri = await getImageUri();
@@ -88,13 +98,9 @@ export function SocialShareRow({
   };
   return (
     <View style={st.row}>
-      {Platform.OS !== "web" ? (
-        <>
-          <Btn testID="share-instagram" label="Story" icon="logo-instagram" onPress={() => shareInstagram("story")} disabled={disabled} />
-          <Btn testID="share-instagram-feed" label="Feed" icon="logo-instagram" onPress={() => shareInstagram("feed")} disabled={disabled} />
-          <Btn testID="share-facebook" label="Facebook" icon="logo-facebook" onPress={shareFacebook} disabled={disabled} />
-        </>
-      ) : null}
+      <Btn testID="share-instagram" label="Story" icon="logo-instagram" onPress={() => shareInstagram("story")} disabled={disabled} />
+      <Btn testID="share-instagram-feed" label="Feed" icon="logo-instagram" onPress={() => shareInstagram("feed")} disabled={disabled} />
+      <Btn testID="share-facebook" label="Facebook" icon="logo-facebook" onPress={shareFacebook} disabled={disabled} />
       <Btn testID="share-x" label="X" icon="logo-twitter" onPress={shareX} disabled={disabled} />
       <Btn testID="share-whatsapp" label="WhatsApp" icon="logo-whatsapp" onPress={shareWhatsApp} disabled={disabled} />
       <Btn testID="share-copy" label="Copy" icon="copy-outline" onPress={copyCaption} disabled={disabled} />
@@ -113,8 +119,8 @@ function Btn({ label, icon, onPress, disabled, testID }: { label: string; icon: 
 }
 
 const st = StyleSheet.create({
-  row: { flexDirection: "row", gap: 8, marginTop: 18, alignSelf: "stretch", justifyContent: "center", flexWrap: "wrap" },
-  btn: { flexGrow: 1, flexBasis: 0, minWidth: 84, maxWidth: 130, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 12, paddingVertical: 11, paddingHorizontal: 8, borderWidth: 1, borderColor: "rgba(255,255,255,0.14)", backgroundColor: "rgba(255,255,255,0.05)" },
+  row: { flexDirection: "row", gap: 9, marginTop: 20, alignSelf: "stretch", justifyContent: "center", flexWrap: "wrap", maxWidth: 480 },
+  btn: { flexGrow: 1, flexBasis: 0, minWidth: 92, maxWidth: 148, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, borderRadius: 14, paddingVertical: 13, paddingHorizontal: 10, borderWidth: 1, borderColor: "rgba(255,255,255,0.14)", backgroundColor: "rgba(255,255,255,0.05)" },
   btnHover: { backgroundColor: "rgba(255,255,255,0.1)", borderColor: "rgba(255,255,255,0.24)" },
-  text: { color: colors.white, fontSize: 12.5, fontWeight: "700" },
+  text: { color: colors.white, fontSize: 13.5, fontWeight: "700" },
 });

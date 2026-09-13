@@ -114,7 +114,6 @@ const ZONE_DESC: Record<string, string> = {
 // Estimate terrain + route length from the chosen workout (used when the route
 // can't be derived from a video). Avg speed & typical grade per workout type.
 const TYPE_SPEED: Record<string, number> = { climbing: 20, threshold: 27, endurance: 30, tempo: 29, vo2max: 30, sprints: 31, recovery: 25, restday: 22, fb50: 24 };
-const TYPE_GRADE: Record<string, number> = { climbing: 7.2, threshold: 4, endurance: 1.5, tempo: 2.2, vo2max: 2.6, sprints: 1.8, recovery: 0.6, restday: 0.4, fb50: 1 };
 
 
 
@@ -648,16 +647,13 @@ export default function LiveWorkout() {
     extendMetaRef.current = { type_id: selected?.typeId ?? "endurance", wearable_on: wearableOn };
   }, [selected, wearableOn]);
 
-  // Terrain + route length derived from the chosen workout (not the video).
+  // Terrain + route length derived from the ACTUAL selected virtual route's
+  // real elevation/distance profile (not a generic per-workout-type guess) —
+  // switching the scenic route now genuinely changes these numbers.
   const terrain = React.useMemo(() => {
-    const type = selected?.typeId ?? "endurance";
-    const dur = selected?.duration ?? 60;
-    const kmh = TYPE_SPEED[type] ?? 28;
-    const grade = TYPE_GRADE[type] ?? 2;
-    const km = Math.max(2, +((dur / 60) * kmh).toFixed(1));
-    const elev = Math.round((km * 1000 * grade) / 100);
-    return { km, grade, elev, isClimb: grade >= 3 };
-  }, [selected]);
+    const grade = vroute.distanceKm > 0 ? +(vroute.elevationM / (vroute.distanceKm * 10)).toFixed(1) : 0;
+    return { km: vroute.distanceKm, grade, elev: vroute.elevationM, isClimb: grade >= 3 };
+  }, [vroute]);
   // Progress along the route: from the trainer's distance when connected, else
   // estimated on a time basis (elapsed / workout duration) so the terrain & route
   // cards still advance through the session.
@@ -945,16 +941,18 @@ export default function LiveWorkout() {
   // from the measured column width — no stretching to fill leftover screen
   // height, so the frame always looks like a real video, not a letterbox.
   const tablet = !compact;
-  // Coach slot (left of video) mirrors the Terrain/Route column width (right
-  // of video) so the video card sits exactly centred between them — clamped
-  // down on very narrow screens so the video never drops below a usable size.
-  const coachW = Math.max(72, Math.min(rightW, centerW - 220 - spacing.xs));
+  // Coach slot (left of video) is sized to roughly match the rendered video
+  // card's own width (not the narrow right-hand Terrain/Route column) so the
+  // two feel balanced — clamped so it never crowds out the video on narrow
+  // screens or grows absurdly wide on very large ones.
+  const gapW = spacing.xs;
+  const coachW = Math.max(180, Math.min(440, Math.round((centerW - gapW) / 3)));
   // Available width between the coach card and the right column — the video
   // card itself is rendered at HALF this size (both dimensions, so the 16:9
   // frame shrinks proportionally) and centred inside that same zone, so the
   // rest of the screen (telemetry, step timeline, control bar) fits above
   // the fold without the rider needing to scroll.
-  const videoAreaW = Math.max(220, Math.round(centerW - coachW - spacing.xs));
+  const videoAreaW = Math.max(220, Math.round(centerW - coachW - gapW));
   const videoW = Math.max(140, Math.round(videoAreaW * 0.5));
   const videoRenderH = Math.round((videoW * 9) / 16);
 
@@ -1098,7 +1096,7 @@ export default function LiveWorkout() {
         </View>
 
         <View style={[styles.rightCol, { width: rightW }]}>
-          <TerrainCard grade={terrain.grade} elevGain={terrain.elev} distanceLeft={Math.max(0, terrain.km - riddenKm)} progress={progress} isClimb={terrain.isClimb} />
+          <TerrainCard grade={vState.gradient} elevGain={terrain.elev} distanceLeft={vState.remainingKm} progress={progress} isClimb />
           <RouteMapCard title={routeInfo.title} progress={progress} riddenKm={riddenKm} totalKm={routeInfo.km} timeBased={!trainerOn} fill />
         </View>
       </View>
@@ -1118,7 +1116,7 @@ export default function LiveWorkout() {
             <MetricCard icon="flash" label="Power" value={trainerOn ? String(powerVal) : "—"} unit="W" status={powerStatus} statusTone={powerTone} sub={`TARGET ${Math.max(0, targetW - 8)}–${targetW + 8} W`} accent={colors.yellow} connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} half={narrow} dense={tablet} />
           </>
         )}
-        <MetricCard icon="trending-up" label="Gradient" value={Math.abs(terrain.grade).toFixed(1)} unit="%" sub={`${Math.max(0, terrain.km - riddenKm).toFixed(1)} KM LEFT ON CLIMB`} accent={colors.yellow} half={narrow} dense={tablet} />
+        <MetricCard icon="trending-up" label="Gradient" value={Math.abs(vState.gradient).toFixed(1)} unit="%" sub={`${vState.remainingKm.toFixed(1)} KM LEFT ON ROUTE`} accent={colors.yellow} half={narrow} dense={tablet} />
         <MetricCard icon="navigate" label="Distance" value={`${riddenKm.toFixed(1)}/${routeInfo.km.toFixed(1)}`} unit="km" sub={`${Math.max(0, routeInfo.km - riddenKm).toFixed(1)} KM DISTANCE LEFT`} accent="#5AC8FA" half={narrow} dense={tablet} />
       </View>
 

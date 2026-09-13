@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, ActivityIndicator, Platform } from "react-native";
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, Platform, Linking } from "react-native";
 import { WebView } from "react-native-webview";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { colors, radius } from "@/src/theme";
@@ -39,16 +39,18 @@ export function EmbeddedWebPlayer({
   return (
     <View style={[wp.wrap, { width, height }]} testID="embedded-web-player">
       {Platform.OS === "web" ? (
-        // react-native-web's WebView shim is an <iframe> — most streaming
-        // sites set X-Frame-Options/CSP to refuse that outright, so on web
-        // we go straight to the honest fallback instead of a guaranteed blank box.
+        // react-native-web has no WebView polyfill (no <iframe> shim in this
+        // package) and most streaming sites set X-Frame-Options/CSP to refuse
+        // embedding anyway — so a *browser preview* can't show this inline.
+        // On the real phone build this loads inside a genuine native WebView
+        // (no iframe, no framing restriction) right here in the video card.
         <View style={wp.fallback}>
-          <Ionicons name="globe-outline" size={26} color={colors.textDim} />
-          <Text style={wp.fallbackTitle}>{label} can&apos;t be embedded in a browser tab</Text>
-          <Text style={wp.fallbackBody}>On the mobile app this opens in an in-app browser. For now, open it directly:</Text>
+          <Ionicons name="phone-portrait-outline" size={26} color={colors.textDim} />
+          <Text style={wp.fallbackTitle}>{label} needs the phone app to embed</Text>
+          <Text style={wp.fallbackBody}>Browser preview can&apos;t show embedded video. On your phone (Expo Go or the built app) this plays right here in the card.</Text>
           <Pressable style={wp.openBtn} onPress={onOpenExternally} testID="embed-open-external">
             <Ionicons name="open-outline" size={15} color={colors.bg} />
-            <Text style={wp.openBtnText}>Open {label}</Text>
+            <Text style={wp.openBtnText}>Open {label} in a new tab</Text>
           </Pressable>
         </View>
       ) : failed ? (
@@ -68,6 +70,16 @@ export function EmbeddedWebPlayer({
             style={wp.webview}
             allowsInlineMediaPlayback
             mediaPlaybackRequiresUserAction={false}
+            setSupportMultipleWindows={false}
+            onShouldStartLoadWithRequest={(req) => {
+              // Keep normal page navigation (http/https) inside our own
+              // WebView. Anything else (intent://, market://, custom app
+              // schemes some sites use to "hand off" to their native app)
+              // gets opened the normal way instead of silently failing here.
+              if (/^https?:\/\//i.test(req.url)) return true;
+              Linking.openURL(req.url).catch(() => {});
+              return false;
+            }}
             onLoadEnd={() => { setLoading(false); if (timeoutRef.current) clearTimeout(timeoutRef.current); }}
             onError={() => setFailed(true)}
             onHttpError={() => setFailed(true)}

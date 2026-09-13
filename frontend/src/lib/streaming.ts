@@ -1,4 +1,4 @@
-import { Linking, Platform } from "react-native";
+import { Linking, Platform, Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 /** Extract a YouTube video ID from any common URL form (or a bare 11-char ID). */
@@ -72,6 +72,25 @@ export async function launchStreaming(svc: StreamingService): Promise<boolean> {
   };
   if (await tryOpen(svc.appUrl)) return true;
   return tryOpen(svc.webUrl);
+}
+
+/** Cross-platform "confirm" dialog. `Alert.alert` renders a real native dialog
+ *  on iOS/Android but is a silent no-op on react-native-web (no browser
+ *  polyfill), so a web build needs `window.confirm` instead or the rider taps
+ *  a button and nothing visibly happens. Resolves true if the rider confirmed. */
+export function confirmOpen(title: string, message: string, confirmLabel: string): Promise<boolean> {
+  if (Platform.OS === "web") {
+    const ok = typeof window !== "undefined" && typeof window.confirm === "function"
+      ? window.confirm(`${title}\n\n${message}`)
+      : true;
+    return Promise.resolve(ok);
+  }
+  return new Promise((resolve) => {
+    Alert.alert(title, message, [
+      { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
+      { text: confirmLabel, onPress: () => resolve(true) },
+    ], { onDismiss: () => resolve(false) });
+  });
 }
 
 /** Platform-specific tip for keeping ROUJAUNE running while watching another app. */

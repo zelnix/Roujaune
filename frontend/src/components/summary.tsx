@@ -814,7 +814,7 @@ const cardBase = { backgroundColor: colors.card, borderRadius: radius.lg, border
 
 const styles = StyleSheet.create({
   /* header */
-  headerRow: { flexDirection: "row", alignItems: "center", gap: spacing.lg, paddingBottom: spacing.sm },
+  headerRow: { flexDirection: "row", alignItems: "center", gap: spacing.lg, paddingBottom: spacing.sm, paddingRight: 50 },
   brandCol: { justifyContent: "center" },
   brandRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   brandText: { fontSize: 20, fontWeight: "900", fontStyle: "italic", letterSpacing: 0.5 },

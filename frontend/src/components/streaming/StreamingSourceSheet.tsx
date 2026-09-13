@@ -1,13 +1,13 @@
 import React from "react";
 import {
   Modal, View, Text, StyleSheet, Pressable, TextInput, ScrollView,
-  KeyboardAvoidingView, Platform, Alert,
+  KeyboardAvoidingView, Platform,
 } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import MaterialCommunityIcons from "@react-native-vector-icons/material-design-icons";
 import { Image } from "expo-image";
 import { colors, radius, spacing } from "@/src/theme";
-import { STREAMING_SERVICES, parseYouTubeId, launchStreaming, pipTip, StreamingService, loadYouTubeRecents, addYouTubeRecent, YouTubeRecent, youtubeThumb, CustomStreamingApp, loadCustomApps, addCustomApp, removeCustomApp, launchCustomApp, loadFavorites, toggleFavorite } from "@/src/lib/streaming";
+import { STREAMING_SERVICES, parseYouTubeId, launchStreaming, pipTip, StreamingService, loadYouTubeRecents, addYouTubeRecent, YouTubeRecent, youtubeThumb, CustomStreamingApp, loadCustomApps, addCustomApp, removeCustomApp, launchCustomApp, loadFavorites, toggleFavorite, confirmOpen } from "@/src/lib/streaming";
 
 type Props = {
   visible: boolean;
@@ -64,14 +64,9 @@ export function StreamingSourceSheet({ visible, source, onClose, onPickRoute, on
 
   const launch = (svc: StreamingService) => {
     if (svc.embeddable) { onPickEmbed(svc.webUrl, svc.name); onClose(); return; }
-    Alert.alert(
-      `Watch on ${svc.name}`,
-      pipTip(svc.name),
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: `Open ${svc.name}`, onPress: () => launchStreaming(svc) },
-      ],
-    );
+    confirmOpen(`Watch on ${svc.name}`, pipTip(svc.name), `Open ${svc.name}`).then((ok) => {
+      if (ok) launchStreaming(svc);
+    });
   };
 
   const launchCustom = (app: CustomStreamingApp) => {
@@ -79,25 +74,15 @@ export function StreamingSourceSheet({ visible, source, onClose, onPickRoute, on
     // own in-app browser first, like a YouTube embed. A real app:// scheme
     // can't be loaded in a webview, so those still deep-link out.
     if (/^https?:\/\//i.test(app.url)) { onPickEmbed(app.url, app.name); onClose(); return; }
-    Alert.alert(
-      `Watch on ${app.name}`,
-      pipTip(app.name),
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: `Open ${app.name}`, onPress: () => launchCustomApp(app) },
-      ],
-    );
+    confirmOpen(`Watch on ${app.name}`, pipTip(app.name), `Open ${app.name}`).then((ok) => {
+      if (ok) launchCustomApp(app);
+    });
   };
 
   const confirmRemoveCustom = (app: CustomStreamingApp) => {
-    Alert.alert(
-      `Remove ${app.name}?`,
-      "This deletes the shortcut. You can add it again anytime.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Remove", style: "destructive", onPress: () => removeCustomApp(app.id).then(setCustomApps) },
-      ],
-    );
+    confirmOpen(`Remove ${app.name}?`, "This deletes the shortcut. You can add it again anytime.", "Remove").then((ok) => {
+      if (ok) removeCustomApp(app.id).then(setCustomApps);
+    });
   };
 
   const saveCustom = () => {
