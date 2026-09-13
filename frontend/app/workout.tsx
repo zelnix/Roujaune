@@ -949,7 +949,13 @@ export default function LiveWorkout() {
   // of video) so the video card sits exactly centred between them — clamped
   // down on very narrow screens so the video never drops below a usable size.
   const coachW = Math.max(72, Math.min(rightW, centerW - 220 - spacing.sm));
-  const videoW = Math.max(220, Math.round(centerW - coachW - spacing.sm));
+  // Available width between the coach card and the right column — the video
+  // card itself is rendered at HALF this size (both dimensions, so the 16:9
+  // frame shrinks proportionally) and centred inside that same zone, so the
+  // rest of the screen (telemetry, step timeline, control bar) fits above
+  // the fold without the rider needing to scroll.
+  const videoAreaW = Math.max(220, Math.round(centerW - coachW - spacing.sm));
+  const videoW = Math.max(140, Math.round(videoAreaW * 0.5));
   const videoRenderH = Math.round((videoW * 9) / 16);
 
   // ---- Derived values for the redesigned live dashboard ----
@@ -1012,7 +1018,7 @@ export default function LiveWorkout() {
               <View style={[styles.coachSlot, { width: coachW }]}>
                 <CoachBanner name={persona.name} message={liveCue} avatar={persona.image} compact struggle={struggle && struggle.active ? { severity: struggle.severity, safety: struggle.safety, label: REASON_LABEL[(struggle.primary ?? struggle.reasons[0]) as keyof typeof REASON_LABEL] ?? "digging deep" } : null} />
               </View>
-              <View style={[styles.videoSlot, { height: videoRenderH, width: videoW }]}>
+              <View style={[styles.videoSlot, { height: videoRenderH, width: videoAreaW }]}>
                 {expanded ? (
                   <Pressable style={styles.fsMinimised} onPress={() => setExpanded(false)} testID="vr-restore-inline">
                     <Ionicons name="contract-outline" size={22} color={colors.textDim} />
@@ -1365,7 +1371,7 @@ const styles = StyleSheet.create({
   flex1: { flex: 1 },
   videoRow: { flexDirection: "row", gap: spacing.sm, alignItems: "stretch" },
   coachSlot: { minWidth: 0, justifyContent: "center" },
-  videoSlot: { minHeight: 150 },
+  videoSlot: { minHeight: 150, alignItems: "center", justifyContent: "center" },
   ytControls: { position: "absolute", top: 8, right: 8, flexDirection: "row", alignItems: "center", gap: 7 },
   ytSourceBtn: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(0,0,0,0.6)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 6 },
   ytSourceText: { color: colors.white, fontSize: 11.5, fontWeight: "800" },
