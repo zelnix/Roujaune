@@ -259,12 +259,25 @@ export default function LiveWorkout() {
   const resumeValueRef = React.useRef<WorkoutResume | null>(null);
   React.useEffect(() => {
     let alive = true;
-    loadWorkoutResumeAsync().then((r) => {
+    (async () => {
+      const r = await loadWorkoutResumeAsync();
       if (!alive) return;
-      resumeValueRef.current = selected?.id && r?.workoutId === selected.id ? r : null;
+      const matched = selected?.id && r?.workoutId === selected.id ? r : null;
+      resumeValueRef.current = matched;
+      // Always reset first (sets workout/workoutId/ftp/route metadata + clears
+      // in-memory samples), then — only for a genuinely matching in-progress
+      // ride — restore the persisted sample history over the top, so the
+      // summary graph stays continuous instead of picking up from a blank
+      // slate after a full app close.
+      rideRecorder.reset({ workout: workoutTitle, workoutId: selected?.id, ftp });
+      const restored = matched && selected?.id ? await rideRecorder.hydrate(selected.id) : false;
+      if (!alive) return;
+      energyRef.current = restored ? rideRecorder.getEnergyJ() : 0;
+      lastEnergyElapsedRef.current = null;
       setResumeReady(true);
-    });
+    })();
     return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.id]);
   const initSent = React.useRef(false);
   const lastTargetSent = React.useRef<number>(-1);
@@ -300,13 +313,6 @@ export default function LiveWorkout() {
       showToast("HUD is turned off — tap the eye icon in full screen to reveal live data.");
     }
   }, [loaded, settings.hudEnabled, showToast]);
-
-  React.useEffect(() => {
-    rideRecorder.reset({ workout: workoutTitle, workoutId: selected?.id, ftp });
-    energyRef.current = 0;
-    lastEnergyElapsedRef.current = null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Keep the recorder's FTP + adaptive bias current (they may load after mount)
   // so the summary scores against the exact targets ridden.
@@ -365,6 +371,7 @@ export default function LiveWorkout() {
       lastEnergyElapsedRef.current = telemetry.elapsed;
       const dt = prev == null ? 0 : telemetry.elapsed - prev;
       if (dt > 0 && dt < 5) energyRef.current += telemetry.power * dt;
+      rideRecorder.setEnergyJ(energyRef.current);
       rideRecorder.push(
         { power: telemetry.power, hr: telemetry.hr, cadence: telemetry.cadence, speed: telemetry.speed },
         telemetry.elapsed,
@@ -398,6 +405,16 @@ export default function LiveWorkout() {
     }, 5000);
     return () => clearInterval(t);
   }, [paused, selected?.id, workoutTitle, vRouteId, routeSource, ergMode]);
+
+  // Also persist the fuller sample history (power/HR/cadence/speed over time)
+  // a little less often — it's a bigger write than the lightweight resume
+  // above — so the summary's graphs stay continuous across a full app close
+  // too, not just the elapsed/distance totals.
+  React.useEffect(() => {
+    if (paused || !selected?.id) return;
+    const t = setInterval(() => { rideRecorder.persist(); }, 15000);
+    return () => clearInterval(t);
+  }, [paused, selected?.id]);
 
   const onCenterLayout = (e: LayoutChangeEvent) => setCenterW(e.nativeEvent.layout.width);
 
@@ -470,6 +487,7 @@ export default function LiveWorkout() {
     rideRecorder.setStruggles(struggleMon.moments.current);
     submitRoutePR(segTotalSec > 0 && telemetryRef.current.elapsed >= segTotalSec);
     clearWorkoutResume();
+    rideRecorder.clearPersisted();
     setEndPrompt(false);
     router.replace("/summary");
   };
@@ -477,6 +495,7 @@ export default function LiveWorkout() {
     setEndPrompt(false);
     rideRecorder.reset({ workout: workoutTitle, workoutId: selected?.id, ftp });
     clearWorkoutResume();
+    rideRecorder.clearPersisted();
     router.replace("/");
   };
   const onResumeRide = () => { setEndPrompt(false); if (paused) { resume(); setPaused(false); } };
@@ -548,7 +567,7 @@ export default function LiveWorkout() {
     }
   }, [speak]);
 
-  const onFinishComplete = () => { rideRecorder.setStruggles(struggleMon.moments.current); clearWorkoutResume(); setCompletePrompt(false); router.replace("/summary"); };
+  const onFinishComplete = () => { rideRecorder.setStruggles(struggleMon.moments.current); clearWorkoutResume(); rideRecorder.clearPersisted(); setCompletePrompt(false); router.replace("/summary"); };
   const onExtendRide = (minutes: number, label: string) => {
     if (!selected) return;
     setExtraSegments((x) => [...x, extensionSegment(selected, minutes)]);
