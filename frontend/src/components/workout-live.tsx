@@ -444,7 +444,7 @@ export type TimelineStep = {
 export type StepStatus = "done" | "current" | "future";
 
 function ProfileSeg({ step, status, width, fill, onPress }: { step: TimelineStep; status: StepStatus; width: number; fill: number; onPress: () => void }) {
-  const h = Math.max(76, 58 + Math.max(0, Math.min(1, step.intensity)) * 38);
+  const h = Math.max(90, 70 + Math.max(0, Math.min(1, step.intensity)) * 40);
   const base = status === "future" ? "rgba(255,255,255,0.12)" : status === "done" ? colors.yellow + "44" : step.color + "33";
   const fillPct = status === "done" ? 100 : status === "current" ? Math.max(0, Math.min(1, fill)) * 100 : 0;
   const dim = status === "future";
@@ -497,9 +497,11 @@ export function StepTimeline({
               <View style={st.nnTagNow}><Text style={st.nnTagNowText}>NOW</Text></View>
               <View style={[st.nnDot, { backgroundColor: cur.color }]} />
               <View style={st.nnBody}>
-                <Text style={st.nnName} numberOfLines={1}>{cur.index + 1}. {cur.label}</Text>
+                <View style={st.nnTitleRow}>
+                  <Text style={st.nnName} numberOfLines={1}>{cur.index + 1}. {cur.label}</Text>
+                  {cur.desc ? <Text style={st.nnDescInline} numberOfLines={1}>· {cur.desc}</Text> : null}
+                </View>
                 <Text style={st.nnMeta} numberOfLines={1}>{cur.zoneLabel}{cur.watts > 0 ? ` · ${cur.watts} W` : ""}</Text>
-                {cur.desc ? <Text style={st.nnDesc} numberOfLines={1}>{cur.desc}</Text> : null}
               </View>
               {remaining ? (
                 <View style={st.nnCountdown}>
@@ -518,9 +520,11 @@ export function StepTimeline({
                 <>
                   <View style={[st.nnDot, { backgroundColor: nxt.color }]} />
                   <View style={st.nnBody}>
-                    <Text style={st.nnName} numberOfLines={1}>{nxt.index + 1}. {nxt.label}</Text>
+                    <View style={st.nnTitleRow}>
+                      <Text style={st.nnName} numberOfLines={1}>{nxt.index + 1}. {nxt.label}</Text>
+                      {nxt.desc ? <Text style={st.nnDescInline} numberOfLines={1}>· {nxt.desc}</Text> : null}
+                    </View>
                     <Text style={st.nnMeta} numberOfLines={1}>{nxt.duration}{nxt.watts > 0 ? ` · ${nxt.watts} W` : ""}</Text>
-                    {nxt.desc ? <Text style={st.nnDesc} numberOfLines={1}>{nxt.desc}</Text> : null}
                   </View>
                 </>
               ) : (
@@ -897,20 +901,21 @@ const st = StyleSheet.create({
   nnNext: { backgroundColor: "rgba(255,255,255,0.04)", borderColor: colors.border },
   nnArrow: { alignSelf: "center" },
   nnDot: { width: 12, height: 12, borderRadius: 6 },
-  nnBody: { flex: 1 },
+  nnBody: { flex: 1, minWidth: 0 },
   nnTagNow: { backgroundColor: colors.yellow, borderRadius: radius.sm, paddingHorizontal: 9, paddingVertical: 5 },
   nnTagNowText: { color: colors.bg, fontSize: 12.5, fontWeight: "900", letterSpacing: 1 },
   nnTagNext: { backgroundColor: "rgba(255,255,255,0.08)", borderRadius: radius.sm, paddingHorizontal: 9, paddingVertical: 5 },
   nnTagNextText: { color: colors.textDim, fontSize: 12.5, fontWeight: "900", letterSpacing: 1 },
-  nnName: { color: colors.white, fontSize: 19, fontWeight: "800" },
+  nnTitleRow: { flexDirection: "row", alignItems: "baseline", gap: 6, minWidth: 0 },
+  nnName: { color: colors.white, fontSize: 19, fontWeight: "800", flexShrink: 0 },
+  nnDescInline: { color: colors.textFaint, fontSize: 13, fontWeight: "600", flexShrink: 1, minWidth: 0 },
   nnMeta: { color: colors.textDim, fontSize: 14.5, fontWeight: "700", marginTop: 3 },
-  nnDesc: { color: colors.textFaint, fontSize: 12.5, fontWeight: "600", marginTop: 2 },
   nnCountdown: { alignItems: "flex-end", marginLeft: 6, paddingLeft: 12, borderLeftWidth: 1, borderLeftColor: colors.yellow + "33" },
   nnCountValue: { color: colors.yellow, fontSize: 22, fontWeight: "900", fontVariant: ["tabular-nums"], letterSpacing: 0.5 },
   nnCountLabel: { color: colors.yellow, fontSize: 9, fontWeight: "800", letterSpacing: 1.5, marginTop: -1 },
   nnProgressTrack: { position: "absolute", left: 0, right: 0, bottom: 0, height: 4, backgroundColor: "rgba(255,255,255,0.10)" },
   nnProgressFill: { height: "100%", backgroundColor: colors.yellow },
-  chart: { flexDirection: "row", alignItems: "flex-end", height: 100, gap: 0 },
+  chart: { flexDirection: "row", alignItems: "flex-end", height: 118, gap: 0 },
   seg: { height: "100%", justifyContent: "flex-end", paddingHorizontal: 2 },
   segBar: { width: "100%", borderRadius: 7, borderWidth: 1, overflow: "hidden", justifyContent: "flex-end" },
   segFill: { position: "absolute", left: 0, top: 0, bottom: 0, backgroundColor: colors.yellow + "3A", borderRightWidth: 2, borderRightColor: colors.yellow },

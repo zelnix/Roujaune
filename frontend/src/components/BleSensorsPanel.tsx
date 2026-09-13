@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView, Linking, ActivityIndicator, Platform, Modal } from "react-native";
+import { View, Text, StyleSheet, Pressable, ScrollView, Linking, ActivityIndicator, Platform, Modal, Switch } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { colors, radius, spacing, shadow } from "../theme";
 import type { BleDevice, BleReadings, PermState } from "../hooks/useBleSensors";
@@ -61,6 +61,35 @@ export function BleSensorsPanel({
                 <Text style={styles.demoText}>Preview demo — showing simulated sensors. Real Bluetooth needs a device build.</Text>
               </View>
             )}
+            {Platform.OS === "web" && (() => {
+              const simOn = connectedIds.has("demo-trainer") && connectedIds.has("demo-hr");
+              return (
+                <Pressable
+                  style={styles.simToggleRow}
+                  testID="ble-sim-toggle"
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: simOn }}
+                  onPress={() => {
+                    if (simOn) { onDisconnect("demo-trainer"); onDisconnect("demo-hr"); }
+                    else { onConnect("demo-trainer"); onConnect("demo-hr"); }
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.simToggleTitle}>Simulate devices connected</Text>
+                    <Text style={styles.simToggleSub}>Preview the dashboard as if a trainer &amp; HR strap were paired — live demo numbers included.</Text>
+                  </View>
+                  <Switch
+                    value={simOn}
+                    onValueChange={() => {
+                      if (simOn) { onDisconnect("demo-trainer"); onDisconnect("demo-hr"); }
+                      else { onConnect("demo-trainer"); onConnect("demo-hr"); }
+                    }}
+                    trackColor={{ false: "rgba(255,255,255,0.16)", true: colors.yellow + "88" }}
+                    thumbColor={simOn ? colors.yellow : "#9aa0a6"}
+                  />
+                </Pressable>
+              );
+            })()}
             <View style={styles.explain}>
               <Ionicons name="information-circle-outline" size={16} color={colors.textDim} />
               <Text style={styles.explainText}>We use Bluetooth only to read your trainer and heart-rate sensor during the ride.</Text>
@@ -178,6 +207,9 @@ const styles = StyleSheet.create({
   explain: { flexDirection: "row", gap: 8, alignItems: "flex-start" },
   demoBanner: { flexDirection: "row", gap: 8, alignItems: "center", backgroundColor: "rgba(245,179,1,0.08)", borderRadius: radius.sm, borderWidth: 1, borderColor: "rgba(245,179,1,0.3)", paddingHorizontal: 10, paddingVertical: 8 },
   demoText: { flex: 1, color: colors.yellow, fontSize: 11.5, fontWeight: "600", lineHeight: 15 },
+  simToggleRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "rgba(255,255,255,0.04)", borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 10 },
+  simToggleTitle: { color: colors.white, fontSize: 13.5, fontWeight: "800" },
+  simToggleSub: { color: colors.textDim, fontSize: 11.5, marginTop: 2, lineHeight: 15 },
   explainText: { flex: 1, color: colors.textDim, fontSize: 12.5, lineHeight: 17 },
   warn: { flexDirection: "row", gap: 8, alignItems: "center", backgroundColor: "rgba(224,30,43,0.08)", borderRadius: radius.sm, padding: 10 },
   warnText: { color: colors.red, fontSize: 13, fontWeight: "600" },

@@ -136,7 +136,7 @@ export default function LiveWorkout() {
   const segments = React.useMemo(() => [...baseSegments, ...extraSegments], [baseSegments, extraSegments]);
   const compact = height < 620;
   const narrow = height >= 620 && winW < 1000;   // small-wide screens (e.g. Z Fold): 2×2 metric grid
-  const rightW = compact ? 250 : 310;
+  const rightW = compact ? 313 : 388;
 
   const [centerW, setCenterW] = React.useState(560);
   const [paused, setPaused] = React.useState(false);
@@ -951,7 +951,13 @@ export default function LiveWorkout() {
   // is centred inside this zone (equal breathing room either side) so it
   // stays centred even when its own rendered size is smaller than the zone.
   const videoAreaW = Math.max(220, Math.round(centerW - coachW - gapW));
-  const videoW = Math.max(140, Math.round(videoAreaW * 0.625));
+  // The video's own rendered size is pinned to a fixed reference column
+  // width (not the live, possibly-wider, rightW) so widening the Coach /
+  // Terrain / Route cards never shrinks the video — it only ever affects
+  // how much of videoAreaW is used as breathing room around it.
+  const videoSizeBasisW = compact ? 250 : 310;
+  const videoBasisAreaW = Math.max(220, Math.round(centerW - videoSizeBasisW - gapW));
+  const videoW = Math.min(videoAreaW, Math.max(140, Math.round(videoBasisAreaW * 0.625)));
   const videoRenderH = Math.round((videoW * 9) / 16);
 
   // ---- Derived values for the redesigned live dashboard ----
