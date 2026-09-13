@@ -232,10 +232,10 @@ export function ConnectionsPanel({ trainerOn, wearableOn, powerOn, hrOn, cadence
 
 // ---- Session card (Elapsed / Est. finish + current time / Devices) -------
 export function SessionCard({
-  elapsed, estFinish, currentTime, sensors, onSensorPress, workoutName,
+  elapsed, estFinish, currentTime, workoutName,
 }: {
   elapsed: string; estFinish: string; currentTime: string;
-  sensors?: SensorHealth[]; onSensorPress?: () => void; workoutName?: string;
+  workoutName?: string;
 }) {
   return (
     <View style={sc.panel} testID="session-card">
@@ -264,15 +264,6 @@ export function SessionCard({
           <Text style={sc.label}>CURRENT TIME</Text>
           <Text style={sc.value} testID="session-currenttime">{currentTime}</Text>
         </View>
-        {sensors && sensors.length > 0 ? (
-          <>
-            <View style={sc.divider} />
-            <View style={sc.devicesWrap}>
-              <Text style={sc.label}>DEVICES</Text>
-              <SensorHealthRow sensors={sensors} onSensorPress={onSensorPress ? () => onSensorPress() : undefined} bare />
-            </View>
-          </>
-        ) : null}
       </View>
     </View>
   );
@@ -806,7 +797,7 @@ const cn = StyleSheet.create({
 });
 
 const sc = StyleSheet.create({
-  panel: { ...card, paddingHorizontal: 18, paddingVertical: 12, gap: 2, minWidth: 260, alignSelf: "center" },
+  panel: { ...card, paddingHorizontal: 18, paddingVertical: 12, gap: 2, minWidth: 260 },
   header: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 6 },
   title: { color: colors.white, fontSize: 11.5, fontWeight: "800", letterSpacing: 1 },
   headerDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: colors.textFaint },
@@ -821,7 +812,7 @@ const sc = StyleSheet.create({
 });
 
 const dd = StyleSheet.create({
-  wrap: { ...card, paddingHorizontal: 14, paddingVertical: 10, gap: 2, justifyContent: "center" },
+  wrap: { ...card, paddingHorizontal: 14, paddingVertical: 12, gap: 2, justifyContent: "flex-start" },
   header: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 6 },
   title: { color: colors.white, fontSize: 11.5, fontWeight: "800", letterSpacing: 1 },
   row: { flexDirection: "row", gap: 8 },

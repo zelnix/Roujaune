@@ -34,7 +34,7 @@ import {
   SettingsPanel, MusicPanel, CastPanel, RouteMapCard,
 } from "@/src/components/workout";
 import {
-  MetricCard, SessionCard, DeviceDock, CoachBanner, TerrainCard, BrandCard, StepTimeline, StepDetailModal, LiveControlBar, AdjustmentsStrip, SensorHealth,
+  MetricCard, SessionCard, DeviceDock, CoachBanner, TerrainCard, BrandCard, StepTimeline, StepDetailModal, LiveControlBar, AdjustmentsStrip,
 } from "@/src/components/workout-live";
 import { useWorkoutAudio } from "@/src/hooks/useWorkoutAudio";
 import { BleSensorsPanel } from "@/src/components/BleSensorsPanel";
@@ -630,18 +630,6 @@ export default function LiveWorkout() {
     wasReconnectingRef.current = now;
   }, [ble.reconnecting, ble.connected, showToast]);
 
-  // Compact per-sensor health list (battery + signal) for the strip, built from
-  // the actually connected BLE devices. Empty with no sensors connected.
-  const sensorHealth: SensorHealth[] = React.useMemo(() => {
-    return ble.connected.map((d) => ({
-      id: d.id,
-      name: d.name || "Sensor",
-      kind: d.id === hrDevice?.id ? "hr" : d.id === trainerDevice?.id ? "trainer" : "sensor",
-      battery: ble.battery[d.id] ?? null,
-      signal: ble.rssi[d.id] ?? null,
-      reconnecting: ble.reconnecting.includes(d.id),
-    }));
-  }, [ble.connected, ble.battery, ble.rssi, ble.reconnecting, hrDevice, trainerDevice]);
   // Keep the extend-advice context (workout type + wearable state) current.
   React.useEffect(() => {
     extendMetaRef.current = { type_id: selected?.typeId ?? "endurance", wearable_on: wearableOn };
@@ -962,11 +950,40 @@ export default function LiveWorkout() {
 
   // ---- Derived values for the redesigned live dashboard ----
   const powerVal = Math.round(telemetry.power);
-  const dPower = powerVal - targetW;
-  const powerStatus = trainerOn ? (Math.abs(dPower) <= 12 ? "ON TARGET" : dPower > 0 ? "HIGH" : "LOW") : undefined;
-  const powerTone: "good" | "warn" = Math.abs(dPower) <= 12 ? "good" : "warn";
-  const cadInRange = telemetry.cadence >= CAD_LOW && telemetry.cadence <= CAD_HIGH;
-  const cadStatus = trainerOn ? (cadInRange ? "ON TARGET" : telemetry.cadence < CAD_LOW ? "LOW" : "HIGH") : undefined;
+
+  // Power/cadence "LOW · ON TARGET · HIGH" badges use hysteresis (a sticky
+  // dead-zone around each boundary) instead of a single hard threshold, so
+  // small natural jitter in the live reading right at the edge doesn't make
+  // the badge flicker back and forth every tick. Once in a state, the value
+  // has to clear a wider buffer to flip out of it, then only needs to cross
+  // back over the original target line to return to "ON TARGET".
+  const [powerStatus, setPowerStatus] = React.useState<"LOW" | "ON TARGET" | "HIGH" | undefined>(undefined);
+  React.useEffect(() => {
+    if (!trainerOn) { setPowerStatus(undefined); return; }
+    const d = powerVal - targetW;
+    setPowerStatus((prev) => {
+      if (prev === "LOW") return d >= -12 ? "ON TARGET" : "LOW";
+      if (prev === "HIGH") return d <= 12 ? "ON TARGET" : "HIGH";
+      if (d < -18) return "LOW";
+      if (d > 18) return "HIGH";
+      return "ON TARGET";
+    });
+  }, [powerVal, targetW, trainerOn]);
+  const powerTone: "good" | "warn" = powerStatus === "ON TARGET" || powerStatus === undefined ? "good" : "warn";
+
+  const [cadStatus, setCadStatus] = React.useState<"LOW" | "ON TARGET" | "HIGH" | undefined>(undefined);
+  React.useEffect(() => {
+    if (!trainerOn) { setCadStatus(undefined); return; }
+    const c = telemetry.cadence;
+    setCadStatus((prev) => {
+      if (prev === "LOW") return c >= CAD_LOW ? "ON TARGET" : "LOW";
+      if (prev === "HIGH") return c <= CAD_HIGH ? "ON TARGET" : "HIGH";
+      if (c < CAD_LOW - 4) return "LOW";
+      if (c > CAD_HIGH + 4) return "HIGH";
+      return "ON TARGET";
+    });
+  }, [telemetry.cadence, trainerOn]);
+  const cadInRange = cadStatus === "ON TARGET" || cadStatus === undefined;
   const remainingSec = Math.max(0, totalSec - telemetry.elapsed);
   const finishAt = new Date(Date.now() + remainingSec * 1000);
   const estFinish = `${String(finishAt.getHours()).padStart(2, "0")}:${String(finishAt.getMinutes()).padStart(2, "0")}`;
@@ -1011,8 +1028,6 @@ export default function LiveWorkout() {
                 elapsed={fmt(telemetry.elapsed)}
                 estFinish={estFinish}
                 currentTime={currentTimeLabel}
-                sensors={sensorHealth}
-                onSensorPress={() => setShowBle(true)}
                 workoutName={workoutTitle}
               />
               <DeviceDock
