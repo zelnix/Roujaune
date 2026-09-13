@@ -1100,6 +1100,7 @@ export default function LiveWorkout() {
                   <MetricCard icon="flash" label="Power" value={trainerOn ? String(powerVal) : "—"} unit="W" status={powerStatus} statusTone={powerTone} sub={`TARGET ${Math.max(0, targetW - 8)}–${targetW + 8} W`} accent={colors.yellow} connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} half={narrow} dense={tablet} />
                 </>
               )}
+              <MetricCard icon="trending-up" label="Gradient" value={Math.abs(terrain.grade).toFixed(1)} unit="%" sub={terrain.isClimb ? `${Math.max(0, terrain.km - riddenKm).toFixed(1)} KM TO TOP` : `${Math.max(0, terrain.km - riddenKm).toFixed(1)} KM LEFT`} accent={colors.yellow} half={narrow} dense={tablet} />
               <MetricCard icon="navigate" label="Distance" value={riddenKm.toFixed(1)} unit="km" sub={`OF ${routeInfo.km.toFixed(1)} KM`} accent="#5AC8FA" half={narrow} dense={tablet} />
             </View>
           </View>
