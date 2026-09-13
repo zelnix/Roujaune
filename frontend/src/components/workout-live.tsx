@@ -228,14 +228,23 @@ export function ConnectionsPanel({ trainerOn, wearableOn, powerOn, hrOn, cadence
 
 // ---- Session card (Elapsed / Est. finish + current time / Devices) -------
 export function SessionCard({
-  elapsed, estFinish, currentTime, sensors, onSensorPress,
+  elapsed, estFinish, currentTime, sensors, onSensorPress, workoutName,
 }: {
   elapsed: string; estFinish: string; currentTime: string;
-  sensors?: SensorHealth[]; onSensorPress?: () => void;
+  sensors?: SensorHealth[]; onSensorPress?: () => void; workoutName?: string;
 }) {
   return (
     <View style={sc.panel} testID="session-card">
-      <View style={sc.header}><Ionicons name="stopwatch-outline" size={14} color={colors.yellow} /><Text style={sc.title}>SESSION</Text></View>
+      <View style={sc.header}>
+        <Ionicons name="stopwatch-outline" size={14} color={colors.yellow} />
+        <Text style={sc.title}>SESSION</Text>
+        {workoutName ? (
+          <>
+            <View style={sc.headerDot} />
+            <Text style={sc.workoutName} numberOfLines={1} testID="session-workout-name">{workoutName}</Text>
+          </>
+        ) : null}
+      </View>
       <View style={sc.row}>
         <View style={sc.stat}>
           <Text style={sc.label}>ELAPSED</Text>
@@ -269,22 +278,44 @@ export function SessionCard({
 export function CoachBanner({ name, message, avatar, struggle, compact }: { name: string; message: string; avatar: any; struggle?: { severity: string; safety: boolean; label: string } | null; compact?: boolean }) {
   const alert = struggle && struggle.severity && struggle.severity !== "none";
   const pillColor = struggle?.safety || struggle?.severity === "high" ? colors.red : colors.yellow;
-  return (
-    <View style={[cb.wrap, compact && cb.wrapCompact, alert ? { borderColor: pillColor, borderWidth: 1 } : null]} testID="coach-banner">
-      <Image source={avatar} style={[cb.avatar, compact && cb.avatarCompact]} contentFit="cover" contentPosition="top center" />
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
-          <Text style={[cb.name, compact && cb.nameCompact]} numberOfLines={1}>{name} · Live coaching</Text>
-        </View>
+
+  // Compact = the narrow left-of-video slot. It's tall (matches the video's
+  // height) but not wide, so it gets its own stacked/centred layout — flex:1
+  // fills that full height (like the Terrain+Route cards do on the right)
+  // instead of leaving dead space below a small row-style card.
+  if (compact) {
+    return (
+      <View style={[cb.wrapTall, alert ? { borderColor: pillColor, borderWidth: 1 } : null]} testID="coach-banner">
+        <Image source={avatar} style={cb.avatarTall} contentFit="cover" contentPosition="top center" />
+        <Text style={cb.nameTall} numberOfLines={1}>{name}</Text>
+        <Text style={cb.tagTall} numberOfLines={1}>LIVE COACHING</Text>
         {alert ? (
-          <View style={[cb.pill, compact && cb.pillCompact, { backgroundColor: pillColor, alignSelf: "flex-start" }]} testID="struggle-pill">
-            <Ionicons name={struggle?.safety ? "shield-half" : "pulse"} size={compact ? 9 : 11} color="#180a0a" />
-            <Text style={[cb.pillText, compact && cb.pillTextCompact]}>{struggle?.safety ? "EASING TO RECOVER" : `HOLD ON · ${struggle?.label ?? "digging deep"}`}</Text>
+          <View style={[cb.pill, { backgroundColor: pillColor }]} testID="struggle-pill">
+            <Ionicons name={struggle?.safety ? "shield-half" : "pulse"} size={10} color="#180a0a" />
+            <Text style={cb.pillTextCompact}>{struggle?.safety ? "EASING TO RECOVER" : `HOLD ON · ${struggle?.label ?? "digging deep"}`}</Text>
           </View>
         ) : null}
-        <Text style={[cb.msg, compact && cb.msgCompact]} numberOfLines={compact ? 3 : 2}>{message}</Text>
+        <Text style={cb.msgTall} numberOfLines={7}>{message}</Text>
       </View>
-      {!compact && <Ionicons name="mic" size={16} color={colors.yellow} />}
+    );
+  }
+
+  return (
+    <View style={[cb.wrap, alert ? { borderColor: pillColor, borderWidth: 1 } : null]} testID="coach-banner">
+      <Image source={avatar} style={cb.avatar} contentFit="cover" contentPosition="top center" />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
+          <Text style={cb.name} numberOfLines={1}>{name} · Live coaching</Text>
+        </View>
+        {alert ? (
+          <View style={[cb.pill, { backgroundColor: pillColor, alignSelf: "flex-start" }]} testID="struggle-pill">
+            <Ionicons name={struggle?.safety ? "shield-half" : "pulse"} size={11} color="#180a0a" />
+            <Text style={cb.pillText}>{struggle?.safety ? "EASING TO RECOVER" : `HOLD ON · ${struggle?.label ?? "digging deep"}`}</Text>
+          </View>
+        ) : null}
+        <Text style={cb.msg} numberOfLines={2}>{message}</Text>
+      </View>
+      <Ionicons name="mic" size={16} color={colors.yellow} />
     </View>
   );
 }
@@ -724,6 +755,8 @@ const sc = StyleSheet.create({
   panel: { ...card, flex: 1, paddingHorizontal: 18, paddingVertical: 12, gap: 2, minWidth: 260 },
   header: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 6 },
   title: { color: colors.white, fontSize: 11.5, fontWeight: "800", letterSpacing: 1 },
+  headerDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: colors.textFaint },
+  workoutName: { flex: 1, minWidth: 0, color: colors.textDim, fontSize: 12, fontWeight: "700" },
   row: { flexDirection: "row", alignItems: "stretch" },
   stat: { paddingVertical: 2, paddingRight: 14, justifyContent: "center" },
   label: { color: colors.textFaint, fontSize: 10, fontWeight: "800", letterSpacing: 1, marginBottom: 3 },
@@ -735,17 +768,21 @@ const sc = StyleSheet.create({
 
 const cb = StyleSheet.create({
   wrap: { flexDirection: "row", alignItems: "center", gap: 14, ...card, borderColor: colors.yellow + "3A", backgroundColor: colors.yellow + "10", paddingVertical: 14, paddingHorizontal: 16 },
-  wrapCompact: { gap: 10, paddingVertical: 12, paddingHorizontal: 12 },
   avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: "rgba(255,255,255,0.08)" },
-  avatarCompact: { width: 38, height: 38, borderRadius: 19 },
   name: { color: colors.yellow, fontSize: 13, fontWeight: "800", letterSpacing: 0.5 },
-  nameCompact: { fontSize: 11, letterSpacing: 0.2 },
   msg: { color: colors.white, fontSize: 28, fontWeight: "600", lineHeight: 36, marginTop: 3 },
-  msgCompact: { fontSize: 14.5, lineHeight: 19, fontWeight: "700", marginTop: 4 },
   pill: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2, marginTop: 4 },
-  pillCompact: { paddingHorizontal: 6, paddingVertical: 2 },
   pillText: { color: "#180a0a", fontSize: 10.5, fontWeight: "900", letterSpacing: 0.5, textTransform: "uppercase" },
-  pillTextCompact: { fontSize: 9 },
+  // Stacked/portrait variant for the narrow-but-tall left-of-video slot —
+  // flex:1 so the card's own background fills the full available height
+  // (mirrors the Terrain+Route "fill" cards on the right of the video)
+  // instead of a small row-card floating above dead space.
+  wrapTall: { flex: 1, flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, ...card, borderColor: colors.yellow + "3A", backgroundColor: colors.yellow + "10", paddingVertical: 20, paddingHorizontal: 16 },
+  avatarTall: { width: 64, height: 64, borderRadius: 32, backgroundColor: "rgba(255,255,255,0.08)" },
+  nameTall: { color: colors.yellow, fontSize: 14, fontWeight: "800", letterSpacing: 0.3, textAlign: "center", marginTop: 2 },
+  tagTall: { color: colors.yellow, fontSize: 9.5, fontWeight: "800", letterSpacing: 1.2, opacity: 0.7, textAlign: "center" },
+  msgTall: { color: colors.white, fontSize: 15.5, fontWeight: "700", lineHeight: 21, textAlign: "center", marginTop: 4 },
+  pillTextCompact: { color: "#180a0a", fontSize: 9, fontWeight: "900", letterSpacing: 0.4, textTransform: "uppercase" },
 });
 
 const ic = StyleSheet.create({

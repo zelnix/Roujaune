@@ -1010,6 +1010,7 @@ export default function LiveWorkout() {
               currentTime={currentTimeLabel}
               sensors={sensorHealth}
               onSensorPress={() => setShowBle(true)}
+              workoutName={workoutTitle}
             />
           </View>
 
@@ -1370,7 +1371,7 @@ const styles = StyleSheet.create({
   tabletContent: { flexGrow: 1, padding: spacing.md, gap: spacing.md },
   flex1: { flex: 1 },
   videoRow: { flexDirection: "row", gap: spacing.sm, alignItems: "stretch" },
-  coachSlot: { minWidth: 0, justifyContent: "center" },
+  coachSlot: { minWidth: 0 },
   videoSlot: { minHeight: 150, alignItems: "center", justifyContent: "center" },
   ytControls: { position: "absolute", top: 8, right: 8, flexDirection: "row", alignItems: "center", gap: 7 },
   ytSourceBtn: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(0,0,0,0.6)", borderWidth: 1, borderColor: "rgba(255,255,255,0.18)", borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 6 },
