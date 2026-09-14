@@ -203,7 +203,7 @@ export default function CalendarScreen() {
                 <Text style={styles.subtitle}>Plan your week. Execute your day.</Text>
               </View>
             </View>
-            {selDay ? <SelectedDayPanel day={selDay} onPrev={() => setSelected((s) => (s + 6) % 7)} onMenu={openSwap} onViewWorkout={() => router.push(selDay?.cycling?.workout_id ? { pathname: "/training", params: { workoutId: selDay.cycling.workout_id } } : "/training")} /> : null}
+            {selDay ? <SelectedDayPanel day={selDay} onPrev={() => setSelected((s) => (s + 6) % 7)} onMenu={openSwap} onViewWorkout={() => router.push(selDay?.cycling?.workout_id || selDay?.cycling?.title ? { pathname: "/training", params: { workoutId: selDay?.cycling?.workout_id ?? "", title: selDay?.cycling?.title, duration: selDay?.cycling?.duration, zone: selDay?.cycling?.zone, tss: selDay?.cycling?.tss } } : "/training")} /> : null}
             {selDay ? <SupplementaryCompleteCard day={selDay} onToggle={onToggleSupp} /> : null}
             {week ? <WeekSummaryCard summary={week.summary} /> : null}
             <QuickActionsCard onAction={onQuickAction} />
@@ -262,7 +262,21 @@ export default function CalendarScreen() {
                 <View style={styles.gridRow}>
                   <View style={{ width: LABEL_W }} />
                   {days.map((d, i) => (
-                    <Pressable key={d.date} testID={`day-head-${i}`} onPress={() => { setSelected(i); setDayModalIdx(i); }} style={styles.col}>
+                    <Pressable
+                      key={d.date}
+                      testID={`day-head-${i}`}
+                      onPress={() => {
+                        setSelected(i);
+                        const cyc = d.cycling;
+                        const isRestRide = cyc && (cyc.status === "rest" || (!cyc.workout_id && !cyc.duration));
+                        if (cyc && !isRestRide && (cyc.workout_id || cyc.title)) {
+                          router.push({ pathname: "/training", params: { workoutId: cyc.workout_id ?? "", title: cyc.title, duration: cyc.duration, zone: cyc.zone, tss: cyc.tss } } as any);
+                        } else {
+                          setDayModalIdx(i);
+                        }
+                      }}
+                      style={styles.col}
+                    >
                       <DayHeader day={d} selected={i === selected} />
                     </Pressable>
                   ))}
@@ -339,7 +353,7 @@ export default function CalendarScreen() {
 
               {/* right panel */}
               <View style={styles.rightCol}>
-                {selDay ? <SelectedDayPanel day={selDay} onPrev={() => setSelected((s) => (s + 6) % 7)} onMenu={openSwap} onViewWorkout={() => router.push(selDay?.cycling?.workout_id ? { pathname: "/training", params: { workoutId: selDay.cycling.workout_id } } : "/training")} /> : null}
+                {selDay ? <SelectedDayPanel day={selDay} onPrev={() => setSelected((s) => (s + 6) % 7)} onMenu={openSwap} onViewWorkout={() => router.push(selDay?.cycling?.workout_id || selDay?.cycling?.title ? { pathname: "/training", params: { workoutId: selDay?.cycling?.workout_id ?? "", title: selDay?.cycling?.title, duration: selDay?.cycling?.duration, zone: selDay?.cycling?.zone, tss: selDay?.cycling?.tss } } : "/training")} /> : null}
                 {selDay ? <SupplementaryCompleteCard day={selDay} onToggle={onToggleSupp} /> : null}
                 {week ? <WeekSummaryCard summary={week.summary} /> : null}
                 <QuickActionsCard onAction={onQuickAction} />
@@ -375,13 +389,17 @@ export default function CalendarScreen() {
                   day={days[dayModalIdx]}
                   onClose={() => setDayModalIdx(null)}
                   onViewCycling={() => {
-                    const wid = days[dayModalIdx]?.cycling?.workout_id;
+                    const cyc = days[dayModalIdx]?.cycling;
                     setDayModalIdx(null);
-                    router.push(wid ? { pathname: "/training", params: { workoutId: wid } } as any : "/training");
+                    router.push(cyc?.workout_id || cyc?.title
+                      ? { pathname: "/training", params: { workoutId: cyc?.workout_id ?? "", title: cyc?.title, duration: cyc?.duration, zone: cyc?.zone, tss: cyc?.tss } } as any
+                      : "/training");
                   }}
                   onViewScheduled={(w) => {
                     setDayModalIdx(null);
-                    router.push(w.workout_id ? { pathname: "/training", params: { workoutId: w.workout_id } } as any : "/workouts");
+                    router.push(w.workout_id || w.title
+                      ? { pathname: "/training", params: { workoutId: w.workout_id ?? "", title: w.title, duration: w.duration, zone: w.zone, tss: w.tss } } as any
+                      : "/workouts");
                   }}
                   onAdd={() => { const d = days[dayModalIdx]?.date; setDayModalIdx(null); goSchedule(undefined, d); }}
                 />

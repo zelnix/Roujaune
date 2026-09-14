@@ -158,7 +158,11 @@ export function usePlan(id = "build-and-climb") {
     return () => { alive = false; };
   }, [id, nonce]);
 
-  const refresh = () => setNonce((n) => n + 1);
+  // Broadcast globally too: any screen that changed the plan (swapped a
+  // session, accepted a new coach-created plan, etc.) should also refresh
+  // every other mounted plan/calendar consumer (e.g. the Calendar screen or
+  // the "This Week" card on the Plan screen), not just this hook instance.
+  const refresh = () => { setNonce((n) => n + 1); notifyPlanChanged(); };
   return { plan, loading, live, refresh };
 }
 

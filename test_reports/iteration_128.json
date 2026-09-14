@@ -1,0 +1,32 @@
+{
+  "summary": "Frontend-only regression + bug-fix verification for the Calendar/Today's Training/Live Workout synthetic-workout-fallback fix, the CalendarCard live-refresh-broadcast fix, and the day-header-direct-navigation UX change. Created two real custom AI plans via Coach 'Create Plan' (Alberto, 4-week beginner endurance, 3 days/week) on the demo@roujaune.app account and fully exercised the reported bug flows end-to-end via Playwright at 1600x1000. All 8 requested test scenarios PASSED with no regressions found.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "training.tsx (Today's Training) for synthetic coach-created sessions",
+        "issues": [
+          "Minor/cosmetic: the 'Intervals' stat tile shows '0' for synthesized custom-plan workouts (e.g. 'Aerobic Foundation', 'Pedal Stroke Drills') even though a real segment bar chart and Warm-up/Endurance/Cool-down breakdown IS built and correctly used on the live /workout screen. Likely training.tsx counts only workout.segmentSpec.length while synthWorkoutFromMeta() doesn't set segmentSpec (buildSegments() falls back to its auto-builder at ride time instead). Cosmetic only — does not affect correctness of the ride itself, not a blocker."
+        ]
+      }
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Optional polish: populate a light segmentSpec (or precompute buildSegments(w).length) for synthWorkoutFromMeta() workouts so the 'Intervals' count tile on Today's Training doesn't show '0' for coach-created custom plan sessions."
+  ],
+  "critical_code_review_comments": [
+    "resolveWorkout()/synthWorkoutFromMeta() in workout-catalog.ts correctly falls back from catalog lookup to a synthesized runnable Workout built from the calendar day's title/duration/zone/tss metadata — verified this eliminates the 'Threshold Climb' hardcoded fallback in both training.tsx and workout.tsx for 3+ distinct custom-plan sessions across 2 different generated plans (all showed correct, distinct titles/durations/TSS/zones).",
+    "usePlan().refresh() now calling notifyPlanChanged() (plan.ts) correctly triggers useCalendarWeek()'s subscribePlanChange listener — verified the '/plan' screen's THIS WEEK'S PLAN card (CalendarCard scope='week') updates live immediately after accepting a new coach-created plan, with zero full-page reload.",
+    "calendar.tsx day-head-{i} Pressable onPress logic (isRestRide check + cyc.workout_id||cyc.title gate) correctly routes cycling days straight to /training while leaving the DayDetail modal path intact for FB50-only, rest, and empty days — verified for both the new custom plan and the pre-existing 'Build & Climb'/CTR structured plans."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A - not modified/tested per request (frontend-only fix)", "frontend": "100% (8/8 acceptance scenarios verified)"},
+  "seed_data_creation": "Created 2 ephemeral custom AI training plans via the live Coach 'Create Plan' flow on demo@roujaune.app during testing (not cleaned up — these persist as the account's active plan going forward; harmless for a demo/QA account but flagging in case a next agent expects to see 'Build & Climb' still active on this account).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All 3 reported bugs are fixed and verified working end-to-end: (1) custom AI plan sessions now show their own correct title/duration/zone/tss on both Today's Training and the live /workout ride screen — tested Monday + Wednesday of 2 separately-generated plans, each showed distinct correct data, never 'Threshold Climb'. (2) THIS WEEK'S PLAN card on /plan now refreshes live (no reload) immediately after accepting a new coach plan — visually confirmed via before/after screenshot diff. (3) Day-header tap on wide layout (1600px) now navigates DIRECTLY to Today's Training for cycling days (verified Mon 'Introductory Endurance/Aerobic Foundation' and a different Wed 'Pedal Stroke Drills' both navigated straight through, no modal), while non-cycling (Tue, strength-only) and rest days (Thu, Full Recovery) still correctly show the Day Detail popup modal. Regression checks also passed: greenlantern@roujaune.app's 'From Couch to Road' structured plan (ctr-ride-1/ctr-ride-2 ids) still resolves correctly via getWorkout() on both View Workout and Start Workout, and the 'Scheduled by you' + button flow (workout-list.tsx addToCalendar -> Day Detail 'View workout' -> onViewScheduled) still opens the correct catalog workout with no fallback issue. No React Native red screens, no console errors, no backend errors observed across the whole flow. Only a very minor cosmetic nit found (Intervals stat shows 0 for synthetic workouts on Today's Training) — not a functional blocker."
+}

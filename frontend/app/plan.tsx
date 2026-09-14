@@ -306,7 +306,7 @@ export default function TrainingPlanScreen() {
           visible={!!workoutDetail}
           onClose={() => setWorkoutDetail(null)}
           workout={workoutDetail}
-          onOpen={(w) => { setWorkoutDetail(null); router.push({ pathname: "/training", params: { workoutId: w.id, title: w.title } } as any); }}
+          onOpen={(w) => { setWorkoutDetail(null); router.push({ pathname: "/training", params: { workoutId: w.id, title: w.title, duration: w.duration, zone: w.zone, tss: w.tss } } as any); }}
           onSwap={(w) => { setWorkoutDetail(null); setSwapWO(w); }}
         />
         <CoachChatModal

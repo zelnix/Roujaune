@@ -16,7 +16,7 @@ import { PaywallModal } from "@/src/components/PaywallModal";
 import { getFavoriteRoute, setFavoriteRoute } from "@/src/lib/prefs";
 import { useSettings } from "@/src/lib/settings";
 import { currentWorkout } from "@/src/data";
-import { getWorkout, buildSegments, currentSegment, mmss, targetWatts, extensionSegment } from "@/src/lib/workout-catalog";
+import { getWorkout, resolveWorkout, buildSegments, currentSegment, mmss, targetWatts, extensionSegment } from "@/src/lib/workout-catalog";
 import { fetchZoneBias, ZoneBias } from "@/src/lib/targets";
 import { WORKOUT_TYPES } from "@/src/lib/workouts";
 import { VirtualRidePlayer } from "@/src/components/virtual-route/VirtualRidePlayer";
@@ -120,9 +120,14 @@ const TYPE_SPEED: Record<string, number> = { climbing: 20, threshold: 27, endura
 export default function LiveWorkout() {
   const { width: winW, height } = useWindowDimensions();
   const router = useRouter();
-  const params = useLocalSearchParams<{ title?: string; workoutId?: string }>();
-  // The workout the rider launched from the catalog (falls back to the default).
-  const selected = getWorkout(params.workoutId) ?? getWorkout("threshold-climb");
+  const params = useLocalSearchParams<{ title?: string; workoutId?: string; duration?: string; zone?: string; tss?: string }>();
+  // The workout the rider launched from the catalog. If it's a coach-created
+  // plan session (not in the static catalog), build it from the schedule
+  // metadata it was opened with instead of silently defaulting to the demo
+  // workout — otherwise the ride itself would run the wrong intervals.
+  const selected = getWorkout(params.workoutId) ?? (params.workoutId && params.title
+    ? resolveWorkout(params.workoutId, { title: params.title, duration: params.duration, zone: params.zone, tss: params.tss })
+    : getWorkout("threshold-climb"));
   const selectedType = selected ? WORKOUT_TYPES.find((t) => t.id === selected.typeId) : undefined;
   const workoutTitle = selected?.name ?? params.title ?? currentWorkout.title;
   // In-progress ride saved to disk (background/app-kill resilience) — only

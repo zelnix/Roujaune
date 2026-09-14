@@ -533,6 +533,101 @@ export function workoutsByType(typeId?: string | null): Workout[] {
   return WORKOUTS.filter((w) => w.typeId === typeId);
 }
 
+/* ============ Synthetic workouts for coach-created plan sessions ============
+ * Custom AI-generated training plans (coach "Create plan") schedule sessions
+ * with a title/duration/zone/tss but no entry in the static catalog above.
+ * These helpers turn that lightweight schedule metadata into a real,
+ * runnable Workout (with an auto-built interval timeline) so "View Workout"
+ * and the live ride always reflect what the rider actually has scheduled —
+ * instead of silently falling back to a hardcoded default. */
+export function parseDurationMinutes(s?: string | null): number {
+  if (!s) return 0;
+  const str = String(s).trim();
+  const hMatch = str.match(/(\d+)\s*h/i);
+  const mMatch = str.match(/(\d+)\s*m/i);
+  if (hMatch || mMatch) {
+    const h = hMatch ? parseInt(hMatch[1], 10) : 0;
+    const m = mMatch ? parseInt(mMatch[1], 10) : 0;
+    return h * 60 + m;
+  }
+  const n = parseInt(str, 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
+export function parseTssNumber(s?: string | null): number {
+  if (!s) return 0;
+  const n = parseInt(String(s).replace(/[^0-9]/g, ""), 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
+export function zoneIndexFromLabel(z?: string | null): number {
+  if (!z) return 1;
+  const m = String(z).match(/([1-6])/);
+  const n = m ? parseInt(m[1], 10) : 2;
+  return Math.max(0, Math.min(5, n - 1));
+}
+
+const _ZONE_META: { typeId: string; typeName: string; difficulty: Workout["difficulty"] }[] = [
+  { typeId: "recovery", typeName: "Recovery", difficulty: "Easy" },
+  { typeId: "endurance", typeName: "Endurance", difficulty: "Easy" },
+  { typeId: "tempo", typeName: "Tempo", difficulty: "Moderate" },
+  { typeId: "threshold", typeName: "Threshold", difficulty: "Hard" },
+  { typeId: "vo2max", typeName: "VO2 Max", difficulty: "Very Hard" },
+  { typeId: "sprints", typeName: "Sprints", difficulty: "Very Hard" },
+];
+const _ZONE_COLORS = [Z.z1, Z.z2, Z.z3, Z.z4, Z.z5, Z.z6];
+const _ZONE_IF = [0.5, 0.65, 0.8, 0.95, 1.12, 1.4];
+const _ZONE_LABEL = ["Z1", "Z2", "Z3", "Z4", "Z5", "Z6"];
+
+export type SessionMeta = { id?: string | null; title?: string | null; duration?: string | null; zone?: string | null; tss?: string | null; description?: string | null };
+
+/** Build a real, runnable Workout from a coach-created plan session's
+ * lightweight schedule metadata (title/duration/zone/tss). Falls back to
+ * sensible defaults for anything missing. */
+export function synthWorkoutFromMeta(meta: SessionMeta): Workout {
+  const zoneIdx = zoneIndexFromLabel(meta.zone);
+  const duration = Math.max(5, parseDurationMinutes(meta.duration) || 30);
+  const tss = parseTssNumber(meta.tss) || Math.round(duration * _ZONE_IF[zoneIdx] * 0.9);
+  const m = _ZONE_META[zoneIdx];
+  const dist = zones(0, 0, 0, 0, 0, 0);
+  dist[zoneIdx] = { ...dist[zoneIdx], pct: 100 };
+  // A simple three-part warm-up → main effort → cool-down timeline so the
+  // "Intervals" stat + "What to Expect" rows reflect real steps instead of 0.
+  const warmMin = Math.max(3, Math.round(duration * 0.15));
+  const coolMin = Math.max(3, Math.round(duration * 0.12));
+  const mainMin = Math.max(4, duration - warmMin - coolMin);
+  const spec: SegSpec[] = [
+    wu(warmMin),
+    { label: zoneIdx >= 2 ? `${m.typeName} Effort` : m.typeName, zoneIdx, minutes: mainMin, targetPct: _ZONE_IF[zoneIdx] },
+    cd(coolMin),
+  ];
+  return {
+    id: meta.id || `plan-session-${zoneIdx}`,
+    name: meta.title || "Training Ride",
+    typeId: m.typeId,
+    typeName: m.typeName,
+    color: _ZONE_COLORS[zoneIdx],
+    icon: "bicycle",
+    duration,
+    tss,
+    if: _ZONE_IF[zoneIdx],
+    difficulty: m.difficulty,
+    focus: meta.title || m.typeName,
+    description: meta.description || `A ${_ZONE_LABEL[zoneIdx]} ${m.typeName.toLowerCase()} session scheduled by your coach.`,
+    zones: dist,
+    segmentSpec: spec,
+  };
+}
+
+/** Resolve a workout for display/riding: catalog first, then a synthetic
+ * build from schedule metadata (coach-created plan sessions), else undefined. */
+export function resolveWorkout(id?: string | null, meta?: SessionMeta): Workout | undefined {
+  const found = getWorkout(id);
+  if (found) return found;
+  if (meta && (meta.title || id)) return synthWorkoutFromMeta({ id, ...meta });
+  return undefined;
+}
+
 export type DurationBand = "any" | "short" | "medium" | "long";
 export const DURATION_BANDS: { id: DurationBand; label: string }[] = [
   { id: "any", label: "Any length" },
