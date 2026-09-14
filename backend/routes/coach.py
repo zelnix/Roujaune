@@ -679,26 +679,125 @@ def _map_style(m: str):
 
 # Plan/calendar/progress routes moved to routes/plan.py
 
+async def _computed_plan(plan_id: str = "") -> dict:
+    """Resolve the FULLY COMPUTED plan (title, phase, progress, goals, workouts,
+    zone_bias, ...) for whichever plan is active — structured (Couch to Road /
+    Ride Stronger / Ride Beyond), a coach-created custom AI plan, or a legacy
+    admin-authored plan. The raw `training_plans` document alone is sparse for
+    structured/custom plans (phase/progress/goals/workouts are derived at read
+    time via get_plan(), not stored) — any code that hands plan facts to the
+    LLM must resolve through this helper instead of querying the collection
+    directly, or the coach ends up "seeing" a blank plan. Best-effort: falls
+    back to the raw doc (or {}) if the computed lookup fails for any reason."""
+    pid = plan_id or await _active_plan_id()
+    raw = {}
+    try:
+        if pid and pid != "none":
+            raw = await udb.training_plans.find_one({"id": pid}) or {}
+    except Exception:
+        pass
+    try:
+        computed = await get_plan()
+        if isinstance(computed, dict) and computed:
+            return {**raw, **computed}
+    except Exception:
+        logging.warning("computed plan resolve failed for %s", pid)
+    return raw
+
+
 async def _build_rider_context(plan_id: str = "") -> str:
-    """Assemble a compact, factual snapshot of the rider (latest ride, current
-    plan phase/progress, readiness) so the coach can reference real numbers in
-    chat. Best-effort — returns whatever is available, never raises."""
+    """Assemble a compact, factual snapshot of the rider (latest rides, current
+    plan phase/progress/schedule, readiness, level) so the coach can reference
+    real numbers in chat. Best-effort — returns whatever is available, never
+    raises."""
     lines: List[str] = []
     rl = await _rider_line()
     if rl:
         lines.append(rl)
     try:
+        rider = await _rider_doc()
+        cap = str(rider.get("capability") or "").strip()
+        if cap:
+            lines.append(f"Rider's self-rated level: {cap}.")
+        loc = ", ".join(p for p in [rider.get("city"), rider.get("region"), rider.get("country")] if p)
+        if loc:
+            lines.append(f"Location: {loc}.")
+    except Exception:
+        logging.warning("rider context: capability lookup failed")
+
+    # FTP + performance benchmark profile (power curve, aerobic efficiency,
+    # cadence preference, recovery response) — real per-rider biometrics from
+    # their FTP test / benchmark history, not just demographics.
+    try:
+        settings_doc = await udb.settings.find_one({"id": "me"}) or {}
+        uid = auth.current_user_id()
+        bp = (await udb.benchmark_profile.find_one({"user_id": uid})) or {} if uid else {}
+        ftp = settings_doc.get("ftp") or bp.get("ftp")
+        if ftp:
+            wkg = bp.get("ftpWkg")
+            lines.append(f"FTP: {ftp} W{f' ({wkg} W/kg)' if wkg else ''}{' (auto-estimated)' if settings_doc.get('ftpAuto') else ''}.")
+        perf_bits = []
+        for key, label, unit in (
+            ("fiveMinPower", "5-min power", "W"), ("oneMinPower", "1-min power", "W"),
+            ("sprintPower", "sprint power", "W"), ("aerobicEfficiency", "aerobic efficiency", ""),
+            ("preferredCadence", "preferred cadence", "rpm"), ("recoveryResponse", "recovery response", ""),
+        ):
+            v = bp.get(key)
+            if v:
+                perf_bits.append(f"{label} {v}{unit}")
+        if perf_bits:
+            lines.append("Benchmark profile: " + ", ".join(perf_bits) + ".")
+    except Exception:
+        logging.warning("rider context: ftp/benchmark lookup failed")
+
+    # Target event / race goal the rider is training towards, if one is set.
+    try:
+        ev = await udb.settings.find_one({"id": "event"}) or {}
+        if ev.get("event_name") or ev.get("event_date"):
+            days_out = ""
+            if ev.get("event_date"):
+                try:
+                    d = (date.fromisoformat(str(ev["event_date"])[:10]) - datetime.now(timezone.utc).date()).days
+                    days_out = f", {d} days away" if d >= 0 else ""
+                except Exception:
+                    pass
+            lines.append(f"Target event: {ev.get('event_name') or 'unnamed event'} on {ev.get('event_date') or 'TBD'}{days_out}.")
+    except Exception:
+        logging.warning("rider context: event lookup failed")
+
+    # All-time season totals (rides, distance, elevation, hours, current streak)
+    # so the coach has the big-picture view, not just this plan's progress.
+    try:
+        all_rides = await udb.ride_history.find().to_list(length=5000)
+        if all_rides:
+            dist = sum((r.get("distance_km") or 0) for r in all_rides)
+            elev = sum((r.get("elevation_m") or 0) for r in all_rides)
+            secs = sum((r.get("duration_sec") or 0) for r in all_rides)
+            ride_days = {str(r.get("created_at"))[:10] for r in all_rides if r.get("created_at")}
+            streak = 0
+            dcur = date.today()
+            while dcur.isoformat() in ride_days:
+                streak += 1
+                dcur -= timedelta(days=1)
+            lines.append(
+                f"Season totals: {len(all_rides)} rides, {round(dist)} km, {int(elev)} m climbed, "
+                f"{round(secs / 3600, 1)} h, current streak {streak} day(s)."
+            )
+    except Exception:
+        logging.warning("rider context: season totals lookup failed")
+
+    plan: dict = {}
+    try:
         plan_id = await _plan_id_or_active(plan_id)
-        plan = (await udb.training_plans.find_one({"id": plan_id})) if plan_id else None
-        if not plan:
-            plan = {}
-        phase = plan.get("phase", {})
-        prog = plan.get("progress", {})
-        goals = [g.get("title") for g in plan.get("goals", []) if g.get("status") != "complete"]
-        lines.append(
-            f"Plan: {plan.get('title')} — {phase.get('name')} ({phase.get('weeks')}), "
-            f"week {plan.get('current_week')} of {plan.get('duration_weeks')}."
-        )
+        plan = await _computed_plan(plan_id)
+        phase = plan.get("phase", {}) or {}
+        prog = plan.get("progress", {}) or {}
+        goals = [g.get("title") for g in (plan.get("goals") or []) if g.get("status") != "complete"]
+        if plan.get("title"):
+            lines.append(
+                f"Plan: {plan.get('title')} — {phase.get('name')} ({phase.get('weeks')}), "
+                f"week {plan.get('current_week')} of {plan.get('duration_weeks')}."
+            )
         if prog:
             lines.append(
                 f"Progress: {prog.get('workouts')} workouts done, {prog.get('time')} ridden, "
@@ -706,30 +805,68 @@ async def _build_rider_context(plan_id: str = "") -> str:
             )
         if goals:
             lines.append("Open goals: " + ", ".join(goals) + ".")
+        # This week's remaining schedule (from the same computed workouts list
+        # the Calendar/Plan screens render), so the coach can reference what's
+        # actually coming up rather than only aggregate stats.
+        upcoming = [w for w in (plan.get("workouts") or []) if isinstance(w, dict) and not w.get("completed")][:5]
+        if upcoming:
+            parts = [f"{w.get('date_label') or w.get('footer') or ''} {w.get('title')} ({w.get('zone') or ''} {w.get('duration') or ''})".strip() for w in upcoming]
+            lines.append("Upcoming scheduled sessions: " + "; ".join(p for p in parts if p) + ".")
+        zbias = plan.get("zone_bias") or {}
+        zbias_txt = ", ".join(f"{z} {'+' if v > 0 else ''}{v}%" for z, v in zbias.items() if v)
+        if zbias_txt:
+            lines.append("Auto-tuned zone targets based on recent execution: " + zbias_txt + ".")
     except Exception:
         logging.warning("rider context: plan lookup failed")
 
     try:
-        ride = await udb.ride_history.find().sort("created_at", -1).to_list(length=1)
-        if ride:
-            r = ride[0]
-            mins = (r.get("duration_sec") or 0) // 60
+        rides = await udb.ride_history.find().sort("created_at", -1).to_list(length=4)
+        if rides:
+            r0 = rides[0]
+            mins = (r0.get("duration_sec") or 0) // 60
             lines.append(
-                f"Last ride: {r.get('workout')} on {r.get('route') or 'the trainer'}, "
-                f"{mins} min, {r.get('distance_km')} km, avg power {r.get('avg_power')} W, TSS {r.get('tss')}."
+                f"Last ride: {r0.get('workout')} on {r0.get('route') or 'the trainer'}, "
+                f"{mins} min, {r0.get('distance_km')} km, avg power {r0.get('avg_power')} W, TSS {r0.get('tss')}."
             )
+            if len(rides) > 1:
+                more = [
+                    f"{r.get('workout') or 'Ride'} ({round((r.get('duration_sec') or 0) / 60)} min, {r.get('tss') or 0} TSS)"
+                    for r in rides[1:4]
+                ]
+                lines.append("Recent rides before that: " + "; ".join(more) + ".")
     except Exception:
         logging.warning("rider context: ride lookup failed")
 
     try:
-        rd = WELLNESS_DATA.get("readiness", {})
-        vit = {v.get("key"): v for v in WELLNESS_DATA.get("vitals", [])}
-        sleep = vit.get("sleep", {}).get("value")
-        hrv = vit.get("hrv", {}).get("value")
-        stress = vit.get("stress", {}).get("value")
-        lines.append(
-            f"Readiness: {rd.get('score')}% ({rd.get('status')}); sleep {sleep}, HRV {hrv}, stress {stress}."
-        )
+        checkin_doc = await udb.daily_checkins.find_one({"id": "latest"})
+        if checkin_doc:
+            factors = checkin_doc.get("mainFactors") or []
+            c = checkin_doc.get("checkin") or {}
+            bits = [f"sleep quality {c.get('sleep_quality')}/10" if c.get("sleep_quality") is not None else None,
+                    f"HRV {c.get('hrv')}" if c.get("hrv") is not None else None,
+                    f"resting HR {c.get('resting_hr')}" if c.get("resting_hr") is not None else None,
+                    f"stress {c.get('stress')}/10" if c.get("stress") is not None else None,
+                    f"soreness {c.get('soreness')}/10" if c.get("soreness") is not None else None]
+            bits = [b for b in bits if b]
+            lines.append(
+                f"Today's readiness (from the rider's own check-in): {checkin_doc.get('score')}% "
+                f"({checkin_doc.get('status')}){'; ' + ', '.join(bits) if bits else ''}"
+                f"{'; ' + '; '.join(factors[:2]) if factors else ''}."
+            )
+            if checkin_doc.get("illness") or checkin_doc.get("injury"):
+                lines.append("The rider flagged " + ", ".join(f for f, v in (("illness", checkin_doc.get("illness")), ("injury", checkin_doc.get("injury"))) if v) + " in today's check-in — be extra cautious about pushing intensity.")
+        else:
+            # No real check-in logged yet today — fall back to the demo
+            # wellness snapshot so the coach still has something to reference.
+            rd = WELLNESS_DATA.get("readiness", {})
+            vit = {v.get("key"): v for v in WELLNESS_DATA.get("vitals", [])}
+            sleep = vit.get("sleep", {}).get("value")
+            hrv = vit.get("hrv", {}).get("value")
+            stress = vit.get("stress", {}).get("value")
+            lines.append(
+                f"Readiness (demo data — rider hasn't logged a check-in yet): {rd.get('score')}% ({rd.get('status')}); "
+                f"sleep {sleep}, HRV {hrv}, stress {stress}."
+            )
     except Exception:
         logging.warning("rider context: readiness lookup failed")
 
@@ -1455,9 +1592,7 @@ async def _refresh_adaptation_after_ride(req: "CoachDebriefRequest", plan_id: st
         plan_id = await _plan_id_or_active(plan_id)
         if not plan_id:
             return
-        plan = await udb.training_plans.find_one({"id": plan_id}) or {}
-        # Feed interval execution into the adaptive-targets engine first so the
-        # coach's note can reference any target nudges it just made.
+        plan = await _computed_plan(plan_id)
         _bias, nudges = await _update_adaptive_targets(plan_id, req.intervals)
         recent_ride = {
             "workout": req.workout,
@@ -1506,16 +1641,10 @@ async def _refresh_adaptation_after_ride(req: "CoachDebriefRequest", plan_id: st
         await _record_adaptation(plan_id, req.coach_name, text, trigger)
         # Regenerate the DETAILED reasoning cache too, so the "why" modal shows
         # fresh, ride-specific reasoning without the rider tapping refresh.
+        # `plan` is already the fully computed plan (see _computed_plan above),
+        # so it works uniformly for structured, custom, and legacy plans.
         try:
-            detail_plan = plan
-            if plan_id in ("couch-to-road", "ride-stronger", "ride-beyond"):
-                try:
-                    computed = await get_plan(id=plan_id)
-                    if isinstance(computed, dict):
-                        detail_plan = {**plan, **computed}
-                except Exception:
-                    pass
-            detail = await _generate_adaptation_detail(detail_plan, req.coach_name, req.coach_gender)
+            detail = await _generate_adaptation_detail(plan, req.coach_name, req.coach_gender)
             dkey = f"adaptation_detail_{req.coach_name.lower()}"
             await udb.training_plans.update_one(
                 {"id": plan_id},
@@ -1636,8 +1765,7 @@ async def coach_adaptation(req: AdaptationRequest):
     req.plan_id = await _plan_id_or_active(req.plan_id)
     if not req.plan_id:
         raise HTTPException(status_code=400, detail="No active training plan to adapt")
-    plan = await udb.training_plans.find_one({"id": req.plan_id}) or {}
-
+    plan = await _computed_plan(req.plan_id)
     cache_key = f"adaptation_ai_{req.coach_name.lower()}"
     if not req.refresh and plan.get(cache_key):
         return {"adaptation": plan[cache_key], "cached": True}
@@ -1741,16 +1869,7 @@ async def coach_adaptation_detail(req: AdaptationRequest):
     req.plan_id = await _plan_id_or_active(req.plan_id)
     if not req.plan_id:
         raise HTTPException(status_code=400, detail="No active training plan to adapt")
-    plan = await udb.training_plans.find_one({"id": req.plan_id}) or {}
-    # Ground structured plans in their COMPUTED phase/progress (the training_plans
-    # doc alone is sparse for couch-to-road / ride-stronger / ride-beyond).
-    if req.plan_id in ("couch-to-road", "ride-stronger", "ride-beyond"):
-        try:
-            computed = await get_plan(id=req.plan_id)
-            if isinstance(computed, dict):
-                plan = {**plan, **computed}
-        except Exception:
-            pass
+    plan = await _computed_plan(req.plan_id)
     cache_key = f"adaptation_detail_{req.coach_name.lower()}"
     if not req.refresh and plan.get(cache_key):
         return {"detail": plan[cache_key], "cached": True}

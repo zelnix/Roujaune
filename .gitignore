@@ -85,3 +85,6 @@ backend/.pw-browsers/chromium-1234/chrome-linux/chrome
 credentials.json
 *.key
 .credentials
+.env
+.env.*
+*.env
