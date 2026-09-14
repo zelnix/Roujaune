@@ -18,7 +18,7 @@ BASE_URL = BASE_URL.rstrip("/")
 
 RIDER_EMAIL = "demo@roujaune.app"
 RIDER_PASSWORD = "demo9900"
-HWG_TOKEN = "hwg_svc_roujaune_0KR5RCmk6XI-TInq6iQTZyFXlRZGMn9J"
+HWG_TOKEN = os.environ.get("HWG_SERVICE_TOKEN", "")
 
 
 def _make_png(w=2, h=2) -> bytes:

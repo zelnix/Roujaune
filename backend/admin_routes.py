@@ -9,6 +9,7 @@ Contract reference: /app/memory/roujaune_admin_api_contract.md
 from __future__ import annotations
 
 import datetime
+import re
 import secrets
 import time
 from typing import Optional
@@ -111,9 +112,13 @@ async def list_users(q: Optional[str] = None, limit: int = 50, skip: int = 0, cu
     limit = max(1, min(limit, 200))
     filt: dict = {}
     if q:
+        # Escape user input before it reaches $regex — an admin-controlled but
+        # unbounded pattern (e.g. nested quantifiers) can otherwise trigger a
+        # catastrophic-backtracking DoS on the query. (2026-09 security audit)
+        safe_q = re.escape(q)[:200]
         filt = {"$or": [
-            {"email": {"$regex": q, "$options": "i"}},
-            {"name": {"$regex": q, "$options": "i"}},
+            {"email": {"$regex": safe_q, "$options": "i"}},
+            {"name": {"$regex": safe_q, "$options": "i"}},
         ]}
     if cursor:
         filt = {"$and": [filt, {"created_at": {"$lt": cursor}}]} if filt else {"created_at": {"$lt": cursor}}
@@ -121,7 +126,7 @@ async def list_users(q: Optional[str] = None, limit: int = 50, skip: int = 0, cu
     cur = _db.users.find(filt, proj).sort("created_at", -1).skip(max(0, skip)).limit(limit)
     items = await cur.to_list(limit)
     total = await _db.users.count_documents({} if not q else {"$or": [
-        {"email": {"$regex": q, "$options": "i"}}, {"name": {"$regex": q, "$options": "i"}},
+        {"email": {"$regex": re.escape(q)[:200], "$options": "i"}}, {"name": {"$regex": re.escape(q)[:200], "$options": "i"}},
     ]})
     next_cursor = items[-1].get("created_at") if len(items) == limit else None
     return {"items": items, "total": total, "skip": skip, "limit": limit, "next_cursor": next_cursor}

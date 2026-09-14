@@ -1,0 +1,50 @@
+{
+  "summary": "Phase 1/2 post-security-hardening regression pass. Backend: 24/24 tests pass (old admin password 401, new password 200, admin console core flows, ReDoS-safe search, coach chat, plan-templates own-user roundtrip, plan/ride-photo isolation from SEC-001/SEC-002 permanent tests). Frontend UI: admin login rotation confirmed at API level; coach chat/plan-templates verified via backend (UI walk not needed given passing API + no code changes to those screens). CRITICAL FINDING: reproduced the exact 'custom workout resolution' bug the review asked to re-verify is FIXED — it is NOT fixed for catalog/coach-scheduled plans (demo@roujaune.app / build-and-climb): tapping ANY day's workout card on /calendar navigates to /training with the correct title/duration/zone/tss in the URL query params, but the Today's Training screen ignores those params and always renders the plan's next-incomplete workout ('Threshold Climb') instead, because the calendar API returns cycling sessions with an 'id' field (not 'workout_id'), so calendar.tsx's goToWorkout() always sends workoutId='' and training.tsx's `paramId || nextPlanRide?.id` treats the empty string as falsy and silently discards the real title/duration/zone that WAS correctly passed. Confirmed this does NOT happen on greenlantern@roujaune.app (structured/custom plan with real catalog ids like 'ctr-ride-1') — calendar->training->live-ride all correctly showed 'Welcome Ride' end-to-end for that account.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "calendar -> Today's Training workout resolution (demo@roujaune.app / catalog plan build-and-climb)",
+        "issue": "Tapping any TRAINING-row day card (testID training-c1..c7) navigates to /training?workoutId=&title=<correct>&duration=<correct>&zone=<correct>&tss=<correct> — but the rendered Main Workout card ALWAYS shows 'Threshold Climb' (the plan's first not-yet-completed workout) regardless of which day was tapped, discarding the correctly-passed title/duration/zone params. Reproduced twice: tapping 'Endurance Ride' (Wed, completed) and 'Sweet Spot' (Sat, upcoming) both rendered 'Threshold Climb' on /training. This is the exact fallback-to-wrong-workout bug the review asked to confirm was fixed; it is NOT fixed for this plan type.",
+        "affected_testIDs": ["training-c1", "training-c4", "main-workout-card", "start-workout-button"]
+      }
+    ],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_regression_2026_security_hardening.py",
+    "/app/backend/tests/test_security_audit_2026_isolation.py",
+    "/app/backend/tests/test_admin_service_token.py",
+    "/app/test_reports/pytest/pytest_results_regression2026.xml",
+    "/app/test_reports/pytest/pytest_results_secaudit.xml"
+  ],
+  "action_items": [
+    "HIGH PRIORITY (matches the explicit re-verification ask): fix backend/frontend field mismatch — GET /api/calendar/week returns cycling session objects with an 'id' field but no 'workout_id' field; frontend's calendar.tsx `goToWorkout()` reads `s.workout_id` (always undefined for catalog-plan days) and sends `workoutId=''` to /training. In training.tsx, `const activeId = (paramId || nextPlanRide?.id)` then treats the empty string as falsy and silently ignores the correctly-passed title/duration/zone/tss, resolving the WRONG workout (falls back to plan's next-incomplete session). Fix options: (a) backend should populate a real `workout_id` on each calendar session, or (b) frontend should check `params.workoutId !== undefined` (not truthy) OR should prefer `meta` built from `params.title` whenever it is present, instead of only when `activePlanRide` lookup by id fails. Root cause is NOT one of the 4 audited security fixes (SEC-001/SEC-002/HARD-4/CRED-1) — pre-existing bug surfaced by this regression pass, but directly impacts the specific end-to-end flow the review explicitly asked to confirm still works.",
+    "Verify with a coach-created custom AI plan (not just catalog build-and-climb / greenlantern's ctr-ride-* plan) whether its scheduled days include a workout_id — if the coach 'Create Plan' output also omits it, the same fallback bug will hit newly created custom plans too.",
+    "Re-run the calendar->training->live-ride check after the fix, on demo@roujaune.app, tapping at least 2 different non-today days, to confirm the correct title/duration/zone/tss is shown on both /training and /workout (live ride)."
+  ],
+  "critical_code_review_comments": [
+    "auth.py USER_SCOPED addition of plan_templates/plan_skips/plan_undo/coach_pending_confirm/notification_reads verified correct via dedicated regression test (test_security_audit_2026_isolation.py) — 3/3 pass, own-user save/list/delete for plan_templates also verified working end-to-end (not just isolation).",
+    "routes/ride_photos.py DB import fix (auth.udb vs raw db) verified via TestRidePhotoIsolation — same-user read/write unaffected, cross-user list/delete/upload correctly scoped/blocked.",
+    "admin_routes.py $regex escape (HARD-4) verified: classic ReDoS payload '(a+)+$' returns 200 promptly (no hang), normal search for 'demo' still returns the expected user — no regression in search UX.",
+    "Admin password rotation fully verified both via backend/.env value and live API: old password 'letmein9900' -> 401, new rotated password -> 200, and downstream admin endpoints (users list, user detail, dashboard) all work with the new token.",
+    "goToWorkout() in calendar.tsx has a subtle falsy-empty-string bug (`s.workout_id ?? \"\"`) that, combined with training.tsx's `paramId || nextPlanRide?.id`, causes silent fallback to the wrong workout whenever a session lacks a workout_id — this is a data-integrity/UX bug independent of the security audit, but it directly breaks the specific 'custom workout resolution' regression the review asked to confirm."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_regression_2026_security_hardening.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% (24/24: 14 pre-existing security-audit + admin-service-token tests, plus 10 new regression tests, all passing)",
+    "frontend": "Admin login rotation + calendar->training navigation flow tested; 1 critical integration bug found in the exact flow under review for the demo/catalog-plan account; same flow works correctly for the structured/custom-plan account (greenlantern)"
+  },
+  "seed_data_creation": "None persistent — test_security_audit_2026_isolation.py and test_regression_2026_security_hardening.py create/cleanup their own ephemeral test riders and a TEST_-prefixed plan template per run.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All 4 security-audit fixes (CRED-1 admin password rotation, SEC-001 USER_SCOPED collections, SEC-002 ride_photos import, HARD-4 ReDoS) are verified working with ZERO regressions to normal same-user flows — safe to consider that part of the review fully passed. However, the 'custom workout resolution' feature this review explicitly asked to re-verify is BROKEN for the demo/catalog-plan account: calendar tap -> Today's Training shows a hardcoded/fallback 'Threshold Climb' instead of the tapped day's real workout, because the calendar API's session objects have no workout_id field and training.tsx's `paramId || nextPlanRide?.id` swallows the empty-string paramId. It works fine for greenlantern's account (custom ids present). Main agent should fix the field-mismatch / falsy-string bug described in action_items, then this should be retested end-to-end on demo@roujaune.app specifically (tap 2+ different days, verify /training AND /workout live ride both show the correct, matching title/duration/zone for each).",
+  "rca_of_issue": "calendar.tsx `goToWorkout()`: `workoutId: s.workout_id ?? \"\"` — the calendar session object from GET /api/calendar/week has an `id` field (e.g. 'c1') but no `workout_id` field, so this always evaluates to the nullish-coalesce fallback `\"\"`. training.tsx then does `const paramId = typeof params.workoutId === \"string\" ? params.workoutId : undefined;` (paramId becomes the empty string, still a string) followed by `const activeId = (paramId || nextPlanRide?.id)` — here `\"\" || nextPlanRide?.id` evaluates to `nextPlanRide?.id` because empty string is falsy in JS, discarding the tapped day entirely and defaulting to the plan's next not-yet-completed workout. The correctly-passed `params.title/duration/zone/tss` are then never used because `activePlanRide` (found via the wrong `activeId`) takes priority over `params.title` in building `meta`. Reproduction: login demo@roujaune.app -> /calendar -> tap any TRAINING card other than 'today' (e.g. Wed 'Endurance Ride' or Sat 'Sweet Spot') -> URL correctly shows `?title=Sweet%20Spot&...` but the rendered page shows 'Threshold Climb' every time."
+}

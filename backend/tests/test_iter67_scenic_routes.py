@@ -20,7 +20,7 @@ BASE = os.environ["EXPO_PUBLIC_BACKEND_URL"].rstrip("/")
 RIDER_EMAIL = "greenlantern@roujaune.app"
 RIDER_PASSWORD = "rideon9900"
 ADMIN_EMAIL = "roger.parenzee@gmail.com"
-ADMIN_PASSWORD = "letmein9900"
+ADMIN_PASSWORD = os.environ.get("ADMIN_LOGIN_PASSWORD", "")
 
 TIMEOUT = 25
 

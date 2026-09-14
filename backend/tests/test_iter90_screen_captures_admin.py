@@ -14,7 +14,7 @@ import requests
 BASE_URL = os.environ.get("EXPO_BACKEND_URL", "https://scenic-trainer.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api/admin/screen-captures"
 
-HWG_TOKEN = "hwg_svc_roujaune_0KR5RCmk6XI-TInq6iQTZyFXlRZGMn9J"
+HWG_TOKEN = os.environ.get("HWG_SERVICE_TOKEN", "")
 
 EXPECTED_KEYS = {"home", "plan", "workouts", "workout_list", "scenic", "progress",
                  "fitness", "calendar", "profile", "wellness"}

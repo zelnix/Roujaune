@@ -15,7 +15,7 @@ from fastapi.responses import Response
 import auth
 import storage
 from core import now_iso
-from db import db as udb
+from auth import udb
 
 router = APIRouter()
 

@@ -10,9 +10,7 @@ import pytest
 import requests
 
 BASE_URL = os.environ["EXPO_PUBLIC_BACKEND_URL"].rstrip("/")
-HWG_SERVICE_TOKEN = os.environ.get(
-    "HWG_SERVICE_TOKEN", "hwg_svc_roujaune_0KR5RCmk6XI-TInq6iQTZyFXlRZGMn9J"
-)
+HWG_SERVICE_TOKEN = os.environ.get("HWG_SERVICE_TOKEN", "")
 RIDER_EMAIL = "demo@roujaune.app"
 RIDER_PASSWORD = "demo9900"
 

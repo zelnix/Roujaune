@@ -15,7 +15,7 @@ BASE_URL = (os.environ.get("EXPO_BACKEND_URL")
 RIDER_EMAIL = "greenlantern@roujaune.app"
 RIDER_PASS = "rideon9900"
 ADMIN_EMAIL = "roger.parenzee@gmail.com"
-ADMIN_PASS = "letmein9900"
+ADMIN_PASS = os.environ.get("ADMIN_LOGIN_PASSWORD", "")
 
 
 # ---------------------------- fixtures ------------------------------------

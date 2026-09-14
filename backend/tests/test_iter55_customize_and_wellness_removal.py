@@ -19,7 +19,7 @@ assert BASE_URL, "EXPO_PUBLIC_BACKEND_URL must be set"
 RIDER_EMAIL = "greenlantern@roujaune.app"
 RIDER_PW = "rideon9900"
 ADMIN_EMAIL = "roger.parenzee@gmail.com"
-ADMIN_PW = "letmein9900"
+ADMIN_PW = os.environ.get("ADMIN_LOGIN_PASSWORD", "")
 
 FORBIDDEN_TERMS = [
     "sleep hygiene",

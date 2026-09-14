@@ -125,8 +125,12 @@ export default function LiveWorkout() {
   // plan session (not in the static catalog), build it from the schedule
   // metadata it was opened with instead of silently defaulting to the demo
   // workout — otherwise the ride itself would run the wrong intervals.
-  const selected = getWorkout(params.workoutId) ?? (params.workoutId && params.title
-    ? resolveWorkout(params.workoutId, { title: params.title, duration: params.duration, zone: params.zone, tss: params.tss })
+  // NOTE: check length, not just truthiness of the param object — an
+  // empty-string workoutId is falsy in JS and must NOT silently fall through
+  // to the hardcoded demo workout when real title/duration/zone WAS passed.
+  const hasWorkoutId = typeof params.workoutId === "string" && params.workoutId.length > 0;
+  const selected = getWorkout(params.workoutId) ?? (params.title
+    ? resolveWorkout(hasWorkoutId ? params.workoutId : undefined, { title: params.title, duration: params.duration, zone: params.zone, tss: params.tss })
     : getWorkout("threshold-climb"));
   const selectedType = selected ? WORKOUT_TYPES.find((t) => t.id === selected.typeId) : undefined;
   const workoutTitle = selected?.name ?? params.title ?? currentWorkout.title;

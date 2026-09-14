@@ -12,7 +12,7 @@ BASE = (os.environ.get("EXPO_BACKEND_URL") or os.environ.get("EXPO_PUBLIC_BACKEN
 assert BASE, "EXPO_BACKEND_URL / EXPO_PUBLIC_BACKEND_URL must be set"
 
 RIDER_A = {"email": "greenlantern@roujaune.app", "password": "rideon9900"}
-ADMIN = {"email": "roger.parenzee@gmail.com", "password": "letmein9900"}
+ADMIN = {"email": "roger.parenzee@gmail.com", "password": os.environ.get("ADMIN_LOGIN_PASSWORD", "")}
 
 
 def _hdr(t):

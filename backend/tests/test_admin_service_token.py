@@ -17,9 +17,15 @@ import pytest
 import requests
 
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "http://localhost:8001").rstrip("/")
-ADMIN_API_TOKEN = "bklwvawaWvAaYsKC6pMB0Rz7oFUPk_xUbVOcxZxOtz-KNL6PoKq9Rk-Nh-0YYqW1"
-ADMIN_EMAIL = "roger.parenzee@gmail.com"
-ADMIN_PASSWORD = "letmein9900"
+# NOTE (2026-06 security audit): this file originally tested a retired
+# mechanism named ADMIN_API_TOKEN with a hardcoded token literal. That
+# mechanism was superseded by HWG_SERVICE_TOKEN (see auth.py::_resolve_token)
+# and the old env var/code path no longer exists — testing it would have
+# been testing dead code with a leaked credential. Fixed to test the real,
+# current mechanism, reading the live token from the environment.
+HWG_SERVICE_TOKEN = os.environ.get("HWG_SERVICE_TOKEN", "")
+ADMIN_EMAIL = os.environ.get("ADMIN_LOGIN_EMAIL", "roger.parenzee@gmail.com")
+ADMIN_PASSWORD = os.environ.get("ADMIN_LOGIN_PASSWORD", "")
 RIDER_EMAIL = "demo@roujaune.app"
 RIDER_PASSWORD = "demo9900"
 
@@ -55,7 +61,7 @@ def admin_login_token(s):
 # ---------- 1) Service token grants admin -----------------------------------
 class TestServiceTokenGrantsAdmin:
     def _h(self):
-        return {"Authorization": f"Bearer {ADMIN_API_TOKEN}"}
+        return {"Authorization": f"Bearer {HWG_SERVICE_TOKEN}"}
 
     def test_admin_me(self, s):
         r = s.get(f"{BASE_URL}/api/admin/me", headers=self._h(), timeout=20)
@@ -63,9 +69,9 @@ class TestServiceTokenGrantsAdmin:
         body = r.json()
         # Response is {"admin": {...}} per admin_routes
         adm = body.get("admin") or body
-        # user_id 'svc_admin_console' is the synthetic principal
+        # user_id 'hwg_console' is the synthetic HWG service principal
         uid = adm.get("admin_id") or adm.get("user_id") or adm.get("id")
-        assert uid == "svc_admin_console", f"expected svc_admin_console, got {adm}"
+        assert uid == "hwg_console", f"expected hwg_console, got {adm}"
         assert (adm.get("role") or "").lower() == "admin"
 
     def test_admin_users(self, s):
@@ -131,9 +137,9 @@ class TestInteractiveAdminRegression:
         body = r.json()
         adm = body.get("admin") or body
         assert (adm.get("role") or "").lower() == "admin"
-        # Must NOT be the synthetic svc principal (must be the real admin store)
+        # Must NOT be the synthetic service principal (must be the real admin store)
         uid = adm.get("admin_id") or adm.get("user_id") or adm.get("id")
-        assert uid != "svc_admin_console", "interactive admin login should not resolve to service principal"
+        assert uid != "hwg_console", "interactive admin login should not resolve to service principal"
 
 
 # ---------- 5) Regression: rider auth still works on rider endpoints --------

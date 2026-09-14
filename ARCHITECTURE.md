@@ -107,7 +107,7 @@ YouTube playback over a ride, BLE cadence/HR sensors (`useBleSensors`), Chromeca
 
 ## Test accounts
 - Rider: `greenlantern@roujaune.app` / `rideon9900`
-- Console admin: `roger.parenzee@gmail.com` / `letmein9900`
+- Console admin: `roger.parenzee@gmail.com` / password rotated — see `/app/memory/test_credentials.md` (gitignored, not committed)
 (see `/app/memory/test_credentials.md`)
 
 ## Conventions

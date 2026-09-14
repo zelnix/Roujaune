@@ -60,21 +60,31 @@ export default function TodaysTraining() {
   const router = useRouter();
   const params = useLocalSearchParams<{ workoutId?: string; title?: string; duration?: string; zone?: string; tss?: string }>();
   const { plan } = usePlan();
-  const paramId = typeof params.workoutId === "string" ? params.workoutId : undefined;
+  // NOTE: must check length, not just typeof — calendar.tsx can pass an
+  // empty-string workoutId for sessions with no catalog/plan id at all, and
+  // `"" || nextPlanRide?.id` would otherwise silently discard the tapped
+  // day and fall back to a DIFFERENT (wrong) workout. See 2026-09 regression.
+  const paramId = typeof params.workoutId === "string" && params.workoutId.length > 0 ? params.workoutId : undefined;
   const nextPlanRide = (plan.workouts?.find((w) => !w.completed) ?? plan.workouts?.[0]) as any;
   const activeId = (paramId || nextPlanRide?.id) as string | undefined;
   const activePlanRide = (plan.workouts?.find((w: any) => w.id === activeId)) as any;
   // The day's actual scheduled session — from the matching plan-workout row
   // (found by id) or the route params it was opened with. Used to build a
   // real workout when the id isn't in the static catalog (coach-created plans
-  // schedule sessions by title/duration/zone/tss, not a catalog id).
-  const meta = activePlanRide
-    ? { title: activePlanRide.title, duration: activePlanRide.duration, zone: activePlanRide.zone, tss: activePlanRide.tss }
-    : params.title ? { title: params.title, duration: params.duration, zone: params.zone, tss: params.tss } : undefined;
+  // schedule sessions by title/duration/zone/tss, not a catalog id). Prefer
+  // the route params whenever THIS screen was opened for a specific tapped
+  // day (paramId present) — activePlanRide can otherwise point at an
+  // unrelated "next incomplete" session if the calendar day's id doesn't
+  // happen to match any row in plan.workouts (e.g. the static demo plan).
+  const meta = paramId && params.title
+    ? { title: params.title, duration: params.duration, zone: params.zone, tss: params.tss }
+    : activePlanRide
+      ? { title: activePlanRide.title, duration: activePlanRide.duration, zone: activePlanRide.zone, tss: activePlanRide.tss }
+      : params.title ? { title: params.title, duration: params.duration, zone: params.zone, tss: params.tss } : undefined;
   const activeWorkout = resolveWorkout(activeId, meta);
   const { week } = useCalendarWeek();
   const rideDate = React.useMemo(() => {
-    const day = (week?.days ?? []).find((d: any) => d.cycling?.workout_id === activeId);
+    const day = (week?.days ?? []).find((d: any) => d.cycling?.workout_id === activeId || d.cycling?.id === activeId);
     return day?.date ? dayjs(day.date).format("dddd, D MMMM YYYY") : undefined;
   }, [week, activeId]);
   const dateLabel = rideDate ?? activePlanRide?.footer ?? (activeWorkout ? `${plan.title ?? "Training"} · ${activeWorkout.focus}` : "Today");

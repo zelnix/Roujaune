@@ -1,0 +1,39 @@
+{
+  "summary": "Retest of the ONE critical bug from iteration_131 (calendar->training workout-resolution fallback for demo/catalog-plan accounts). Fix VERIFIED WORKING end-to-end. Frontend-only testing performed via Playwright against the live preview URL (https://scenic-trainer.preview.emergentagent.com). All 5 requested scenarios pass: (1) demo@roujaune.app tapping FRI 'Recovery Ride' and SAT 'Sweet Spot' calendar cards each correctly rendered THAT day's title/duration/zone/tss on Today's Training (not 'Threshold Climb'); (2) Start Workout from the Sweet Spot screen correctly launched the live /workout screen also showing 'Sweet Spot' (SESSION · Sweet Spot header, correct segment plan); (3) greenlantern@roujaune.app regression: tapping THU 'Pedal Smoothly' (ctr-ride-2) correctly showed Pedal Smoothly on both /training and live /workout — no regression; (4) Today's-own-day card on both accounts (demo WED 'Endurance Ride', greenlantern TUE 'Welcome Ride') still resolves correctly; (5) Rest-day sanity check on demo (TUE 'Rest Day') and greenlantern ('Complete Rest') — tapping stayed on /calendar (day just selected, no navigation), unchanged from before.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "calendar.tsx TrainingSessionCard (greenlantern/structured-plan sessions)",
+        "issue": "Minor/cosmetic: on greenlantern's structured plan, the TRAINING row card's testID renders as literal 'training-undefined' for all 4 sessions (id attribute passed to testID template is undefined) instead of a unique id like 'training-c1'. Does not affect functionality (workoutId in the URL params is correctly populated with the real catalog id e.g. ctr-ride-2) — purely a testability/debugging gap, not a functional bug.",
+        "testID": "training-undefined",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "LOW PRIORITY (optional): fix the DraggableSession/TrainingSessionCard testID generation for greenlantern-style structured plan sessions so it uses a stable unique id (e.g. `training-${d.cycling.id ?? d.cycling.workout_id ?? d.date}`) instead of rendering literally 'training-undefined' for every day — purely a test-tooling improvement, no user-facing impact."
+  ],
+  "critical_code_review_comments": [
+    "calendar.tsx goToWorkout(): `const wid = s.workout_id || s.id || \"\";` correctly falls back to the bare `id` field when workout_id is absent — verified this produces workoutId=c1..c7 for the demo catalog plan and never sends an empty string anymore.",
+    "training.tsx: `const paramId = typeof params.workoutId === \"string\" && params.workoutId.length > 0 ? params.workoutId : undefined;` correctly requires non-empty length (not just truthiness), and `meta` correctly prioritizes `params.title` whenever `paramId` is present, before falling back to `activePlanRide` lookup — verified this is what fixed the bug (each tapped day now shows its own distinct title/duration/zone instead of always 'Threshold Climb').",
+    "workout.tsx: same `hasWorkoutId = typeof params.workoutId === \"string\" && params.workoutId.length > 0` guard applied to the live-ride resolution path — verified the live workout screen also reflects the correct tapped-day workout, not a hardcoded demo default."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "not tested this pass (out of scope per review request — backend already 24/24 in iteration_131)",
+    "frontend": "100% (5/5 requested scenarios pass on both demo@roujaune.app and greenlantern@roujaune.app)"
+  },
+  "seed_data_creation": "None — used existing seeded demo/greenlantern accounts only, no data created or mutated beyond normal navigation (no workouts were completed/started to persistence).",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The iteration_131 critical bug (calendar tap -> Today's Training showing wrong/hardcoded 'Threshold Climb' for demo/catalog-plan accounts) is CONFIRMED FIXED. Verified with 2 distinct non-today days (Recovery Ride, Sweet Spot) on demo@roujaune.app, plus the full Start Workout -> live /workout chain, plus regression on greenlantern@roujaune.app (Pedal Smoothly, ctr-ride-2), plus today's-own-day and rest-day sanity checks on both accounts. No further action needed on this specific flow. Only remaining note is a cosmetic testID gap ('training-undefined') on greenlantern's structured-plan training cards — non-blocking, optional cleanup only.",
+  "rca_of_issue": "N/A — this pass is a verification-only retest confirming the previously-identified RCA (empty-string workoutId falsy-coalescing in training.tsx/calendar.tsx) has been correctly fixed per the described code changes in calendar.tsx, training.tsx, and workout.tsx."
+}

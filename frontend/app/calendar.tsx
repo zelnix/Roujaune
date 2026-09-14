@@ -132,11 +132,17 @@ export default function CalendarScreen() {
   // day header, the training-row card itself, and rider-scheduled cards.
   // Returns false (does nothing) for rest days / empty sessions so callers
   // can fall back to the day-detail popup where there's nothing to "view".
-  const goToWorkout = React.useCallback((s?: { workout_id?: string; title?: string; duration?: string; zone?: string; tss?: string; status?: SessionStatus } | null) => {
+  const goToWorkout = React.useCallback((s?: { id?: string; workout_id?: string; title?: string; duration?: string; zone?: string; tss?: string; status?: SessionStatus } | null) => {
     if (!s) return false;
     const isRestRide = s.status === "rest" || (!s.workout_id && !s.duration);
-    if (isRestRide || !(s.workout_id || s.title)) return false;
-    router.push({ pathname: "/training", params: { workoutId: s.workout_id ?? "", title: s.title, duration: s.duration, zone: s.zone, tss: s.tss } } as any);
+    if (isRestRide || !(s.workout_id || s.id || s.title)) return false;
+    // Structured/custom plan days carry a real `workout_id` (may resolve from
+    // the static catalog); the static demo calendar's days only have a bare
+    // `id` (e.g. "c1") with no `workout_id` at all — either way we MUST pass
+    // a non-empty id string, or training.tsx's `paramId || nextPlanRide?.id`
+    // treats "" as falsy and silently swaps in a different (wrong) workout.
+    const wid = s.workout_id || s.id || "";
+    router.push({ pathname: "/training", params: { workoutId: wid, title: s.title, duration: s.duration, zone: s.zone, tss: s.tss } } as any);
     return true;
   }, [router]);
 

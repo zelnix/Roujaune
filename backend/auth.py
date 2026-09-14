@@ -70,6 +70,13 @@ USER_SCOPED = {
     "settings", "calendar_weeks", "rider_prs", "rider_prefs", "rider_appearance", "kv_prefs",
     "rider_workouts", "scenic_favourites", "scenic_discoveries", "scenic_recap_covers", "mode_interest",
     "billing",
+    # Added 2026-09 security audit (SEC-001): these were previously queried via
+    # the SAME `udb` proxy but were missing from this set, so the proxy quietly
+    # returned the RAW unscoped collection — any authenticated rider could read
+    # (plan_templates: `find({})`) or collide with (plan_skips/plan_undo/
+    # coach_pending_confirm/notification_reads: fixed doc ids with no owner
+    # filter) another rider's data. See SECURITY_AUDIT_REPORT.md SEC-001.
+    "plan_templates", "plan_skips", "plan_undo", "coach_pending_confirm", "notification_reads",
 }
 
 # Per-user benchmark collections (scoped by explicit user_id filters, not via udb).

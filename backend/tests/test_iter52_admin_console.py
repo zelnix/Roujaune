@@ -16,7 +16,7 @@ import requests
 BASE = os.environ["EXPO_PUBLIC_BACKEND_URL"].rstrip("/")
 
 ADMIN_EMAIL = "roger.parenzee@gmail.com"
-ADMIN_PW = "letmein9900"
+ADMIN_PW = os.environ.get("ADMIN_LOGIN_PASSWORD", "")
 RIDER_EMAIL = "greenlantern@roujaune.app"
 RIDER_PW = "rideon9900"
 
