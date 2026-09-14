@@ -56,7 +56,6 @@ export function DraggableSession({
 
   const tap = Gesture.Tap().maxDuration(250).onEnd(() => { runOnJS(onSelect)(); });
   const pan = Gesture.Pan()
-    .enabled(enabled)
     .activateAfterLongPress(240)
     .onStart(() => { dragging.value = 1; })
     .onUpdate((e) => { tx.value = e.translationX; ty.value = e.translationY; })
@@ -71,6 +70,14 @@ export function DraggableSession({
     zIndex: dragging.value ? 50 : 1,
     opacity: dragging.value ? 0.94 : 1,
   }));
+
+  // Rest days / non-draggable sessions: skip the gesture composition entirely.
+  // On web, Gesture.Exclusive(pan, tap) stops recognizing taps once the Pan
+  // member is disabled, so a plain tap-only Pressable is used instead —
+  // selecting the day still works even though there's nothing to drag.
+  if (!enabled) {
+    return <Pressable onPress={onSelect}>{children}</Pressable>;
+  }
 
   return (
     <GestureDetector gesture={gesture}>
