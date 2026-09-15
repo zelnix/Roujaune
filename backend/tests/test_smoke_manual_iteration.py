@@ -123,7 +123,7 @@ class TestAdmin:
     def test_admin_login_and_integrations_default(self, api_client):
         r = api_client.post(f"{BASE_URL}/api/admin/login", json={
             "email": "roger.parenzee@gmail.com",
-            "password": os.environ.get("ADMIN_LOGIN_PASSWORD", "8hvOdFrIOPe0Tt366afx")
+            "password": os.environ.get("ADMIN_LOGIN_PASSWORD", "")
         })
         assert r.status_code == 200, f"admin login failed: {r.status_code} {r.text}"
         token = r.json().get("token") or r.json().get("access_token")

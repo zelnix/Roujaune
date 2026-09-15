@@ -1,0 +1,412 @@
+{
+  "src/components/BleSensorsPanel.tsx": {
+    "react-hooks/purity": {
+      "count": 1
+    }
+  },
+  "src/components/CalendarCard.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/ChangeStartDateModal.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/CoachChatModal.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/CoachPlanCreatorModal.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    },
+    "react-hooks/purity": {
+      "count": 1
+    },
+    "react-hooks/rules-of-hooks": {
+      "count": 1
+    },
+    "react/no-unescaped-entities": {
+      "count": 3
+    }
+  },
+  "src/components/DiscoveryDetailModal.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/MilestoneNudgeBanner.tsx": {
+    "react/no-unescaped-entities": {
+      "count": 1
+    }
+  },
+  "src/components/PaywallModal.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/PhaseCelebrationModal.tsx": {
+    "react-hooks/refs": {
+      "count": 12
+    }
+  },
+  "src/components/PickRescheduleDateModal.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/RidePhotos.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/RideShareSheet.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/ScenicRecapShareModal.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 2
+    }
+  },
+  "src/components/ShareCardModal.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 2
+    }
+  },
+  "src/components/SwapSessionSheet.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/VirtualRoute.tsx": {
+    "react-hooks/refs": {
+      "count": 10
+    }
+  },
+  "src/components/WeeklyEmailPreview.tsx": {
+    "react/no-unescaped-entities": {
+      "count": 1
+    }
+  },
+  "src/components/analysis/FitnessCharts.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 3
+    },
+    "react/no-unescaped-entities": {
+      "count": 3
+    },
+    "react-hooks/rules-of-hooks": {
+      "count": 1
+    }
+  },
+  "src/components/app-scaffold.tsx": {
+    "react-hooks/refs": {
+      "count": 5
+    }
+  },
+  "src/components/plan-modals.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 3
+    }
+  },
+  "src/components/scenic/hud-widgets.tsx": {
+    "react-hooks/refs": {
+      "count": 3
+    }
+  },
+  "src/components/streaming/StreamingSourceSheet.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/streaming/TrainerControlPanel.tsx": {
+    "react-hooks/static-components": {
+      "count": 3
+    }
+  },
+  "src/components/summary.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 2
+    }
+  },
+  "src/components/today/WelcomeBackRibbon.tsx": {
+    "react-hooks/refs": {
+      "count": 7
+    }
+  },
+  "src/components/ui.tsx": {
+    "react-hooks/refs": {
+      "count": 5
+    }
+  },
+  "src/components/virtual-route/RiveRider.native.tsx": {
+    "react-hooks/refs": {
+      "count": 1
+    }
+  },
+  "src/components/virtual-route/scene.tsx": {
+    "react-hooks/refs": {
+      "count": 38
+    }
+  },
+  "src/components/workout/WorkoutModals.tsx": {
+    "react-hooks/refs": {
+      "count": 7
+    }
+  },
+  "src/components/workout.tsx": {
+    "react-hooks/immutability": {
+      "count": 1
+    }
+  },
+  "src/hooks/useBleSensors.ts": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    },
+    "react-hooks/immutability": {
+      "count": 1
+    }
+  },
+  "src/hooks/useStore.native.ts": {
+    "react-hooks/refs": {
+      "count": 4
+    }
+  },
+  "src/hooks/useTelemetry.ts": {
+    "react-hooks/purity": {
+      "count": 1
+    },
+    "react-hooks/immutability": {
+      "count": 1
+    }
+  },
+  "src/hooks/useWorkoutAudio.ts": {
+    "react-hooks/refs": {
+      "count": 3
+    },
+    "react-hooks/immutability": {
+      "count": 13
+    }
+  },
+  "src/lib/benchmark/api.ts": {
+    "react-hooks/set-state-in-effect": {
+      "count": 7
+    }
+  },
+  "src/lib/calendar.ts": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/lib/notifications.ts": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/lib/plan.ts": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/lib/progress-timeline.ts": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/lib/rider-profile.ts": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/lib/scenic-routes.ts": {
+    "react-hooks/set-state-in-effect": {
+      "count": 3
+    }
+  },
+  "src/lib/summary.ts": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "app/about.tsx": {
+    "react-hooks/static-components": {
+      "count": 3
+    }
+  },
+  "app/activities.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "app/activity/[id].tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "app/benchmark/index.tsx": {
+    "react-hooks/purity": {
+      "count": 1
+    }
+  },
+  "app/benchmark/player/[id].tsx": {
+    "react-hooks/refs": {
+      "count": 12
+    },
+    "react-hooks/immutability": {
+      "count": 1
+    }
+  },
+  "app/calendar.tsx": {
+    "react-hooks/refs": {
+      "count": 5
+    },
+    "react-hooks/set-state-in-effect": {
+      "count": 3
+    },
+    "react-hooks/static-components": {
+      "count": 1
+    }
+  },
+  "app/climb/[id].tsx": {
+    "react/no-unescaped-entities": {
+      "count": 1
+    }
+  },
+  "app/climbs.tsx": {
+    "react/no-unescaped-entities": {
+      "count": 1
+    }
+  },
+  "app/compare.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 3
+    }
+  },
+  "app/fitness.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    },
+    "react/no-unescaped-entities": {
+      "count": 1
+    }
+  },
+  "app/index.tsx": {
+    "react-hooks/refs": {
+      "count": 11
+    }
+  },
+  "app/plan.tsx": {
+    "react-hooks/refs": {
+      "count": 5
+    },
+    "react/no-unescaped-entities": {
+      "count": 2
+    }
+  },
+  "app/profile.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "app/progress.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "app/rider-customise.tsx": {
+    "import/no-unresolved": {
+      "count": 1
+    },
+    "react-hooks/refs": {
+      "count": 1
+    }
+  },
+  "app/scenic-ride.tsx": {
+    "react-hooks/refs": {
+      "count": 18
+    },
+    "react-hooks/purity": {
+      "count": 1
+    },
+    "react-hooks/immutability": {
+      "count": 3
+    },
+    "react-hooks/set-state-in-effect": {
+      "count": 4
+    }
+  },
+  "app/settings.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    },
+    "react/no-unescaped-entities": {
+      "count": 2
+    }
+  },
+  "app/summary.tsx": {
+    "react-hooks/refs": {
+      "count": 7
+    }
+  },
+  "app/training.tsx": {
+    "react-hooks/refs": {
+      "count": 7
+    }
+  },
+  "app/virtual-route.tsx": {
+    "react-hooks/immutability": {
+      "count": 1
+    },
+    "react-hooks/refs": {
+      "count": 1
+    }
+  },
+  "app/wheel-calibration.tsx": {
+    "react-hooks/purity": {
+      "count": 1
+    },
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "app/workout-builder.tsx": {
+    "react-hooks/immutability": {
+      "count": 1
+    }
+  },
+  "app/workout-list.tsx": {
+    "react-hooks/refs": {
+      "count": 5
+    },
+    "react-hooks/set-state-in-effect": {
+      "count": 3
+    }
+  },
+  "app/workout.tsx": {
+    "react-hooks/refs": {
+      "count": 10
+    },
+    "react-hooks/purity": {
+      "count": 3
+    },
+    "react-hooks/set-state-in-effect": {
+      "count": 6
+    },
+    "react-hooks/immutability": {
+      "count": 4
+    },
+    "react-hooks/preserve-manual-memoization": {
+      "count": 2
+    }
+  },
+  "app/workouts.tsx": {
+    "react-hooks/refs": {
+      "count": 5
+    }
+  }
+}

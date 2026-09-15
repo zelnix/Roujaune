@@ -17,7 +17,7 @@ import requests
 BASE = (os.environ.get("EXPO_BACKEND_URL") or os.environ.get("EXPO_PUBLIC_BACKEND_URL") or "http://localhost:8001").rstrip("/")
 
 ADMIN_EMAIL = "roger.parenzee@gmail.com"
-ADMIN_PW_NEW = "8hvOdFrIOPe0Tt366afx"
+ADMIN_PW_NEW = os.environ.get("ADMIN_LOGIN_PASSWORD", "")
 ADMIN_PW_OLD = "letmein9900"
 
 DEMO_EMAIL = "demo@roujaune.app"

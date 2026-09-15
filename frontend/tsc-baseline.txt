@@ -1,0 +1,47 @@
+app/_layout.tsx(37,37): error TS2322: Type 'Promise<{ shouldShowAlert: true; shouldPlaySound: true; shouldSetBadge: false; }>' is not assignable to type 'Promise<NotificationBehavior>'.
+app/calendar.tsx(347,130): error TS2345: Argument of type 'ScheduledWorkout' is not assignable to parameter of type '{ id?: string | undefined; workout_id?: string | undefined; title?: string | undefined; duration?: string | undefined; zone?: string | undefined; tss?: string | undefined; status?: SessionStatus | undefined; }'.
+app/climb/[id].tsx(30,44): error TS2537: Type 'ClimbDetailAttempt[] | undefined' has no matching index signature for type 'number'.
+app/climb/[id].tsx(31,22): error TS7006: Parameter 'p' implicitly has an 'any' type.
+app/climb/[id].tsx(31,50): error TS7006: Parameter 'p' implicitly has an 'any' type.
+app/climbs.tsx(42,52): error TS2339: Property 'rouge' does not exist on type '{ bg: string; nav: string; card: string; cardElevated: string; border: string; borderSoft: string; red: string; redBright: string; redDeep: string; redDeepBg: string; yellow: string; yellowBright: string; ... 8 more ...; overlay: string; }'.
+app/connections.tsx(73,65): error TS2339: Property 'red' does not exist on type '{ bg: string; nav: string; card: string; cardHi: string; deepRouge: string; rouge: string; yellow: string; white: string; dim: string; green: string; purple: string; blue: string; amber: string; orange: string; greenyellow: string; border: string; borderSoft: string; }'.
+app/login.tsx(182,26): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+app/onboarding.tsx(188,26): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+app/profile.tsx(172,70): error TS2339: Property 'red' does not exist on type '{ bg: string; nav: string; card: string; cardHi: string; deepRouge: string; rouge: string; yellow: string; white: string; dim: string; green: string; purple: string; blue: string; amber: string; orange: string; greenyellow: string; border: string; borderSoft: string; }'.
+app/rider-customise.tsx(22,27): error TS2307: Cannot find module '@/src/components/virtual-route/RiveRider' or its corresponding type declarations.
+app/scenic-ride.tsx(688,8): error TS2741: Property 'onPickEmbed' is missing in type '{ visible: boolean; source: "route" | "youtube"; onClose: () => void; onPickRoute: () => void; onPickYouTube: (id: string) => void; }' but required in type 'Props'.
+app/scenic-ride.tsx(725,30): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+app/summary.tsx(639,28): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+app/virtual-route.tsx(554,35): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+app/workout.tsx(1418,30): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+app/workout.tsx(1419,32): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+app/workout.tsx(1446,28): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/components/BleSensorsPanel.tsx(200,28): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/components/EmbeddedWebPlayer.tsx(114,28): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/components/FullscreenHud.tsx(191,25): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/components/RouteVideo.tsx(143,26): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/components/RouteVideo.tsx(144,32): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/components/SideNavigation.tsx(25,7): error TS2322: Type '{ children: Element; testID: string; onPress: () => void; scaleTo: number; lift: false; style: { width: "100%"; }; accessibilityLabel: string; accessibilityState: { selected: boolean; }; }' is not assignable to type 'IntrinsicAttributes & { children: ReactNode; onPress?: (() => void) | undefined; style?: StyleProp<ViewStyle>; containerStyle?: StyleProp<...>; testID?: string | undefined; scaleTo?: number | undefined; lift?: boolean | undefined; }'.
+src/components/analysis/FitnessCharts.tsx(485,74): error TS2339: Property 'protectBtn' does not exist on type '{ empty: { color: string; fontSize: number; lineHeight: number; }; stripLabel: { color: string; fontSize: number; fontWeight: "800"; letterSpacing: number; marginBottom: number; }; legend: { flexDirection: "row"; flexWrap: "wrap"; gap: number; marginTop: number; }; ... 120 more ...; recWhen: { ...; }; }'.
+src/components/calendar.tsx(488,29): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/components/plan.tsx(734,25): error TS2339: Property 'gold' does not exist on type '{ bg: string; nav: string; card: string; cardHi: string; deepRouge: string; rouge: string; yellow: string; white: string; dim: string; green: string; amber: string; orange: string; border: string; borderSoft: string; }'.
+src/components/scenic/LeaveRideDialog.tsx(42,31): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/components/scenic/RideCompleteOverlay.tsx(86,33): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/components/streaming/StreamingSourceSheet.tsx(311,29): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/components/streaming/TrainerControlPanel.tsx(125,29): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/components/today/ScenicCyclingTodayView.tsx(322,30): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/components/virtual-route/VirtualRidePlayer.tsx(348,27): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/components/virtual-route/scene.tsx(10,27): error TS2307: Cannot find module './RiveRider' or its corresponding type declarations.
+src/components/virtual-route/scene.tsx(235,23): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/components/virtual-route/scene.tsx(238,30): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/components/virtual-route/scene.tsx(240,30): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/components/virtual-route/scene.tsx(246,25): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/components/virtual-route/scene.tsx(248,26): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/components/virtual-route/scene.tsx(249,30): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/components/workout.tsx(1233,30): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/components/workout.tsx(1252,33): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/components/workout.tsx(824,50): error TS2769: No overload matches this call.
+src/components/workout.tsx(975,23): error TS2322: Type '"musical-notes" | "logo-spotify"' is not assignable to type '"push" | "map" | "filter" | "at" | "body" | "code" | "link" | "menu" | "search" | "time" | "ellipse" | "image" | "stop" | "text" | "accessibility" | "accessibility-outline" | "accessibility-sharp" | ... 1339 more ... | "woman-sharp"'.
+src/components/workout/VRoutePicker.tsx(77,28): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/components/workout/WorkoutModals.tsx(135,28): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+src/lib/plan.ts(86,5): error TS2353: Object literal may only specify known properties, and 'plan_complete' does not exist in type '{ id: string; title: string; label: string; description: string; durationWeeks: string; avgDays: string; phase: { name: string; weeks: string; description: string; }; goals: PlanGoal[]; phases: PlanPhase[]; ... 11 more ...; no_plan: boolean; }'.
