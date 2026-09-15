@@ -224,11 +224,11 @@ export default function TrainingPlanScreen() {
   const Grid = (
     <View style={styles.gridInner}>
       <View style={styles.headerRow}>
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, minWidth: 220 }}>
           <PlanHeader />
           <PlanTabs active={tab} onChange={setTab} />
         </View>
-        <View style={styles.headerRight}>
+        <View style={[styles.headerRight, compact && styles.headerRightCompact]}>
           {hasPlan ? (
             <Pressable
               testID="change-start-date"
@@ -380,8 +380,15 @@ const styles = StyleSheet.create({
   npBtnPrimary: { backgroundColor: C.rouge },
   npBtnGhost: { backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: "rgba(255,255,255,0.12)" },
   npBtnText: { color: C.white, fontSize: 15, fontWeight: "700" },
-  headerRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 20 },
-  headerRight: { flexDirection: "row", alignItems: "center", gap: 14 },
+  headerRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 20, flexWrap: "wrap" },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 14, flexWrap: "wrap", justifyContent: "flex-start" },
+  // On phones (compact), headerRight must own a fully-bounded row width for
+  // its own flexWrap to actually break the 3 action buttons onto multiple
+  // lines instead of overflowing past the screen edge (Yoga only wraps a
+  // flex item's children once that item itself has a resolved width — an
+  // unconstrained "size to content" row never triggers the wrap). On
+  // tablets/desktop it stays natural-width, side-by-side with the title.
+  headerRightCompact: { width: "100%" },
   messageBtn: { flexDirection: "row", alignItems: "center", gap: 9, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12, minHeight: 44 },
   messageBtnHover: { borderColor: "rgba(255,194,10,0.4)", backgroundColor: "rgba(255,255,255,0.05)" },
   messageAvatar: { width: 26, height: 26, borderRadius: 13, backgroundColor: "rgba(255,255,255,0.08)" },

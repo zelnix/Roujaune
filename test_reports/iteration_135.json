@@ -1,0 +1,59 @@
+{
+  "summary": "Backend regression re-confirmed green (826 passed, 2 skipped, 0 failed). Verified the 3 mechanical pointerEvents prop->style fixes (EmbeddedWebPlayer.tsx, ble-context.tsx, app/index.tsx) are correctly applied — no behavior regression found. Verified the plan.tsx headerRow flexWrap fix DOES stop the title from wrapping letter-by-letter (title renders cleanly on its own line at 375px/360px). However, found that the action-button row (Change start date / Create plan / Message Coach) does NOT wrap onto a second line as intended — the 'Message Alberto/Coach' button is pushed off-screen (x=330, width=188 -> extends to x=519 on a 375px viewport) and is visually/functionally unreachable without a horizontal scroll (which the screen doesn't support). Ran the full release-journey: signup->login demo@roujaune.app/demo9900 worked, Today/Plan/Calendar/Settings/Profile navigation worked, sign-out + re-login persisted session/data correctly. CRITICAL finding: tested Coach chat plan-edit end-to-end exactly as requested — asked Alberto to shorten a workout duration; the coach REPLIED claiming it applied the change ('I have updated your plan to shorten that threshold climb to forty-five minutes...') but the API response showed plan_updated: false, plan_change: '' and neither /api/plan nor /api/plan/adaptations reflect any change — this is a hallucinated confirmation bug, not a benign no-op. Coach chat text quality/naturalness (adaptation_history context addition) reads well, no garbled text observed in any of several exchanges tested.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/coach/chat",
+        "issue": "Companion plan-edit intent for 'shorten/change a workout's duration' is not recognized/applied by companion_plan.has_plan_edit_intent()/extract_plan_ops. The LLM reply falsely confirms the change was made ('I have updated your plan to shorten that threshold climb to forty-five minutes as you requested') while the JSON response explicitly returns plan_updated: false, plan_change: \"\", can_undo: false — and neither GET /api/plan nor GET /api/plan/adaptations show any resulting change (workout duration stayed '1h 00m', no new adaptation_history entry). This is a misleading/hallucinated confirmation that could seriously mislead riders into thinking their plan was edited when it was not.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "app/plan.tsx headerRight (Change start date / Create plan / Message Coach buttons)",
+        "issue": "At narrow mobile viewports (360-375px), headerRight's flexWrap:'wrap' does not actually wrap its 3-4 children onto a second line — instead the row overflows and the last button ('Message Alberto', testID=message-coach) is rendered mostly/fully off-screen (bounding box x=330.6, width=188.6 on a 375px-wide screen) and is not reachable by normal scrolling (the outer ScrollView is vertical-only). Verified via bounding_box() measurements: change-start-date x=22 w=160, create-plan-btn x=196 w=121, message-coach x=330 w=189 (extends to x=519, ~144px beyond the viewport). The title fix itself (headerRow flexWrap) works correctly — title no longer squeezes into single-letter column — but the button row needs its own fix (e.g. reduce button min-widths at narrow breakpoints, or ensure headerRight's flex-wrap line is constrained to the row's available width so it truly wraps instead of overflowing).",
+        "testID": "message-coach",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Coach chat plan-edit (duration change) via UI",
+        "issue": "Reproduced via UI: opened Coach chat on Plan screen, asked 'Can you make my next scheduled workout 15 minutes shorter?' — Alberto's reply claimed the change was applied, but the Key Workouts list on Plan screen (and Calendar) still shows the original 1h 00m duration after refresh. See backend_issues.critical for root cause (plan_updated:false returned by /api/coach/chat, no adaptation recorded).",
+        "affected_testIDs": ["message-coach"]
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "plan.tsx (Overview tab)",
+        "issues": [
+          "PlanTabs row ('Overview / Phases / Key Workouts / Load & Progress...') is also clipped at the right edge at 360-375px width (text 'Load & Progress' cut to 'Load & Pro...') — likely needs horizontal scroll or wrap, same root cause as the header button overflow."
+        ]
+      }
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/pytest/iter135_run1.xml"
+  ],
+  "action_items": [
+    "Fix headerRight (plan.tsx) so buttons actually wrap to a second row at narrow widths instead of overflowing off-screen — verify with bounding_box checks at 360/375px that all 3-4 action buttons remain within the viewport.",
+    "CRITICAL: Investigate why companion_plan.extract_plan_ops does not recognize duration-shortening requests as an editable op, AND why the LLM confirms an edit was applied when plan_updated is false — this is a trust-breaking hallucination that should either (a) be caught by extending companion_plan intent patterns to cover duration/time changes, or (b) have the prompt explicitly told NOT to claim success when no ops were extracted/applied.",
+    "Consider also checking other plan-edit phrasings (e.g. 'make it easier', 'reduce the intensity') for the same false-confirmation pattern, since this suggests a systemic gap between what companion_plan.has_plan_edit_intent() covers and what the LLM believes it can promise.",
+    "Minor: PlanTabs row is also cut off at narrow widths — consider making it horizontally scrollable or wrap similarly."
+  ],
+  "critical_code_review_comments": [
+    "coach.py's coach_chat handler applies plan edits only through a fixed set of regex-guarded code paths (_START_RE, _REST_RE, _SESSION_MOVE_RE, _SCHEDULE_RE, _FTP_RE, _DAYS_RE, _GOAL_RE, _PAUSE_RE, _RESUME_RE, companion_plan.has_plan_edit_intent) before generating the final LLM reply — but the LLM reply generation itself is not constrained to only claim success when one of these paths actually set plan_updated=True. This is a prompt/architecture gap: the final natural-language reply should be conditioned on the actual plan_updated/applied_note state, not generated independently and potentially inventing confirmations.",
+    "plan.tsx styles.headerRight has flexWrap:'wrap' but its parent flex item (in headerRow) is not itself given a maxWidth/flexShrink bound to the row's available width when it wraps to its own line — this lets its un-wrapped total content width exceed the viewport instead of forcing an internal wrap. A width:'100%' or alignSelf:'stretch' on headerRight when it's alone on its line would likely fix this."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (826/828 executable, 2 intentionally skipped)", "frontend": "~85% (core navigation/auth/session flows pass; header button overflow + coach chat false-confirmation are real regressions/gaps found)"},
+  "seed_data_creation": "None created; used existing demo@roujaune.app seeded account.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend suite green (826/2/0), re-confirmed via /app/test_reports/pytest/iter135_run1.xml. The 3 pointerEvents mechanical fixes and the plan.tsx title-wrap fix are verified correct — no regression. Two NEW findings this round: (1) HIGH priority frontend bug — plan.tsx header action-button row overflows off-screen at narrow viewports instead of wrapping (message-coach button unreachable at 375px). (2) CRITICAL backend/integration bug — coach chat can hallucinate a plan-edit confirmation ('I have updated your plan...') when plan_updated is actually false and nothing changed server-side, specifically for workout-duration-shortening requests. Note: profile screen for demo@roujaune.app shows display name 'Green Lantern' instead of 'Demo Rider' (login API returns name='Demo Rider' but /profile shows 'Green Lantern') — likely stale/cross-contaminated seed data in this shared preview DB from earlier test iterations rather than a new regression; flagging for awareness but did not investigate root cause given time constraints.",
+  "rca_of_issue": "For the coach-chat false-confirmation bug: routes/coach.py's coach_chat() builds a final LLM prompt/reply after running through ordered regex/intent handlers (start-date, rest-day, session-move, schedule, undo, ftp, days, goal, pause/resume, style, missed-workout, companion_plan.has_plan_edit_intent). None of these patterns match a phrase like 'make my workout 15 minutes shorter' (there is no duration-shortening regex, and companion_plan.has_plan_edit_intent() apparently also doesn't classify it as a plan-edit intent, or extract_plan_ops returned no ops). Because none of these set plan_updated=True, the final LLM system/user prompt is still built and sent to the model, which is not explicitly told 'no plan change was actually applied' — so the persona happily fabricates a confirmation sentence. Fix requires either widening the intent coverage (map duration-shortening language to a companion_plan op) or explicitly informing the LLM's prompt when plan_updated is False so it does not claim to have made a change."
+}

@@ -816,6 +816,18 @@ async def _build_rider_context(plan_id: str = "") -> str:
         zbias_txt = ", ".join(f"{z} {'+' if v > 0 else ''}{v}%" for z, v in zbias.items() if v)
         if zbias_txt:
             lines.append("Auto-tuned zone targets based on recent execution: " + zbias_txt + ".")
+        # The coach's OWN past plan-adaptation decisions (taper-apply, low-
+        # compliance auto-ease, FTP updates, start-date resets, etc.) are
+        # recorded in adaptation_history but happen silently — they are NOT
+        # chat messages, so without this the coach has zero memory of having
+        # made them in a NEW conversation (e.g. rider asks "why does this
+        # week feel easier?" right after a silent auto-ease). Surface the
+        # most recent ones so the coach can reference its own prior reasoning.
+        hist = plan.get("adaptation_history") or []
+        if hist:
+            bits = [f"{h.get('text')} ({(h.get('at') or '')[:10]})" for h in hist[:2] if h.get("text")]
+            if bits:
+                lines.append("Coach's own recent adaptation notes on this plan: " + "; ".join(bits) + ".")
     except Exception:
         logging.warning("rider context: plan lookup failed")
 
@@ -1225,7 +1237,15 @@ async def coach_chat(req: CoachChatRequest):
 
     # Companion plan editing: if the rider asks for a plan change, turn it into
     # safe structured edits and apply them so the coach can confirm in-reply.
+    # `edit_intent_unfulfilled` tracks the case that caused a real bug: the
+    # rider's message reads like a plan-edit request, has_plan_edit_intent()
+    # matched, but nothing was actually applied (no structured "weeks" plan,
+    # or the extractor couldn't map it to a concrete op) — WITHOUT this flag,
+    # the LLM reply below had zero signal that no edit happened and would
+    # cheerfully confirm a change that never touched the rider's plan.
+    edit_intent_unfulfilled = False
     if not plan_updated and not clarify and not confirm_prompt and companion_plan.has_plan_edit_intent(req.message):
+        edit_intent_unfulfilled = True
         try:
             plan_id = await _active_plan_id()
             # Read the RIDER'S OWN snapshot (never the shared admin template) —
@@ -1243,6 +1263,7 @@ async def coach_chat(req: CoachChatRequest):
                 )
                 if applied:
                     plan_updated = True
+                    edit_intent_unfulfilled = False
                     applied_note = summary or ("; ".join(applied))
                     await _record_adaptation(
                         plan_id, req.coach_name,
@@ -1267,6 +1288,15 @@ async def coach_chat(req: CoachChatRequest):
     ) + (
         f"IMPORTANT: {clarify} Do not claim anything was changed — ask one short, friendly question.\n\n"
         if (clarify and not applied_note and not confirm_prompt) else ""
+    ) + (
+        "IMPORTANT: The rider is asking for a plan change, but NO change was actually made to "
+        "their plan this turn (their current plan can't be edited this way right now, or the "
+        "request wasn't specific enough to safely apply). Do NOT say or imply that you changed, "
+        "shortened, adjusted, or updated their plan — that would be false. Instead, be honest and "
+        "warm: acknowledge what they're asking for, and either ask one short clarifying question "
+        "(e.g. which specific ride/day), or explain you can't directly edit this plan yet and "
+        "suggest a simple workaround they can do themselves.\n\n"
+        if (edit_intent_unfulfilled and not applied_note and not confirm_prompt and not clarify) else ""
     ) + f"Rider: {req.message.strip()}\n{req.coach_name}:"
 
     try:

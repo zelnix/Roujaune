@@ -50,8 +50,8 @@ function Toast({ message, onUndo }: { message: ToastMsg | null; onUndo?: () => v
         styles.toast,
         shadow.glow,
         { opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] }) }] },
+        { pointerEvents: message.undo ? "box-none" : "none" },
       ]}
-      pointerEvents={message.undo ? "box-none" : "none"}
     >
       <Ionicons name="checkmark-circle" size={18} color={colors.yellow} />
       <Text style={styles.toastText} numberOfLines={2}>{message.text}</Text>

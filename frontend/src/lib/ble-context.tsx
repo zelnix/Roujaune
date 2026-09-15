@@ -123,7 +123,7 @@ export function BLEProvider({ children }: { children: React.ReactNode }) {
     <BLEContext.Provider value={value}>
       {children}
       {reconnectingName ? (
-        <View pointerEvents="none" style={[styles.banner, { top: insets.top + 10 }]}>
+        <View style={[styles.banner, { top: insets.top + 10, pointerEvents: "none" }]}>
           <View style={styles.dot} />
           <Text style={styles.bannerText}>Reconnecting to {reconnectingName}…</Text>
         </View>

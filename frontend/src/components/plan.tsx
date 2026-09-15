@@ -298,7 +298,13 @@ export function PlanSelector({ value, onPress }: { value: string; onPress: () =>
 
 export function PlanTabs({ active, onChange }: { active: string; onChange: (t: string) => void }) {
   return (
-    <View style={s.tabs} accessibilityRole="tablist">
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      accessibilityRole="tablist"
+      contentContainerStyle={s.tabs}
+      style={s.tabsScroll}
+    >
       {PLAN_TABS.map((t) => {
         const on = active === t;
         return (
@@ -309,7 +315,7 @@ export function PlanTabs({ active, onChange }: { active: string; onChange: (t: s
           </Pressable>
         );
       })}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -744,7 +750,8 @@ const s = StyleSheet.create({
   selectorLabel: { color: C.dim, fontSize: 13 },
   selectorValue: { color: C.white, fontSize: 14, fontWeight: "700", flex: 1 },
 
-  tabs: { flexDirection: "row", gap: 26, marginTop: 14, borderBottomWidth: 1, borderBottomColor: C.borderSoft },
+  tabs: { flexDirection: "row", gap: 26, alignItems: "flex-end", paddingRight: 8 },
+  tabsScroll: { marginTop: 14, borderBottomWidth: 1, borderBottomColor: C.borderSoft },
   tab: { paddingBottom: 10 },
   tabText: { color: C.dim, fontSize: 14, fontWeight: "600" },
   tabTextOn: { color: C.white, fontWeight: "800" },

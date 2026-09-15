@@ -86,7 +86,7 @@ export function EmbeddedWebPlayer({
             testID="embed-webview"
           />
           {loading && (
-            <View style={wp.loading} pointerEvents="none">
+            <View style={[wp.loading, { pointerEvents: "none" }]}>
               <ActivityIndicator color={colors.yellow} />
             </View>
           )}
