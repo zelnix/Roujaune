@@ -12,6 +12,7 @@ Covers:
  - POST /api/connections/garmin/callback (400 when not configured)
 """
 import os
+import uuid
 import pytest
 import requests
 
@@ -30,8 +31,19 @@ API = f"{BASE_URL}/api"
 
 @pytest.fixture(scope="module")
 def api():
+    """A fresh throwaway rider so outdoor-ride counts start at an exact zero —
+    reusing a long-lived shared fixture account (Green Lantern/demo) would make
+    the exact-4-rides assertions flaky since those accounts accumulate real
+    history across many test runs."""
     s = requests.Session()
     s.headers.update({"Content-Type": "application/json"})
+    email = f"tmp_ridesync_{uuid.uuid4().hex[:8]}@roujaune.app"
+    r = s.post(f"{API}/auth/register",
+               json={"email": email, "password": "pw12345678", "name": "Tmp RideSync"}, timeout=20)
+    assert r.status_code == 200, f"register failed: {r.status_code} {r.text}"
+    token = r.json().get("token")
+    assert token, "no token from register"
+    s.headers.update({"Authorization": f"Bearer {token}"})
     return s
 
 
@@ -59,7 +71,7 @@ class TestConnectionsList:
         assert "providers" in d and "encryption_ready" in d and "imported_activities" in d
         assert isinstance(d["providers"], list)
         ids = {p["id"] for p in d["providers"]}
-        assert {"garmin", "apple_health", "health_connect"}.issubset(ids)
+        assert {"garmin", "apple_health", "health_connect", "strava"}.issubset(ids)
 
     def test_encryption_ready(self, api):
         d = api.get(f"{API}/connections", timeout=20).json()
@@ -68,10 +80,11 @@ class TestConnectionsList:
     def test_provider_statuses(self, api):
         d = api.get(f"{API}/connections", timeout=20).json()
         by = {p["id"]: p for p in d["providers"]}
-        assert by["garmin"]["connection_status"] == "not_configured"
-        assert by["garmin"]["configured"] is False
         assert by["apple_health"]["connection_status"] == "requires_build"
         assert by["health_connect"]["connection_status"] == "requires_build"
+        # Strava now has real OAuth credentials configured (see test_iter104).
+        assert by["strava"]["configured"] is True
+        assert by["strava"]["connected"] is False
 
 
 # ------------------------- sandbox import + dedup -------------------------

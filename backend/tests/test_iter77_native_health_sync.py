@@ -112,8 +112,10 @@ class TestConnectionsListing:
             "not_configured", "disconnected", "connected", "syncing", "setup"
         ), by_id["garmin"]
 
-        assert "google_fit" in by_id, f"google_fit missing: {list(by_id)}"
-        assert by_id["google_fit"].get("kind") == "cloud_oauth", by_id["google_fit"]
+        # Google Fit was intentionally removed — see test_iter103_no_google_fit.py.
+        # Health Connect (native, on-device) is the current Android provider.
+        assert "google_fit" not in by_id, f"google_fit should be removed: {list(by_id)}"
+        assert "health_connect" in by_id, f"health_connect missing: {list(by_id)}"
 
     def test_oauth_authorize_unaffected_for_cloud(self, H):
         """Cloud OAuth authorize endpoint must still respond (not_configured is OK)."""

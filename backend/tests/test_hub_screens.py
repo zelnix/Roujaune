@@ -23,6 +23,10 @@ assert BASE_URL, "EXPO_PUBLIC_BACKEND_URL missing"
 def api():
     s = requests.Session()
     s.headers.update({"Content-Type": "application/json"})
+    r = s.post(f"{BASE_URL}/api/auth/login",
+               json={"email": "demo@roujaune.app", "password": "demo9900"}, timeout=20)
+    assert r.status_code == 200, f"login failed: {r.status_code} {r.text}"
+    s.headers.update({"Authorization": f"Bearer {r.json()['token']}"})
     return s
 
 
@@ -107,13 +111,14 @@ class TestCommunity:
 # ─────────────── Connections ───────────────
 class TestConnections:
     def test_connections_shape(self, api):
+        """Schema was consolidated: no more devices/services lists or
+        TrainingPeaks — see test_iter19_profile_progress.py for the current
+        contract. Garmin Connect is registered (cloud OAuth, not yet
+        configured with real credentials)."""
         r = api.get(f"{BASE_URL}/api/connections", timeout=15)
         assert r.status_code == 200, r.text
         d = r.json()
-        assert isinstance(d["devices"], list) and len(d["devices"]) >= 1
-        statuses = {dev["status"] for dev in d["devices"]}
-        assert "connected" in statuses
-        assert "disconnected" in statuses  # at least one disconnected
-        assert isinstance(d["services"], list) and len(d["services"]) >= 3
-        assert any(s["id"] == "trainingpeaks" for s in d["services"])
-        assert any(s["id"] == "strava" for s in d["services"])
+        assert isinstance(d["providers"], list) and len(d["providers"]) >= 4
+        ids = {p["id"] for p in d["providers"]}
+        assert {"apple_health", "health_connect", "strava", "garmin"}.issubset(ids)
+        assert not any(p["id"] == "trainingpeaks" for p in d["providers"])

@@ -22,7 +22,7 @@ from core import now_iso
 from models import (
     CoachCueRequest, ExtendAdviceRequest, CoachDebriefRequest, CoachChatRequest, AdaptationRequest,
 )
-from services.coach_llm import coach_system, coach_chat_system, STYLE_TONE, coach_line  # noqa: F401
+from services.coach_llm import coach_system, coach_chat_system, STYLE_TONE, coach_line, extract_json_object  # noqa: F401
 from services.rider_common import _rider_doc, _rider_line  # noqa: F401
 from services.plan_common import _active_plan_id, _plan_id_or_active, STRUCTURED_PLAN_IDS  # noqa: F401
 from services import plan_engine  # noqa: F401
@@ -955,7 +955,7 @@ async def coach_chat(req: CoachChatRequest):
                     plan_updated, applied_note = True, res["note"]
                     await _record_adaptation(await _active_plan_id() or "none", req.coach_name, f"I {res['note']}", "FTP updated")
             except Exception:
-                logging.warning("chat pending-confirm apply failed")
+                logging.exception("chat pending-confirm apply failed")
                 confirm_prompt = "Something went wrong applying that change — let the rider know kindly and offer to try again."
         elif _DENY_RE.search(_ml):
             confirm_prompt = (f"The rider decided NOT to go ahead with the change you'd proposed "
@@ -981,7 +981,7 @@ async def coach_chat(req: CoachChatRequest):
                     confirm_prompt = (f"The rider asked to {note}. This shifts every future session — before doing it, "
                                        "ask them to confirm with a quick yes/no in one short friendly sentence. Do NOT say it's done yet.")
             except Exception:
-                logging.warning("chat start-date reset failed")
+                logging.exception("chat start-date reset failed")
 
     # Cancel / rest-day a session ("cancel today's ride", "make today a rest day").
     if not plan_updated and not confirm_prompt and _REST_RE.search(_ml):
@@ -1007,7 +1007,7 @@ async def coach_chat(req: CoachChatRequest):
                 else:
                     clarify = res.get("note") or "Ask the rider which day they mean."
         except Exception:
-            logging.warning("chat rest-day failed")
+            logging.exception("chat rest-day failed")
 
     # Move a planned session to another day ("move my next workout to tomorrow").
     if not plan_updated and not confirm_prompt and _SESSION_MOVE_RE.search(_ml):
@@ -1029,7 +1029,7 @@ async def coach_chat(req: CoachChatRequest):
                 elif src and not dst:
                     clarify = "The rider wants to move a session but didn't give a clear day — ask which day to move it to."
         except Exception:
-            logging.warning("chat session-move failed")
+            logging.exception("chat session-move failed")
 
     # Schedule a workout on a day ("add a recovery ride Thursday").
     if not plan_updated and not confirm_prompt and _SCHEDULE_RE.search(_ml) and "goal" not in _ml:
@@ -1056,7 +1056,7 @@ async def coach_chat(req: CoachChatRequest):
                 applied_note = f"added a {nm} to {when.isoformat()}"
                 await _record_adaptation(plan_id or "none", req.coach_name, f"I {applied_note}.", "Workout scheduled")
         except Exception:
-            logging.warning("chat schedule-workout failed")
+            logging.exception("chat schedule-workout failed")
 
     # Undo the last plan change ("undo that").
     if not plan_updated and not confirm_prompt and _UNDO_RE.search(_ml):
@@ -1072,7 +1072,7 @@ async def coach_chat(req: CoachChatRequest):
             else:
                 clarify = "There's no recent plan change to undo — let the rider know kindly."
         except Exception:
-            logging.warning("chat undo failed")
+            logging.exception("chat undo failed")
 
     # Set FTP or schedule an FTP re-test.
     if not plan_updated and not clarify and not confirm_prompt and _FTP_RE.search(_ml):
@@ -1115,7 +1115,7 @@ async def coach_chat(req: CoachChatRequest):
             else:
                 clarify = "The rider mentioned FTP but didn't give a number or ask for a test — ask if they want to set a value or schedule a re-test."
         except Exception:
-            logging.warning("chat ftp intent failed")
+            logging.exception("chat ftp intent failed")
 
     # Set weekly training days ("make it 4 days a week").
     if not plan_updated and not clarify and not confirm_prompt and _DAYS_RE.search(_ml):
@@ -1130,7 +1130,7 @@ async def coach_chat(req: CoachChatRequest):
                     applied_note = res["note"]
                     await _record_adaptation(plan_id, req.coach_name, f"I {res['note']}", "Weekly volume")
         except Exception:
-            logging.warning("chat weekly-days intent failed")
+            logging.exception("chat weekly-days intent failed")
 
     # Add a training goal.
     if not plan_updated and not clarify and not confirm_prompt and _GOAL_RE.search(_ml):
@@ -1147,7 +1147,7 @@ async def coach_chat(req: CoachChatRequest):
             else:
                 clarify = "The rider wants to set a goal but it's unclear — ask them to state the goal in a few words."
         except Exception:
-            logging.warning("chat goal intent failed")
+            logging.exception("chat goal intent failed")
 
     # Pause / resume the whole plan.
     if not plan_updated and not clarify and not confirm_prompt and _PAUSE_RE.search(_ml):
@@ -1165,7 +1165,7 @@ async def coach_chat(req: CoachChatRequest):
                 else:
                     clarify = res.get("note") or ""
         except Exception:
-            logging.warning("chat pause intent failed")
+            logging.exception("chat pause intent failed")
 
     if not plan_updated and not clarify and not confirm_prompt and _RESUME_RE.search(_ml):
         try:
@@ -1180,7 +1180,7 @@ async def coach_chat(req: CoachChatRequest):
                 else:
                     clarify = res.get("note") or ""
         except Exception:
-            logging.warning("chat resume intent failed")
+            logging.exception("chat resume intent failed")
 
     # Switch coaching tone ("be tougher on me", "keep it gentler").
     if not plan_updated and not clarify and not confirm_prompt and _STYLE_RE.search(_ml):
@@ -1221,14 +1221,17 @@ async def coach_chat(req: CoachChatRequest):
                 if _pid:
                     await _record_adaptation(_pid, req.coach_name, f"At your request, I {applied_note}.", "Missed workout")
         except Exception:
-            logging.warning("chat missed-resolve failed")
+            logging.exception("chat missed-resolve failed")
 
     # Companion plan editing: if the rider asks for a plan change, turn it into
     # safe structured edits and apply them so the coach can confirm in-reply.
     if not plan_updated and not clarify and not confirm_prompt and companion_plan.has_plan_edit_intent(req.message):
         try:
             plan_id = await _active_plan_id()
-            plan_def = await plans_admin.get_plan_def(plan_id)
+            # Read the RIDER'S OWN snapshot (never the shared admin template) —
+            # this is both what the rider actually sees and what the edit below
+            # will be applied to, so the LLM's ops target real current state.
+            plan_def = await _rider_plan_def(plan_id)
             if plan_def and plan_def.get("weeks"):
                 state = await udb.plan_state.find_one({"id": plan_id}) or {}
                 cur = int(state.get("current_week", 1))
@@ -1246,7 +1249,7 @@ async def coach_chat(req: CoachChatRequest):
                         f"At your request, I {applied_note}.", "At your request",
                     )
         except Exception:
-            logging.warning("chat plan-edit failed")
+            logging.exception("chat plan-edit failed")
 
     recent = history[-10:]
     transcript = "\n".join(
@@ -1402,8 +1405,7 @@ async def coach_weekly_note(coach_name: str = "Alberto", coach_gender: str = "ma
         raw = (reply or "").strip()
         if raw.startswith("```"):
             raw = raw.strip("`")
-        s, e = raw.find("{"), raw.rfind("}")
-        data_json = json.loads(raw[s:e + 1]) if s >= 0 and e > s else {}
+        data_json = extract_json_object(raw)
         note = str(data_json.get("note", "")).strip().strip('"')
         focus = str(data_json.get("focus", "")).strip().strip('"')
         if not note:
@@ -1468,8 +1470,7 @@ async def coach_taper_note(coach_name: str = "Alberto", coach_gender: str = "mal
         raw = (reply or "").strip()
         if raw.startswith("```"):
             raw = raw.strip("`")
-        s, e = raw.find("{"), raw.rfind("}")
-        dj = json.loads(raw[s:e + 1]) if s >= 0 and e > s else {}
+        dj = extract_json_object(raw)
         note = str(dj.get("note", "")).strip().strip('"')
         actions = [str(a).strip() for a in (dj.get("actions") or []) if str(a).strip()][:3]
         if not note:
@@ -1523,8 +1524,7 @@ async def coach_milestone_note(coach_name: str = "Alberto", coach_gender: str = 
         raw = (reply or "").strip()
         if raw.startswith("```"):
             raw = raw.strip("`")
-        s, e = raw.find("{"), raw.rfind("}")
-        dj = json.loads(raw[s:e + 1]) if s >= 0 and e > s else {}
+        dj = extract_json_object(raw)
         note = str(dj.get("note", "")).strip().strip('"')
         if not note:
             raise ValueError("empty milestone note")
@@ -1546,7 +1546,9 @@ async def coach_taper_apply(body: dict):
     plan_id = await _active_plan_id()
     if not plan_id:
         return {"applied": False, "reason": "no_plan"}
-    plan_def = await plans_admin.get_plan_def(plan_id)
+    # RIDER'S OWN snapshot — never the shared admin template — so the "is
+    # there anything left to ease" check matches what the rider actually has.
+    plan_def = await _rider_plan_def(plan_id)
     if not (plan_def and plan_def.get("weeks")):
         return {"applied": False, "reason": "unstructured"}
 
@@ -1608,7 +1610,8 @@ async def _refresh_adaptation_after_ride(req: "CoachDebriefRequest", plan_id: st
         # rider's next upcoming week. Applies to any STRUCTURED plan (has weeks[]),
         # driven by plan metadata rather than a hardcoded id. Once per week.
         try:
-            plan_def = await plans_admin.get_plan_def(plan_id)
+            # RIDER'S OWN snapshot — never the shared admin template.
+            plan_def = await _rider_plan_def(plan_id)
             structured = bool(plan_def and plan_def.get("weeks"))
             if structured and 0 < req.compliance < 70:
                 state = await udb.plan_state.find_one({"id": plan_id}) or {}
@@ -1842,14 +1845,7 @@ async def _generate_adaptation_detail(plan: dict, coach_name: str, coach_gender:
     ).with_model("anthropic", "claude-sonnet-4-6")
     reply = await chat.send_message(UserMessage(text=prompt))
     raw = (reply or "").strip()
-    # Strip any accidental code fences and isolate the JSON object.
-    if raw.startswith("```"):
-        raw = raw.strip("`")
-        raw = raw[raw.find("{"):] if "{" in raw else raw
-    start, end = raw.find("{"), raw.rfind("}")
-    if start >= 0 and end > start:
-        raw = raw[start:end + 1]
-    data = json.loads(raw)
+    data = extract_json_object(raw)
     return {
         "summary": str(data.get("summary", "")).strip(),
         "factors": [
@@ -2020,8 +2016,7 @@ async def coach_create_plan(body: dict):
         rawtxt = (reply or "").strip()
         if rawtxt.startswith("```"):
             rawtxt = rawtxt.strip("`")
-        s, e = rawtxt.find("{"), rawtxt.rfind("}")
-        data = json.loads(rawtxt[s:e + 1]) if s >= 0 and e > s else {}
+        data = extract_json_object(rawtxt)
         plan = _normalize_created_plan(data, weeks, days_per_week)
         plan["created_by"] = coach_name
         if event_date:
@@ -2198,8 +2193,7 @@ async def coach_swap_session(body: dict):
                            system_message=coach_system(coach_name, coach_gender)).with_model("anthropic", "claude-sonnet-4-6")
             reply = (await chat.send_message(UserMessage(text=prompt))) or ""
             reply = reply.strip().strip("`")
-            s, e = reply.find("{"), reply.rfind("}")
-            data = json.loads(reply[s:e + 1]) if s >= 0 and e > s else {}
+            data = extract_json_object(reply)
         except Exception as e:
             logging.exception("swap-session llm failed")
             raise HTTPException(status_code=502, detail=f"Swap failed: {e}")

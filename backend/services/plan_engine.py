@@ -15,6 +15,7 @@ import json
 import re
 import copy
 import logging
+import uuid
 from pathlib import Path
 from datetime import date, datetime, timedelta, timezone  # noqa: F401
 
@@ -316,17 +317,61 @@ async def _on_plan_change(plan_id: str):
 
 
 async def _apply_companion_ops(plan_id: str, ops: list, source: str, reason: str) -> list:
-    """Apply sanitized companion ops via the portable plans_admin router."""
+    """Apply RIDER-INITIATED companion ops (chat plan-edit, taper-apply, low-
+    compliance auto-ease) onto the CALLING RIDER'S OWN plan snapshot —
+    `udb.training_plans` (user-scoped) — never the shared admin template in
+    `plans_admin`'s `plans` collection.
+
+    Why: "Templates define future assignments. Assigned plans are versioned
+    snapshots." (see plans_admin.py / test_plans_admin_fork.py). Reads go
+    through `_rider_plan_def`, which snapshots the template onto the rider's
+    own `training_plans` doc on first access and never re-reads the shared
+    template afterwards. Before this fix, rider-initiated edits were applied
+    via `plans_admin.adapt_plan` (the SHARED template) — which any other
+    rider already snapshotted onto the same named plan (e.g. two riders both
+    on "couch-to-road") would never see reflected back to them, silently
+    turning the coach's "done!" confirmation into a no-op. Mutating the
+    caller's own snapshot here fixes that while keeping isolation intact:
+    two riders on the same plan_id now have fully independent
+    `training_plans` documents (auto-scoped by `udb`'s user_id injection)."""
     if not ops:
         return []
-    res = await plans_admin.adapt_plan(
-        plan_id,
-        plans_admin.AdaptRequest(
-            source=source, reason=reason,
-            ops=[plans_admin.AdaptOp(**o) for o in ops],
-        ),
+    doc = await _rider_plan_def(plan_id)  # ensures + returns the rider's OWN definition
+    if not doc:
+        return []
+    applied: list[str] = []
+    for op in ops:
+        target = op.get("target")
+        if target == "field" and op.get("key") is not None:
+            doc[op["key"]] = op.get("value")
+            applied.append(f"set {op['key']}")
+        elif target == "week_field" and op.get("week") is not None and op.get("key") is not None:
+            week = plans_admin._find_week(doc, op["week"])
+            if week is not None:
+                week[op["key"]] = op.get("value")
+                applied.append(f"week {op['week']}: set {op['key']}")
+        elif target == "day" and op.get("week") is not None and op.get("day_index") is not None:
+            week = plans_admin._find_week(doc, op["week"])
+            days = week.get("days", []) if week else []
+            di = op["day_index"]
+            if week and isinstance(di, int) and 0 <= di < len(days):
+                days[di].update(op.get("patch") or {})
+                applied.append(f"week {op['week']} day {di}: {', '.join((op.get('patch') or {}).keys())}")
+    if not applied:
+        return []
+    entry = {
+        "id": uuid.uuid4().hex, "source": source, "reason": reason,
+        "applied": applied, "at": datetime.now(timezone.utc).isoformat(),
+    }
+    history = doc.setdefault("edit_history", [])
+    history.insert(0, entry)
+    doc["edit_history"] = history[:30]
+    await udb.training_plans.update_one(
+        {"id": plan_id},
+        {"$set": {"definition": doc, "edited_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True,
     )
-    return res.get("applied", [])
+    return applied
 
 
 def _ctr_today():

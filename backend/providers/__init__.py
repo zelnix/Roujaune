@@ -8,4 +8,5 @@ Health on-device.
 """
 from . import native  # noqa: F401  (registers Apple Health + Health Connect)
 from . import strava  # noqa: F401  (registers Strava cloud OAuth)
+from . import garmin  # noqa: F401  (registers Garmin Connect cloud OAuth)
 from .base import PROVIDERS, get_provider  # noqa: F401

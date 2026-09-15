@@ -9,6 +9,7 @@ Coverage:
 - PUT /api/rider/profile → persists updates
 """
 import os
+import uuid
 import pytest
 import requests
 
@@ -17,8 +18,19 @@ BASE_URL = os.environ["EXPO_PUBLIC_BACKEND_URL"].rstrip("/")
 
 @pytest.fixture(scope="module")
 def api():
+    """Fresh throwaway rider — the zero-state assertions below (season/
+    achievements) need a guaranteed-empty ride_history, which a long-lived
+    shared fixture account can no longer offer after years of accumulated
+    test runs."""
     s = requests.Session()
     s.headers.update({"Content-Type": "application/json"})
+    email = f"tmp_iter19_{uuid.uuid4().hex[:8]}@roujaune.app"
+    r = s.post(f"{BASE_URL}/api/auth/register",
+               json={"email": email, "password": "pw12345678", "name": "Tmp Iter19"}, timeout=20)
+    assert r.status_code == 200, f"register failed: {r.status_code} {r.text}"
+    token = r.json().get("token")
+    assert token, "no token from register"
+    s.headers.update({"Authorization": f"Bearer {token}"})
     return s
 
 
@@ -50,21 +62,21 @@ def test_rider_achievements_empty(api):
 
 # ---------------- connections ----------------
 def test_connections_services_contract(api):
+    """/api/connections was consolidated: Apple Health + Health Connect
+    (native, build-only), Strava (cloud OAuth, configured) and Garmin
+    Connect (cloud OAuth, not yet configured — needs real
+    GARMIN_CLIENT_ID/SECRET) are the current providers. Google Fit, Samsung
+    Health and Harmony Wellness were speculative entries that were removed
+    (Health Connect now covers Android on-device health data)."""
     r = api.get(f"{BASE_URL}/api/connections", timeout=15)
     assert r.status_code == 200, r.text
     j = r.json()
-    assert "services" in j and isinstance(j["services"], list)
-    names = {s.get("name") for s in j["services"]}
-    for expected in [
-        "Strava",
-        "Garmin Connect",
-        "Apple Health",
-        "Google Fit",
-        "Samsung Health",
-        "Harmony Wellness",
-    ]:
-        assert expected in names, f"expected service {expected!r}, got {names}"
-    assert "TrainingPeaks" not in names, f"TrainingPeaks should be removed, got {names}"
+    assert "providers" in j and isinstance(j["providers"], list)
+    names = {p.get("name") for p in j["providers"]}
+    for expected in ["Apple Health", "Google Health (Health Connect)", "Strava", "Garmin Connect"]:
+        assert expected in names, f"expected provider {expected!r}, got {names}"
+    for removed in ["TrainingPeaks", "Google Fit", "Samsung Health", "Harmony Wellness"]:
+        assert removed not in names, f"{removed} should be removed, got {names}"
 
 
 # ---------------- rider/profile ----------------

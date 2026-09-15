@@ -237,14 +237,19 @@ async def get_plan_progress(plan_id: str = ""):
         return {"progress_pct": 0, "summary": {}, "fitness": [], "trend": [], "metrics": [], "weeks": []}
     plan = await udb.training_plans.find_one({"id": plan_id}) or {}
     plan.pop("_id", None)
-    # Structured plans compute their progress live rather than storing weekly_load.
-    if plan_id in STRUCTURED_PLAN_IDS:
-        try:
-            computed = await get_plan(id=plan_id)
-            if isinstance(computed, dict):
-                plan = {**plan, **computed}
-        except Exception:
-            pass
+    # get_plan() is the single source of truth for how a plan resolves —
+    # structured plans compute live, and non-structured/roadmap plans
+    # (e.g. build-and-climb) overlay the per-rider doc onto the shared
+    # definition via _rider_plan_def(). Progress must reflect the SAME
+    # resolved shape (weekly_load/you_are_here/etc. all live on the shared
+    # definition, not flat on the per-rider overlay doc), so always merge
+    # via get_plan() rather than special-casing structured plans only.
+    try:
+        computed = await get_plan(id=plan_id)
+        if isinstance(computed, dict):
+            plan = {**plan, **computed}
+    except Exception:
+        pass
 
     weekly = plan.get("weekly_load", [])
     here = plan.get("you_are_here", 1)

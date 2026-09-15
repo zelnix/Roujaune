@@ -83,14 +83,16 @@ def sanitize_ops(ops: list[dict] | None, plan_def: dict) -> list[dict]:
 def _parse_json(raw: str | None) -> dict:
     if not raw:
         return {}
-    s = raw.strip()
-    m = re.search(r"\{.*\}", s, re.DOTALL)
-    if m:
-        s = m.group(0)
-    try:
-        return json.loads(s)
-    except Exception:
-        return {}
+    # Was: re.search(r"\{.*\}", s, re.DOTALL) — greedy from the FIRST '{' to
+    # the LAST '}' in the whole response. Any trailing content with its own
+    # braces (the model echoing the schema example, stray commentary) got
+    # included in the match, so json.loads raised "Extra data" and this
+    # silently swallowed it via `except: return {}` — extract_plan_ops then
+    # returned empty ops even though the model's real answer was valid JSON.
+    # This is the same root cause as the coach.py create-plan/taper-note
+    # parsing bug — see services/coach_llm.extract_json_object.
+    from services.coach_llm import extract_json_object
+    return extract_json_object(raw)
 
 
 async def extract_plan_ops(message: str, plan_def: dict, cur_week: int,
@@ -111,7 +113,7 @@ async def extract_plan_ops(message: str, plan_def: dict, cur_week: int,
         'If the message is NOT a concrete plan edit, return {"ops":[],"summary":""}.'
     )
     prompt = f"Plan weeks (JSON):\n{json.dumps(brief)}\n\nRider request: {message}\n\nJSON:"
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from services.gemini_shim import LlmChat, UserMessage
     chat = LlmChat(api_key=llm_key, session_id=f"{coach_name.lower()}-planedit", system_message=system) \
         .with_model("anthropic", "claude-sonnet-4-6")
     raw = await chat.send_message(UserMessage(text=prompt))

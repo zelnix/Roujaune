@@ -16,8 +16,13 @@ API = f"{BASE_URL}/api/admin/screen-captures"
 
 HWG_TOKEN = os.environ.get("HWG_SERVICE_TOKEN", "")
 
-EXPECTED_KEYS = {"home", "plan", "workouts", "workout_list", "scenic", "progress",
-                 "fitness", "calendar", "profile", "wellness"}
+EXPECTED_KEYS = {
+    "activities", "calendar", "climbs", "community", "compare", "connections",
+    "fitness", "help", "home", "live_workout", "milestones", "plan", "profile",
+    "progress", "rider_customise", "routes", "scenic", "settings", "summary",
+    "upgrade", "virtual_route", "wellness", "wheel_calibration", "workout_list",
+    "workouts",
+}
 
 STORE_FIELDS = {"title", "subtitle", "promotional_text", "description", "keywords"}
 
@@ -88,7 +93,9 @@ class TestScreens:
         assert "screens" in data, f"Missing 'screens' key: {data}"
         screens = data["screens"]
         assert isinstance(screens, list)
-        assert len(screens) == 10, f"Expected exactly 10 screens, got {len(screens)}"
+        assert len(screens) == len(EXPECTED_KEYS), \
+            f"Expected exactly {len(EXPECTED_KEYS)} screens (catalogue has grown since this test " \
+            f"was written — update EXPECTED_KEYS if this is an intentional addition), got {len(screens)}"
         keys = {s["key"] for s in screens}
         assert keys == EXPECTED_KEYS, f"Keys mismatch. Got {keys}, expected {EXPECTED_KEYS}"
         # Every entry has key, title, path, caption

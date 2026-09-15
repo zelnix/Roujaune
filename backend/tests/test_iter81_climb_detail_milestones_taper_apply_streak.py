@@ -1,10 +1,55 @@
 """Iter 81 features: Climb Detail page endpoint, Milestones endpoint, Taper Auto-Apply
 endpoint (demo unstructured + greenlantern structured idempotent), Streak enrichment."""
+import json
 import os
+from datetime import date, timedelta
+from pathlib import Path
+
 import pytest
 import requests
+from pymongo import MongoClient
 
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://scenic-trainer.preview.emergentagent.com").rstrip("/")
+
+# Pristine week definitions (source of truth for the couch-to-road template),
+# used to restore Green Lantern's OWN plan snapshot after taper-apply mutates
+# it — see services/plan_engine.py::_apply_companion_ops. Without this, every
+# CI run permanently erodes that week's cycling durations a little further
+# until they fall below the 20-min easing threshold and this test fails
+# forever (exactly what happened to week 7 from years of un-restored runs —
+# fixed once via a one-time DB restore; this restore step prevents recurrence).
+_COUCH_WEEKS = {w["number"]: w for w in
+                json.loads((Path(__file__).resolve().parent.parent / "couch_to_road_plan.json").read_text())["weeks"]}
+
+
+def _mongo():
+    return MongoClient("mongodb://localhost:27017")[os.environ.get("DB_NAME", "test_database")]
+
+
+def _restore_rider_week(week_number: int) -> None:
+    """Restore Green Lantern's own couch-to-road snapshot for `week_number`
+    back to the pristine template + clear the eased_weeks marker."""
+    pristine_week = _COUCH_WEEKS.get(week_number)
+    if not pristine_week:
+        return
+    db = _mongo()
+    doc = db.training_plans.find_one({"id": "couch-to-road", "user_id": "user_greenlantern"})
+    if not doc or not isinstance(doc.get("definition"), dict):
+        return
+    definition = doc["definition"]
+    weeks = definition.get("weeks", [])
+    for i, w in enumerate(weeks):
+        if w.get("number") == week_number:
+            weeks[i] = json.loads(json.dumps(pristine_week))  # deep copy, pristine
+            break
+    db.training_plans.update_one(
+        {"id": "couch-to-road", "user_id": "user_greenlantern"},
+        {"$set": {"definition": definition}},
+    )
+    db.plan_state.update_one(
+        {"id": "couch-to-road", "user_id": "user_greenlantern"},
+        {"$unset": {"eased_weeks": ""}},
+    )
 
 
 def _login(email, password):
@@ -116,15 +161,19 @@ class TestTaperApplyGreenLanternStructured:
     def test_first_call_applies_then_second_call_is_idempotent(self, gl_headers):
         # Ensure there is an event set (needed for taper target week calc). Snapshot & restore.
         prior = requests.get(f"{BASE_URL}/api/analysis/event", headers=gl_headers, timeout=15).json()
-        # Set a near event so days_out is positive
+        # Set a near-future event so days_out is positive — computed relative to
+        # "today" (a hardcoded past-relative date here silently makes days_out
+        # negative and always resolves week=cur=1, see coach.py taper-apply).
+        future_event = (date.today() + timedelta(days=45)).isoformat()
         put_r = requests.put(
             f"{BASE_URL}/api/analysis/event",
             headers=gl_headers,
-            json={"event_date": "2026-03-15", "event_name": "TEST_GL_Event"},
+            json={"event_date": future_event, "event_name": "TEST_GL_Event"},
             timeout=15,
         )
         assert put_r.status_code == 200, put_r.text[:200]
 
+        week1 = None
         try:
             r1 = requests.post(
                 f"{BASE_URL}/api/coach/taper-apply",
@@ -159,6 +208,10 @@ class TestTaperApplyGreenLanternStructured:
                 json={"event_date": prior.get("event_date"), "event_name": prior.get("event_name")},
                 timeout=15,
             )
+            # Restore Green Lantern's OWN plan snapshot for the eased week so
+            # this test is idempotent across repeated CI runs (see module docstring).
+            if week1 is not None:
+                _restore_rider_week(week1)
 
 
 # ---- Streak enrichment (at_risk / days_left / weekday) ----

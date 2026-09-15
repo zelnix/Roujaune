@@ -5,8 +5,12 @@ Contract:
   and source == 'disconnected'.
 - {type: 'sensor', power, cadence, hr} → next frames have source == 'sensor'
   and the sensor values propagate (power == sent power, hr == sent hr, etc.).
-- {type: 'mode', mode: 'demo'} → frames have source == 'estimated' and
-  simulated non-zero power/cadence/hr.
+- {type: 'mode', mode: 'demo'} used to fabricate a non-zero 'estimated'
+  stream for showcase purposes. That fabrication path has since been
+  intentionally removed (see server.py RideState.step(): "Never fabricate —
+  only real sensor readings count") so a rider is never shown a fake power
+  number. 'mode: demo' is now simply an unrecognized message — the stream
+  stays disconnected/zero, exactly like the live-with-no-sensor case.
 """
 import asyncio
 import json
@@ -74,14 +78,16 @@ async def test_ws_sensor_pushes_real_values_and_source_sensor():
 
 
 @pytest.mark.asyncio
-async def test_ws_demo_mode_source_estimated_and_nonzero_power():
+async def test_ws_demo_mode_is_a_noop_never_fabricates():
     async with websockets.connect(WS_URL, open_timeout=10) as ws:
         await ws.send(json.dumps({"type": "mode", "mode": "demo"}))
-        # Let the mode change propagate
+        # Let any (non-existent) mode change propagate
         await _drain_frames(ws, 3)
         frames = await _drain_frames(ws, 5)
+        # 'demo' fabrication was removed — this must behave exactly like the
+        # no-sensor 'live' default: disconnected + zero, never a fake number.
         for f in frames:
-            assert f["source"] == "estimated", f
-        assert any(f["power"] > 0 for f in frames), frames
-        assert any(f["cadence"] > 0 for f in frames), frames
-        assert any(f["hr"] > 0 for f in frames), frames
+            assert f["source"] == "disconnected", f
+            assert f["power"] == 0, f
+            assert f["cadence"] == 0, f
+            assert f["hr"] == 0, f

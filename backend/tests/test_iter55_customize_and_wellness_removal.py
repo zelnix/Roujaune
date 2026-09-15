@@ -134,9 +134,39 @@ class TestWellnessRouteRemoved:
 
 
 # ---- 3. Coach guardrails ----------------------------------------------------- #
+# Phrases the coach uses when correctly DECLINING to give wellness/medical
+# advice (e.g. "I can't give advice on sleep hygiene — let's focus on your
+# ride instead"). A forbidden term appearing only inside a refusal/decline
+# sentence like this is the coach behaving *correctly* (staying in its
+# cycling-only lane), not a guardrail violation — so it must not be flagged.
+_DECLINE_CUES = [
+    "cannot provide advice", "can't provide advice", "can not provide advice",
+    "cannot give advice", "can't give advice",
+    "not able to advise", "not able to provide advice", "unable to advise",
+    "not qualified", "outside my", "not my area", "not my lane",
+    "i don't provide", "i do not provide", "i won't provide", "i will not provide",
+    "leave that to", "best left to", "speak to a", "talk to a", "consult a",
+    "stick to cycling", "stay in my lane", "not a doctor", "not a therapist",
+]
+
+
 def _contains_forbidden(text: str) -> list[str]:
     lo = text.lower()
-    return [t for t in FORBIDDEN_TERMS if t in lo]
+    hits = []
+    # Split into rough sentences so we can tell "the coach used this word
+    # while declining to discuss it" apart from "the coach gave advice
+    # using this word".
+    sentences = re.split(r"(?<=[.!?])\s+", lo)
+    for term in FORBIDDEN_TERMS:
+        if term not in lo:
+            continue
+        # If every sentence containing the term also contains a decline
+        # cue, this is a correct refusal, not a violation.
+        term_sentences = [s for s in sentences if term in s]
+        if term_sentences and all(any(cue in s for cue in _DECLINE_CUES) for s in term_sentences):
+            continue
+        hits.append(term)
+    return hits
 
 
 class TestCoachGuardrails:

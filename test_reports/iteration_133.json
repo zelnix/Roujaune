@@ -1,0 +1,37 @@
+{
+  "summary": "Backend-only regression test after P0 security credential rotation + cross-user data isolation hardening pass. Ran full pytest suite (830 tests) against preview URL: 796 passed, 2 skipped, 3 failed, 9 errors (all 9 errors were flaky network TimeoutErrors on urllib3 connect - confirmed by re-running tests/test_readiness_downgrade.py alone which passed 9/9). Final stable result: 796 passed, 2 skipped, 3 failed (all 3 are the documented KNOWN/PENDING items: test_iter84 email digest 502 due to expired RESEND_API_KEY, and 2 test_plans_admin_fork tests failing due to intentional snapshot-on-assignment architecture pending user decision). No NEW failures found beyond what main agent documented. Also ran 6 targeted manual smoke tests (new file tests/test_smoke_manual_iteration.py) covering all 5 requested scenarios - all passed: greenlantern plan/calendar/coach-chat-edit (verified persistence via fresh GET - ctr-ride-1 duration confirmed changed to '20 min'), coach guardrails decline sleep/medical advice, demo plan/progress (13 weeks, Week 4 current:true)/calendar week TSS 287, connections includes all 4 providers (apple_health, health_connect, strava, garmin) + garmin/authorize returns setup_required:true, admin login + /api/admin/integrations default excludes 'database' key.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "N/A - test infra", "issue": "9 network TimeoutErrors in tests/test_readiness_downgrade.py during full-suite run are flaky (urllib3 connection timeout to preview URL under load); all 9 passed cleanly when file was re-run in isolation. Not a code defect."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_smoke_manual_iteration.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "No new action items - all fixes described in review_request verified working (companion_plan.py LLM client fix persists plan edits, plan.py get_plan_progress fix returns 13 weeks/week4-current for roadmap plans, garmin provider registration + setup_required response, admin/integrations health default excludes database key).",
+    "Known pending (unchanged, per main agent's note, do not fix without user decision): test_iter84_email_prefs_digest_resend.py (RESEND_API_KEY expired), test_plans_admin_fork.py TestEditPropagation & TestAdapt (snapshot-on-assignment architecture question)."
+  ],
+  "critical_code_review_comments": [
+    "Verified via direct API call that coach/chat plan edit for greenlantern actually persists across a separate subsequent GET /api/plan call (ctr-ride-1 duration = '20 min', changed from default 21 min) - confirms the companion_plan.py LLM client import fix (services.gemini_shim) resolved the silent-failure bug end-to-end, not just returning plan_updated:true in the same response."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_smoke_manual_iteration.py (new file - added targeted smoke tests for this review's 5 scenarios)"
+  ],
+  "success_rate": {
+    "backend": "99.6% (796 passed / 799 non-skipped tests in full suite; 3 known/pending failures excluded from scope of this fix pass) + 100% (6/6) on manual smoke tests"
+  },
+  "seed_data_creation": "None - used existing seeded greenlantern/demo/admin accounts only. Note: coach/chat test call did mutate greenlantern's live plan (ctr-ride-1 duration set to 20 min) as an intentional real persistence check, matching the review request's expected behavior.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Full pytest suite is healthy: 796 passed/2 skipped/3 known-pending failures. The 3 failures are NOT new: test_iter84 (RESEND_API_KEY expired - needs user decision), test_plans_admin_fork TestEditPropagation + TestAdapt (snapshot-on-assignment by design - needs user decision on whether tests or architecture should change). Do not attempt to fix these without user input. All 5 manually-requested smoke scenarios verified working end-to-end including real DB persistence check on the companion_plan.py fix. No regressions found.",
+  "rca_of_issue": "N/A - this was a verification pass confirming previously-described fixes work; no new bugs found."
+}

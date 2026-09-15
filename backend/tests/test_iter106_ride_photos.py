@@ -67,7 +67,14 @@ def ride_id(auth_headers) -> str:
     assert r.status_code == 200, f"summarize failed: {r.status_code} {r.text}"
     data = r.json()
     assert data.get("id"), f"no ride id returned: {data}"
-    return data["id"]
+    rid = data["id"]
+    yield rid
+    # Clean up — this creates a real ride_history row on the shared demo
+    # account; leaving it behind inflates lifetime totals for every other
+    # test that reads demo's ride history (e.g. test_iter81's milestones
+    # zero/two-ride assertions).
+    from pymongo import MongoClient
+    MongoClient("mongodb://localhost:27017")["test_database"].ride_history.delete_one({"id": rid})
 
 
 # ---------- tests -----------------------------------------------------------

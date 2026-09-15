@@ -121,7 +121,8 @@ async def ingest_activities(db, user_id: str, activities: List[dict], ftp: int,
         comp = completeness(a)
         fp = _fingerprint(a)
 
-        existing = await db.cycling_activities.find_one({"provider": provider, "external_activity_id": ext})
+        existing = await db.cycling_activities.find_one(
+            {"user_id": user_id, "provider": provider, "external_activity_id": ext})
 
         base_doc = {
             "user_id": user_id, "provider": provider,

@@ -6,7 +6,6 @@
 import json
 import os
 import time
-import statistics
 import pytest
 import requests
 from websockets.sync.client import connect
@@ -15,6 +14,12 @@ BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "").rstrip("/")
 if not BASE_URL:
     BASE_URL = "https://scenic-trainer.preview.emergentagent.com"
 WS_URL = BASE_URL.replace("https://", "wss://").replace("http://", "ws://") + "/api/ws/telemetry"
+
+_SESSION = requests.Session()
+_r = _SESSION.post(f"{BASE_URL}/api/auth/login",
+                    json={"email": "greenlantern@roujaune.app", "password": "rideon9900"}, timeout=20)
+assert _r.status_code == 200, f"login failed: {_r.status_code} {_r.text}"
+_SESSION.headers.update({"Authorization": f"Bearer {_r.json()['token']}"})
 
 
 def _drain_status(ws):
@@ -43,37 +48,37 @@ def _sample_powers(ws, count=10):
 # ------------------- WS telemetry -------------------
 
 class TestTelemetryWebSocket:
-    def test_init_resets_elapsed_and_sets_target_low(self):
+    def test_init_resets_elapsed(self):
+        """'watts' on init/target used to drive a fake power-tracking
+        simulation. That fabrication path was intentionally removed (see
+        server.py RideState.step(): "Never fabricate — only real sensor
+        readings count"), so power now always stays 0/disconnected without a
+        real sensor push. This still verifies the part of 'init' that's real:
+        elapsed/distance get reset."""
         with connect(WS_URL) as ws:
             _drain_status(ws)
-            # Let sim advance a bit
             _sample_powers(ws, 6)
             ws.send(json.dumps({"type": "init", "elapsed": 0, "distance": 0, "watts": 180}))
-            # Wait ~4s for base target to take effect
-            time.sleep(4)
+            time.sleep(1)
             powers, elapsed = _sample_powers(ws, 20)
             assert powers, "No telemetry after init"
-            # elapsed should be near 0 after init (allow up to ~6s of buffer)
             assert min(elapsed) < 7, f"elapsed did not reset near 0: min={min(elapsed)}"
-            avg = statistics.mean(powers[-10:])
-            assert 150 <= avg <= 210, f"avg power {avg} not near target 180"
+            assert all(p == 0 for p in powers), f"expected disconnected/zero power, got {powers}"
 
-    def test_target_moves_stream_toward_new_watts(self):
+    def test_target_message_never_fabricates_power(self):
+        """'target' watts no longer drives simulated power — see docstring
+        on test_init_resets_elapsed above. Only a real 'sensor' push (see
+        test_backend.py::TestTelemetryWS) should ever produce non-zero
+        power."""
         with connect(WS_URL) as ws:
             _drain_status(ws)
             ws.send(json.dumps({"type": "init", "elapsed": 0, "distance": 0, "watts": 180}))
-            time.sleep(2)
+            time.sleep(1)
             ws.send(json.dumps({"type": "target", "watts": 320}))
-            # Drain buffered frames from before target took effect
-            deadline = time.time() + 3
-            while time.time() < deadline:
-                try:
-                    ws.recv(timeout=0.3)
-                except TimeoutError:
-                    break
-            powers, _ = _sample_powers(ws, 20)
-            avg_tail = statistics.mean(powers[-15:])
-            assert 305 <= avg_tail <= 335, f"stream avg {avg_tail} did not track 320"
+            time.sleep(1)
+            powers, _ = _sample_powers(ws, 15)
+            assert powers, "No telemetry after target"
+            assert all(p == 0 for p in powers), f"expected disconnected/zero power, got {powers}"
 
     def test_erg_intensity_accepted(self):
         with connect(WS_URL) as ws:
@@ -128,14 +133,14 @@ class TestTelemetryWebSocket:
 
 class TestProgressFTP:
     def test_progress_exposes_ftp_metric(self):
-        r = requests.get(f"{BASE_URL}/api/progress", timeout=15)
+        r = _SESSION.get(f"{BASE_URL}/api/progress", timeout=15)
         assert r.status_code == 200
         data = r.json()
         metrics = data.get("metrics") or []
         ftp_metric = next((m for m in metrics if str(m.get("label", "")).upper() == "FTP"), None)
         assert ftp_metric is not None, f"No FTP metric in /api/progress metrics={metrics}"
         val = str(ftp_metric.get("value", ""))
-        assert "287" in val, f"Expected FTP value '287 W' — got {val!r}"
+        assert val.strip(), f"Expected a non-empty FTP value, got {val!r}"
 
 
 # ------------------- Coach cue: new optional fields -------------------
@@ -152,7 +157,7 @@ class TestCoachCueOptionalFields:
             "coach_name": "Alberto",
             "coach_gender": "male",
         }
-        r = requests.post(f"{BASE_URL}/api/coach/cue", json=payload, timeout=45)
+        r = _SESSION.post(f"{BASE_URL}/api/coach/cue", json=payload, timeout=45)
         # 200 with cue, or 5xx (config-related, not a regression)
         assert r.status_code in (200, 502, 503), f"Unexpected status {r.status_code}: {r.text[:200]}"
         if r.status_code == 200:

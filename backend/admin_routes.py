@@ -648,7 +648,7 @@ async def _cost_estimates() -> dict:
 
 
 @admin_router.get("/integrations")
-async def integrations(health: int = 1):
+async def integrations(health: int = 0):
     import os
     def _st(configured: bool) -> str:
         return "healthy" if configured else "not_configured"

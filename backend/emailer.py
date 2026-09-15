@@ -24,6 +24,24 @@ def _key() -> str:
     return os.environ.get("RESEND_API_KEY", "")
 
 
+def _sandbox_mode() -> bool:
+    """Boundary flag for the Resend network call ONLY — every caller (routes,
+    background loops, tests) still goes through send_email() exactly as before.
+
+    Why this exists: the live RESEND_API_KEY in this environment is expired,
+    which made the CI/regression test suite red on a third-party credential
+    issue rather than an application bug (see PRODUCTION_READINESS_REPORT.md).
+    When EMAIL_SANDBOX_MODE=true, send_email() short-circuits BEFORE the
+    httpx call to Resend (never touches the network), logs what would have
+    been sent, and returns True — so callers behave identically to a real
+    successful send. When false/unset (the default), behaviour is 100%
+    unchanged: a real HTTP call to Resend, real failures surfaced as False.
+    A real deployment must set EMAIL_SANDBOX_MODE=false (or unset it) and
+    provide a valid, non-expired RESEND_API_KEY for real email delivery."""
+    load_dotenv()
+    return os.environ.get("EMAIL_SANDBOX_MODE", "false").strip().lower() == "true"
+
+
 def _from_name() -> str:
     return os.environ.get("EMAIL_FROM_NAME", "ROUJAUNE")
 
@@ -42,6 +60,10 @@ BRAND_DARK = "#0B0C0C"
 async def send_email(to: str, subject: str, html: str, reply_to: str | None = None) -> bool:
     """Send one HTML email via Resend. Returns True on success; logs and returns
     False on failure (callers must not leak send failures to the client)."""
+    if _sandbox_mode():
+        logger.info("EMAIL_SANDBOX_MODE: simulated send to %s — subject=%r (no network call made)",
+                    to, subject)
+        return True
     key = _key()
     if not key:
         logger.error("RESEND_API_KEY not configured — cannot send email")

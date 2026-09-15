@@ -196,12 +196,25 @@ async def get_scenic_route(route_id: str):
 
 def _fallback_pois(doc: dict) -> list[dict]:
     """Derive simple points of interest from the route's highlights so the HUD
-    always has real, route-specific content even without the LLM."""
+    always has real, route-specific content even without the LLM. Some
+    seeded routes have zero/one highlight on file (a data gap, not a bug) —
+    pad with generic distance-spread waypoints so every route still gets a
+    reliable minimum of 3 POIs instead of silently degrading to 1."""
     highs = [h for h in (doc.get("highlights") or []) if h]
-    if not highs:
-        highs = [doc.get("place") or doc.get("name") or "Scenic viewpoint"]
-    n = len(highs)
+    place = doc.get("place") or doc.get("name") or "the route"
     tag = (doc.get("tag") or "scenic").lower()
+    if len(highs) < 3:
+        generic = [
+            f"Scenic viewpoint near {place}",
+            f"Midway rest stop, {place}",
+            f"Local landmark along the {tag} route",
+        ]
+        for g in generic:
+            if len(highs) >= 3:
+                break
+            if g not in highs:
+                highs.append(g)
+    n = len(highs)
     out = []
     for i, h in enumerate(highs):
         at = round((i + 1) / (n + 1), 3)
@@ -209,7 +222,7 @@ def _fallback_pois(doc: dict) -> list[dict]:
             "order": i,
             "at_pct": at,
             "title": h,
-            "description": f"A memorable stop along the {tag} route near {doc.get('place') or doc.get('name')}.",
+            "description": f"A memorable stop along the {tag} route near {place}.",
             "narration": f"Coming up: {h}. Take a moment to enjoy the view as you ride past.",
         })
     return out
@@ -261,7 +274,13 @@ async def _generate_pois(doc: dict) -> list[dict]:
                 "narration": str(it.get("narration") or "")[:260],
                 "wiki": str(it.get("wiki") or "")[:120],
             })
-        return pois or _fallback_pois(doc)
+        # Reliability guard: the LLM occasionally returns far fewer items than
+        # the "5-7" asked for (observed as a single-item response in practice,
+        # which then gets cached and silently degrades the feature for every
+        # rider until the cache is refreshed). Treat an implausibly short list
+        # the same as a parsing failure and use the deterministic fallback
+        # instead of caching a degraded result.
+        return pois if len(pois) >= 3 else _fallback_pois(doc)
     except Exception:
         return _fallback_pois(doc)
 

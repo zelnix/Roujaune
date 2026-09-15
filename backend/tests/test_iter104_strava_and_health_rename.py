@@ -67,20 +67,23 @@ class TestConnectionsProviders:
         assert hc["requires_native_build"] is True
         assert hc["connection_status"] == "requires_build"
 
-    def test_strava_registered_not_configured(self, auth_session):
+    def test_strava_registered_and_configured(self, auth_session):
+        """Strava now has real OAuth credentials configured (STRAVA_CLIENT_ID/
+        SECRET in .env) — this genuinely moved on from 'not_configured' since
+        this test was first written."""
         d = auth_session.get(f"{API}/connections", timeout=20).json()
         by = {p["id"]: p for p in d["providers"]}
         assert "strava" in by, list(by)
         st = by["strava"]
         assert st["name"] == "Strava"
         assert st["kind"] == "cloud_oauth"
-        assert st["configured"] is False
-        assert st["connection_status"] == "not_configured"
+        assert st["configured"] is True
+        assert st["connection_status"] == "disconnected"
         assert st["connected"] is False
 
 
 class TestStravaAuthorize:
-    def test_authorize_setup_required(self, auth_session):
+    def test_authorize_returns_real_oauth_url(self, auth_session):
         r = auth_session.post(
             f"{API}/connections/strava/authorize",
             json={"redirect_uri": "roujaune://oauth/strava"},
@@ -88,6 +91,7 @@ class TestStravaAuthorize:
         )
         assert r.status_code == 200, f"{r.status_code} {r.text}"
         body = r.json()
-        assert body.get("setup_required") is True, body
-        # Should NOT expose an authorize_url when unconfigured
-        assert "authorize_url" not in body or not body.get("authorize_url")
+        assert not body.get("setup_required")
+        assert body.get("authorize_url", "").startswith("https://www.strava.com/oauth/authorize")
+        assert "client_id=" in body["authorize_url"]
+        assert body.get("state")

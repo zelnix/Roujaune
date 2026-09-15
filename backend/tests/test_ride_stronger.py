@@ -29,10 +29,25 @@ def api():
     return s
 
 
+@pytest.fixture(scope="module")
+def admin_api():
+    """/api/plans (definition catalogue) is admin-gated — see admin_routes.py
+    plans_router dependency."""
+    s = requests.Session()
+    s.headers.update({"Content-Type": "application/json"})
+    r = s.post(f"{BASE_URL}/api/admin/login", json={
+        "email": os.environ.get("ADMIN_LOGIN_EMAIL", "roger.parenzee@gmail.com"),
+        "password": os.environ.get("ADMIN_LOGIN_PASSWORD", ""),
+    }, timeout=15)
+    assert r.status_code == 200, f"admin login failed: {r.status_code} {r.text}"
+    s.headers.update({"Authorization": f"Bearer {r.json()['token']}"})
+    return s
+
+
 # ---------- 1. GET /api/plans (ride-stronger week_count/duration_weeks == 12) ----------
 class TestPlansCatalog:
-    def test_ride_stronger_is_twelve_weeks(self, api):
-        r = api.get(f"{BASE_URL}/api/plans")
+    def test_ride_stronger_is_twelve_weeks(self, admin_api):
+        r = admin_api.get(f"{BASE_URL}/api/plans")
         assert r.status_code == 200, r.text
         payload = r.json()
         plans = payload.get("plans") if isinstance(payload, dict) else payload

@@ -2,9 +2,61 @@
 plan-gate. Kept in services/ so both server.py and the domain routers can import
 without a circular dependency.
 """
+import json
 import os
 import logging
 from typing import Optional
+
+
+def extract_json_object(text: str) -> dict:
+    """Extract the first syntactically-complete JSON object from LLM output.
+
+    Every LLM-JSON call site in coach.py used to do `text.find("{")` /
+    `text.rfind("}")` and slice between them. That grabs everything between
+    the FIRST '{' and the LAST '}' in the WHOLE response — so any trailing
+    content with its own braces (an echoed schema example, a second JSON
+    blob, stray commentary) got included in the slice and caused
+    `json.JSONDecodeError: Extra data` even though the model's actual answer
+    was perfectly valid JSON. This is the root cause of the intermittent
+    "coach create-plan JSON parsing" failures.
+
+    Fix: scan forward from the first '{', tracking brace depth (string- and
+    escape-aware so braces inside string values don't confuse the count),
+    and stop at the FIRST matching closing brace. Anything after that is
+    ignored, so trailing junk can never break the parse. Returns {} if no
+    balanced object is found or it fails to parse.
+    """
+    if not text:
+        return {}
+    start = text.find("{")
+    if start < 0:
+        return {}
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                candidate = text[start:i + 1]
+                try:
+                    return json.loads(candidate)
+                except (json.JSONDecodeError, ValueError):
+                    return {}
+    return {}
 
 
 def coach_system(name: str = "Alberto", gender: str = "male") -> str:

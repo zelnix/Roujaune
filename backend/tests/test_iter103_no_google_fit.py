@@ -63,7 +63,9 @@ class TestGoogleFitRetired:
         assert hc["requires_native_build"] is True
         assert hc["connection_status"] == "requires_build"
         assert hc["connected"] is False
-        assert hc["name"] == "Health Connect"
+        # Renamed to "Google Health (Health Connect)" in iteration 104 for
+        # clarity — see test_iter104_strava_and_health_rename.py.
+        assert hc["name"] == "Google Health (Health Connect)"
 
     def test_apple_health_present_and_native(self, auth_session):
         d = auth_session.get(f"{API}/connections", timeout=20).json()

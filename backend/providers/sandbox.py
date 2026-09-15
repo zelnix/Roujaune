@@ -26,8 +26,18 @@ def generate_sandbox_activities(count: int = 3) -> List[NormalizedActivity]:
     for i in range(min(count, len(_SAMPLES))):
         s = _SAMPLES[i]
         start = now - (i + 1) * 86400
+        # Identity/dedup key is index-only (NOT time-based): activity_sync.
+        # ingest_activities() dedups on (provider, external_activity_id), and
+        # this generator is called twice per idempotency test a few seconds
+        # apart. Baking the current wall-clock second into the id (as before)
+        # made the "same 4 rides" re-import non-deterministically look like 4
+        # BRAND NEW rides whenever the two calls landed in different seconds
+        # (near-guaranteed under real network/CI latency) — a flaky-by-design
+        # bug, not a timing coincidence. `started_at` still uses `now` so the
+        # rides look recent; only the identity key is stable.
+        ext_id = f"sandbox-{i}"
         out.append(NormalizedActivity(
-            external_activity_id=f"sandbox-{start}-{i}",
+            external_activity_id=ext_id,
             provider="sandbox",
             name=f"[Demo] {s['name']}",
             started_at=time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(start)),
@@ -45,6 +55,6 @@ def generate_sandbox_activities(count: int = 3) -> List[NormalizedActivity]:
             route_data=None, laps=None,
             device_name="Garmin Edge (demo)", activity_type=s["type"],
             indoor_outdoor="outdoor",
-            source_payload_reference=f"sandbox-{start}-{i}",
+            source_payload_reference=ext_id,
         ))
     return out

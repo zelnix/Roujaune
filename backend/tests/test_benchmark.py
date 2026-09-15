@@ -59,6 +59,23 @@ class TestBenchmarkAuthGating:
 
 # --- Profile / results (empty state) ---------------------------------------
 class TestBenchmarkProfileAndResults:
+    @pytest.fixture(autouse=True)
+    def _clear_prior_benchmark_profile(self):
+        """Green Lantern has accumulated real benchmark_profile data across
+        years of test runs, so the 'empty state' this class asserts on needs
+        a scoped, TEMPORARY reset — snapshot + restore, never a permanent
+        delete, since other test files (iter60/61/64/65) depend on this
+        rider's real FTP/benchmark history staying intact."""
+        from pymongo import MongoClient
+        db = MongoClient("mongodb://localhost:27017")["test_database"]
+        snapshot = db.benchmark_profile.find_one({"user_id": "user_greenlantern"})
+        db.benchmark_profile.delete_many({"user_id": "user_greenlantern"})
+        yield
+        if snapshot:
+            snapshot.pop("_id", None)
+            db.benchmark_profile.update_one(
+                {"user_id": "user_greenlantern"}, {"$set": snapshot}, upsert=True)
+
     def test_profile_returns_all_nine_keys(self, api):
         r = api.get(f"{BASE_URL}/api/benchmark/profile", timeout=15)
         assert r.status_code == 200

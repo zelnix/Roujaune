@@ -14,6 +14,10 @@ API = f"{BASE_URL}/api"
 def api_client():
     s = requests.Session()
     s.headers.update({"Content-Type": "application/json"})
+    r = s.post(f"{BASE_URL}/api/auth/login",
+               json={"email": "greenlantern@roujaune.app", "password": "rideon9900"}, timeout=20)
+    assert r.status_code == 200, f"login failed: {r.status_code} {r.text}"
+    s.headers.update({"Authorization": f"Bearer {r.json()['token']}"})
     return s
 
 

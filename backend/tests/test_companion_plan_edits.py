@@ -11,20 +11,52 @@ from pymongo import MongoClient
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://scenic-trainer.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
 PLAN_ID = "couch-to-road"
+RIDER_USER_ID = "user_greenlantern"
+
+ADMIN_EMAIL = os.environ.get("ADMIN_LOGIN_EMAIL", "roger.parenzee@gmail.com")
+ADMIN_PW = os.environ.get("ADMIN_LOGIN_PASSWORD", "")
 
 # Pristine values (per problem statement)
 PRISTINE_W1 = {1: "20 min", 3: "25 min", 5: "30 min"}
 PRISTINE_W2 = {1: "25 min", 3: "30 min", 5: "35 min"}
+
+# /api/plans/* (definition CRUD) is admin-gated; /api/coach/* is rider-gated.
+# Two separate authenticated sessions, built once on import.
+_ADMIN = requests.Session()
+_ADMIN.headers.update({"Content-Type": "application/json"})
+_r = _ADMIN.post(f"{API}/admin/login", json={"email": ADMIN_EMAIL, "password": ADMIN_PW}, timeout=15)
+assert _r.status_code == 200, f"admin login failed: {_r.status_code} {_r.text}"
+_ADMIN.headers.update({"Authorization": f"Bearer {_r.json()['token']}"})
+
+_RIDER = requests.Session()
+_RIDER.headers.update({"Content-Type": "application/json"})
+_r = _RIDER.post(f"{API}/auth/login", json={"email": "greenlantern@roujaune.app", "password": "rideon9900"}, timeout=20)
+assert _r.status_code == 200, f"rider login failed: {_r.status_code} {_r.text}"
+_RIDER.headers.update({"Authorization": f"Bearer {_r.json()['token']}"})
 
 
 def _mongo():
     return MongoClient("mongodb://localhost:27017")["test_database"]
 
 
+def _ensure_snapshot():
+    """Force-create Green Lantern's per-rider plan snapshot if it doesn't
+    exist yet (first-ever /api/plan read triggers services.plan_engine.
+    _rider_plan_def to copy the template onto training_plans)."""
+    r = _RIDER.get(f"{API}/plan", timeout=15)
+    assert r.status_code == 200, f"GET /plan → {r.status_code}"
+
+
 def _get_plan():
-    r = requests.get(f"{API}/plans/{PLAN_ID}", timeout=15)
-    assert r.status_code == 200, f"GET /plans/{PLAN_ID} → {r.status_code}"
-    return r.json()
+    """The RIDER'S OWN live plan snapshot (never the shared admin template —
+    see services/plan_engine.py::_rider_plan_def / plans_admin.py). This is
+    what /api/plan and /api/calendar/week actually render for Green Lantern,
+    so it is the only source of truth for 'did the edit really take?'."""
+    _ensure_snapshot()
+    doc = _mongo().training_plans.find_one({"id": PLAN_ID, "user_id": RIDER_USER_ID})
+    assert doc and isinstance(doc.get("definition"), dict), \
+        f"Green Lantern has no {PLAN_ID} snapshot in training_plans"
+    return doc["definition"]
 
 
 def _day(plan, week_num, day_idx):
@@ -35,22 +67,34 @@ def _day(plan, week_num, day_idx):
 
 
 def _patch_day(week_num, day_idx, patch):
-    r = requests.patch(
-        f"{API}/plans/{PLAN_ID}/weeks/{week_num}/days/{day_idx}",
-        json={"patch": patch}, timeout=15,
+    """Directly patch Green Lantern's OWN snapshot (mirrors what
+    _apply_companion_ops now does) — NOT the shared admin template, which no
+    longer has any effect on an already-snapshotted rider."""
+    doc = _mongo().training_plans.find_one({"id": PLAN_ID, "user_id": RIDER_USER_ID})
+    assert doc and isinstance(doc.get("definition"), dict), "snapshot missing — call _ensure_snapshot() first"
+    definition = doc["definition"]
+    day = _day(definition, week_num, day_idx)
+    day.update(patch)
+    _mongo().training_plans.update_one(
+        {"id": PLAN_ID, "user_id": RIDER_USER_ID},
+        {"$set": {"definition": definition}},
     )
-    assert r.status_code == 200, f"PATCH failed: {r.status_code} {r.text}"
 
 
 def _restore_pristine():
     """Restore week1 & week2 cycling day durations to seeded values + clear eased_weeks."""
+    _ensure_snapshot()
     for di, dur in PRISTINE_W1.items():
         _patch_day(1, di, {"duration": dur})
     for di, dur in PRISTINE_W2.items():
         _patch_day(2, di, {"duration": dur})
     db = _mongo()
+    # Scoped to the Green Lantern rider only — an unscoped update_one({"id":
+    # PLAN_ID}) here would silently mutate ANY other rider's plan_state doc
+    # that happens to share this plan id, which is exactly the cross-user
+    # blast radius the isolation hardening work is meant to prevent.
     db.plan_state.update_one(
-        {"id": PLAN_ID},
+        {"id": PLAN_ID, "user_id": RIDER_USER_ID},
         {"$set": {"current_week": 1}, "$unset": {"eased_weeks": ""}},
         upsert=True,
     )
@@ -80,7 +124,7 @@ class TestChatEdit:
             "coaching_style": "balanced",
             "message": "Please shorten my First Endurance Ride to 20 minutes to make this week easier.",
         }
-        r = requests.post(f"{API}/coach/chat", json=body, timeout=90)
+        r = _RIDER.post(f"{API}/coach/chat", json=body, timeout=90)
         assert r.status_code == 200, f"{r.status_code} {r.text}"
         data = r.json()
         assert data.get("plan_updated") is True, f"plan_updated missing/false: {data}"
@@ -110,7 +154,7 @@ class TestChatEdit:
             "coaching_style": "balanced",
             "message": "How is my training going?",
         }
-        r = requests.post(f"{API}/coach/chat", json=body, timeout=60)
+        r = _RIDER.post(f"{API}/coach/chat", json=body, timeout=60)
         assert r.status_code == 200, f"{r.status_code} {r.text}"
         data = r.json()
         # plan_updated must be falsy (False/absent)
@@ -128,10 +172,10 @@ class TestChatEdit:
 
 class TestAutoEase:
     def test_b1_low_compliance_eases_week2_and_is_idempotent(self):
-        # Ensure clean state: eased_weeks empty
+        # Ensure clean state: eased_weeks empty (scoped to this rider only)
         db = _mongo()
         db.plan_state.update_one(
-            {"id": PLAN_ID},
+            {"id": PLAN_ID, "user_id": RIDER_USER_ID},
             {"$set": {"current_week": 1}, "$unset": {"eased_weeks": ""}},
             upsert=True,
         )
@@ -154,7 +198,7 @@ class TestAutoEase:
             "coach_gender": "male",
             "zones": [{"z": "Z1", "pct": 60}, {"z": "Z2", "pct": 40}],
         }
-        r = requests.post(f"{API}/coach/debrief", json=body, timeout=90)
+        r = _RIDER.post(f"{API}/coach/debrief", json=body, timeout=90)
         assert r.status_code == 200, f"debrief: {r.status_code} {r.text}"
         data = r.json()
         assert isinstance(data.get("debrief"), str) and data["debrief"].strip()
@@ -164,11 +208,11 @@ class TestAutoEase:
         eased_ok = False
         while time.time() < deadline:
             time.sleep(2)
-            state = db.plan_state.find_one({"id": PLAN_ID}) or {}
+            state = db.plan_state.find_one({"id": PLAN_ID, "user_id": RIDER_USER_ID}) or {}
             if 2 in (state.get("eased_weeks") or []):
                 eased_ok = True
                 break
-        assert eased_ok, f"week 2 was never eased. plan_state={db.plan_state.find_one({'id': PLAN_ID})}"
+        assert eased_ok, f"week 2 was never eased. plan_state={db.plan_state.find_one({'id': PLAN_ID, 'user_id': RIDER_USER_ID})}"
 
         plan_after = _get_plan()
         d_after = {i: _day(plan_after, 2, i)["duration"] for i in (1, 3, 5)}
@@ -178,7 +222,7 @@ class TestAutoEase:
         assert d_after[5] == "32 min", f"day5 expected 32 min, got {d_after[5]}"
 
         # Second identical debrief must NOT ease week 2 again (idempotent)
-        r2 = requests.post(f"{API}/coach/debrief", json=body, timeout=90)
+        r2 = _RIDER.post(f"{API}/coach/debrief", json=body, timeout=90)
         assert r2.status_code == 200, f"debrief2: {r2.status_code} {r2.text}"
         time.sleep(8)
         plan_third = _get_plan()
@@ -186,5 +230,5 @@ class TestAutoEase:
         assert d_third == d_after, f"idempotency broken: {d_after} -> {d_third}"
 
         # eased_weeks still contains 2 (only)
-        state = db.plan_state.find_one({"id": PLAN_ID}) or {}
+        state = db.plan_state.find_one({"id": PLAN_ID, "user_id": RIDER_USER_ID}) or {}
         assert 2 in (state.get("eased_weeks") or [])
