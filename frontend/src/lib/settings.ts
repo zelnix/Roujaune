@@ -19,9 +19,10 @@ export type Settings = {
   autoSync: boolean;     // auto-sync completed rides to connected services
   weeklyReport: boolean; // weekly training summary email
   restReminders: boolean; // reminders to take scheduled rest days
+  backpedalPause: boolean; // auto-pause when cadence = 0 for 3 s (backpedal-to-pause)
 };
 
-const DEFAULTS: Settings = { hasTrainer: false, hasWearable: false, hudEnabled: true, ftp: 287, ftpAuto: true, maxHr: 0, age: 0, wheelCircumference: 2105, seatedMode: false, homeCity: "", homeLat: 0, homeLon: 0, units: "metric", coachAudio: true, autoSync: true, weeklyReport: true, restReminders: false };
+const DEFAULTS: Settings = { hasTrainer: false, hasWearable: false, hudEnabled: true, ftp: 287, ftpAuto: true, maxHr: 0, age: 0, wheelCircumference: 2105, seatedMode: false, homeCity: "", homeLat: 0, homeLon: 0, units: "metric", coachAudio: true, autoSync: true, weeklyReport: true, restReminders: false, backpedalPause: true };
 const KEY = "roujaune:settings";
 
 // Common tyre roll-outs (mm) — matches standard cycling speed-sensor tables.

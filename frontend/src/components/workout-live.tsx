@@ -603,12 +603,74 @@ export function StepDetailModal({
   );
 }
 
+// ---- Backpedal / grace-period banner (top of workout, below header) -------
+export type BackpedalPhase = "riding" | "detecting" | "paused" | "grace";
+export function BackpedalBanner({
+  phase, graceRemainingSec, graceEaseFactor, detectingSec,
+}: {
+  phase: BackpedalPhase; graceRemainingSec: number; graceEaseFactor: number; detectingSec: number;
+}) {
+  if (phase === "riding") return null;
+  const isDetecting = phase === "detecting";
+  const isPaused = phase === "paused";
+  const isGrace = phase === "grace";
+  const bg = isPaused ? colors.yellow + "22" : isGrace ? colors.green + "22" : colors.yellow + "10";
+  const border = isPaused ? colors.yellow + "66" : isGrace ? colors.green + "55" : colors.yellow + "33";
+  const iconColor = isPaused ? colors.yellow : isGrace ? colors.green : colors.yellow;
+  const gracePct = isGrace ? Math.round(graceEaseFactor * 100) : 0;
+  return (
+    <View style={[bp.wrap, { backgroundColor: bg, borderColor: border }]} testID="backpedal-banner">
+      {isDetecting ? (
+        <>
+          <Ionicons name="pause-circle-outline" size={18} color={iconColor} />
+          <Text style={[bp.text, { color: colors.yellow }]}>
+            Cadence zero — pausing in {Math.max(0, Math.ceil(3 - detectingSec))}s…
+          </Text>
+        </>
+      ) : isPaused ? (
+        <>
+          <Ionicons name="pause-circle" size={20} color={colors.yellow} />
+          <View style={bp.body}>
+            <Text style={[bp.title, { color: colors.yellow }]}>Backpedal Detected — Paused</Text>
+            <Text style={bp.sub}>Resume pedaling to continue with a 5 s grace ramp</Text>
+          </View>
+        </>
+      ) : isGrace ? (
+        <>
+          <Ionicons name="refresh-circle" size={20} color={colors.green} />
+          <View style={bp.body}>
+            <Text style={[bp.title, { color: colors.green }]}>Building cadence… {graceRemainingSec}s</Text>
+            <View style={bp.trackOuter}>
+              <View style={[bp.trackFill, { width: `${gracePct}%` }]} />
+            </View>
+            <Text style={bp.sub}>ERG at {gracePct}% — ramping to full</Text>
+          </View>
+        </>
+      ) : null}
+    </View>
+  );
+}
+
+const bp = StyleSheet.create({
+  wrap: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    borderWidth: 1, borderRadius: radius.lg,
+    paddingVertical: 10, paddingHorizontal: 14,
+  },
+  body: { flex: 1, gap: 4 },
+  title: { fontSize: 14, fontWeight: "800", letterSpacing: 0.3 },
+  text: { fontSize: 13, fontWeight: "700" },
+  sub: { color: colors.textDim, fontSize: 11.5, fontWeight: "600" },
+  trackOuter: { height: 5, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.10)", overflow: "hidden" },
+  trackFill: { height: "100%", backgroundColor: colors.green, borderRadius: 3 },
+});
+
 // ---- Bottom controls ------------------------------------------------------
 export function LiveControlBar({
-  paused, erg, audioOn, onAudio, onMirror, onErg, onControls, onReconnect, onSettings, onBluetooth, onLock, locked, onPauseToggle, onEnd,
+  paused, erg, audioOn, ergMode, onAudio, onMirror, onErg, onErgToggle, onControls, onReconnect, onSettings, onBluetooth, onLock, locked, onPauseToggle, onEnd,
 }: {
-  paused: boolean; erg: number; audioOn: boolean; onAudio: () => void; onMirror: () => void;
-  onErg: (d: number) => void; onControls: () => void; onReconnect: () => void; onSettings: () => void; onBluetooth: () => void; onLock: () => void; locked: boolean;
+  paused: boolean; erg: number; audioOn: boolean; ergMode: boolean; onAudio: () => void; onMirror: () => void;
+  onErg: (d: number) => void; onErgToggle: () => void; onControls: () => void; onReconnect: () => void; onSettings: () => void; onBluetooth: () => void; onLock: () => void; locked: boolean;
   onPauseToggle: () => void; onEnd: () => void;
 }) {
   // Scale the bar down on small screens so nothing overflows and Pause/End
@@ -626,6 +688,7 @@ export function LiveControlBar({
   const PADH = tiny ? 8 : compact ? 12 : 20;        // secondary button padding
   const PPADH = tiny ? 16 : compact ? 22 : 30;      // pause/end padding
   const ERGV = tiny ? 16 : compact ? 18 : 22;       // erg value font
+  const ETXT = tiny ? 11 : compact ? 13 : 15;       // erg toggle label font
 
   const roundStyle = [bc.round, { minWidth: MINW, height: H, paddingHorizontal: PADH }];
   const rtxt = [bc.roundText, { fontSize: RTXT }];
@@ -674,6 +737,22 @@ export function LiveControlBar({
       </ScrollView>
 
       <View style={bc.primary}>
+        <Pressable
+          onPress={onErgToggle}
+          style={[bc.ergToggle, { height: PH, paddingHorizontal: tiny ? 10 : compact ? 14 : 18 }, ergMode ? bc.ergToggleOn : bc.ergToggleOff]}
+          testID="bc-erg-toggle"
+          accessibilityRole="button"
+          accessibilityLabel={ergMode ? "ERG mode is on. Tap to turn off." : "ERG mode is off. Tap to turn on."}
+        >
+          <Ionicons name={ergMode ? "flash" : "flash-off"} size={PICON} color={ergMode ? colors.bg : colors.textDim} />
+          <Text style={[bc.ergToggleText, { fontSize: ETXT, color: ergMode ? colors.bg : colors.textDim }]}>
+            {ergMode ? "ERG" : "ERG"}
+          </Text>
+          <View style={[bc.ergToggleDot, { backgroundColor: ergMode ? colors.bg + "55" : colors.textFaint }]} />
+          <Text style={[bc.ergToggleState, { fontSize: tiny ? 8 : 9, color: ergMode ? colors.bg + "AA" : colors.textFaint }]}>
+            {ergMode ? "ON" : "OFF"}
+          </Text>
+        </Pressable>
         <Pressable onPress={onPauseToggle} style={[bc.pause, { height: PH, paddingHorizontal: PPADH }]} testID="bc-pause">
           <Ionicons name={paused ? "play" : "pause"} size={PICON} color={colors.bg} />
           <Text style={[bc.pauseText, { fontSize: PTXT }]}>{paused ? "Resume" : "Pause"}</Text>
@@ -980,4 +1059,11 @@ const bc = StyleSheet.create({
   pauseText: { color: colors.bg, fontSize: 20, fontWeight: "800" },
   end: { flexDirection: "row", alignItems: "center", gap: 8, height: 76, paddingHorizontal: 28, borderRadius: radius.md, backgroundColor: colors.red },
   endText: { color: "#fff", fontSize: 20, fontWeight: "800" },
+  // ERG toggle — primary-level quick-action button
+  ergToggle: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: radius.md, borderWidth: 1.5 },
+  ergToggleOn: { backgroundColor: colors.green, borderColor: colors.green },
+  ergToggleOff: { backgroundColor: colors.card, borderColor: colors.border },
+  ergToggleText: { fontWeight: "900", letterSpacing: 0.5 },
+  ergToggleDot: { width: 6, height: 6, borderRadius: 3 },
+  ergToggleState: { fontWeight: "800", letterSpacing: 1 },
 });

@@ -259,7 +259,7 @@ def _describe(ride: dict) -> str:
 
 async def upload_tcx(access_token: str, ride: dict, samples: list) -> dict:
     """Upload a TCX ride file to Strava and poll until it becomes an activity.
-    Returns {activity_id, upload_id, status, error}."""
+    Returns {activity_id, upload_id, status, error}.  Legacy — prefer upload_fit."""
     tcx = build_tcx(ride, samples)
     ext_id = str(ride.get("id") or _dt.datetime.now().timestamp())
     headers = {"Authorization": f"Bearer {access_token}"}
@@ -275,6 +275,72 @@ async def upload_tcx(access_token: str, ride: dict, samples: list) -> dict:
         if up.get("error"):
             return {"activity_id": None, "upload_id": upload_id, "status": "error", "error": up["error"]}
         # Strava processes asynchronously — poll a few times for the activity id.
+        import asyncio
+        for _ in range(6):
+            if up.get("activity_id"):
+                return {"activity_id": up["activity_id"], "upload_id": upload_id, "status": "ready", "error": None}
+            await asyncio.sleep(1.5)
+            r2 = await client.get(f"{UPLOAD_URL}/{upload_id}", headers=headers)
+            up = r2.json()
+            if up.get("error"):
+                return {"activity_id": None, "upload_id": upload_id, "status": "error", "error": up["error"]}
+        return {"activity_id": up.get("activity_id"), "upload_id": upload_id,
+                "status": "processing", "error": None}
+
+
+async def upload_fit(access_token: str, ride: dict, samples: list, ftp: int = 200) -> dict:
+    """Upload a .FIT ride file to Strava — preferred over TCX for richer data
+    (NP, IF, TSS in the Session message, per-second power/cadence/HR).
+
+    Uses POST https://www.strava.com/api/v3/uploads with data_type="fit",
+    trainer=1 to flag it as an indoor ride (no GPS mapping).  Polls for
+    the asynchronous activity_id."""
+    from services.fit_builder import build_fit_activity
+
+    started_at = ride.get("started_at")
+    start_dt = _dt.datetime.now(_dt.timezone.utc)
+    if started_at:
+        try:
+            s = str(started_at).replace("Z", "+00:00")
+            start_dt = _dt.datetime.fromisoformat(s)
+            if start_dt.tzinfo is None:
+                start_dt = start_dt.replace(tzinfo=_dt.timezone.utc)
+        except Exception:
+            pass
+
+    fit_bytes = build_fit_activity(
+        samples=samples,
+        start_time=start_dt,
+        elapsed_sec=int(ride.get("elapsed_seconds") or len(samples)),
+        ftp=ftp,
+        workout_name=ride.get("name") or "Indoor Ride",
+        calories=int(ride.get("calories") or 0),
+    )
+
+    ext_id = str(ride.get("id") or _dt.datetime.now().timestamp())
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    async with httpx.AsyncClient(timeout=40) as client:
+        files = {"file": (f"{ext_id}.fit", fit_bytes, "application/octet-stream")}
+        data = {
+            "data_type": "fit",
+            "external_id": ext_id,
+            "trainer": "1",
+            "name": ride.get("name") or "Indoor Ride",
+            "description": _describe(ride),
+        }
+        res = await client.post(UPLOAD_URL, headers=headers, data=data, files=files)
+        if res.status_code >= 400:
+            raise httpx.HTTPStatusError(
+                f"upload {res.status_code}: {res.text[:200]}",
+                request=res.request, response=res,
+            )
+        up = res.json()
+        upload_id = up.get("id")
+        if up.get("error"):
+            return {"activity_id": None, "upload_id": upload_id, "status": "error", "error": up["error"]}
+
+        # Strava processes asynchronously — poll for the activity id.
         import asyncio
         for _ in range(6):
             if up.get("activity_id"):

@@ -18,7 +18,7 @@ export const HEALTH_PLATFORM: HealthPlatform =
   Platform.OS === "ios" ? "apple_health" : Platform.OS === "android" ? "health_connect" : "none";
 export const healthNativeAvailable = Platform.OS === "ios" || Platform.OS === "android";
 
-const HC_PERMS = (["ExerciseSession", "Distance", "TotalCaloriesBurned", "HeartRate"] as const).flatMap(
+const HC_PERMS = (["ExerciseSession", "Distance", "TotalCaloriesBurned", "HeartRate", "Power"] as const).flatMap(
   (recordType) => [
     { accessType: "read" as const, recordType },
     { accessType: "write" as const, recordType },
@@ -101,6 +101,11 @@ export async function pushWorkoutToHealth(w: CyclingWorkout): Promise<{ ok: bool
     const HK = loadHK();
     if (!HK) return { ok: false, error: "unsupported" };
     try {
+      // Build metadata with external UUID for deduplication.
+      // HealthKit uses HKMetadataKeyExternalUUID to merge overlapping sessions.
+      const metadata: Record<string, unknown> = {};
+      if (w.externalUUID) metadata.HKExternalUUID = w.externalUUID;
+
       await new Promise<void>((resolve, reject) =>
         HK.saveWorkout(
           {
@@ -111,10 +116,48 @@ export async function pushWorkoutToHealth(w: CyclingWorkout): Promise<{ ok: bool
             energyBurnedUnit: "calorie",
             distance: w.distanceMeters ?? 0,
             distanceUnit: "meter",
+            metadata,
           },
           (err: unknown) => (err ? reject(err) : resolve())
         )
       );
+
+      // Write per-second power + cadence + HR as HKQuantitySamples.
+      // These attach to the workout as time-series data so Apple Health
+      // can display the full power curve (not just averages).
+      const startMs = new Date(w.startDate).getTime();
+      if (w.powerSamples?.length) {
+        try {
+          const pwSamples = w.powerSamples.map((v, i) => ({
+            value: v,
+            startDate: new Date(startMs + i * 1000).toISOString(),
+            endDate: new Date(startMs + (i + 1) * 1000).toISOString(),
+          }));
+          await new Promise<void>((resolve) =>
+            HK.saveSamples?.(
+              "CyclingPower",
+              pwSamples,
+              () => resolve()
+            ) ?? resolve()
+          );
+        } catch { /* best-effort — bridge may not support CyclingPower */ }
+      }
+      if (w.hrSamples?.length) {
+        try {
+          const hrS = w.hrSamples.filter(v => v > 0).map((v, i) => ({
+            value: v,
+            startDate: new Date(startMs + i * 1000).toISOString(),
+            endDate: new Date(startMs + (i + 1) * 1000).toISOString(),
+          }));
+          await new Promise<void>((resolve) =>
+            HK.saveSamples?.(
+              "HeartRate",
+              hrS,
+              () => resolve()
+            ) ?? resolve()
+          );
+        } catch { /* best-effort */ }
+      }
       return { ok: true };
     } catch (e: any) {
       return { ok: false, error: e?.message || "Could not save to Apple Health" };
@@ -125,11 +168,52 @@ export async function pushWorkoutToHealth(w: CyclingWorkout): Promise<{ ok: bool
     if (!HC) return { ok: false, error: "unsupported" };
     try {
       await HC.initialize();
+      // Build metadata with clientRecordId for deduplication.
+      const meta = w.externalUUID
+        ? { clientRecordId: w.externalUUID, clientRecordVersion: 1 }
+        : undefined;
+
       const records: any[] = [
-        { recordType: "ExerciseSession", exerciseType: 8 /* BIKING */, startTime: w.startDate, endTime: w.endDate, title: w.title || "Cycling" },
+        {
+          recordType: "ExerciseSession",
+          exerciseType: 8 /* BIKING */,
+          startTime: w.startDate,
+          endTime: w.endDate,
+          title: w.title || "Cycling",
+          ...(meta ? { metadata: meta } : {}),
+        },
         { recordType: "Distance", distance: { unit: "meters", value: w.distanceMeters ?? 0 }, startTime: w.startDate, endTime: w.endDate },
         { recordType: "TotalCaloriesBurned", energy: { unit: "kilocalories", value: w.calories ?? 0 }, startTime: w.startDate, endTime: w.endDate },
       ];
+
+      // Add per-second power samples as PowerRecord entries.
+      const startMs = new Date(w.startDate).getTime();
+      if (w.powerSamples?.length) {
+        for (let i = 0; i < w.powerSamples.length; i++) {
+          if (w.powerSamples[i] > 0) {
+            records.push({
+              recordType: "Power",
+              power: { unit: "watts", value: w.powerSamples[i] },
+              startTime: new Date(startMs + i * 1000).toISOString(),
+              endTime: new Date(startMs + (i + 1) * 1000).toISOString(),
+            });
+          }
+        }
+      }
+      // Heart rate samples.
+      if (w.hrSamples?.length) {
+        for (let i = 0; i < w.hrSamples.length; i++) {
+          if (w.hrSamples[i] > 0) {
+            records.push({
+              recordType: "HeartRate",
+              samples: [{ beatsPerMinute: w.hrSamples[i], time: new Date(startMs + i * 1000).toISOString() }],
+              startTime: new Date(startMs + i * 1000).toISOString(),
+              endTime: new Date(startMs + (i + 1) * 1000).toISOString(),
+            });
+          }
+        }
+      }
+
       await HC.insertRecords(records);
       return { ok: true };
     } catch (e: any) {

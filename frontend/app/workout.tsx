@@ -29,14 +29,16 @@ import { vrouteIdForType, deriveVirtualRide } from "@/src/lib/workout-vroute";
 import { prTracker, prToastMessages } from "@/src/lib/pr-tracker";
 import { Toast, CompletePrompt, EndPrompt } from "@/src/components/workout/WorkoutModals";
 import { VRoutePicker } from "@/src/components/workout/VRoutePicker";
+import { PreRideChecklist, getErgCoachTip } from "@/src/components/workout/PreRideChecklist";
 import { loadAppearance, RiderAppearanceConfiguration, DEFAULT_APPEARANCE } from "@/src/lib/rider-config";
 import {
   SettingsPanel, MusicPanel, CastPanel, RouteMapCard,
 } from "@/src/components/workout";
 import {
-  MetricCard, SessionCard, DeviceDock, CoachBanner, TerrainCard, BrandCard, StepTimeline, StepDetailModal, LiveControlBar, AdjustmentsStrip,
+  MetricCard, SessionCard, DeviceDock, CoachBanner, TerrainCard, BrandCard, StepTimeline, StepDetailModal, LiveControlBar, AdjustmentsStrip, BackpedalBanner,
 } from "@/src/components/workout-live";
 import { useWorkoutAudio } from "@/src/hooks/useWorkoutAudio";
+import { useBackpedalPause } from "@/src/hooks/useBackpedalPause";
 import { BleSensorsPanel } from "@/src/components/BleSensorsPanel";
 import { TrainerControlPanel } from "@/src/components/streaming/TrainerControlPanel";
 import { fetchCoachCue, fetchExtendPlan, ExtendPlan } from "@/src/lib/coach";
@@ -176,6 +178,7 @@ export default function LiveWorkout() {
   const [stepDetail, setStepDetail] = React.useState<number | null>(null);
   const [toast, setToast] = React.useState<{ id: number; text: string } | null>(null);
   const [cueIdx] = React.useState(0);
+  const [showPreRide, setShowPreRide] = React.useState(true);
 
   const { settings, setSetting, loaded } = useSettings();
   const { telemetry, connectionState, sendErg, sendTarget, sendInit, sendSensor, pause, resume } = useTelemetry();
@@ -206,6 +209,29 @@ export default function LiveWorkout() {
     if (Date.now() > ergPendingUntil.current) { ergRef.current = telemetry.erg; setErg(telemetry.erg); }
   }, [telemetry.erg]);
 
+  // ── Backpedal-to-Pause: cadence = 0 for 3 s → auto-pause, resume with
+  // a 5 s grace ramp so the rider can rebuild cadence before full ERG.
+  const backpedalPausedRef = React.useRef(false);
+  const backpedal = useBackpedalPause({
+    cadence: ble.readings.cadence,
+    trainerConnected: ble.connected.length > 0 && (ble.readings.power != null || ble.readings.cadence != null),
+    workoutPaused: paused,
+    enabled: settings.backpedalPause,
+    onBackpedalPause: React.useCallback(() => {
+      backpedalPausedRef.current = true;
+      pause(); setPaused(true);
+      rideRecorder.addAdjustment(mmss(Math.round(telemetryRef.current.elapsed)), "Backpedal pause");
+    }, [pause]),
+    onGraceStart: React.useCallback(() => {
+      resume(); setPaused(false);
+      backpedalPausedRef.current = false;
+      rideRecorder.addAdjustment(mmss(Math.round(telemetryRef.current.elapsed)), "Grace ramp started");
+    }, [resume]),
+    onGraceEnd: React.useCallback(() => {
+      rideRecorder.addAdjustment(mmss(Math.round(telemetryRef.current.elapsed)), "ERG fully re-engaged");
+    }, []),
+  });
+
   // Push real Bluetooth sensor readings into the telemetry stream so the backend
   // records measured power/cadence/HR (falls back to the trainer sim if BLE stops).
   React.useEffect(() => {
@@ -227,7 +253,44 @@ export default function LiveWorkout() {
   const targetW = activeSeg ? targetWatts(activeSeg.segment, ftp, zoneBias) : 251;
   // The watts actually sent to the trainer — the planned target, eased down while
   // the rider is struggling so the resistance backs off to help them recover.
-  const effTarget = Math.max(0, Math.round(targetW * struggleEase));
+  // During a backpedal grace ramp the factor goes 0.30 → 1.0 over 5 s.
+  const effTarget = Math.max(0, Math.round(targetW * struggleEase * backpedal.graceEaseFactor));
+
+  // ── Anticipatory command offsetting ────────────────────────────────
+  // Send the NEXT interval's ERG target ~2 s before the boundary so the
+  // trainer's electromagnets have time to spin up (1.5-3 s latency).
+  // For large jumps (>100 W), interpolate with intermediate ramp commands.
+  const anticipatoryFiredRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!activeSeg || !activeSeg.next || paused || !ergMode) return;
+    if (activeSeg.remaining > 2.5 || activeSeg.remaining < 0.3) {
+      anticipatoryFiredRef.current = false;
+      return;
+    }
+    if (anticipatoryFiredRef.current) return;
+    anticipatoryFiredRef.current = true;
+    const nextTarget = Math.max(0, Math.round(targetWatts(activeSeg.next, ftp, zoneBias) * struggleEase));
+    const delta = Math.abs(nextTarget - effTarget);
+    if (delta > 100) {
+      // Large jump: ramp with 2 intermediate steps spaced 500 ms apart.
+      const step1 = Math.round(effTarget + (nextTarget - effTarget) * 0.33);
+      const step2 = Math.round(effTarget + (nextTarget - effTarget) * 0.66);
+      sendTarget(step1);
+      if (ble.hasTrainerControl && autoErg) ble.setErgWatts(step1);
+      setTimeout(() => {
+        sendTarget(step2);
+        if (ble.hasTrainerControl && autoErg) ble.setErgWatts(step2);
+      }, 500);
+      setTimeout(() => {
+        sendTarget(nextTarget);
+        if (ble.hasTrainerControl && autoErg) ble.setErgWatts(nextTarget);
+      }, 1000);
+    } else {
+      // Small jump: single pre-command.
+      sendTarget(nextTarget);
+      if (ble.hasTrainerControl && autoErg) ble.setErgWatts(nextTarget);
+    }
+  }, [activeSeg, activeSeg?.remaining, paused, ergMode, effTarget, ftp, zoneBias, struggleEase, sendTarget, ble, autoErg]);
   const timeLeftLabel = activeSeg ? mmss(activeSeg.remaining) : undefined;
   // Workout intervals as vertical "stages" for the shared fullscreen HUD rail.
   const workoutStages = React.useMemo(
@@ -445,10 +508,21 @@ export default function LiveWorkout() {
     logControl(`ERG ${d > 0 ? "+" : "−"}${Math.abs(d)}% → ${next}%`);
   };
   const onPauseToggle = () => {
+    // Manual pause/resume — reset backpedal detection so it doesn't fight.
+    backpedal.reset();
+    backpedalPausedRef.current = false;
     if (paused) { resume(); } else { pause(); }
     setPaused((p) => !p);
     showToast(paused ? "Resuming workout" : "Workout paused");
     logControl(paused ? "Resumed" : "Paused");
+  };
+  const onErgToggle = () => {
+    setErgMode((m) => {
+      const next = !m;
+      showToast(next ? "ERG mode ON — trainer holds your target" : "ERG mode OFF — use gears to control effort");
+      logControl(next ? "ERG mode ON" : "ERG mode OFF");
+      return next;
+    });
   };
   const onControlAction = (key: string) => {
     setShowControls(false);
@@ -466,7 +540,7 @@ export default function LiveWorkout() {
         onErg(5);
         break;
       case "erg":
-        setErgMode((m) => { const next = !m; showToast(next ? "ERG mode ON — trainer holds your target" : "ERG mode OFF — ride at your own effort"); logControl(next ? "ERG mode ON" : "ERG mode OFF"); return next; });
+        onErgToggle();
         break;
       case "camera":
         setShowRoutes(true);
@@ -777,9 +851,10 @@ export default function LiveWorkout() {
         fallback = "Ease right off and just spin — sit tall, breathe deep and let your heart rate come down. Recovery is the smart move here.";
       } else if (kind === "struggle") {
         const prim = (extra?.struggle_primary as keyof typeof REASON_LABEL) || null;
-        const tip = prim === "cadence_decay" ? "lift your cadence and keep the legs turning"
+        const tip = prim === "erg_spiral" ? getErgCoachTip("spiral")
+          : prim === "cadence_decay" ? "lift your cadence and keep the legs turning"
           : prim === "hr_near_max" || prim === "hr_decoupling" ? "breathe deep and settle your effort"
-          : prim === "power_variability" || prim === "pedal_asymmetry" ? "smooth out your pedal stroke"
+          : prim === "power_variability" || prim === "pedal_asymmetry" ? getErgCoachTip("trust")
           : "stay relaxed and hold your form";
         fallback = `Dig in — ${tip}. You've got this, one pedal stroke at a time.`;
       } else {
@@ -893,14 +968,18 @@ export default function LiveWorkout() {
   }, [activeSeg?.index, paused, generateCue]);
 
   // As the rider nears the end of the current step, prepare them for the next.
+  // ERG-specific: include the "spin up your legs" anticipation tip when the
+  // upcoming interval is significantly harder (power jump ≥ 30 W).
   React.useEffect(() => {
     if (paused || !activeSeg || !activeSeg.next || nextPreviewFiredRef.current) return;
     const threshold = Math.min(20, Math.max(8, Math.round(activeSeg.segment.durationSec * 0.15)));
     if (activeSeg.remaining > 0 && activeSeg.remaining <= threshold) {
       nextPreviewFiredRef.current = true;
-      generateCue("next_preview");
+      const nextTarget = targetWatts(activeSeg.next, ftp, zoneBias);
+      const isHarder = nextTarget - targetW >= 30;
+      generateCue("next_preview", isHarder && ergMode ? { erg_anticipation_tip: getErgCoachTip("anticipate") } : undefined);
     }
-  }, [activeSeg, activeSeg?.remaining, paused, generateCue]);
+  }, [activeSeg, activeSeg?.remaining, paused, generateCue, ftp, zoneBias, targetW, ergMode]);
 
   const onSelectRoute = (id: string) => {
     setVRouteId(id); setShowRoutes(false);
@@ -959,6 +1038,26 @@ export default function LiveWorkout() {
 
   // ---- Derived values for the redesigned live dashboard ----
   const powerVal = Math.round(telemetry.power);
+
+  // 3-second rolling average (smooths single-pedal-stroke spikes)
+  const powerBufferRef = React.useRef<{ t: number; v: number }[]>([]);
+  const power3s = React.useMemo(() => {
+    const now = Date.now();
+    const buf = powerBufferRef.current;
+    buf.push({ t: now, v: telemetry.power });
+    // Trim entries older than 3 seconds
+    while (buf.length > 0 && now - buf[0].t > 3000) buf.shift();
+    if (buf.length === 0) return powerVal;
+    const avg = buf.reduce((sum, e) => sum + e.v, 0) / buf.length;
+    return Math.round(avg);
+  }, [telemetry.power, powerVal]);
+
+  // Color coding for the 3s power relative to target (within 5% = green, 10% = yellow, else red)
+  const powerDeltaPct = targetW > 0 ? Math.abs(power3s - targetW) / targetW : 0;
+  const powerColor = !trainerOn ? colors.textDim
+    : powerDeltaPct <= 0.05 ? colors.green
+    : powerDeltaPct <= 0.10 ? colors.yellow
+    : colors.red;
 
   // Power/cadence "LOW · ON TARGET · HIGH" badges use hysteresis (a sticky
   // dead-zone around each boundary) instead of a single hard threshold, so
@@ -1129,6 +1228,15 @@ export default function LiveWorkout() {
         </View>
       </View>
 
+      {backpedal.phase !== "riding" && (
+        <BackpedalBanner
+          phase={backpedal.phase}
+          graceRemainingSec={backpedal.graceRemainingSec}
+          graceEaseFactor={backpedal.graceEaseFactor}
+          detectingSec={backpedal.detectingSec}
+        />
+      )}
+
       <View style={[styles.metricRow, styles.telemetryRow, narrow && styles.metricRowWrap]}>
         {timeBased ? (
           <>
@@ -1138,14 +1246,17 @@ export default function LiveWorkout() {
           </>
         ) : (
           <>
+            {/* ERG-optimized hierarchy: Power → Cadence → Interval Time → HR → (secondary) */}
+            <MetricCard icon="flash" label="Power (3s avg)" value={trainerOn ? String(power3s) : "—"} unit="W" status={powerStatus} statusTone={powerTone} sub={`TARGET ${Math.max(0, targetW - 8)}–${targetW + 8} W`} accent={powerColor} connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} half={narrow} dense={tablet} />
+            <MetricCard icon="sync" label="Cadence" value={trainerOn ? String(telemetry.cadence) : "—"} unit="rpm" status={cadStatus} statusTone={cadInRange ? "good" : "warn"} sub={`TARGET ${CAD_LOW}–${CAD_HIGH} RPM`} accent={colors.green} connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} half={narrow} dense={tablet} />
+            <MetricCard icon="timer-outline" label="Interval Left" value={timeLeftLabel ?? "—"} status="REMAINING" statusTone="neutral" sub="CURRENT BLOCK" accent="#5AC8FA" half={narrow} dense={tablet} />
             <MetricCard icon="heart" label="Heart Rate" value={wearableOn ? String(telemetry.hr) : "—"} unit="bpm" status={wearableOn ? `ZONE ${hrZone(telemetry.hr)}` : undefined} statusTone="neutral" accent={colors.red} connected={wearableOn} deviceName={hrName} battery={hrBattery} signal={hrSignal} onDevicePress={() => setShowBle(true)} half={narrow} dense={tablet} />
-            <MetricCard icon="speedometer" label="Speed" value={trainerOn ? String(Math.round(telemetry.speed)) : "—"} unit="km/h" accent="#5AC8FA" connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} half={narrow} dense={tablet} />
-            <MetricCard icon="sync" label="Cadence" value={trainerOn ? String(telemetry.cadence) : "—"} unit="rpm" status={cadStatus} statusTone={cadInRange ? "good" : "warn"} sub={`TARGET ${CAD_LOW}–${CAD_HIGH}`} accent={colors.green} connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} half={narrow} dense={tablet} />
-            <MetricCard icon="flash" label="Power" value={trainerOn ? String(powerVal) : "—"} unit="W" status={powerStatus} statusTone={powerTone} sub={`TARGET ${Math.max(0, targetW - 8)}–${targetW + 8} W`} accent={colors.yellow} connected={trainerOn} deviceName={trainerName} battery={trainerBattery} signal={trainerSignal} onDevicePress={() => setShowBle(true)} half={narrow} dense={tablet} />
           </>
         )}
+        {/* Secondary — de-emphasised in ERG mode (Speed + Distance provide no actionable feedback) */}
         <MetricCard icon="trending-up" label="Gradient" value={Math.abs(vState.gradient).toFixed(1)} unit="%" sub={`${vState.remainingKm.toFixed(1)} KM LEFT ON ROUTE`} accent={colors.yellow} half={narrow} dense={tablet} />
-        <MetricCard icon="navigate" label="Distance" value={`${riddenKm.toFixed(1)}/${routeInfo.km.toFixed(1)}`} unit="km" sub={`${Math.max(0, routeInfo.km - riddenKm).toFixed(1)} KM DISTANCE LEFT`} accent="#5AC8FA" half={narrow} dense={tablet} />
+        <MetricCard icon="speedometer" label="Speed" value={trainerOn ? String(Math.round(telemetry.speed)) : "—"} unit="km/h" accent={colors.textDim} connected={trainerOn} half={narrow} dense={tablet} />
+        <MetricCard icon="navigate" label="Distance" value={`${riddenKm.toFixed(1)}/${routeInfo.km.toFixed(1)}`} unit="km" sub={`${Math.max(0, routeInfo.km - riddenKm).toFixed(1)} KM LEFT`} accent={colors.textDim} half={narrow} dense={tablet} />
       </View>
 
       <StepTimeline steps={stepList} activeIndex={activeSeg?.index ?? -1} remaining={timeLeftLabel} stepProgress={activeSeg ? activeSeg.elapsedInSeg / Math.max(1, activeSeg.segment.durationSec) : 0} onStepPress={(i) => setStepDetail(i)} />
@@ -1154,9 +1265,11 @@ export default function LiveWorkout() {
         paused={paused}
         erg={erg}
         audioOn={musicOn}
+        ergMode={ergMode}
         onAudio={() => setShowMusic(true)}
         onMirror={() => setShowCast(true)}
         onErg={onErg}
+        onErgToggle={onErgToggle}
         onControls={() => setShowControls(true)}
         onReconnect={() => setShowBle(true)}
         onSettings={() => setShowSettings(true)}
@@ -1173,6 +1286,7 @@ export default function LiveWorkout() {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
       <StatusBar hidden />
       <PaywallModal visible={!!paywall} onClose={closePaywall} reason={paywall || undefined} />
+      <PreRideChecklist visible={showPreRide && ergMode} onDismiss={() => setShowPreRide(false)} />
       <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
         {tablet ? (
           <ScrollView style={styles.flex1} contentContainerStyle={styles.tabletContent} showsVerticalScrollIndicator={false} testID="workout-fit">
@@ -1238,7 +1352,7 @@ export default function LiveWorkout() {
                 exitLabel="Exit"
                 exitIcon="contract-outline"
                 ergOn={ergMode}
-                onErgToggle={() => setErgMode((m) => { const next = !m; showToast(next ? "ERG mode ON" : "ERG mode OFF"); logControl(next ? "ERG mode ON" : "ERG mode OFF"); return next; })}
+                onErgToggle={onErgToggle}
                 onReconnect={() => setShowBle(true)}
                 onPreset={(w) => { sendTarget(w); showToast(`Target ${w} W`); logControl(`Target → ${w} W`); }}
                 compact={compact}
@@ -1267,7 +1381,7 @@ export default function LiveWorkout() {
               onPauseToggle={onPauseToggle}
               onPreset={(w) => { sendTarget(w); showToast(`Target ${w} W`); logControl(`Target → ${w} W`); }}
               ergOn={ergMode}
-              onErgToggle={() => setErgMode((m) => { const next = !m; showToast(next ? "ERG mode ON" : "ERG mode OFF"); logControl(next ? "ERG mode ON" : "ERG mode OFF"); return next; })}
+              onErgToggle={onErgToggle}
               onReconnect={() => setShowBle(true)}
             />
           )}

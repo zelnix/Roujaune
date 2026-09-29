@@ -398,14 +398,14 @@ def _ride_to_strava(h: dict, coach_summary: str | None = None) -> dict:
 
 
 async def _do_strava_push(acc: dict, h: dict, coach_summary: str | None = None) -> dict:
-    """Upload one ride to Strava (TCX when we have samples, else a summary
-    activity) and record the resulting id on the ride. Idempotent per ride."""
+    """Upload one ride to Strava (FIT when we have samples for best data fidelity,
+    else a summary activity) and record the resulting id on the ride. Idempotent."""
     import providers.strava as strava
     ride = _ride_to_strava(h, coach_summary)
     samples = h.get("samples") or []
     access = await _fresh_access_token(acc)
     if samples:
-        res = await strava.upload_tcx(access, ride, samples)
+        res = await strava.upload_fit(access, ride, samples, ftp=int(h.get("ftp_used") or 200))
     else:
         res = await strava.create_manual_activity(access, ride)
     await udb.ride_history.update_one({"id": h["id"]}, {"$set": {

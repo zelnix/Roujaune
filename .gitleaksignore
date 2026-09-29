@@ -2,26 +2,32 @@
 #
 # WHY THIS FILE EXISTS: `.github/workflows/ci.yml` runs gitleaks with
 # `fetch-depth: 0`, so it scans the ENTIRE git history on every push, not
-# just the new commits. The 10 findings below were discovered when Gate 1
+# just the new commits. The 9 findings below were discovered when Gate 1
 # (CI) was first wired up against this already-existing, previously
 # ungated repo. Each was individually triaged (see notes) — this file does
 # NOT hide anything going forward; any NEW secret introduced by a future
 # commit will still fail CI, because it won't have a matching fingerprint
 # here. Format: <fingerprint> = <commit>:<file>:<rule>:<line>
 #
-# 1) REAL secret, already rotated out of test-file hardcoding (see the
-#    commit that removed the fallback default). Recommend rotating
-#    ADMIN_LOGIN_PASSWORD in backend/.env + the ADMIN_LOGIN_PASSWORD GitHub
-#    secret regardless, since this repo is public and the value was
-#    exposed in history — see RELEASE_PROCESS.md follow-up.
-ced632781383c15cd2d30c081df3060a86ecfc6a:backend/tests/test_smoke_manual_iteration.py:generic-api-key:126
+# NOT LISTED HERE, BY POLICY: the real ADMIN_LOGIN_PASSWORD leak in
+# backend/tests/test_smoke_manual_iteration.py (commit ced6327...) is
+# intentionally NOT allowlisted. It has been rotated + server-side
+# invalidated (old value confirmed to return 401; see
+# PRODUCTION_READINESS_REPORT.md), but the OLD (now-dead) string still
+# physically exists in that historical commit's blob, so gitleaks will
+# keep flagging it on every future push while `fetch-depth: 0` is set.
+# Closing this out for real requires either (a) rewriting git history for
+# that blob (git-filter-repo + coordinated force-push — a repo-owner
+# operation, not done from this session) or (b) a deliberate decision to
+# scan only new commits going forward. Left as an explicit open decision;
+# see RELEASE_PROCESS.md.
 
-# 2) Retired ADMIN_API_TOKEN mechanism (dead code path, removed — see the
+# 1) Retired ADMIN_API_TOKEN mechanism (dead code path, removed — see the
 #    NOTE comment at the top of test_admin_service_token.py). Not a live
 #    credential.
 ba9fb7d5ae1725717370fae04203150150309bed:backend/tests/test_admin_service_token.py:generic-api-key:20
 
-# 3-5) Old HWG_SERVICE_TOKEN value hardcoded in test fixtures from an
+# 2-4) Old HWG_SERVICE_TOKEN value hardcoded in test fixtures from an
 #    earlier iteration. Confirmed it does NOT match the current
 #    backend/.env HWG_SERVICE_TOKEN (already rotated since); all three
 #    files now read the token from os.environ in HEAD.
@@ -29,21 +35,26 @@ ba9fb7d5ae1725717370fae04203150150309bed:backend/tests/test_admin_service_token.
 f1296ba01d13405598174b375f348bf9ce7e6c9f:backend/tests/test_iter91_feedback.py:generic-api-key:21
 66bdf6a9c621539aa4c1a4e1d9247a101a1671ea:backend/tests/test_iter90_screen_captures_admin.py:generic-api-key:17
 
-# 6-7) Obviously-fake placeholder test fixture values (literal strings
+# 5-6) Obviously-fake placeholder test fixture values (literal strings
 #    prefixed "TEST_"), not real credentials.
 394f41c66076b74c110a35d295fe777b520c8f6f:backend/tests/test_iter64_rider_benchmark_refactor.py:generic-api-key:161
 d3c922d7b30db576128e61d64f0d00d63eb622b4:backend/tests/test_iter63_catalog_system_notifs.py:generic-api-key:177
 
-# 8) Firebase/Google Android API key in google-services.json. This key is
-#    designed to be public (protected by Firebase Security Rules / App
-#    Check, not secrecy) and is meant to be committed for Android builds.
+# 7) Firebase/Google Android API key in google-services.json. Firebase
+#    Android client API keys are designed to be public (they identify the
+#    Firebase project to Google's servers; access is gated by Firebase
+#    Security Rules / App Check, not by key secrecy — this is documented
+#    Firebase behavior, and the file is meant to be committed for Android
+#    builds). RECOMMENDATION: verify in the Firebase console that API key
+#    restrictions / App Check are configured as an additional hardening
+#    layer, but the key itself is not a "leak" in the traditional sense.
 77e1338b38ea41b6e4359851f4dcc21390bf8280:frontend/google-services.json:gcp-api-key:18
 
-# 9) `verify_token` inside demo seed fixture data — an opaque email-verify
+# 8) `verify_token` inside demo seed fixture data — an opaque email-verify
 #    token for the synthetic demo/preview account, not a credential.
 b0d25de7236a61be9fcca3883c6aa499666d8dfc:backend/seed_data/demo_seed.json:generic-api-key:1
 
-# 10) Vendored Playwright/Chromium binary resource (Google's own bundled
+# 9) Vendored Playwright/Chromium binary resource (Google's own bundled
 #    test key inside chrome-linux, unrelated to this app). The whole
 #    backend/.pw-browsers/ cache directory has been removed from tracking
 #    and added to .gitignore (see that commit) so this can't recur.

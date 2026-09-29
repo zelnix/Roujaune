@@ -245,7 +245,71 @@ full-suite runs (2026-09-15). The Resend item is now resolved via `EMAIL_SANDBOX
 2026-09-15 update above); the plan-snapshot item was a real bug, now fixed (not a stale test).
 This is a trustworthy green baseline, now wired into `.github/workflows/ci.yml` as the release gate.
 
----
+## 7b) Gate 1 — first real CI run on GitHub infrastructure (2026-09-15, session 3)
+Run `34932284200` (triggered by an actual push) failed all 3 jobs. Diagnosed directly from the
+GitHub Actions run + the gitleaks SARIF artifact (not guessed):
+
+1. **Secret scan (gitleaks) — REAL secret found.** `backend/tests/test_smoke_manual_iteration.py`
+   had `ADMIN_LOGIN_PASSWORD`'s live value hardcoded as a fallback default; a second file
+   (`test_regression_2026_security_hardening.py`) had it hardcoded outright. Both fixed to read
+   only from `os.environ`. **The admin password has been rotated and the old value confirmed to
+   return 401** (new value is in `backend/.env`; the `ADMIN_LOGIN_PASSWORD` GitHub secret still
+   needs updating to match — no DB/fixture regeneration needed, `seed_login_admin()` re-syncs the
+   hash from the env var on every backend startup).
+   - A full-history gitleaks scan (`gitleaks git`, 481 commits) was run locally to be thorough
+     and turned up 9 more findings: a retired/dead token, 3 already-rotated old service-token
+     values, 2 obviously-fake `TEST_`-prefixed placeholders, a Firebase Android API key (public
+     by design), and an opaque demo-seed email-verify token. All 9 triaged individually and
+     recorded with reasons in `.gitleaksignore`.
+   - **Repo hygiene bug found in the same pass:** `backend/.pw-browsers/` — Playwright's browser
+     binary cache — had been accidentally committed (984MB, 482 files; `.gitignore` only excluded
+     3 specific binary paths, not the directory). Untracked via `git rm -r --cached` and
+     `.gitignore` now excludes the whole directory. Not needed in git at all: `screen_capture.py`
+     already installs Chromium on demand (`playwright install chromium`) the first time the
+     feature actually runs.
+   - **Open decision, not yet resolved:** because `ci.yml` uses `fetch-depth: 0`, gitleaks
+     re-scans the *entire* git history on every push, and the real password's old (now-dead)
+     string still physically exists in one historical commit's blob — it will keep getting
+     flagged by the secret-scan job on every future run until either (a) that commit is purged
+     via `git-filter-repo` + a coordinated force-push (a repo-owner operation with real risk to
+     any existing clones/branches — not something to run from this sandbox unilaterally), or
+     (b) the workflow is changed to scan only new commits going forward. Per explicit instruction,
+     this finding was **not** added to `.gitleaksignore` — it stays visible rather than hidden.
+2. **Backend pytest — dependency install failure, root cause confirmed.**
+   `emergentintegrations==0.2.0` in `backend/requirements.txt` is an Emergent-internal package not
+   published on public PyPI, so a plain `pip install` on a GitHub-hosted runner fails immediately
+   (this sandbox resolves it via a private extra-index-url that a public GitHub runner doesn't
+   have). Confirmed via code search it is not on any live/tested code path: `services/gemini_shim.py`
+   is already a drop-in replacement used by the real app code, and the only 3 references left
+   (`scripts/gen_*.py` one-off asset-gen tools + one `try/except`-guarded optional import in
+   `screen_capture.py`) are outside the CI/production path. Removed from `requirements.txt`.
+   Verified: targeted pytest on the edited files + `test_admin_service_token.py` — 27/27 passed.
+3. **Frontend lint + typecheck — pre-existing debt, not caused by this RC.** `npx tsc --noEmit`
+   never even ran in the failed CI (the lint step failed first, and GitHub Actions doesn't run
+   later steps in the same job after a failing step by default). Investigated both in full:
+   - `yarn lint`: 310 pre-existing errors, 56 warnings, spread across the whole (previously
+     ungated) codebase — not something to mass-fix mid-code-freeze. Baselined with ESLint 9's
+     official bulk-suppressions feature: `frontend/eslint-suppressions.json` (generated via
+     `--suppress-all`, zero source files touched). CI now runs
+     `expo lint -- --suppressions-location eslint-suppressions.json`, which **fails only on
+     NEW ESLint errors** — the 310 are recorded as accepted technical debt for post-1.0
+     reduction, not the new permanent baseline standard.
+   - `npx tsc --noEmit`: separately found ~47 pre-existing type errors (also never previously
+     gated). No native TypeScript equivalent of ESLint's suppressions exists, so a deterministic
+     diff-based baseline was added instead: `frontend/tsc-baseline.txt` (current errors, captured
+     once) + a CI step that re-runs `tsc --noEmit` and fails **only if a line appears that isn't
+     in the baseline**. `tsc --noEmit` itself is still run in full and its full output is visible
+     in the CI log — nothing is hidden or disguised as a clean typecheck.
+   - **Explicit debt record:** 310 pre-existing ESLint errors + 47 pre-existing TypeScript errors
+     are baselined/known technical debt, tracked for burn-down after the 1.0 release. CI's bar for
+     this RC is "no *new* errors," not "zero errors."
+
+## GitHub Actions secret to update after this session
+`ADMIN_LOGIN_PASSWORD` was rotated in `backend/.env` — the GitHub Actions secret of the same name
+must be updated to match before the next CI run, or the `backend-tests` job's admin-login tests
+will fail authentication (this is expected/correct behavior, not a new bug).
+
+
 
 ## What's NOT done yet (the rest of the original 11-phase brief)
 

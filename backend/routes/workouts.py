@@ -378,6 +378,21 @@ async def _save_ride_history(body: SummarizeRequest, result: dict) -> Optional[s
                for s in (body.samples or [])]
         step = max(1, len(raw) // 3600)  # cap ~3600 points (1 Hz for a 1h ride)
         samples = raw[::step][:3600] if raw else []
+
+        # ── Compute NP / IF / TSS from raw power (TrainingPeaks model) ──
+        from services.power_metrics import compute_all
+        power_arr = [int(s.get("power") or 0) for s in samples]
+        dur_sec = int(result.get("duration_sec") or len(samples) or 0)
+        ftp = 200
+        try:
+            from auth import udb as _udb
+            settings_doc = await _udb.settings.find_one({"id": "app"})
+            if settings_doc and settings_doc.get("ftp"):
+                ftp = int(settings_doc["ftp"])
+        except Exception:
+            pass
+        pm = compute_all(power_arr, dur_sec, ftp)
+
         doc = {
             "id": rid,
             "created_at": now_iso(),
@@ -387,16 +402,18 @@ async def _save_ride_history(body: SummarizeRequest, result: dict) -> Optional[s
             "duration_sec": result.get("duration_sec"),
             "distance_km": result.get("distance_km"),
             "elevation_m": result.get("elevation_m"),
-            "avg_power": result.get("avg_power"),
-            "max_power": result.get("max_power") or result.get("norm_power"),
+            "avg_power": pm.get("avg_power") or result.get("avg_power"),
+            "max_power": pm.get("max_power") or result.get("max_power") or result.get("norm_power"),
             "avg_hr": result.get("avg_hr"),
             "max_hr": result.get("max_hr"),
             "avg_cadence": result.get("avg_cadence"),
-            "tss": result.get("tss"),
+            "tss": pm.get("tss") or result.get("tss"),
             "calories": result.get("calories", 0),
             "computed": result.get("computed", False),
             "intensity": result.get("intensity"),
-            "norm_power": result.get("norm_power"),
+            "norm_power": pm.get("normalized_power") or result.get("norm_power"),
+            "intensity_factor": pm.get("intensity_factor"),
+            "ftp_used": ftp,
             # Longitudinal adaptation metrics (present for computed rides).
             "ef": result.get("ef"),
             "vi": result.get("vi"),
@@ -487,3 +504,114 @@ async def energy_rollup():
 
 
 # ----------------------- Outdoor ride syncing (connections) -----------------------
+
+
+
+# ── FIT file export ──────────────────────────────────────────────────────
+from fastapi.responses import Response
+
+
+@router.get("/rides/{ride_id}/export/fit")
+async def export_fit(ride_id: str):
+    """Download a binary .FIT file for an indoor ride.
+
+    The file contains per-second raw power/cadence/HR records plus a Session
+    message with NP, IF, TSS (correctly FIT-scaled).  Compatible with Strava,
+    Garmin Connect, TrainingPeaks, and any other platform that accepts FIT.
+    """
+    h = await udb.ride_history.find_one({"id": ride_id})
+    if not h:
+        raise HTTPException(404, "Ride not found")
+    samples = h.get("samples") or []
+    if not samples:
+        raise HTTPException(400, "No sample data for this ride")
+
+    from services.fit_builder import build_fit_activity
+
+    ftp = int(h.get("ftp_used") or 200)
+    started = h.get("created_at")
+    start_dt = datetime.now(timezone.utc)
+    if started:
+        try:
+            start_dt = datetime.fromisoformat(str(started).replace("Z", "+00:00"))
+            if start_dt.tzinfo is None:
+                start_dt = start_dt.replace(tzinfo=timezone.utc)
+        except Exception:
+            pass
+
+    data = build_fit_activity(
+        samples=samples,
+        start_time=start_dt,
+        elapsed_sec=int(h.get("duration_sec") or len(samples)),
+        ftp=ftp,
+        workout_name=h.get("workout") or "Indoor Ride",
+        calories=int(h.get("calories") or 0),
+    )
+    name = (h.get("workout") or "ride").replace(" ", "_").lower()
+    return Response(
+        content=data,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{name}_{ride_id[:8]}.fit"'},
+    )
+
+
+@router.get("/rides/{ride_id}/metrics")
+async def ride_metrics(ride_id: str):
+    """Return computed NP / IF / TSS for an indoor ride."""
+    h = await udb.ride_history.find_one({"id": ride_id})
+    if not h:
+        raise HTTPException(404, "Ride not found")
+    return {
+        "id": ride_id,
+        "avg_power": h.get("avg_power"),
+        "max_power": h.get("max_power"),
+        "normalized_power": h.get("norm_power"),
+        "intensity_factor": h.get("intensity_factor"),
+        "tss": h.get("tss"),
+        "ftp_used": h.get("ftp_used"),
+        "duration_sec": h.get("duration_sec"),
+        "calories": h.get("calories"),
+    }
+
+
+@router.get("/rides/{ride_id}/share-video")
+async def share_video(ride_id: str):
+    """Generate an animated 12-second MP4 share video for a completed ride.
+
+    The video shows the power curve drawing itself with HR overlay and key
+    stats fading in — designed for Instagram Stories and TikTok."""
+    h = await udb.ride_history.find_one({"id": ride_id})
+    if not h:
+        raise HTTPException(404, "Ride not found")
+    samples = h.get("samples") or []
+    if len(samples) < 10:
+        raise HTTPException(400, "Not enough sample data for a share video")
+
+    from services.share_video import generate_share_video
+
+    def _mmss(sec: int) -> str:
+        return f"{sec // 60}:{sec % 60:02d}"
+
+    metrics = {
+        "avg_power": h.get("avg_power"),
+        "max_power": h.get("max_power"),
+        "normalized_power": h.get("norm_power"),
+        "intensity_factor": h.get("intensity_factor"),
+        "tss": h.get("tss"),
+        "avg_hr": h.get("avg_hr"),
+        "avg_cadence": h.get("avg_cadence"),
+        "duration_label": _mmss(int(h.get("duration_sec") or len(samples))),
+        "calories": h.get("calories"),
+    }
+    mp4 = generate_share_video(
+        samples=samples,
+        metrics=metrics,
+        workout_name=h.get("workout") or "Indoor Ride",
+        route_name=h.get("route"),
+    )
+    name = (h.get("workout") or "ride").replace(" ", "_").lower()
+    return Response(
+        content=mp4,
+        media_type="video/mp4",
+        headers={"Content-Disposition": f'attachment; filename="{name}_{ride_id[:8]}.mp4"'},
+    )

@@ -79,12 +79,17 @@ agenthub/agents/youtube/db
 memory/test_credentials.md
 
 # Mobile development
-android-sdk/backend/.pw-browsers/chromium-1234/chrome-linux/chrome
-backend/.pw-browsers/chromium_headless_shell-1234/chrome-linux/headless_shell
-backend/.pw-browsers/chromium-1234/chrome-linux/chrome
+# Playwright's on-demand browser cache (installed lazily by screen_capture.py
+# via `playwright install chromium` when the admin screen-capture feature
+# actually runs — see PW_BROWSERS_DIR). Must NEVER be committed: it was
+# previously tracked by mistake (984MB / 482 files) and untracked as part of
+# the ROUJAUNE Gate 1 CI hardening pass.
+backend/.pw-browsers/
 credentials.json
 *.key
 .credentials
 .env
 .env.*
 *.env
+backend/.pw-browsers/chromium_headless_shell-1234/chrome-linux/headless_shell
+backend/.pw-browsers/chromium-1234/chrome-linux/chrome
