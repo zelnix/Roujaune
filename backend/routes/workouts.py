@@ -399,6 +399,7 @@ async def _save_ride_history(body: SummarizeRequest, result: dict) -> Optional[s
             "workout": body.workout,
             "workout_id": body.workout_id,
             "route": body.route,
+            "route_id": (body.route or {}).get("id") if isinstance(body.route, dict) else None,
             "duration_sec": result.get("duration_sec"),
             "distance_km": result.get("distance_km"),
             "elevation_m": result.get("elevation_m"),
@@ -615,3 +616,59 @@ async def share_video(ride_id: str):
         media_type="video/mp4",
         headers={"Content-Disposition": f'attachment; filename="{name}_{ride_id[:8]}.mp4"'},
     )
+
+
+@router.get("/rides/{ride_id}/flythrough")
+async def flythrough_video(ride_id: str):
+    """Generate an animated 3D route flythrough MP4 for a completed ride.
+
+    Shows an overhead satellite map with the route line drawing itself as the
+    camera tracks the rider, plus a power graph strip and fading stats at the
+    bottom.  Designed for Instagram Stories/TikTok (9:16)."""
+    h = await udb.ride_history.find_one({"id": ride_id})
+    if not h:
+        raise HTTPException(404, "Ride not found")
+    samples = h.get("samples") or []
+
+    # Look up the route ID used for this ride.
+    route_id = h.get("route_id") or h.get("route", "").lower().replace(" ", "-")
+
+    from services.flythrough import generate_flythrough_video
+
+    def _mmss(sec: int) -> str:
+        return f"{sec // 60}:{sec % 60:02d}"
+
+    metrics = {
+        "avg_power": h.get("avg_power"),
+        "normalized_power": h.get("norm_power"),
+        "tss": h.get("tss"),
+        "avg_hr": h.get("avg_hr"),
+        "intensity_factor": h.get("intensity_factor"),
+        "duration_label": _mmss(int(h.get("duration_sec") or len(samples))),
+    }
+    mp4 = generate_flythrough_video(
+        route_id=route_id,
+        samples=samples,
+        metrics=metrics,
+        workout_name=h.get("workout") or "Indoor Ride",
+        route_name=h.get("route"),
+    )
+    if mp4 is None:
+        raise HTTPException(404, "No GPS data available for this route")
+
+    name = (h.get("workout") or "ride").replace(" ", "_").lower()
+    return Response(
+        content=mp4,
+        media_type="video/mp4",
+        headers={"Content-Disposition": f'attachment; filename="flythrough_{name}_{ride_id[:8]}.mp4"'},
+    )
+
+
+@router.get("/routes/{route_id}/geojson")
+async def route_geojson(route_id: str):
+    """Return the GeoJSON LineString for a virtual route's GPS path."""
+    from services.route_gps import get_route_geojson
+    geo = get_route_geojson(route_id)
+    if not geo:
+        raise HTTPException(404, "No GPS data for this route")
+    return geo
