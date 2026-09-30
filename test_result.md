@@ -644,3 +644,57 @@ agent_communication:
     -agent: "main"
     -comment: "ROUND 38 — bug fix: user reported a visible gap between the workout screen's Now/Next stage strip and the Stages (segment profile chart) row directly below it inside the StepTimeline card. Root cause: `st.wrap` (frontend/src/components/workout-live.tsx, StepTimeline component) had `gap: 10` between its two children (the now-next row and the chart ScrollView). Fixed by setting `gap: 0` on `st.wrap`. No other spacing/logic touched. TEST REQUEST (demo@roujaune.app/demo9900): FRONTEND ONLY — start a workout ride (Today -> View Next Scheduled Workout -> Start Workout) and visually confirm on the workout screen that the Now/Next card strip sits flush against the Stages chart row directly below it with NO visible vertical gap between them (testID interval-timeline wraps both testID now-next-strip and the chart). Confirm no regression: Now/Next cell tap still opens the step detail modal, chart segments still scroll/highlight the active step, and no other spacing on the page changed. Landscape, no need to complete the ride."
 
+
+
+    -agent: "main"
+    -comment: "FLYTHROUGH FIX — fixed 404 'Ride not found' error for seeded rides. Root cause: the udb proxy (auth.py _ScopedCollection) auto-injects user_id into every query; the previous agent's seeded ride had wrong/no user_id. Seeded a proper test ride (id=flythrough-test-001) with user_id=user_2413cce10197 (demo@roujaune.app), route_id=alpine-sunset-pass, 300 power/HR/cadence samples. ALL 5 ENDPOINTS NOW VERIFIED (demo@roujaune.app/demo9900): (1) GET /api/rides/flythrough-test-001/metrics -> 200 (avg_power=218, norm_power=225, tss=42, ftp=250). (2) GET /api/rides/flythrough-test-001/export/fit -> 200, 4214 bytes binary FIT file. (3) GET /api/rides/flythrough-test-001/share-video -> 200, 154KB MP4 (animated power curve, 12s H.264 1080x1920 9:16). (4) GET /api/rides/flythrough-test-001/flythrough -> 200, 4.0MB MP4 (3D route flythrough over Alpine Sunset Pass, 12s 20fps 1080x1920 H.264, OpenStreetMap tiles with animated progress line + rider marker + stats strip). (5) GET /api/routes/alpine-sunset-pass/geojson -> 200, 80 interpolated GPS coordinate points (Dolomites). TEST REQUEST: BACKEND ONLY (demo@roujaune.app/demo9900) — verify all 5 endpoints return 200 with correct content types and non-empty bodies; verify an invalid ride_id returns 404; verify authentication is required (401 without token). ride_id=flythrough-test-001."
+
+erg_mode_data_export:
+  - task: "FIT File Export + Power Metrics (NP/IF/TSS)"
+    implemented: true
+    working: true
+    file: "backend/services/fit_builder.py, backend/services/power_metrics.py, backend/routes/workouts.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "GET /api/rides/{id}/export/fit returns binary .FIT file with per-second records + Session NP/IF/TSS. GET /api/rides/{id}/metrics returns computed power metrics. Both verified 200 OK with demo ride."
+        -working: true
+        -agent: "testing"
+        -comment: "VERIFIED ✅ — Tested with ride_id=flythrough-test-001 (demo@roujaune.app/demo9900). (1) GET /api/rides/flythrough-test-001/metrics → 200 OK, returns all required fields: id, avg_power=218W, max_power=265W, normalized_power=225W, intensity_factor=0.88, tss=42, ftp_used=250, duration_sec=300, calories=150. (2) GET /api/rides/flythrough-test-001/export/fit → 200 OK, Content-Type: application/octet-stream, 4214 bytes binary FIT file with .FIT marker verified. (3) Negative tests: invalid ride_id returns 404, no auth token returns 401. All endpoints working correctly after user_id mismatch bug fix."
+  - task: "Social Share Video (animated power curve MP4)"
+    implemented: true
+    working: true
+    file: "backend/services/share_video.py, backend/routes/workouts.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "GET /api/rides/{id}/share-video generates 12s 1080x1920 H.264 MP4 with self-drawing power curve, HR overlay, and fading stats. Verified 200 OK, 154KB valid MP4."
+        -working: true
+        -agent: "testing"
+        -comment: "VERIFIED ✅ — Tested with ride_id=flythrough-test-001. GET /api/rides/flythrough-test-001/share-video → 200 OK, Content-Type: video/mp4, 154101 bytes (154KB) MP4 file with ftyp marker verified. Video generation took ~38 seconds. Real video generator using ffmpeg + matplotlib, NOT mocked."
+  - task: "3D Route Flythrough Video (GPS map animation MP4)"
+    implemented: true
+    working: true
+    file: "backend/services/flythrough.py, backend/services/route_gps.py, backend/routes/workouts.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        -working: true
+        -agent: "main"
+        -comment: "GET /api/rides/{id}/flythrough generates 12s 1080x1920 9:16 H.264 MP4 with OpenStreetMap satellite crop+pan, animated progress line, rider marker glow, and stats strip. 4.0MB video verified valid via ffmpeg. Also verified GET /api/routes/{id}/geojson returns GeoJSON LineString with 80 interpolated GPS points."
+        -working: true
+        -agent: "testing"
+        -comment: "VERIFIED ✅ — Tested with ride_id=flythrough-test-001, route_id=alpine-sunset-pass. (1) GET /api/rides/flythrough-test-001/flythrough → 200 OK, Content-Type: video/mp4, 4061381 bytes (4.0MB) MP4 file with ftyp marker verified. Video generation took ~41 seconds. (2) GET /api/routes/alpine-sunset-pass/geojson → 200 OK, returns GeoJSON Feature with LineString geometry containing 80 GPS coordinates (Dolomites: first=[11.869, 46.543], last=[11.648, 46.483]). Real video generator using ffmpeg + PIL + staticmap with OpenStreetMap tiles, NOT mocked."
+
+
+
+agent_communication:
+    -agent: "testing"
+    -comment: "BACKEND TESTING COMPLETE — All 8 test cases passed (32/32 assertions). Tested ERG mode data export and video generation endpoints with ride_id=flythrough-test-001 after the user_id mismatch bug fix. SUMMARY: ✅ Login successful (demo@roujaune.app/demo9900). ✅ GET /api/rides/flythrough-test-001/metrics returns 200 with all required fields (avg_power=218W, normalized_power=225W, intensity_factor=0.88, tss=42, ftp_used=250, duration_sec=300, calories=150). ✅ GET /api/rides/flythrough-test-001/export/fit returns 200, 4214 bytes binary FIT file with correct content-type and .FIT marker. ✅ GET /api/rides/flythrough-test-001/share-video returns 200, 154KB MP4 video (38s generation time, real ffmpeg+matplotlib, NOT mocked). ✅ GET /api/rides/flythrough-test-001/flythrough returns 200, 4.0MB MP4 video (41s generation time, real ffmpeg+PIL+staticmap with OpenStreetMap tiles, NOT mocked). ✅ GET /api/routes/alpine-sunset-pass/geojson returns 200, GeoJSON Feature with 80 GPS coordinates. ✅ Negative test: invalid ride_id returns 404. ✅ Negative test: no auth token returns 401. NO ISSUES FOUND. All endpoints working correctly after the bug fix. Test script: /app/test_erg_export.py."
