@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Modal, Pressable, ActivityIndicator, Platform, Linking, ScrollView, useWindowDimensions } from "react-native";
+import { View, Text, StyleSheet, Modal, Pressable, ActivityIndicator, Platform, Linking, ScrollView } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { Image } from "expo-image";
 import { captureRef } from "react-native-view-shot";
@@ -7,7 +7,7 @@ import * as Sharing from "expo-sharing";
 import * as MediaLibrary from "expo-media-library/legacy";
 import { colors, radius } from "@/src/theme";
 import { ScenicJourney, setRecapCover } from "@/src/lib/scenic-routes";
-import { ScenicRecapCard, RECAP_W, RECAP_H } from "./ScenicRecapCard";
+import { ScenicRecapCard } from "./ScenicRecapCard";
 import { CaptionEditor } from "./CaptionEditor";
 import { styleCaption, getSavedTone, CaptionTone } from "@/src/lib/caption-styles";
 
@@ -21,8 +21,6 @@ export function ScenicRecapShareModal({
   onClose: () => void;
 }) {
   const cardRef = React.useRef<View>(null);
-  const { width: winW } = useWindowDimensions();
-  const cardScale = Math.min(1, (winW - 40) / RECAP_W);
   const [busy, setBusy] = React.useState<null | "share" | "save">(null);
   const [notice, setNotice] = React.useState<{ msg: string; action?: "settings" } | null>(null);
   // Live cover override so the card updates the instant a cover is picked.
@@ -106,10 +104,8 @@ export function ScenicRecapShareModal({
         <Pressable style={StyleSheet.absoluteFill as any} onPress={onClose} accessibilityLabel="Close" />
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
           <View style={s.sheet}>
-            <View style={[s.cardWrap, { width: RECAP_W * cardScale, height: RECAP_H * cardScale }]}>
-              <View style={{ transform: [{ scale: cardScale }], transformOrigin: "top left" }}>
-                <ScenicRecapCard ref={cardRef} journey={{ ...journey, cover: cover === undefined ? journey.cover : cover }} coachName={coachName} />
-              </View>
+            <View style={s.cardWrap}>
+              <ScenicRecapCard ref={cardRef} journey={{ ...journey, cover: cover === undefined ? journey.cover : cover }} coachName={coachName} />
             </View>
 
             {coverPhotos.length > 0 ? (

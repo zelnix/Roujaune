@@ -37,9 +37,9 @@ BG_COLOR = (13, 13, 15)
 # ── Video params ────────────────────────────────────────────────────────
 FPS = 20
 DURATION_SEC = 12
-FRAME_W, FRAME_H = 1920, 1080
-MAP_DISPLAY_H = 820    # map takes most of the height in landscape
-STAT_H = FRAME_H - MAP_DISPLAY_H  # 260px stats strip at bottom
+FRAME_W, FRAME_H = 1080, 1350   # 4:5 portrait — max feed real estate
+MAP_DISPLAY_H = 1050            # map takes the top portion
+STAT_H = FRAME_H - MAP_DISPLAY_H  # 300px stats strip at bottom
 
 # Overview map: render at high resolution so we can crop sub-regions.
 OVERVIEW_W, OVERVIEW_H = 2400, 2400

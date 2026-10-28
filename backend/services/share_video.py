@@ -43,7 +43,7 @@ FAINT = "#3A3A4C"
 # ── Video params ────────────────────────────────────────────────────────
 FPS = 30
 DURATION_SEC = 12
-W, H = 1920, 1080  # 16:9 landscape
+W, H = 1080, 1350  # 4:5 portrait — max feed real estate
 DPI = 100
 
 

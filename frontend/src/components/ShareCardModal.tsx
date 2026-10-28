@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Modal, Pressable, ActivityIndicator, Platform, Linking, ScrollView, useWindowDimensions } from "react-native";
+import { View, Text, StyleSheet, Modal, Pressable, ActivityIndicator, Platform, Linking, ScrollView } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { Image } from "expo-image";
 import { captureRef } from "react-native-view-shot";
@@ -10,7 +10,7 @@ import { fetchDiscoveries } from "../lib/scenic-routes";
 import { C } from "./plan";
 import { CaptionEditor } from "./CaptionEditor";
 import { styleCaption, getSavedTone, CaptionTone } from "../lib/caption-styles";
-import { AchievementCard, AchievementCardData, CARD_W, CARD_H } from "./AchievementCard";
+import { AchievementCard, AchievementCardData } from "./AchievementCard";
 
 /** Presents the branded achievement card and lets the rider share it or save it
  * to their photo library. */
@@ -22,9 +22,6 @@ export function ShareCardModal({
   onClose: () => void;
 }) {
   const cardRef = React.useRef<View>(null);
-  const { width: winW } = useWindowDimensions();
-  // Scale the 640×360 card to fit the screen width with padding
-  const cardScale = Math.min(1, (winW - 40) / CARD_W);
   const [busy, setBusy] = React.useState<null | "share" | "save">(null);
   const [notice, setNotice] = React.useState<{ msg: string; action?: "settings" } | null>(null);
   const [bgUri, setBgUri] = React.useState<string | null>(null);
@@ -70,7 +67,7 @@ export function ShareCardModal({
       }
       const res = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true, aspect: [16, 9], quality: 0.85,
+        allowsEditing: true, aspect: [4, 5], quality: 0.85,
       });
       if (!res.canceled && res.assets?.[0]?.uri) setBgUri(res.assets[0].uri);
     } catch (e) {
@@ -138,10 +135,8 @@ export function ShareCardModal({
         <Pressable style={StyleSheet.absoluteFill as any} onPress={onClose} accessibilityLabel="Close" />
         <ScrollView contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false} bounces={false}>
         <View style={s.sheet}>
-          <View style={[s.cardWrap, { width: CARD_W * cardScale, height: CARD_H * cardScale }]}>
-            <View style={{ transform: [{ scale: cardScale }], transformOrigin: "top left" }}>
-              <AchievementCard ref={cardRef} data={{ ...data, bgUri: bgUri ?? undefined }} />
-            </View>
+          <View style={s.cardWrap}>
+            <AchievementCard ref={cardRef} data={{ ...data, bgUri: bgUri ?? undefined }} />
           </View>
 
           {data.variant === "season" ? (

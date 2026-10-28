@@ -75,21 +75,21 @@ RideShareCard.displayName = "RideShareCard";
 
 const cs = StyleSheet.create({
   card: {
-    width: 640,
-    height: 360,
+    width: 360,
+    height: 450,
     backgroundColor: "#0D0D0F",
-    borderRadius: 18,
+    borderRadius: radius.xl,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
     padding: spacing.lg,
     overflow: "hidden",
   },
-  header: { marginBottom: 24 },
-  brandRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 },
+  header: { marginBottom: 16 },
+  brandRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
   brandDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.yellow },
   brandText: { color: colors.yellow, fontSize: 12, fontWeight: "900", letterSpacing: 2 },
   workoutName: { color: colors.white, fontSize: 20, fontWeight: "900", letterSpacing: 0.3 },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 24, flex: 1 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 16, flex: 1 },
   stat: {
     minWidth: 100, flex: 1,
     backgroundColor: "rgba(255,255,255,0.04)",
