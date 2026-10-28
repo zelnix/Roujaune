@@ -2,14 +2,13 @@ import React from "react";
 import { View, Text, StyleSheet, Modal, Pressable, ScrollView } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { colors, radius, spacing } from "@/src/theme";
-import { SocialShareRow } from "./SocialShareRow";
 import { CaptionEditor } from "./CaptionEditor";
 import { styleCaption, getSavedTone, CaptionTone } from "@/src/lib/caption-styles";
 
-/** End-of-ride share sheet: same quick-share row (Instagram Story/Feed, X,
- * WhatsApp, Copy) + editable caption with tone chips, opened from the ride
- * summary so riders can post right after finishing. Presented as a centred
- * popup dialog (not a bottom sheet) so it reads clearly over the screen. */
+/** End-of-ride share sheet: editable caption with tone chips, opened from the
+ * ride summary so riders can post right after finishing. Presented as a centred
+ * popup dialog (not a bottom sheet) so it reads clearly over the screen.
+ * The Share button opens the native OS share sheet (all platforms). */
 export function RideShareSheet({
   visible, onClose, initialCaption, captionFacts, getImageUri, onMore, onNotice,
 }: {
@@ -50,13 +49,12 @@ export function RideShareSheet({
               activeTone={tone}
               onTone={captionFacts ? (t) => { setTone(t); setCaption(styleCaption(t, captionFacts)); } : undefined}
             />
-            <SocialShareRow caption={caption} getImageUri={getImageUri} onNotice={(m) => onNotice(m)} />
             <View style={st.actions}>
               <Pressable testID="ride-share-more" onPress={onMore} accessibilityRole="button"
-                accessibilityLabel="Share ride image via more apps"
+                accessibilityLabel="Share ride image"
                 style={({ pressed }: any) => [st.primaryBtn, pressed && { opacity: 0.9 }]}>
                 <Ionicons name="share-social" size={18} color="#241B00" />
-                <Text style={st.primaryText}>More…</Text>
+                <Text style={st.primaryText}>Share</Text>
               </Pressable>
               <Pressable testID="ride-share-close" onPress={onClose} accessibilityRole="button"
                 style={({ pressed }: any) => [st.secondaryBtn, pressed && { opacity: 0.85 }]}>

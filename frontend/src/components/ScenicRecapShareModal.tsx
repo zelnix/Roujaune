@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Modal, Pressable, ActivityIndicator, Platform, Linking, ScrollView } from "react-native";
+import { View, Text, StyleSheet, Modal, Pressable, ActivityIndicator, Platform, Linking, ScrollView, useWindowDimensions } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { Image } from "expo-image";
 import { captureRef } from "react-native-view-shot";
@@ -7,8 +7,7 @@ import * as Sharing from "expo-sharing";
 import * as MediaLibrary from "expo-media-library/legacy";
 import { colors, radius } from "@/src/theme";
 import { ScenicJourney, setRecapCover } from "@/src/lib/scenic-routes";
-import { ScenicRecapCard } from "./ScenicRecapCard";
-import { SocialShareRow } from "./SocialShareRow";
+import { ScenicRecapCard, RECAP_W, RECAP_H } from "./ScenicRecapCard";
 import { CaptionEditor } from "./CaptionEditor";
 import { styleCaption, getSavedTone, CaptionTone } from "@/src/lib/caption-styles";
 
@@ -22,6 +21,8 @@ export function ScenicRecapShareModal({
   onClose: () => void;
 }) {
   const cardRef = React.useRef<View>(null);
+  const { width: winW } = useWindowDimensions();
+  const cardScale = Math.min(1, (winW - 40) / RECAP_W);
   const [busy, setBusy] = React.useState<null | "share" | "save">(null);
   const [notice, setNotice] = React.useState<{ msg: string; action?: "settings" } | null>(null);
   // Live cover override so the card updates the instant a cover is picked.
@@ -105,8 +106,10 @@ export function ScenicRecapShareModal({
         <Pressable style={StyleSheet.absoluteFill as any} onPress={onClose} accessibilityLabel="Close" />
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
           <View style={s.sheet}>
-            <View style={s.cardWrap}>
-              <ScenicRecapCard ref={cardRef} journey={{ ...journey, cover: cover === undefined ? journey.cover : cover }} coachName={coachName} />
+            <View style={[s.cardWrap, { width: RECAP_W * cardScale, height: RECAP_H * cardScale }]}>
+              <View style={{ transform: [{ scale: cardScale }], transformOrigin: "top left" }}>
+                <ScenicRecapCard ref={cardRef} journey={{ ...journey, cover: cover === undefined ? journey.cover : cover }} coachName={coachName} />
+              </View>
             </View>
 
             {coverPhotos.length > 0 ? (
@@ -151,14 +154,11 @@ export function ScenicRecapShareModal({
               onTone={(t) => { setTone(t); setCaption(buildCaption(t)); }}
             />
 
-            <SocialShareRow caption={caption} getImageUri={capture} disabled={!!busy}
-              onNotice={(msg, action) => setNotice({ msg, action })} />
-
             <View style={s.actions}>
-              <Pressable testID="recap-share" onPress={onShare} disabled={!!busy} accessibilityRole="button" accessibilityLabel="Share scenic ride recap image via more apps"
+              <Pressable testID="recap-share" onPress={onShare} disabled={!!busy} accessibilityRole="button" accessibilityLabel="Share scenic ride recap image"
                 style={({ pressed }: any) => [s.primaryBtn, pressed && { opacity: 0.9 }, !!busy && { opacity: 0.6 }]}>
                 {busy === "share" ? <ActivityIndicator size="small" color="#241B00" /> : <Ionicons name="share-social" size={18} color="#241B00" />}
-                <Text style={s.primaryText}>More…</Text>
+                <Text style={s.primaryText}>Share</Text>
               </Pressable>
               <Pressable testID="recap-save" onPress={onSave} disabled={!!busy} accessibilityRole="button" accessibilityLabel="Save scenic ride recap to photos"
                 style={({ pressed }: any) => [s.secondaryBtn, pressed && s.secondaryHover, !!busy && { opacity: 0.6 }]}>
@@ -179,7 +179,7 @@ export function ScenicRecapShareModal({
 
 const s = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(6,7,7,0.9)" },
-  scroll: { flexGrow: 1, alignItems: "center", justifyContent: "center", padding: 20 },
+  scroll: { flexGrow: 1, alignItems: "center", justifyContent: "center", padding: 20, paddingVertical: 40 },
   sheet: { width: "100%", maxWidth: 440, alignItems: "center" },
   cardWrap: { borderRadius: 22, ...Platform.select({ web: { boxShadow: "0px 12px 24px rgba(0,0,0,0.5)" }, default: { shadowColor: "#000", shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 12 } }) },
   coverPicker: { alignSelf: "stretch", marginTop: 16, maxWidth: 360, width: "100%" },

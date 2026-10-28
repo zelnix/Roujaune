@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView, Image, useWindowDimensio
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useKeepAwake } from "expo-keep-awake";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { colors, radius, spacing, shadow } from "@/src/theme";
 import { useTelemetry } from "@/src/hooks/useTelemetry";
@@ -61,6 +62,8 @@ function buildSummary(
 }
 
 export default function VirtualRouteScreen() {
+  // Keep the screen awake during the virtual ride
+  useKeepAwake();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const compact = width < 820;

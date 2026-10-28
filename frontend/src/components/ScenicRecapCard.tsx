@@ -11,8 +11,8 @@ import { elevationProfile, recapCaption } from "@/src/lib/scenic-recap";
 const BG = require("../../assets/images/auth_bg_sunset.png");
 const WORDMARK = require("../../assets/images/auth_wordmark.png");
 
-export const RECAP_W = 360;
-export const RECAP_H = 588;
+export const RECAP_W = 640;
+export const RECAP_H = 360;
 
 function fmtDur(sec?: number | null): string {
   const s = Math.max(0, Math.round(sec ?? 0));
@@ -87,53 +87,65 @@ export const ScenicRecapCard = React.forwardRef<View, { journey: ScenicJourney; 
         </ImageBackground>
 
         <View style={c.inner}>
-          <Image source={WORDMARK} style={c.wordmark} contentFit="contain" />
-
-          <View style={c.thumbWrap}>
-            {(journey.cover || journey.thumbnail) ? (
-              <Image source={{ uri: (journey.cover || journey.thumbnail) as string }} style={c.thumb} contentFit="cover" />
-            ) : (
-              <View style={[c.thumb, c.thumbFallback]}><Ionicons name="image-outline" size={28} color={colors.textFaint} /></View>
-            )}
-            <LocationBadge place={journey.place} country={journey.country} />
+          {/* Top bar */}
+          <View style={c.topBar}>
+            <Image source={WORDMARK} style={c.wordmark} contentFit="contain" />
+            <Text style={c.kicker}>SCENIC JOURNEY</Text>
           </View>
 
-          <Text style={c.kicker}>SCENIC JOURNEY</Text>
-          <Text style={c.title} numberOfLines={2}>{journey.name}</Text>
-          <Text style={c.subtitle}>{fmtDate(journey.at)}</Text>
-
-          <View style={c.statsRow}>
-            <View style={c.stat}><Text style={c.statValue}>{fmtDist(journey.distance_km)}</Text><Text style={c.statLabel}>Distance</Text></View>
-            <View style={c.statDivider} />
-            <View style={c.stat}><Text style={c.statValue}>{fmtDur(journey.duration_sec)}</Text><Text style={c.statLabel}>Ride time</Text></View>
-            <View style={c.statDivider} />
-            <View style={c.stat}><Text style={c.statValue}>{discoveries.length}</Text><Text style={c.statLabel}>Discoveries</Text></View>
-          </View>
-
-          <View style={c.traceWrap}>
-            <View style={c.traceHead}>
-              <Text style={c.traceLabel}>ROUTE PROFILE</Text>
-              <Text style={c.traceClimb}>{climb}</Text>
-            </View>
-            <ElevationTrace journey={journey} width={RECAP_W - 48} height={46} />
-          </View>
-
-          {discoveries.length > 0 ? (
-            <View style={c.discWrap}>
-              {discoveries.slice(0, 3).map((d) => (
-                <View key={d.id} style={c.discRow}>
-                  <Ionicons name="bookmark" size={12} color={colors.yellow} />
-                  <Text style={c.discText} numberOfLines={1}>{d.title}</Text>
+          {/* Main body: two-column landscape */}
+          <View style={c.body}>
+            {/* Left column: cover + location */}
+            <View style={c.leftCol}>
+              <View style={c.thumbWrap}>
+                {(journey.cover || journey.thumbnail) ? (
+                  <Image source={{ uri: (journey.cover || journey.thumbnail) as string }} style={c.thumb} contentFit="cover" />
+                ) : (
+                  <View style={[c.thumb, c.thumbFallback]}><Ionicons name="image-outline" size={24} color={colors.textFaint} /></View>
+                )}
+                <LocationBadge place={journey.place} country={journey.country} />
+              </View>
+              <View style={c.traceWrap}>
+                <View style={c.traceHead}>
+                  <Text style={c.traceLabel}>PROFILE</Text>
+                  <Text style={c.traceClimb}>{climb}</Text>
                 </View>
-              ))}
-              {discoveries.length > 3 ? <Text style={c.discMore}>+{discoveries.length - 3} more discoveries</Text> : null}
+                <ElevationTrace journey={journey} width={250} height={36} />
+              </View>
             </View>
-          ) : null}
 
-          <Text style={c.caption} numberOfLines={3}>&ldquo;{caption}&rdquo;</Text>
+            {/* Right column: title + stats + discoveries */}
+            <View style={c.rightCol}>
+              <Text style={c.title} numberOfLines={2}>{journey.name}</Text>
+              <Text style={c.subtitle}>{fmtDate(journey.at)}</Text>
 
+              <View style={c.statsRow}>
+                <View style={c.stat}><Text style={c.statValue}>{fmtDist(journey.distance_km)}</Text><Text style={c.statLabel}>Distance</Text></View>
+                <View style={c.statDivider} />
+                <View style={c.stat}><Text style={c.statValue}>{fmtDur(journey.duration_sec)}</Text><Text style={c.statLabel}>Ride time</Text></View>
+                <View style={c.statDivider} />
+                <View style={c.stat}><Text style={c.statValue}>{discoveries.length}</Text><Text style={c.statLabel}>Finds</Text></View>
+              </View>
+
+              {discoveries.length > 0 ? (
+                <View style={c.discWrap}>
+                  {discoveries.slice(0, 2).map((d) => (
+                    <View key={d.id} style={c.discRow}>
+                      <Ionicons name="bookmark" size={10} color={colors.yellow} />
+                      <Text style={c.discText} numberOfLines={1}>{d.title}</Text>
+                    </View>
+                  ))}
+                  {discoveries.length > 2 ? <Text style={c.discMore}>+{discoveries.length - 2} more</Text> : null}
+                </View>
+              ) : null}
+
+              {caption ? <Text style={c.caption} numberOfLines={2}>&ldquo;{caption}&rdquo;</Text> : null}
+            </View>
+          </View>
+
+          {/* Footer */}
           <View style={c.footer}>
-            <Ionicons name="bicycle" size={15} color={colors.yellow} />
+            <Ionicons name="bicycle" size={13} color={colors.yellow} />
             <Text style={c.footerText}>ROUJAUNE Scenic Cycling · Ride, discover, remember</Text>
           </View>
         </View>
@@ -143,39 +155,43 @@ export const ScenicRecapCard = React.forwardRef<View, { journey: ScenicJourney; 
 );
 
 const c = StyleSheet.create({
-  card: { width: RECAP_W, height: RECAP_H, borderRadius: 22, overflow: "hidden", backgroundColor: colors.bg },
-  inner: { flex: 1, paddingHorizontal: 24, paddingTop: 20, paddingBottom: 18, alignItems: "center" },
-  wordmark: { width: 152, height: 23, marginBottom: 12 },
-  thumbWrap: { alignSelf: "stretch" },
-  thumb: { width: "100%", height: 114, borderRadius: 14, backgroundColor: "#0E1512", borderWidth: 1, borderColor: "rgba(255,194,10,0.28)" },
+  card: { width: RECAP_W, height: RECAP_H, borderRadius: 18, overflow: "hidden", backgroundColor: colors.bg },
+  inner: { flex: 1, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
+  topBar: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 8 },
+  wordmark: { width: 120, height: 18 },
+  kicker: { color: colors.yellow, fontSize: 9, fontWeight: "800", letterSpacing: 2 },
+  body: { flex: 1, flexDirection: "row", gap: 16 },
+  leftCol: { width: 260, justifyContent: "center" },
+  rightCol: { flex: 1, justifyContent: "center" },
+  thumbWrap: { width: "100%" },
+  thumb: { width: "100%", height: 150, borderRadius: 12, backgroundColor: "#0E1512", borderWidth: 1, borderColor: "rgba(255,194,10,0.28)" },
   thumbFallback: { alignItems: "center", justifyContent: "center" },
   locBadge: {
-    position: "absolute", left: 8, bottom: 8, flexDirection: "row", alignItems: "center", gap: 6,
+    position: "absolute", left: 6, bottom: 6, flexDirection: "row", alignItems: "center", gap: 4,
     backgroundColor: "rgba(8,10,10,0.82)", borderRadius: 999, borderWidth: 1, borderColor: "rgba(255,194,10,0.4)",
-    paddingLeft: 9, paddingRight: 12, paddingVertical: 6, maxWidth: RECAP_W - 80, overflow: "hidden",
+    paddingLeft: 7, paddingRight: 10, paddingVertical: 4, maxWidth: 220, overflow: "hidden",
   },
-  locText: { color: colors.white, fontSize: 12, fontWeight: "700" },
-  kicker: { color: colors.yellow, fontSize: 11.5, fontWeight: "800", letterSpacing: 2.5, marginTop: 13 },
-  title: { color: colors.white, fontSize: 23, fontWeight: "900", textAlign: "center", marginTop: 5, lineHeight: 27 },
-  subtitle: { color: colors.textDim, fontSize: 12.5, fontWeight: "600", marginTop: 5, textAlign: "center" },
+  locText: { color: colors.white, fontSize: 10, fontWeight: "700" },
+  traceWrap: { marginTop: 8 },
+  traceHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 2 },
+  traceLabel: { color: colors.textDim, fontSize: 8, fontWeight: "800", letterSpacing: 1.2 },
+  traceClimb: { color: colors.yellow, fontSize: 9, fontWeight: "800" },
+  title: { color: colors.white, fontSize: 18, fontWeight: "900", lineHeight: 22 },
+  subtitle: { color: colors.textDim, fontSize: 11, fontWeight: "600", marginTop: 3 },
   statsRow: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 14,
-    backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 16, borderWidth: 1,
-    borderColor: "rgba(255,194,10,0.28)", paddingVertical: 12, paddingHorizontal: 8, alignSelf: "stretch",
+    flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 10,
+    backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 12, borderWidth: 1,
+    borderColor: "rgba(255,194,10,0.28)", paddingVertical: 8, paddingHorizontal: 6,
   },
   stat: { flex: 1, alignItems: "center" },
-  statValue: { color: colors.yellow, fontSize: 18, fontWeight: "900" },
-  statLabel: { color: colors.white, fontSize: 9.5, fontWeight: "600", marginTop: 3, opacity: 0.85, textTransform: "uppercase", letterSpacing: 1 },
-  statDivider: { width: 1, height: 32, backgroundColor: "rgba(255,255,255,0.14)" },
-  traceWrap: { alignSelf: "stretch", marginTop: 14 },
-  traceHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
-  traceLabel: { color: colors.textDim, fontSize: 10, fontWeight: "800", letterSpacing: 1.4 },
-  traceClimb: { color: colors.yellow, fontSize: 11, fontWeight: "800" },
-  discWrap: { alignSelf: "stretch", marginTop: 12, gap: 6 },
-  discRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  discText: { color: "rgba(255,255,255,0.9)", fontSize: 12.5, fontWeight: "600", flex: 1 },
-  discMore: { color: colors.textDim, fontSize: 11, fontWeight: "600", marginTop: 1 },
-  caption: { color: colors.white, fontSize: 13, fontStyle: "italic", fontWeight: "600", textAlign: "center", marginTop: 14, lineHeight: 19, opacity: 0.95 },
-  footer: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: "auto", paddingTop: 12 },
-  footerText: { color: colors.textDim, fontSize: 10.5, fontWeight: "600", textAlign: "center" },
+  statValue: { color: colors.yellow, fontSize: 15, fontWeight: "900" },
+  statLabel: { color: colors.white, fontSize: 8, fontWeight: "600", marginTop: 2, opacity: 0.85, textTransform: "uppercase", letterSpacing: 0.8 },
+  statDivider: { width: 1, height: 24, backgroundColor: "rgba(255,255,255,0.14)" },
+  discWrap: { marginTop: 8, gap: 3 },
+  discRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  discText: { color: "rgba(255,255,255,0.9)", fontSize: 10.5, fontWeight: "600", flex: 1 },
+  discMore: { color: colors.textDim, fontSize: 9, fontWeight: "600" },
+  caption: { color: colors.white, fontSize: 10.5, fontStyle: "italic", fontWeight: "600", marginTop: 8, lineHeight: 15, opacity: 0.9 },
+  footer: { flexDirection: "row", alignItems: "center", gap: 6, paddingTop: 8 },
+  footerText: { color: colors.textDim, fontSize: 9, fontWeight: "600" },
 });

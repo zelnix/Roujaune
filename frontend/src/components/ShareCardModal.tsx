@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Modal, Pressable, ActivityIndicator, Platform, Linking, ScrollView } from "react-native";
+import { View, Text, StyleSheet, Modal, Pressable, ActivityIndicator, Platform, Linking, ScrollView, useWindowDimensions } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { Image } from "expo-image";
 import { captureRef } from "react-native-view-shot";
@@ -8,10 +8,9 @@ import * as MediaLibrary from "expo-media-library/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { fetchDiscoveries } from "../lib/scenic-routes";
 import { C } from "./plan";
-import { SocialShareRow } from "./SocialShareRow";
 import { CaptionEditor } from "./CaptionEditor";
 import { styleCaption, getSavedTone, CaptionTone } from "../lib/caption-styles";
-import { AchievementCard, AchievementCardData } from "./AchievementCard";
+import { AchievementCard, AchievementCardData, CARD_W, CARD_H } from "./AchievementCard";
 
 /** Presents the branded achievement card and lets the rider share it or save it
  * to their photo library. */
@@ -23,6 +22,9 @@ export function ShareCardModal({
   onClose: () => void;
 }) {
   const cardRef = React.useRef<View>(null);
+  const { width: winW } = useWindowDimensions();
+  // Scale the 640×360 card to fit the screen width with padding
+  const cardScale = Math.min(1, (winW - 40) / CARD_W);
   const [busy, setBusy] = React.useState<null | "share" | "save">(null);
   const [notice, setNotice] = React.useState<{ msg: string; action?: "settings" } | null>(null);
   const [bgUri, setBgUri] = React.useState<string | null>(null);
@@ -68,7 +70,7 @@ export function ShareCardModal({
       }
       const res = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true, aspect: [4, 5], quality: 0.85,
+        allowsEditing: true, aspect: [16, 9], quality: 0.85,
       });
       if (!res.canceled && res.assets?.[0]?.uri) setBgUri(res.assets[0].uri);
     } catch (e) {
@@ -134,9 +136,12 @@ export function ShareCardModal({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={s.backdrop}>
         <Pressable style={StyleSheet.absoluteFill as any} onPress={onClose} accessibilityLabel="Close" />
+        <ScrollView contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false} bounces={false}>
         <View style={s.sheet}>
-          <View style={s.cardWrap}>
-            <AchievementCard ref={cardRef} data={{ ...data, bgUri: bgUri ?? undefined }} />
+          <View style={[s.cardWrap, { width: CARD_W * cardScale, height: CARD_H * cardScale }]}>
+            <View style={{ transform: [{ scale: cardScale }], transformOrigin: "top left" }}>
+              <AchievementCard ref={cardRef} data={{ ...data, bgUri: bgUri ?? undefined }} />
+            </View>
           </View>
 
           {data.variant === "season" ? (
@@ -194,14 +199,11 @@ export function ShareCardModal({
             onTone={(t) => { setTone(t); setCaption(buildCaption(t)); }}
           />
 
-          <SocialShareRow caption={caption} getImageUri={capture} disabled={!!busy}
-            onNotice={(msg, action) => setNotice({ msg, action })} />
-
           <View style={s.actions}>
-            <Pressable testID="share-card-share" onPress={onShare} disabled={!!busy} accessibilityRole="button" accessibilityLabel="Share achievement card image via more apps"
+            <Pressable testID="share-card-share" onPress={onShare} disabled={!!busy} accessibilityRole="button" accessibilityLabel="Share achievement card image"
               style={({ hovered, pressed }: any) => [s.primaryBtn, (hovered || pressed) && { opacity: 0.9 }, !!busy && { opacity: 0.6 }]}>
               {busy === "share" ? <ActivityIndicator size="small" color="#241B00" /> : <Ionicons name="share-social" size={18} color="#241B00" />}
-              <Text style={s.primaryText}>More…</Text>
+              <Text style={s.primaryText}>Share</Text>
             </Pressable>
             <Pressable testID="share-card-save" onPress={onSave} disabled={!!busy} accessibilityRole="button" accessibilityLabel="Save achievement card to photos"
               style={({ hovered, pressed }: any) => [s.secondaryBtn, (hovered || pressed) && s.secondaryHover, !!busy && { opacity: 0.6 }]}>
@@ -214,13 +216,15 @@ export function ShareCardModal({
             <Text style={s.closeText}>Close</Text>
           </Pressable>
         </View>
+        </ScrollView>
       </View>
     </Modal>
   );
 }
 
 const s = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(6,7,7,0.9)", alignItems: "center", justifyContent: "center", padding: 20 },
+  backdrop: { flex: 1, backgroundColor: "rgba(6,7,7,0.9)" },
+  scrollContent: { flexGrow: 1, alignItems: "center", justifyContent: "center", padding: 20, paddingVertical: 40 },
   sheet: { width: "100%", maxWidth: 440, alignItems: "center" },
   cardWrap: { borderRadius: 22, ...Platform.select({ web: { boxShadow: "0px 12px 24px rgba(0,0,0,0.5)" }, default: { shadowColor: "#000", shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 12 } }) },
   notice: { marginTop: 16, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 12, borderWidth: 1, borderColor: C.border, paddingVertical: 10, paddingHorizontal: 14, maxWidth: 360, alignItems: "center" },
