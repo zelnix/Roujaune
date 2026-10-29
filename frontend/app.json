@@ -136,6 +136,7 @@
         }
       ],
       "./plugins/withChromeOsCompat",
+      "./plugins/withForceMediarouter",
       "expo-asset",
       "@react-native-vector-icons/ionicons",
       "@react-native-vector-icons/material-design-icons",
