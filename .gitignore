@@ -88,8 +88,5 @@ backend/.pw-browsers/
 credentials.json
 *.key
 .credentials
-.env
-.env.*
-*.env
 backend/.pw-browsers/chromium_headless_shell-1234/chrome-linux/headless_shell
 backend/.pw-browsers/chromium-1234/chrome-linux/chrome
