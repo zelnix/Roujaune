@@ -92,7 +92,8 @@
         "react-native-google-cast",
         {
           "receiverAppId": "CC1AD845",
-          "iosStartDiscoveryAfterFirstTapOnCastButton": true
+          "iosStartDiscoveryAfterFirstTapOnCastButton": true,
+          "androidPlayServicesCastFrameworkVersion": "22.1.0"
         }
       ],
       [
