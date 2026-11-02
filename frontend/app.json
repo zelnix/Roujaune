@@ -144,10 +144,23 @@
       [
         "react-native-share",
         {
-          "ios": ["instagram", "instagram-stories", "fb", "facebook-stories"],
-          "android": ["com.instagram.android", "com.facebook.katana"]
+          "ios": [
+            "instagram",
+            "instagram-stories",
+            "fb",
+            "facebook-stories"
+          ],
+          "android": [
+            "com.instagram.android",
+            "com.facebook.katana"
+          ]
         }
-      ]
+      ],
+      "expo-font",
+      "expo-image",
+      "expo-secure-store",
+      "expo-sharing",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
