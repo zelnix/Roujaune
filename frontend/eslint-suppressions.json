@@ -389,16 +389,16 @@
   },
   "app/workout.tsx": {
     "react-hooks/refs": {
-      "count": 10
+      "count": 20
     },
     "react-hooks/purity": {
-      "count": 3
+      "count": 4
     },
     "react-hooks/set-state-in-effect": {
       "count": 6
     },
     "react-hooks/immutability": {
-      "count": 4
+      "count": 5
     },
     "react-hooks/preserve-manual-memoization": {
       "count": 2
@@ -407,6 +407,24 @@
   "app/workouts.tsx": {
     "react-hooks/refs": {
       "count": 5
+    }
+  },
+  "src/components/workout/PreRideChecklist.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/hooks/useBackpedalPause.ts": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/hooks/useStaleGuard.ts": {
+    "react-hooks/purity": {
+      "count": 1
+    },
+    "react-hooks/set-state-in-effect": {
+      "count": 1
     }
   }
 }

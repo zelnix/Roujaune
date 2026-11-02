@@ -12,10 +12,10 @@ app/rider-customise.tsx(22,27): error TS2307: Cannot find module '@/src/componen
 app/scenic-ride.tsx(688,8): error TS2741: Property 'onPickEmbed' is missing in type '{ visible: boolean; source: "route" | "youtube"; onClose: () => void; onPickRoute: () => void; onPickYouTube: (id: string) => void; }' but required in type 'Props'.
 app/scenic-ride.tsx(725,30): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
 app/summary.tsx(639,28): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
-app/virtual-route.tsx(554,35): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
-app/workout.tsx(1418,30): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
-app/workout.tsx(1419,32): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
-app/workout.tsx(1446,28): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+app/virtual-route.tsx(557,35): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+app/workout.tsx(1535,30): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+app/workout.tsx(1536,32): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
+app/workout.tsx(1563,28): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
 src/components/BleSensorsPanel.tsx(200,28): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
 src/components/EmbeddedWebPlayer.tsx(114,28): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?
 src/components/FullscreenHud.tsx(191,25): error TS2551: Property 'absoluteFillObject' does not exist on type 'typeof StyleSheet'. Did you mean 'absoluteFill'?

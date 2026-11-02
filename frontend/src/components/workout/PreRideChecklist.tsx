@@ -10,11 +10,12 @@ import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
 import Ionicons from "@react-native-vector-icons/ionicons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { colors, radius, spacing } from "@/src/theme";
+import type { IoniconName } from "@/src/lib/icon-types";
 
 const DISMISS_KEY = "roujaune:preride:dismissed";
 const DISMISS_DAYS = 7;
 
-type Tip = { icon: keyof typeof Ionicons.glyphMap; title: string; body: string };
+type Tip = { icon: IoniconName; title: string; body: string };
 
 const SETUP_TIPS: Tip[] = [
   {
@@ -148,7 +149,7 @@ export function getErgCoachTip(kind: "trust" | "anticipate" | "spiral" | "smooth
 
 const s = StyleSheet.create({
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill as object,
     backgroundColor: "rgba(0,0,0,0.72)",
     justifyContent: "center",
     alignItems: "center",
