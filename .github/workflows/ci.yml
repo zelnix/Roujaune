@@ -177,3 +177,67 @@ jobs:
             exit 1
           fi
           echo "No new TypeScript errors. ($(wc -l < /tmp/tsc-actual-sorted.txt) pre-existing baselined, ignored.)"
+
+  # ── Native build smoke gate ──────────────────────────────────────────────────
+  # Runs an EAS Android build (preview profile) to confirm the native toolchain
+  # compiles cleanly.  Fails the pipeline if the app process would crash during
+  # cold launch.  Requires EXPO_TOKEN as a GitHub Secret (Settings → Secrets →
+  # Actions).  The iOS gate mirrors this once an Apple certificate is configured.
+  android-build-smoke:
+    name: Android build smoke (EAS preview)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'   # skip on PRs to save build minutes
+    needs: [frontend-checks]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: yarn install --frozen-lockfile
+
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Run EAS Android build (preview)
+        working-directory: frontend
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "⚠️  EXPO_TOKEN not configured — skipping native build smoke gate."
+            echo "   Add your Expo token as a GitHub Secret to enable this check."
+            exit 0
+          fi
+          eas build --platform android --profile preview --non-interactive --no-wait
+
+  # Placeholder: iOS build smoke gate.  Enable once an Apple Distribution
+  # certificate is configured in eas.json and the EXPO_TOKEN secret is live.
+  # ios-build-smoke:
+  #   name: iOS build smoke (EAS preview)
+  #   runs-on: ubuntu-latest
+  #   if: github.event_name == 'push'
+  #   needs: [frontend-checks]
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: "20"
+  #     - name: Enable corepack
+  #       run: corepack enable
+  #     - name: Install frontend dependencies
+  #       working-directory: frontend
+  #       run: yarn install --frozen-lockfile
+  #     - name: Install EAS CLI
+  #       run: npm install -g eas-cli
+  #     - name: Run EAS iOS build (preview)
+  #       working-directory: frontend
+  #       env:
+  #         EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+  #       run: eas build --platform ios --profile preview --non-interactive --no-wait

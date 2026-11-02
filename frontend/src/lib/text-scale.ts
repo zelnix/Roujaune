@@ -1,21 +1,19 @@
-import { Text, TextInput, StyleSheet } from "react-native";
+import { StyleSheet } from "react-native";
 
 /** Font multiplier applied when Large Text is on. */
 export const LARGE_TEXT_SCALE = 1.22;
 
 /**
- * Global Text / TextInput render patch that makes the app-wide accessibility
- * toggles work without touching hundreds of call-sites.
+ * Accessibility runtime state.  These module-level values are updated by
+ * `setA11yRuntime()` and read by components that opt-in to the a11y system
+ * (via `useA11y()` or `getA11yOverrideStyle()`).
  *
- * RN's Text/TextInput are forwardRef components, so their render function lives
- * on `.render` and can be wrapped. We read each element's own resolved style at
- * render time and append an override (which therefore wins):
- *   - Large Text:    multiply the effective fontSize (and lineHeight) by a scale
- *   - High Contrast: raise dimmed/neutral body text to full white and thicken
- *                    light weights (accent colours are left vivid on the dark UI)
- *
- * Runtime values are module-level so a single re-key at the root re-renders the
- * whole tree the instant a toggle flips.
+ * The old approach monkey-patched Text.render at module scope — an unsupported
+ * internal API that broke with Fabric/new-architecture runtimes.  The new
+ * approach is declarative: each Text/TextInput can call `getA11yOverrideStyle`
+ * for its own style prop, and the root AuthGate re-keys the Stack to force a
+ * full re-render when a toggle changes.  Screens that don't call the helper
+ * inherit the system's native font-scale instead.
  */
 let _scale = 1;
 let _contrast = false;
@@ -29,14 +27,10 @@ export function setA11yRuntime(largeText: boolean, highContrast: boolean) {
 const DEFAULT_FONT_SIZE = 14;
 const HC_WHITE = "#FFFFFF";
 
-// Neutral (grey / off-white) body-text colours we promote to full white. We
-// deliberately DON'T touch saturated accents (yellow/red/green/blue) so the
-// brand palette and status colours stay meaningful.
 function isNeutralDimColor(color: unknown): boolean {
-  if (color == null) return true; // unstyled text → default off-white on dark bg
+  if (color == null) return true;
   if (typeof color !== "string") return false;
   const c = color.trim().toLowerCase();
-  // Our theme's neutral text family: rgba(244,240,233, a<1) and #F4F0E9-ish.
   if (c.startsWith("rgba(244") || c.startsWith("rgb(244")) return true;
   if (c.startsWith("rgba(255,255,255") || c.startsWith("rgba(255, 255, 255")) return true;
   const m = c.match(/^#([0-9a-f]{6})$/);
@@ -45,7 +39,6 @@ function isNeutralDimColor(color: unknown): boolean {
     const g = parseInt(m[1].slice(2, 4), 16);
     const b = parseInt(m[1].slice(4, 6), 16);
     const max = Math.max(r, g, b), min = Math.min(r, g, b);
-    // near-grey (low saturation) → treat as neutral body text
     if (max - min <= 24) return true;
   }
   return false;
@@ -57,7 +50,14 @@ function isLightWeight(w: unknown): boolean {
   return s === "normal" || s === "400" || s === "500" || s === "300";
 }
 
-function a11yOverride(styleProp: any): Record<string, any> | null {
+/**
+ * Returns an override style object when Large Text or High Contrast is active,
+ * or null when no modification is needed.  Call from individual components:
+ *
+ *   const override = getA11yOverrideStyle(style);
+ *   return <Text style={[style, override]}>{...}</Text>;
+ */
+export function getA11yOverrideStyle(styleProp: any): Record<string, any> | null {
   if (_scale === 1 && !_contrast) return null;
   const flat = StyleSheet.flatten(styleProp) || {};
   const out: Record<string, any> = {};
@@ -74,24 +74,4 @@ function a11yOverride(styleProp: any): Record<string, any> | null {
   }
 
   return Object.keys(out).length ? out : null;
-}
-
-let patched = false;
-
-/** Install the global patch once, at module import time from the root layout. */
-export function installA11yTextPatch() {
-  if (patched) return;
-  patched = true;
-
-  for (const Comp of [Text, TextInput] as any[]) {
-    const orig = Comp.render;
-    if (typeof orig !== "function") continue;
-    Comp.render = function patchedRender(props: any, ref: any) {
-      const override = a11yOverride(props?.style);
-      if (!override) return orig.call(this, props, ref);
-      // Inject into the INPUT style so both native and react-native-web process
-      // the combined RN style normally (our override wins as it's last).
-      return orig.call(this, { ...props, style: [props?.style, override] }, ref);
-    };
-  }
 }

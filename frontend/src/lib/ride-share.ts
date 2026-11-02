@@ -6,8 +6,21 @@
  * the OS share sheet + Instagram Stories sticker API.
  */
 import { Linking } from "react-native";
-import ViewShot from "react-native-view-shot";
-import Share from "react-native-share";
+
+// Lazily load native-only modules so this file can be safely imported anywhere.
+let _ViewShot: any = null;
+function getViewShot() {
+  if (_ViewShot) return _ViewShot;
+  try { _ViewShot = require("react-native-view-shot"); } catch {}
+  return _ViewShot;
+}
+
+let _Share: any = null;
+function getShare() {
+  if (_Share) return _Share;
+  try { _Share = require("react-native-share")?.default ?? require("react-native-share"); } catch {}
+  return _Share;
+}
 
 export type ShareTarget = "instagram" | "x" | "os" | "copy";
 
@@ -15,7 +28,9 @@ export type ShareTarget = "instagram" | "x" | "os" | "copy";
 export async function captureCardAsUri(viewRef: React.RefObject<any>): Promise<string | null> {
   try {
     if (!viewRef.current) return null;
-    const uri = await ViewShot.captureRef(viewRef.current, {
+    const VS = getViewShot();
+    if (!VS) return null;
+    const uri = await VS.captureRef(viewRef.current, {
       format: "png",
       quality: 1,
       result: "tmpfile",
@@ -44,17 +59,20 @@ function buildCaption(workoutName: string, avgPower?: number | null, tss?: numbe
  */
 async function shareInstagramStory(imageUri: string): Promise<boolean> {
   try {
+    const Share = getShare();
+    if (!Share) return false;
     await Share.shareSingle({
       stickerImage: imageUri,
       backgroundBottomColor: "#0D0D0F",
       backgroundTopColor: "#1A1A2E",
       social: Share.Social.INSTAGRAM_STORIES,
-      appId: "roujaune",  // Meta app ID (for attribution)
+      appId: "roujaune",
     } as any);
     return true;
   } catch {
-    // Fallback: try generic Instagram share
     try {
+      const Share = getShare();
+      if (!Share) return false;
       await Share.shareSingle({
         url: imageUri,
         social: Share.Social.INSTAGRAM,
@@ -72,14 +90,13 @@ async function shareInstagramStory(imageUri: string): Promise<boolean> {
  */
 async function shareToX(imageUri: string, caption: string): Promise<boolean> {
   try {
-    // Try X/Twitter deep link for text first
     const url = `twitter://post?message=${encodeURIComponent(caption)}`;
     const canOpen = await Linking.canOpenURL(url);
     if (canOpen) {
       await Linking.openURL(url);
-      // The deep link only handles text — for the image, fall through to OS sheet
     }
-    // Use the OS share sheet with the image targeting X
+    const Share = getShare();
+    if (!Share) return false;
     await Share.shareSingle({
       url: imageUri,
       message: caption,
@@ -97,6 +114,8 @@ async function shareToX(imageUri: string, caption: string): Promise<boolean> {
  */
 async function shareViaOSSheet(imageUri: string, caption: string): Promise<boolean> {
   try {
+    const Share = getShare();
+    if (!Share) return false;
     await Share.open({
       url: imageUri,
       message: caption,

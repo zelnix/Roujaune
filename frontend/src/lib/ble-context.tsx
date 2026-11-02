@@ -132,12 +132,38 @@ export function BLEProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Access the single app-wide BLE connection from any screen. */
+/** Access the single app-wide BLE connection from any screen.
+ *  Returns a no-op stub if called outside a BLEProvider (e.g. before auth),
+ *  so an accidental call can never crash the app. */
 export function useBLE(): BLEContextValue {
   const ctx = useContext(BLEContext);
-  if (!ctx) throw new Error("useBLE must be used within a BLEProvider");
-  return ctx;
+  if (ctx) return ctx;
+  // No-op stub — BLE features are disabled outside the provider.
+  return NOOP_BLE;
 }
+
+const NOOP_BLE: BLEContextValue = {
+  supported: false,
+  poweredOn: false,
+  scanning: false,
+  discovered: [],
+  connected: [],
+  reconnecting: [],
+  readings: { power: null, cadence: null, hr: null, speed: null, wheelRevs: null, ts: 0 },
+  permState: "unknown" as const,
+  controlMode: null,
+  requestPermission: async () => "unknown" as const,
+  startScan: () => {},
+  stopScan: () => {},
+  connect: async () => {},
+  connectSilently: () => {},
+  disconnect: async () => {},
+  setWheelCircumferenceMm: () => {},
+  setErgTarget: () => {},
+  setResistance: () => {},
+  setSimGrade: () => {},
+  triggerSpindownCalibration: async () => false,
+} as any;
 
 const styles = StyleSheet.create({
   banner: {
