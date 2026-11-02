@@ -1,6 +1,5 @@
 import React from "react";
 import { Image, StyleProp, ViewStyle } from "react-native";
-import Rive, { RiveRef, Fit, Alignment, BindByName } from "rive-react-native";
 import {
   createRiderAnimator,
   CyclingTelemetry,
@@ -28,9 +27,32 @@ import { RiderType, BikeType, ClothingStyle, wheelCircumferenceFor } from "@/src
  * data-bound enum properties, and drives all animation values from the pure
  * telemetry engine (wheel phase uses the selected bike's circumference).
  * Falls back to the chroma-keyed sprite if the .riv/artboard fails to load.
+ *
+ * rive-react-native is lazily loaded so the app doesn't crash in Expo Go
+ * or any environment where the native module isn't linked.
  */
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- Rive loads .riv via a required asset
-const RIDERS_RIV = require("../../../assets/rive/roujaune-riders.riv");
+let _RiveModule: any = null;
+let _riveLoadError = false;
+function loadRive(): any {
+  if (_RiveModule || _riveLoadError) return _RiveModule;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    _RiveModule = require("rive-react-native");
+  } catch {
+    _riveLoadError = true;
+  }
+  return _RiveModule;
+}
+
+let _ridersRiv: any = null;
+function loadRidersRiv(): any {
+  if (_ridersRiv) return _ridersRiv;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    _ridersRiv = require("../../../assets/rive/roujaune-riders.riv");
+  } catch { /* asset may not exist yet */ }
+  return _ridersRiv;
+}
 
 export type RiveRiderProps = {
   sprite: any;                 // fallback artwork (web / load failure)
@@ -57,10 +79,17 @@ export type RiveRiderProps = {
 
 export function RiveRider(props: RiveRiderProps) {
   const { sprite, riderType, bikeType, clothingStyle, style } = props;
-  const ref = React.useRef<RiveRef>(null);
-  // Start "failed" (→ sprite fallback) whenever Rive is disabled, so the native
-  // <Rive> component is never mounted against the placeholder .riv asset.
-  const [failed, setFailed] = React.useState(!RIVE_ENABLED);
+  const riveModule = loadRive();
+  const RiveComp = riveModule?.default;
+  const Fit = riveModule?.Fit;
+  const Alignment = riveModule?.Alignment;
+  const BindByName = riveModule?.BindByName;
+  const RIDERS_RIV = loadRidersRiv();
+
+  const ref = React.useRef<any>(null);
+  // Start "failed" (→ sprite fallback) whenever Rive is disabled or unavailable,
+  // so the native <Rive> component is never mounted without its native module.
+  const [failed, setFailed] = React.useState(!RIVE_ENABLED || _riveLoadError || !RiveComp || !RIDERS_RIV);
   const prototype = RIVE_MODE === "prototype";
 
   const inputsRef = React.useRef(props);
@@ -126,15 +155,15 @@ export function RiveRider(props: RiveRiderProps) {
   }
 
   return (
-    <Rive
+    <RiveComp
       ref={ref}
       source={RIDERS_RIV}
       artboardName={prototype ? PROTOTYPE_ARTBOARD : riderArtboardFor(riderType)}
       stateMachineName={prototype ? PROTOTYPE_STATE_MACHINE : RIVE_STATE_MACHINE}
-      dataBinding={prototype ? undefined : BindByName(RIVE_VIEW_MODEL_INSTANCE)}
+      dataBinding={prototype ? undefined : BindByName?.(RIVE_VIEW_MODEL_INSTANCE)}
       autoplay
-      fit={Fit.Contain}
-      alignment={Alignment.BottomCenter}
+      fit={Fit?.Contain}
+      alignment={Alignment?.BottomCenter}
       style={style as any}
       onError={() => setFailed(true)}
     />
