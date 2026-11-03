@@ -16,6 +16,13 @@ RIDER_USER_ID = "user_greenlantern"
 ADMIN_EMAIL = os.environ.get("ADMIN_LOGIN_EMAIL", "roger.parenzee@gmail.com")
 ADMIN_PW = os.environ.get("ADMIN_LOGIN_PASSWORD", "")
 
+# Skip entire module when admin password is not available (e.g. CI without secrets)
+if not ADMIN_PW:
+    pytest.skip(
+        "ADMIN_LOGIN_PASSWORD not configured — skipping companion plan edit tests",
+        allow_module_level=True,
+    )
+
 # Pristine values (per problem statement)
 PRISTINE_W1 = {1: "20 min", 3: "25 min", 5: "30 min"}
 PRISTINE_W2 = {1: "25 min", 3: "30 min", 5: "35 min"}

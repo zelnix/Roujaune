@@ -111,6 +111,18 @@ jobs:
             --archive=backend/tests/fixtures/ci_seed.archive \
             --nsInclude='test_database.*'
 
+      - name: Create frontend .env for test suite
+        run: |
+          mkdir -p frontend
+          cat > frontend/.env <<'EOF'
+          EXPO_PUBLIC_BACKEND_URL=http://localhost:8001
+          EXPO_BACKEND_URL=http://localhost:8001
+          EXPO_PACKAGER_PROXY_URL=http://localhost:3000
+          EXPO_PACKAGER_HOSTNAME=localhost
+          EOF
+          # Strip leading whitespace from heredoc
+          sed -i 's/^[[:space:]]*//' frontend/.env
+
       - name: Start backend (uvicorn)
         run: |
           cd backend
