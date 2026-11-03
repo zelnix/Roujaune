@@ -91,12 +91,12 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
       - name: Install backend dependencies
-        run: pip install -r backend/requirements.txt
+        run: pip install --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/ -r backend/requirements.txt
 
       - name: Install MongoDB Database Tools (mongorestore)
         run: |
@@ -144,7 +144,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Enable corepack (pinned Yarn from package.json)
         run: corepack enable
@@ -193,7 +193,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Enable corepack
         run: corepack enable
@@ -228,7 +228,7 @@ jobs:
   #     - uses: actions/checkout@v4
   #     - uses: actions/setup-node@v4
   #       with:
-  #         node-version: "20"
+  #         node-version: "22"
   #     - name: Enable corepack
   #       run: corepack enable
   #     - name: Install frontend dependencies
