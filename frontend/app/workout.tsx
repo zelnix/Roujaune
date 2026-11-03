@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, useWindowDimensions, LayoutChangeEv
 import { StatusBar } from "expo-status-bar";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { useKeepAwake } from "expo-keep-awake";
+import { useSafeKeepAwake } from "@/src/hooks/useSafeKeepAwake";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@react-native-vector-icons/ionicons";
 
@@ -122,7 +122,7 @@ const TYPE_SPEED: Record<string, number> = { climbing: 20, threshold: 27, endura
 
 export default function LiveWorkout() {
   // Keep the screen awake during the entire workout session
-  useKeepAwake();
+  useSafeKeepAwake();
   const { width: winW, height } = useWindowDimensions();
   const router = useRouter();
   const params = useLocalSearchParams<{ title?: string; workoutId?: string; duration?: string; zone?: string; tss?: string }>();

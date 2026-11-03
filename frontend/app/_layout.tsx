@@ -22,6 +22,20 @@ import { useA11y } from "@/src/lib/a11y";
 // Capture recent console output for diagnostics (non-invasive wrapper).
 installLogBuffer();
 
+// Global native error handler — logs unhandled errors that would otherwise
+// cause a silent crash on native devices.  No-op on web.
+if (Platform.OS !== "web") {
+  try {
+    const origHandler = (globalThis as any).ErrorUtils?.getGlobalHandler?.();
+    (globalThis as any).ErrorUtils?.setGlobalHandler?.((error: Error, isFatal?: boolean) => {
+      console.error(`[Roujaune] Unhandled ${isFatal ? "FATAL" : "error"}:`, error?.message ?? error);
+      origHandler?.(error, isFatal);
+    });
+  } catch {
+    /* ErrorUtils not available — skip */
+  }
+}
+
 // Keep the splash visible until fonts are loaded.  Wrapped in try/catch so a
 // missing native module (or Expo Go quirks) can never kill cold start.
 try {

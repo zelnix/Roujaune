@@ -1,4 +1,4 @@
-app/_layout.tsx(72,41): error TS2322: Type 'Promise<{ shouldShowAlert: true; shouldPlaySound: true; shouldSetBadge: false; }>' is not assignable to type 'Promise<NotificationBehavior>'.
+app/_layout.tsx(86,41): error TS2322: Type 'Promise<{ shouldShowAlert: true; shouldPlaySound: true; shouldSetBadge: false; }>' is not assignable to type 'Promise<NotificationBehavior>'.
 app/calendar.tsx(347,130): error TS2345: Argument of type 'ScheduledWorkout' is not assignable to parameter of type '{ id?: string | undefined; workout_id?: string | undefined; title?: string | undefined; duration?: string | undefined; zone?: string | undefined; tss?: string | undefined; status?: SessionStatus | undefined; }'.
 app/climb/[id].tsx(30,44): error TS2537: Type 'ClimbDetailAttempt[] | undefined' has no matching index signature for type 'number'.
 app/climb/[id].tsx(31,22): error TS7006: Parameter 'p' implicitly has an 'any' type.
