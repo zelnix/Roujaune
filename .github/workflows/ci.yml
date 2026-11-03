@@ -96,13 +96,7 @@ jobs:
           cache-dependency-path: backend/requirements.txt
 
       - name: Install backend dependencies
-        run: |
-          # Install litellm first from the custom URL (pinned .whl),
-          # then install the rest with --extra-index-url for emergentintegrations.
-          # This avoids pip's resolver conflict between the URL-pinned litellm
-          # and emergentintegrations' own litellm dependency.
-          pip install "litellm @ https://customer-assets.emergentagent.com/internal-asset/library/litellm-1.80.0-py3-none-any.whl#sha256=adf398c513273de9341f61822296c6b2145f7f2dc4a69daf3ac04829f5bde3f8"
-          pip install --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/ -r backend/requirements.txt
+        run: pip install --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/ -r backend/requirements.txt
 
       - name: Install MongoDB Database Tools (mongorestore)
         run: |
