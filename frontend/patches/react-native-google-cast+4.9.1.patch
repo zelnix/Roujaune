@@ -1,0 +1,36 @@
+diff --git a/node_modules/react-native-google-cast/lib/commonjs/plugin/withAndroidGoogleCast.js b/node_modules/react-native-google-cast/lib/commonjs/plugin/withAndroidGoogleCast.js
+index 92cf07c..84de991 100644
+--- a/node_modules/react-native-google-cast/lib/commonjs/plugin/withAndroidGoogleCast.js
++++ b/node_modules/react-native-google-cast/lib/commonjs/plugin/withAndroidGoogleCast.js
+@@ -15,11 +15,11 @@ const META_PROVIDER_CLASS = 'com.google.android.gms.cast.framework.OPTIONS_PROVI
+ const META_RECEIVER_APP_ID = 'com.reactnative.googlecast.RECEIVER_APPLICATION_ID';
+ const MAIN_ACTIVITY_LANGUAGES = {
+   java: {
+-    code: 'RNGCCastContext.getSharedInstance(this)',
++    code: 'try { RNGCCastContext.getSharedInstance(this); } catch (Throwable _ignored) { /* Cast unavailable */ }',
+     anchor: /super\.onCreate\(\w+\)/
+   },
+   kt: {
+-    code: 'RNGCCastContext.getSharedInstance(this)',
++    code: 'try { RNGCCastContext.getSharedInstance(this) } catch (_: Throwable) { /* Cast unavailable */ }',
+     anchor: /super\.onCreate\(\w+\)/
+   }
+ };
+diff --git a/node_modules/react-native-google-cast/lib/module/plugin/withAndroidGoogleCast.js b/node_modules/react-native-google-cast/lib/module/plugin/withAndroidGoogleCast.js
+index e96d08b..8268d04 100644
+--- a/node_modules/react-native-google-cast/lib/module/plugin/withAndroidGoogleCast.js
++++ b/node_modules/react-native-google-cast/lib/module/plugin/withAndroidGoogleCast.js
+@@ -9,11 +9,11 @@ const META_PROVIDER_CLASS = 'com.google.android.gms.cast.framework.OPTIONS_PROVI
+ const META_RECEIVER_APP_ID = 'com.reactnative.googlecast.RECEIVER_APPLICATION_ID';
+ const MAIN_ACTIVITY_LANGUAGES = {
+   java: {
+-    code: 'RNGCCastContext.getSharedInstance(this)',
++    code: 'try { RNGCCastContext.getSharedInstance(this); } catch (Throwable _ignored) { /* Cast unavailable */ }',
+     anchor: /super\.onCreate\(\w+\)/
+   },
+   kt: {
+-    code: 'RNGCCastContext.getSharedInstance(this)',
++    code: 'try { RNGCCastContext.getSharedInstance(this) } catch (_: Throwable) { /* Cast unavailable */ }',
+     anchor: /super\.onCreate\(\w+\)/
+   }
+ };

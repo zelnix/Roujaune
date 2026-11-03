@@ -4,10 +4,11 @@
   "version": "1.0.0",
   "scripts": {
     "preinstall": "./scripts/cmd-guard.js --preinstall",
+    "postinstall": "npx patch-package",
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint"
   },
@@ -85,6 +86,7 @@
     "eslint": "9.25.0",
     "eslint-config-expo": "~57.0.2",
     "expo-doctor": "1.19.8",
+    "patch-package": "8.0.1",
     "typescript": "~6.0.3"
   },
   "resolutions": {

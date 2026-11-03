@@ -96,6 +96,7 @@
           "androidPlayServicesCastFrameworkVersion": "22.1.0"
         }
       ],
+      "./plugins/withSafeCastInit.js",
       [
         "expo-build-properties",
         {
